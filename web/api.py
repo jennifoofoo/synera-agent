@@ -15,6 +15,24 @@ from starter_agent.building_map import DOOR_PREFIX, OUTSIDE, BuildingMap, MapErr
 COORD_DIGITS = 2
 
 
+class RecordingMap(BuildingMap):
+    """A BuildingMap that also remembers the arguments of its last route, so the page can redraw the chat
+    agent's route with its via stops (RouteResult does not keep them). Survives deepcopy like any attribute."""
+
+    last_route_request: dict | None = None
+
+    def route(self, start: str, destination: str, step_free: bool = False, via: list[str] | None = None):
+        result = super().route(start, destination, step_free, via)
+        self.last_route_request = {
+            "start": start,
+            "destination": destination,
+            "step_free": step_free,
+            "via": [str(stop) for stop in via or [] if stop],
+            "result": result,
+        }
+        return result
+
+
 @dataclass
 class Session:
     """One loaded building plus what the page needs to remember about it."""
@@ -23,6 +41,7 @@ class Session:
     directory: Path
     map: BuildingMap
     route_request: dict | None = None
+    route_version: int = 0  # bumped by every route the page asks for or clears; newer page routes win
     original_opening_ids: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
@@ -33,16 +52,22 @@ class Session:
         """Doors added on the page or by the chat agent (both edit the same BuildingMap)."""
         return [opening_id for opening_id in self.map.openings if opening_id not in self.original_opening_ids]
 
-    def adopt_agent_route(self, previous_route: object) -> None:
-        """If the chat agent routed, show its route on the map (via stops are not kept by RouteResult)."""
+    def adopt_agent_route(self, previous_route: object, version_before_chat: int) -> bool:
+        """If the chat agent routed, show its route on the map, with its via stops when the map recorded them.
+        A route the page asked for while the agent was thinking is newer and stays. Returns whether it adopted."""
         route = self.map.last_route
-        if route is not None and route is not previous_route:
-            self.route_request = {
-                "start": route.start_space_id,
-                "destination": route.destination_space_id,
-                "step_free": route.step_free,
-                "via": [],
-            }
+        if route is None or route is previous_route or self.route_version != version_before_chat:
+            return False
+        recorded = getattr(self.map, "last_route_request", None)
+        via = recorded["via"] if recorded and recorded.get("result") is route else []
+        self.route_request = {
+            "start": route.start_space_id,
+            "destination": route.destination_space_id,
+            "step_free": route.step_free,
+            "via": via,
+        }
+        self.route_version += 1
+        return True
 
 
 # ---------- building list ----------
@@ -186,12 +211,25 @@ def opening_summary(bm: BuildingMap, opening_id: str) -> dict:
 
 
 def route_view(session: Session, start: str, destination: str, step_free: bool = False, via=None) -> dict:
-    """Shortest route plus per-floor polylines (room anchor -> door -> room anchor) and floor changes."""
-    bm = session.map
+    """A route the page asks for: remembered (newest wins over the chat agent's), then drawn."""
     via = [stop for stop in via or [] if stop]
     # Remember the request even if it fails, so the page shows "no route" instead of a stale line.
     session.route_request = {"start": start, "destination": destination, "step_free": step_free, "via": via}
-    result = bm.route(start, destination, step_free=step_free, via=via)
+    session.route_version += 1
+    return draw_route(session, start, destination, step_free, via)
+
+
+def draw_route(session: Session, start: str, destination: str, step_free: bool, via: list[str]) -> dict:
+    """Shortest route plus per-floor polylines (room anchor -> door -> room anchor) and floor changes.
+    Leaves map.last_route alone: that slot belongs to the chat agent, so redrawing never looks like a new agent route."""
+    bm = session.map
+    kept_route, kept_request = bm.last_route, getattr(bm, "last_route_request", None)
+    try:
+        result = bm.route(start, destination, step_free=step_free, via=via)
+    finally:
+        bm.last_route = kept_route
+        if isinstance(bm, RecordingMap):
+            bm.last_route_request = kept_request
     stops = [result.start_space_id, *[bm.resolve_space(stop) for stop in via], result.destination_space_id]
     nodes = route_nodes(bm, stops, step_free)
     geometry = route_geometry(bm, nodes, step_free)
@@ -215,7 +253,7 @@ def current_route(session: Session) -> dict | None:
         return None
     request = session.route_request
     try:
-        return route_view(session, request["start"], request["destination"], request["step_free"], request["via"])
+        return draw_route(session, request["start"], request["destination"], request["step_free"], request["via"])
     except MapError as error:
         return {"ok": False, "error": str(error), **request}
 
@@ -336,5 +374,6 @@ def add_door(session: Session, first: str, second: str, step_free: bool = True) 
 
 def clear_route(session: Session) -> dict:
     session.route_request = None
+    session.route_version += 1
     session.map.last_route = None
     return {"state": state_view(session)}
