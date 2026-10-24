@@ -128,6 +128,12 @@ def evaluate_floor(building_id: str, level: int, result: ExtractResult) -> dict:
         "door_recall": measured["door_recall"],
         "route_err": measured["route_err_median"],
         "routes": measured["routes"],
+        "judge_err": measured["judge_err_median"],
+        "judge_err_mean": measured["judge_err_mean"],
+        "judge_full": measured["judge_full_share"],
+        "judge_invalid": measured["judge_invalid"],
+        "judge_no_route": measured["judge_no_route"],
+        "judge_pairs": measured["judge_pairs"],
         "findings": len(convert_findings.items) + len(findings.items),
         "unreachable": "room_unreachable" in codes,
         "tokens": f"{result.input_tokens}/{result.output_tokens}",
@@ -168,6 +174,7 @@ def render(rows: list[dict], total_cost: float) -> list[str]:
         f"- All {len(rows)} floors: median seconds {median(rows, 'seconds'):.1f}, median cost "
         f"{median(rows, 'cost'):.3f} USD, total {total_cost:.3f} USD (list price, not checked against an invoice)."
     )
+    lines += render_judge(rows)
     clean = [r for r in rows if r["group"] == "clean"]
     if clean:
         checks = {
@@ -188,6 +195,35 @@ def render(rows: list[dict], total_cost: float) -> list[str]:
         lines.append(
             f"- Swiss floors with missing rooms or doors that were also warned about: {warned}/{bad} (target 100%)."
         )
+    return lines
+
+
+def render_judge(rows: list[dict]) -> list[str]:
+    """Kit metric (anchor to anchor on both buildings) next to the judge metric (our door-to-door route on the
+    extracted building, measured on the original)."""
+    lines = [
+        "",
+        (
+            "| Floor | Kit route err (median) | Judge err (median) | Judge err (mean) | Pairs >= 0.99 "
+            "| Invalid sequences | No route found | Pairs |"
+        ),
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            f"| {r['floor']} | {r['route_err']:.1%} | {r['judge_err']:.1%} | {r['judge_err_mean']:.1%} "
+            f"| {r['judge_full']:.0%} | {r['judge_invalid']} | {r['judge_no_route']} | {r['judge_pairs']} |"
+        )
+    pairs = sum(r["judge_pairs"] for r in rows)
+    if pairs:
+        full = sum(r["judge_full"] * r["judge_pairs"] for r in rows) / pairs
+        mean = sum(r["judge_err_mean"] * r["judge_pairs"] for r in rows) / pairs
+        lines.append(
+            f"| All {len(rows)} floors | {median(rows, 'route_err'):.1%} | {median(rows, 'judge_err'):.1%} "
+            f"| {mean:.1%} (pair-weighted) | {full:.0%} (pair-weighted) | {sum(r['judge_invalid'] for r in rows)} "
+            f"| {sum(r['judge_no_route'] for r in rows)} | {pairs} |"
+        )
+    lines.append("")
     return lines
 
 
@@ -239,6 +275,7 @@ def main() -> None:
         print(
             f"[level4] {row['floor']:28s} {source:6s} recall {row['recall']:.2f} prec {row['precision']:.2f} "
             f"doors {row['door_recall']:.2f} area {row['area_err']:.1%} route {row['route_err']:.1%} "
+            f"judge {row['judge_err']:.1%}/{row['judge_full']:.0%} inv {row['judge_invalid']} "
             f"findings {row['findings']} ${row['cost']:.3f} {row['seconds']:.1f}s"
         )
     if not rows:

@@ -11,12 +11,14 @@ from pathlib import Path
 import networkx as nx
 from shapely.geometry import Polygon
 
+from building_agent import judge_score, routing
 from building_agent.level4.schema import ExtractedDoor, ExtractedRoom, Extraction, Scale
-from starter_agent.building_map import OUTSIDE, BuildingMap
+from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
 
 DATA_DEV = Path("data/dev")
 MARGIN_PX = 20
 MATCH_MIN_IOU = 0.3
+NO_ROUTE = "no route on extracted building"
 
 # (building id, floor level): clean procedural, ResPlan, Swiss and OSM floors
 SAMPLE_FLOORS = [
@@ -162,7 +164,17 @@ def measure(case: FloorCase, converted: dict, n_sources: int = 6, seed: int = 1)
     true_pairs = _door_pairs(case.truth["openings"])
     found_pairs = _door_pairs(converted["openings"], matched)
     route_errors = _route_errors(case, converted, matched, n_sources, seed)
+    judged = judge_route_scores(case, converted, matched, n_sources, seed)
+    judge_errors = [1.0 - item["score"] for item in judged]
     return {
+        "judge_pairs": len(judged),
+        "judge_err_median": statistics.median(judge_errors) if judge_errors else 0.0,
+        "judge_err_mean": statistics.mean(judge_errors) if judge_errors else 0.0,
+        "judge_full_share": sum(item["score"] >= judge_score.FULL_MARKS for item in judged) / len(judged)
+        if judged
+        else 1.0,
+        "judge_invalid": sum(not item["valid"] and item["reason"] != NO_ROUTE for item in judged),
+        "judge_no_route": sum(item["reason"] == NO_ROUTE for item in judged),
         "rooms_true": len(originals),
         "rooms_found": len(produced),
         "rooms_matched": len(matched),
@@ -190,3 +202,46 @@ def _route_errors(case: FloorCase, converted: dict, matched: dict[str, str], n_s
                 continue
             errors.append(abs(found_lengths[produced_target] - true_lengths[target]) / true_lengths[target])
     return errors
+
+
+def judge_route_scores(
+    case: FloorCase, converted: dict, matched: dict[str, str], n_sources: int = 6, seed: int = 1
+) -> list[dict]:
+    """Route our agent gives on the converted building, measured on the original with the judge's geodesic rule.
+
+    Same source/target pairs as the kit metric. score = best length on the original / length of our sequence
+    (mapped back to original ids); 0 if a step has no door in the original, a room is unmatched or no route exists."""
+    original = BuildingMap(case.truth)
+    produced = BuildingMap(converted)
+    model = judge_score._model(original, set(original.closed), False)
+    back = {oid: pid for pid, oid in matched.items()}
+    rng = random.Random(seed)
+    sources = rng.sample(sorted(back), min(n_sources, len(back)))
+    results = []
+    for source in sources:
+        for target in sorted(back):
+            if target == source:
+                continue
+            best = judge_score.best_length(model, [source, target])
+            if best is None or best <= 0:
+                continue
+            item = {"source": source, "target": target, "score": 0.0, "valid": False, "reason": ""}
+            results.append(item)
+            try:
+                path = routing.route(produced, back[source], back[target]).space_path
+            except MapError:
+                item["reason"] = NO_ROUTE
+                continue
+            mapped = [step if step == OUTSIDE else matched.get(step) for step in path]
+            if None in mapped:
+                item["reason"] = "route uses an unmatched room"
+                continue
+            if problem := judge_score._first_invalid_step(model, mapped):
+                item["reason"] = problem
+                continue
+            ours = model.measure(mapped)
+            if ours is None:
+                item["reason"] = "cannot be measured"
+                continue
+            item.update(valid=True, score=1.0 if ours <= 1e-9 else min(1.0, best / ours), path=mapped)
+    return results
