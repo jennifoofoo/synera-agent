@@ -6,8 +6,8 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-API_PORT="${API_PORT:-8765}"
-TWIN_PORT="${TWIN_PORT:-5181}"
+API_PORT="${API_PORT:-8780}"
+TWIN_PORT="${TWIN_PORT:-5185}"
 
 if ! command -v cloudflared >/dev/null; then
   echo "cloudflared is missing. Install it with: brew install cloudflared" >&2
