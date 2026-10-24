@@ -126,6 +126,7 @@ button.x:hover { color: var(--text); }
 
 /* ===== Phone (owner: mobile session) ===== */
 .worker .dock { bottom: 10px; width: calc(100vw - 16px); }
+.worker .pill { top: 58px; right: 10px; }
 .worker .card-actions button, .worker .omnibox-input .mic { min-height: 44px; }
 .worker .rail-floor, .worker .rail-toggle { width: 40px; height: 40px; min-height: 40px; }
 @media (pointer: coarse) { button { min-height: 40px; } }

@@ -12,6 +12,10 @@ interface Props {
   flat?: boolean;
 }
 
+const centre = new THREE.Vector3();
+const LABEL_PX = 150; // typical label width on screen
+const MIN_ROOM_PX = 56; // a room narrower than this on screen gets no label
+
 /** Drops labels whose anchors sit too close to an already kept one (metres), so they never overlap. */
 function cullOverlaps<T extends { anchor: [number, number] }>(items: T[], minDistance: number): T[] {
   const kept: T[] = [];
@@ -21,39 +25,37 @@ function cullOverlaps<T extends { anchor: [number, number] }>(items: T[], minDis
   return kept;
 }
 
-const centre = new THREE.Vector3();
-
-/** Names on the focused floor, by distance: far away only stairs and lifts, closer the biggest rooms, close up
- * every named room (capped). Labels sit above the room anchor and never take pointer events. */
+/** Room names on the focused floor. What is shown depends on the scale (metres per screen pixel): far away only
+ * lifts and stairs, closer the rooms that are wide enough to carry a label, never overlapping. */
 export function Labels({ floor, model, y, limit, flat = false }: Props) {
-  const [tier, setTier] = useState(0);
-  useFrame(({ camera }) => {
-    const size = floor.bounds.size;
-    let next: number;
+  const [scale, setScale] = useState(1); // metres per pixel, quantised so labels only re-flow on real zoom changes
+  useFrame(({ camera, size }) => {
+    let metresPerPixel: number;
     if ((camera as THREE.OrthographicCamera).isOrthographicCamera) {
-      // metres per screen pixel decide what is readable in the plan
       const ortho = camera as THREE.OrthographicCamera;
-      const metresPerPixel = (ortho.right - ortho.left) / ortho.zoom / Math.max(1, window.innerWidth);
-      next = metresPerPixel > 0.6 ? 0 : metresPerPixel > 0.25 ? 1 : 2;
+      metresPerPixel = (ortho.right - ortho.left) / ortho.zoom / Math.max(1, size.width);
     } else {
+      const perspective = camera as THREE.PerspectiveCamera;
       centre.set(floor.bounds.cx, y, -floor.bounds.cy);
       const distance = camera.position.distanceTo(centre);
-      next = distance > size * 1.7 ? 0 : distance > size * 0.9 ? 1 : 2;
+      metresPerPixel = (2 * distance * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) / Math.max(1, size.height);
     }
-    if (next !== tier) setTier(next);
+    const quantised = Math.pow(2, Math.round(Math.log2(Math.max(1e-3, metresPerPixel)) * 2) / 2);
+    if (quantised !== scale) setScale(quantised);
   });
   const labelled = useMemo(() => {
     const named = floor.spaces.filter((space) => space.name && space.type !== "outdoor");
-    const connectors = named.filter((space) => model.connectorBySpace.has(space.id)).slice(0, 12);
-    const rooms = named
-      .filter((space) => !model.connectorBySpace.has(space.id) && space.type !== "corridor")
-      .sort((a, b) => b.area_m2 - a.area_m2);
+    const connectors = named.filter((space) => model.connectorBySpace.has(space.id));
     const lifts = connectors.filter((space) => model.connectorBySpace.get(space.id)?.kind === "lift");
-    const size = floor.bounds.size;
-    const chosen =
-      tier === 0 ? lifts.slice(0, 4) : tier === 1 ? [...connectors.slice(0, 8), ...rooms.slice(0, Math.min(10, limit))] : [...connectors, ...rooms.slice(0, limit)];
-    return cullOverlaps(chosen, tier === 0 ? size * 0.08 : tier === 1 ? size * 0.05 : flat ? 2.5 : 3.5);
-  }, [floor, model, limit, tier, flat]);
+    const minWidth = MIN_ROOM_PX * scale;
+    const rooms = named
+      .filter((space) => !model.connectorBySpace.has(space.id) && space.type !== "corridor" && Math.sqrt(space.area_m2) >= minWidth)
+      .sort((a, b) => b.area_m2 - a.area_m2)
+      .slice(0, limit);
+    const far = floor.bounds.size / scale < 700; // the whole floor is under ~700 px wide
+    const chosen = far ? [...lifts.slice(0, 4), ...rooms.slice(0, 6)] : [...connectors.slice(0, 12), ...rooms];
+    return cullOverlaps(chosen, LABEL_PX * scale * (flat ? 0.9 : 1.1));
+  }, [floor, model, limit, scale, flat]);
   return (
     <group position-y={y + 0.5}>
       {labelled.map((space) => (
