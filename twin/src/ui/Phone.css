@@ -1,0 +1,94 @@
+/* ===== Phone (owner: mobile session). Worker profile only; everything is scoped to .worker or .phone-*. ===== */
+
+html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+.worker { -webkit-tap-highlight-color: transparent; }
+.worker canvas { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.worker button { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+
+/* the app is the visual viewport: no page scroll, no rubber band, the input stays above the keyboard */
+.app.worker {
+  position: fixed; left: 0; right: 0; top: var(--vvtop, 0px);
+  height: 100vh; height: 100dvh; height: var(--vvh, 100dvh);
+  overflow: hidden; overscroll-behavior: none;
+}
+
+/* header: Back · name · Search, one 44 px row under the notch */
+.worker { --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); --head-y: calc(var(--safe-t) + 8px); }
+.phone-back, .phone-search {
+  position: absolute; top: var(--head-y); z-index: 4; width: 44px; height: 44px; min-height: 44px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.phone-back { left: calc(var(--safe-l) + 8px); }
+.phone-search { right: calc(var(--safe-r) + 8px); }
+.worker .topbar { top: var(--head-y); left: calc(var(--safe-l) + 60px); right: calc(var(--safe-r) + 60px); display: flex; justify-content: center; }
+.worker .building-name { height: 44px; max-width: 100%; padding: 0 14px; font-size: 16px; }
+.worker .building-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.worker .building-name select { font-size: 16px; }
+.worker .pill { top: calc(var(--head-y) + 52px); right: calc(var(--safe-r) + 8px); }
+.worker .pill button { min-height: 36px; padding: 4px 12px; }
+
+/* floors: left edge, 44 px, scrolls when the phone is on its side */
+.worker .floorrail {
+  top: calc(var(--head-y) + 56px); left: calc(var(--safe-l) + 8px); gap: 4px;
+  max-height: calc(var(--vvh, 100dvh) - var(--head-y) - 56px - var(--dock-h, 90px) - 16px);
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+}
+.worker .floorrail::-webkit-scrollbar { display: none; }
+.worker .rail-floor, .worker .rail-toggle { width: 44px; height: 44px; min-height: 44px; flex: none; font-size: 15px; }
+
+/* bottom: sheet above one big input, in thumb reach, above the home indicator */
+.worker .dock {
+  bottom: calc(var(--safe-b) + 8px); width: auto; left: calc(var(--safe-l) + 8px); right: calc(var(--safe-r) + 8px);
+  transform: none; gap: 8px;
+}
+.keyboard-open .worker .dock { bottom: 8px; }
+.worker .omnibox-input { min-height: 60px; padding: 6px 8px 6px 6px; gap: 8px; }
+.worker .omnibox-input input { font-size: 17px; padding: 10px 4px; }
+.worker .omnibox-input .mic { width: 48px; min-width: 48px; height: 48px; min-height: 48px; font-size: 20px; }
+.worker .hits { max-height: 38vh; max-height: calc(var(--vvh, 100dvh) * 0.38); overflow-y: auto; overscroll-behavior: contain; }
+.worker .hits button { min-height: 48px; font-size: 15px; align-items: center; }
+.worker .card { font-size: 15px; }
+.worker .card-line, .worker .card-who { font-size: 14px; }
+.worker .card-actions { gap: 8px; }
+.worker .card-actions button { min-height: 44px; flex: 1 1 auto; font-size: 15px; }
+.worker button.x { width: 44px; min-width: 44px; min-height: 44px; margin: -8px -8px -8px 0; font-size: 22px; }
+
+/* the sheet */
+.phone-sheet {
+  position: relative; border-radius: 18px; background: var(--panel-solid); border: 1px solid var(--line);
+  box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.35); overflow: hidden;
+  max-height: 45vh; max-height: calc(var(--vvh, 100dvh) * 0.45);
+  display: flex; flex-direction: column; animation: phone-sheet-in 180ms ease-out;
+}
+.phone-sheet.dragging { transition: none; }
+.phone-sheet:not(.dragging) { transition: transform 160ms ease-out; }
+.phone-sheet .sheet-grip { flex: none; height: 22px; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: grab; }
+.phone-sheet .sheet-handle { width: 44px; min-height: 22px; height: 22px; padding: 0; border: 0; background: transparent; position: relative; }
+.phone-sheet .sheet-handle::after { content: ""; position: absolute; left: 4px; right: 4px; top: 8px; height: 5px; border-radius: 3px; background: rgba(159, 182, 209, 0.5); }
+.phone-sheet .sheet-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
+/* the card inside the sheet: the sheet is the surface */
+.phone-sheet .card { background: transparent; border: 0; box-shadow: none; padding: 0 14px 12px; border-radius: 0; }
+.phone-sheet .card-text { max-height: none; overflow: visible; }
+.phone-sheet.peek { max-height: 96px; cursor: pointer; }
+.phone-sheet.peek .sheet-body { overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent); }
+@keyframes phone-sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* touch screens: no sticky hover, tooltips are not the only label */
+@media (hover: none) {
+  .worker button:hover { background: rgba(255, 255, 255, 0.05); }
+  .worker button.active:hover { background: rgba(227, 180, 90, 0.18); }
+  .worker .rail-floor.active:hover { background: rgba(227, 180, 90, 0.22); }
+}
+
+/* phone on its side: input bottom right, narrower, the sheet may use more of the short screen */
+@media (orientation: landscape) and (max-height: 520px) {
+  .worker .dock { left: auto; width: min(460px, 58vw); }
+  .worker .phone-sheet { max-height: calc(var(--vvh, 100dvh) * 0.6); }
+  .worker .omnibox-input { min-height: 54px; }
+  .worker .hits { max-height: calc(var(--vvh, 100dvh) * 0.45); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone-sheet, .phone-sheet:not(.dragging) { animation: none; transition: none; }
+}

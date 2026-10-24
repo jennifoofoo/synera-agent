@@ -1,11 +1,98 @@
-// TODO (phone session, branch claude/twin-phone): phone glue, replaces this stub. Renders only on worker:
-// Back + Search 44 px header buttons, CSS vars --vvh/--vvtop/--dock-h, html.keyboard-open, audio unlock on the
-// first tap, wake lock while state.guide.active, bottom-sheet card. Rules: twin/MOBILE.md. Styles: Phone.css.
+// Phone glue (owner: mobile session). Mounted once in App; renders only on the worker profile.
+// - header buttons: Back (one step back) left of the name, Search (focuses the one input) on the right
+// - viewport: --vvh/--vvtop follow the visual viewport so the input stays above the iOS keyboard
+// - audio unlock on the first tap, screen wake lock while a guide is active
 
+import { useEffect } from "react";
 import { useTwin } from "../store";
+import { installAudioUnlock, keepAwake } from "../voice";
+import "./Phone.css";
+
+let audioUnlockInstalled = false;
+
+function useVisualViewport() {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const update = () => {
+      if (Math.abs(vv.scale - 1) > 0.01) return; // pinch zoom: leave the layout alone
+      root.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+      root.style.setProperty("--vvtop", `${Math.round(vv.offsetTop)}px`);
+      root.classList.toggle("keyboard-open", window.innerHeight - vv.height > 120);
+      if (window.scrollY) window.scrollTo(0, 0);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+}
+
+/** --dock-h: how much of the bottom the input (and sheet) cover; the floor rail stops above it. */
+function useDockHeight(worker: boolean) {
+  useEffect(() => {
+    const dock = document.querySelector<HTMLElement>(".dock");
+    if (!dock || !worker) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => root.style.setProperty("--dock-h", `${Math.round(dock.getBoundingClientRect().height)}px`));
+    observer.observe(dock);
+    return () => observer.disconnect();
+  }, [worker]);
+}
 
 export function Phone() {
-  const profile = useTwin((s) => s.profile);
-  if (profile !== "worker") return null;
-  return null; // stub
+  const worker = useTwin((s) => s.profile === "worker");
+  const guiding = useTwin((s) => !!s.state?.guide?.active);
+  const selection = useTwin((s) => s.selection);
+  const replyShown = useTwin((s) => s.replyShown);
+  const floorMode = useTwin((s) => s.floorMode);
+  const model = useTwin((s) => s.model);
+
+  useVisualViewport();
+  useDockHeight(worker);
+  useEffect(() => {
+    if (audioUnlockInstalled) return;
+    audioUnlockInstalled = true;
+    installAudioUnlock();
+  }, []);
+  useEffect(() => {
+    keepAwake("guiding", guiding);
+    return () => keepAwake("guiding", false);
+  }, [guiding]);
+
+  if (!worker || !model) return null;
+
+  // One step back: close the card, then the reply, then leave single-floor, then the home view.
+  const back = () => {
+    const s = useTwin.getState();
+    if (s.selection) s.select(null);
+    else if (s.replyShown) s.dismissReply();
+    else if (s.floorMode !== "stacked") s.setFloorMode("stacked");
+    else s.requestCamera({ kind: "home" });
+  };
+  const backLabel = selection ? "Close" : replyShown ? "Dismiss reply" : floorMode !== "stacked" ? "All floors" : "Home view";
+
+  return (
+    <>
+      <button className="phone-back" onClick={back} aria-label={backLabel}>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+          <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <button
+        className="phone-search"
+        aria-label="Search"
+        onClick={() => document.querySelector<HTMLInputElement>(".omnibox-input input")?.focus()}
+      >
+        <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden>
+          <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
+          <path d="M15.5 15.5L20 20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+        </svg>
+      </button>
+    </>
+  );
 }
