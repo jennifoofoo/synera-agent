@@ -53,7 +53,7 @@ Legs: `legsFromRoute` cuts the route at every `floor_change`. Those legs end wit
 3. `position`: `useWalkMotion.estimate` only. `HereDot` draws it as the blue dot with a soft ring (radius grows with 10 % of the metres since the last confirmation, at least 1.5 m) and a small "estimated" label. It is never written to `state.position`, never sent as `here`, never put into a request.
 4. Steps follow the estimate: the route's step lines are mapped onto the route metres (`buildPlan`: each floor stretch is shared out over its "Walk about N m" lines in proportion to N). When the estimate passes the end of a line, the guide moves on like the Next button, and the existing speech says the new line. It only moves forward by itself.
 5. `legEnded` at stairs or a lift: the guide shows the "Take/Use …" line and waits ("Waiting here. Tap Next once you are through."). Next, "next" by voice or "Hey Wanda, next" moves the step past the ride, and that calls `walk.next()`.
-6. `arrived`: "You should be about there." (shown, and spoken when voice is on). While the switch is on, the step line "You have arrived at X" becomes "X should be about here", and hands-free "how far" says "About N metres left".
+6. `arrived`: "You should be about there." (shown, and spoken when voice is on). While the switch is on, the step line "You have arrived at X" becomes "X should be about here", and hands-free "how far" says "About N metres left". `offRoute` shows the quiet hint "Looks like you turned around?" (no reroute).
 7. Corrections: "I'm here", dragging the dot, or a position set by voice (any real change of `state.position`) calls `resetTo({ point, floorId }, { calibrate: true })`; the step follows the estimate both ways then. Next/Back by hand move the estimate to the start of that step (no calibration).
 8. Distance left in the sheet is the module's `distanceLeftM` ("about N m left") while it runs.
 9. Stops on End route, Done, Esc, building change, a new route, switch off and guide stop.
@@ -89,7 +89,7 @@ Phone: `scripts/build_twin.sh`, then `scripts/tunnel.sh` (needs `brew install cl
 6. Walk 20 steps at normal pace and count them yourself: the app's count should be within ±2.
 7. Walk a straight corridor of known length: the "m left" should be within 10 %. Note the difference.
 8. At the stairs: the dot stops, the sheet shows the stairs line and "Waiting here". Walk the stairs, then tap Next (or say "Hey Wanda, next"): the dot is at the start of the next floor.
-9. Turn around and walk 5 steps back: `offRoute` appears and the dot stops. Turn again and it moves on.
+9. Turn around and walk 5 steps back: the sheet says "Looks like you turned around?" and the dot stops. Turn again and it moves on.
 10. Tap the plan where you really are and press "I'm here" (or drag the dot): the dot jumps there and the step follows. Walk on and check that the drift is smaller.
 11. Phone in a trouser pocket, repeat step 6.
 12. At the end the sheet says "You should be about there.", never "you have arrived". Switch off and back on: it remembers the switch.

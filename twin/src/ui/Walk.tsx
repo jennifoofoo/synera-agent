@@ -139,9 +139,9 @@ export function Walk() {
             </button>
           )}
         </div>
-        {(motionNotice || estimate?.atConnector) && (
+        {(motionNotice || estimate?.atConnector || estimate?.offRoute) && (
           <p className="walk-motion-note" role="status" aria-live="polite">
-            {estimate?.atConnector ? "Waiting here. Tap Next once you are through." : motionNotice}
+            {estimate?.atConnector ? "Waiting here. Tap Next once you are through." : estimate?.offRoute ? "Looks like you turned around?" : motionNotice}
           </p>
         )}
         {list && (
