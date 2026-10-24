@@ -1,9 +1,10 @@
-// The one input: "Ask or search…". Typing shows hits (rooms, things, stairs/lifts, floors) and an "Ask" row;
-// picking a hit flies there and selects it, Enter on a sentence asks the building (the reply shows in the Card).
+// The one input: "Ask or search…". Typing completes the best match inline as grey ghost text (rooms, things,
+// stairs/lifts, floors); Enter, → or a tap on the ghost flies there and selects it. Enter on a sentence asks the
+// building (the reply shows in the Card). A list of matches only on a laptop, with ↓ or Cmd/Ctrl+K.
 // Voice in via the mic (push-to-talk), replies to spoken questions are spoken back (mute toggle).
 // Owner: chat/search session, see ARCHITECTURE.md.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Fuse from "fuse.js";
 import { floorLabel } from "../model/model";
 import { prettyType } from "../model/palette";
@@ -30,6 +31,34 @@ const QUESTION_START =
 const VOICE_PREF = "twin.voiceOut";
 const MAX_HITS = 6;
 
+// Card session's "Route here → Where are you?" mode; read defensively until the store has it.
+interface PickingStore {
+  pickingStartFor?: string | null;
+  pickStart?: (spaceId: string, floorId: string) => Promise<void> | void;
+  cancelPickStart?: () => void;
+}
+const picking = () => useTwin.getState() as unknown as PickingStore;
+
+const coarsePointer = () => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+
+const KIND_RANK: Record<Hit["kind"], number> = { room: 0, connector: 1, thing: 2, floor: 3 };
+
+/** The one best completion: a title that starts with the text wins (rooms first, then shorter), else fuse's best. */
+function bestCompletion(hits: Hit[], fuse: Fuse<Hit>, query: string): Hit | null {
+  const lower = query.toLowerCase();
+  let best: Hit | null = null;
+  for (const hit of hits) {
+    if (!hit.title.toLowerCase().startsWith(lower)) continue;
+    if (
+      !best ||
+      KIND_RANK[hit.kind] < KIND_RANK[best.kind] ||
+      (KIND_RANK[hit.kind] === KIND_RANK[best.kind] && hit.title.length < best.title.length)
+    )
+      best = hit;
+  }
+  return best ?? fuse.search(query, { limit: 1 })[0]?.item ?? null;
+}
+
 function looksLikeQuestion(text: string): boolean {
   const trimmed = text.trim();
   return trimmed.includes("?") || trimmed.split(/\s+/).length > 3 || QUESTION_START.test(trimmed);
@@ -49,6 +78,7 @@ export function Omnibox() {
   const select = useTwin((s) => s.select);
   const focusFloor = useTwin((s) => s.focusFloor);
   const requestCamera = useTwin((s) => s.requestCamera);
+  const pickingFor = useTwin((s) => (s as unknown as PickingStore).pickingStartFor ?? null);
 
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
@@ -104,7 +134,7 @@ export function Omnibox() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const hits = useMemo<Hit[]>(() => {
+  const allHits = useMemo<Hit[]>(() => {
     if (!model) return [];
     const floorName = (id: string) => {
       const floor = model.floorById.get(id);
@@ -144,6 +174,16 @@ export function Omnibox() {
       })),
     ];
   }, [model]);
+  // While picking a start, only rooms and stairs/lifts make sense.
+  const hits = useMemo(
+    () => (pickingFor ? allHits.filter((hit) => hit.kind === "room" || hit.kind === "connector") : allHits),
+    [allHits, pickingFor],
+  );
+
+  // Focus the input when the card asks "Where are you?".
+  useEffect(() => {
+    if (pickingFor) inputRef.current?.focus();
+  }, [pickingFor]);
 
   const fuse = useMemo(
     () =>
@@ -160,7 +200,14 @@ export function Omnibox() {
   );
 
   const query = text.trim();
-  const question = looksLikeQuestion(query);
+  const question = !pickingFor && looksLikeQuestion(query);
+  const completion = useMemo(() => (query && !question ? bestCompletion(hits, fuse, query) : null), [hits, fuse, query, question]);
+  // Ghost text after the typed text: the rest of the title, or "→ title" when the match is not a prefix.
+  const ghost = completion
+    ? completion.title.toLowerCase().startsWith(text.toLowerCase())
+      ? completion.title.slice(text.length)
+      : `  → ${completion.title}`
+    : "";
   const rows = useMemo<Row[]>(() => {
     if (!query) return [];
     const found = fuse.search(query, { limit: question ? 3 : MAX_HITS }).map<Row>((result) => ({ kind: "hit", hit: result.item }));
@@ -173,6 +220,11 @@ export function Omnibox() {
     setText("");
     setOpen(false);
     inputRef.current?.blur();
+    if (picking().pickingStartFor) {
+      // "Where are you?": set the position and start the route, no card in between (card session's action).
+      void picking().pickStart?.(hit.id, hit.floorId);
+      return;
+    }
     if (hit.kind === "floor") {
       select(null);
       focusFloor(hit.floorId);
@@ -190,6 +242,10 @@ export function Omnibox() {
   const submit = useCallback(
     async (message: string, voice = false) => {
       if (!message.trim() || useTwin.getState().chatBusy) return;
+      if (picking().pickingStartFor) {
+        setNotice("Type a room name, then pick it.");
+        return;
+      }
       if (!useTwin.getState().chatAvailable) {
         setNotice("Asking is off: the server has no agent key. Search still works.");
         return;
@@ -267,8 +323,24 @@ export function Omnibox() {
     return result.slice(-5).reverse();
   }, [chat]);
 
-  const showRows = open && rows.length > 0 && !listening && !busy;
-  const placeholder = listening ? "Listening…" : chatAvailable ? "Ask or search…" : "Search rooms and things…";
+  const showRows = open && rows.length > 0 && !listening && !busy && !coarsePointer();
+  const placeholder = listening
+    ? "Listening…"
+    : pickingFor
+      ? "Where are you?"
+      : chatAvailable
+        ? "Ask or search…"
+        : "Search rooms and things…";
+  const showGhost = !!ghost && !listening && !showRows;
+
+  // The ghost text sits exactly over the input: copy its font and padding (the phone CSS changes them).
+  const [ghostStyle, setGhostStyle] = useState<CSSProperties>({});
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!showGhost || !input) return;
+    const css = getComputedStyle(input);
+    setGhostStyle({ font: css.font, letterSpacing: css.letterSpacing, padding: css.padding });
+  }, [showGhost]);
 
   return (
     <div className="omnibox" ref={rootRef}>
@@ -348,42 +420,60 @@ export function Omnibox() {
         onSubmit={(event) => {
           event.preventDefault();
           if (!query) return;
-          pick(rows[active] ?? { kind: "ask" });
+          if (showRows) pick(rows[active] ?? { kind: "ask" });
+          else if (completion) go(completion);
+          else void submit(query);
         }}
       >
-        <input
-          ref={inputRef}
-          value={listening ? heard : text}
-          onChange={(event) => {
-            setText(event.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown" && rows.length) {
-              event.preventDefault();
-              setOpen(true);
-              setActive((index) => (index + 1) % rows.length);
-            } else if (event.key === "ArrowUp" && rows.length) {
-              event.preventDefault();
-              setActive((index) => (index - 1 + rows.length) % rows.length);
-            } else if (event.key === "Escape") {
-              if (text) setText("");
-              else inputRef.current?.blur();
-              setOpen(false);
-              stopSpeaking();
-            }
-          }}
-          placeholder={placeholder}
-          aria-label="Ask or search"
-          aria-expanded={showRows}
-          aria-controls="ob-hits"
-          role="combobox"
-          autoComplete="off"
-          autoCorrect="off"
-          enterKeyHint={question ? "send" : "search"}
-          readOnly={listening}
-        />
+        <div className="ob-field">
+          {showGhost && (
+            <div className="ob-ghost" aria-hidden style={ghostStyle}>
+              <span className="ob-typed">{text}</span>
+              <span className="ob-suggest" onPointerDown={(event) => event.preventDefault()} onClick={() => completion && go(completion)}>
+                {ghost}
+              </span>
+            </div>
+          )}
+          <input
+            ref={inputRef}
+            value={listening ? heard : text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              const input = event.currentTarget;
+              const atEnd = input.selectionStart === input.value.length && input.selectionEnd === input.value.length;
+              if ((event.key === "ArrowRight" || event.key === "Tab") && atEnd && completion && !showRows) {
+                event.preventDefault();
+                go(completion);
+              } else if (event.key === "ArrowDown" && rows.length && !coarsePointer()) {
+                event.preventDefault();
+                if (!open) {
+                  setOpen(true);
+                  setActive(0);
+                } else setActive((index) => (index + 1) % rows.length);
+              } else if (event.key === "ArrowUp" && rows.length && showRows) {
+                event.preventDefault();
+                setActive((index) => (index - 1 + rows.length) % rows.length);
+              } else if (event.key === "Escape") {
+                if (open) setOpen(false);
+                else if (text) setText("");
+                else {
+                  inputRef.current?.blur();
+                  if (picking().pickingStartFor) picking().cancelPickStart?.();
+                }
+                stopSpeaking();
+              }
+            }}
+            placeholder={placeholder}
+            aria-label="Ask or search"
+            aria-expanded={showRows}
+            aria-controls="ob-hits"
+            role="combobox"
+            autoComplete="off"
+            autoCorrect="off"
+            enterKeyHint={question ? "send" : "search"}
+            readOnly={listening}
+          />
+        </div>
         {pairs.length > 1 && (
           <button
             type="button"
