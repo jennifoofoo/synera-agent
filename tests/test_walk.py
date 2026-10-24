@@ -222,9 +222,19 @@ def test_yes_and_guide_me_start_guiding_from_the_overview(said):
     assert walking.intent(said, "overview") == "guide"
 
 
-@pytest.mark.parametrize("said", ["no", "nein", "no thanks", "banana", "", "ok", "next"])
-def test_no_and_noise_do_not_start_guiding(said):
+@pytest.mark.parametrize("said", ["banana", "", "ok", "next"])
+def test_noise_does_not_start_guiding(said):
     assert walking.intent(said, "overview") is None
+
+
+@pytest.mark.parametrize("said", ["no", "nein", "no thanks", "not now", "stop"])
+def test_no_ends_the_offer(said, setup):
+    _bm, state, tools, start, end = setup
+    call(tools, "give_directions", start=start, destination=end)
+    result = call(tools, "walk", said=said)
+    assert result["mode"] == "stopped" and "not guide" in result["note"] and "landmarks" not in result
+    assert state.walk.mode == "stopped"
+    assert call(tools, "walk", said="guide me")["mode"] == "guided"  # the route stays, a later yes still works
 
 
 def test_where_do_i_go_again_repeats_the_step_with_the_destination_without_advancing(setup):
@@ -480,3 +490,53 @@ def test_closing_a_connector_that_ties_with_the_route_is_still_unaffected(setup)
     done = confirm_close(tools, state, other["id"])
     assert done["walk_update"] == {"route_unaffected": True}
     assert state.walk.index == 1
+
+
+def test_plain_routes_repeat_in_full_after_find_route_too(setup):
+    bm, state, tools, _start, _end = setup
+    pair = next(
+        (a, b)
+        for a in bm.spaces
+        for b in bm.spaces
+        if a != b and OUTSIDE not in (a, b) and len(routing.route(bm, a, b).space_path) == 2
+    )
+    first = call(tools, "find_route", start=pair[0], destination=pair[1])
+    again = call(tools, "repeat_steps")
+    assert state.walk.mode == "plain" and again["mode"] == "plain" and again["steps"] == state.walk.steps
+    assert call(tools, "walk", said="where do I go again")["say_destination"] is True
+    assert call(tools, "next_steps")["done"] is True
+    assert first["length_m"] == again["length_m"]
+
+
+def test_find_route_asks_first_while_guiding_like_give_directions(setup):
+    bm, state, tools, start, end = setup
+    guided(setup)
+    other = next(s for s in bm.spaces if s not in (start, end) and bm.spaces[s]["type"] == "room")
+    asked = call(tools, "find_route", start=start, destination=other)
+    assert asked["needs_confirmation"] is True and bm.spaces[end]["name"] in asked["question"]
+    assert state.walk.mode == "guided" and state.walk.destination == end
+    same = call(tools, "find_route", start=start, destination=end)  # the same destination is no conflict
+    assert "needs_confirmation" not in same
+    guided(setup)
+    replaced = call(tools, "find_route", start=start, destination=other, replace_guide=True)
+    assert replaced["destination_space_id"] == other and state.walk.destination == other
+
+
+def test_following_the_route_does_not_replace_the_last_route(setup):
+    bm, state, tools, _start, _end = setup
+    guided(setup)
+    asked_for = bm.last_route
+    assert asked_for is not None
+    call(tools, "next_steps")
+    call(tools, "next_steps")
+    connector = connector_ahead(bm, state)
+    call(tools, "set_position", place=f"I'm at the {connector['name']}")
+    assert bm.last_route is asked_for
+    off = next(s for s, space in bm.spaces.items() if space["type"] == "room" and s not in state.walk.spaces)
+    names = [space["name"] for space in bm.spaces.values()]
+    if names.count(bm.spaces[off]["name"]) == 1:
+        call(tools, "set_position", place=bm.spaces[off]["name"])
+        assert bm.last_route is asked_for
+    other = next(c for c in bm.connectors.values() if c["id"] != connector["id"])
+    confirm_close(tools, state, other["id"])
+    assert bm.last_route is asked_for

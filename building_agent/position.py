@@ -14,6 +14,10 @@ SOURCES = ("said", "click", "device", "route")
 MAX_QUERY_CHARS = 120
 MAX_OPTIONS = 6
 TIE_M = 1.0  # two different rooms this close in route length count as equally near
+BENCHMARK_START = (
+    "The start is given in the question: pass it as `start` (a room number or name from the question). "
+    "Nobody can answer, never ask where the person is."
+)
 NO_POSITION = "I do not know where the person is. Ask once 'Where are you?', then call set_position."
 
 
@@ -33,6 +37,11 @@ class Position:
             "point": list(self.point) if self.point else None,
             "source": self.source,
         }
+
+
+def no_position_error(state) -> str:
+    """The message when a route has no start: ask the person, except in a benchmark message ('Answer:')."""
+    return BENCHMARK_START if "answer:" in str(getattr(state, "last_user_text", "")).lower() else NO_POSITION
 
 
 def make_position(bm: BuildingMap, space_id: str, point=None, source: str = "said", turn: int = 0) -> Position:

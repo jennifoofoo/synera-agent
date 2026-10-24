@@ -18,12 +18,12 @@ from building_agent.guide_tools import GuideState, building_signature, make_guid
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
-from building_agent.position import NO_POSITION
+from building_agent.position import no_position_error
 from building_agent.position_tools import distance_annotator, make_position_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
 from building_agent.task_tools import make_task_tools
-from building_agent.walk import remember_route
+from building_agent.walk import guide_conflict, remember_route
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 from starter_agent.tools import make_tools as make_starter_tools
@@ -127,7 +127,11 @@ def make_tools(
 
     @beta_tool
     def find_route(
-        destination: str, start: str | None = None, step_free: bool = False, via: list[str] | None = None
+        destination: str,
+        start: str | None = None,
+        step_free: bool = False,
+        via: list[str] | None = None,
+        replace_guide: bool = False,
     ) -> str:
         """Shortest walking route between two places, with step-by-step directions and length in metres.
 
@@ -137,10 +141,14 @@ def make_tools(
                 the person's position (see set_position) and say so (start_assumed).
             step_free: True to avoid stairs and steps (wheelchair, trolley, pram).
             via: Optional list of places to visit in order between start and destination (multi-stop tour).
+            replace_guide: True only after the person agreed to drop the route they are being guided on.
         """
         if start is None and guide.position is None:
-            raise ToolError(NO_POSITION)
+            raise ToolError(no_position_error(guide))
         try:
+            conflict = guide_conflict(bm, guide, bm.resolve_space(destination), replace_guide)
+            if conflict is not None:
+                return as_json(conflict)
             result = routing.route(bm, guide.position.space_id if start is None else start, destination, step_free, via)
             remember_route(bm, guide, result, [bm.resolve_space(stop) for stop in via or []])
             guide.signature = building_signature(bm)

@@ -12,11 +12,11 @@ from building_agent.find_space import find_space
 from building_agent.find_tools import find_asset, words_of
 from building_agent.position import (
     MAX_OPTIONS,
-    NO_POSITION,
     describe_position,
     lengths_from,
     make_position,
     nearest,
+    no_position_error,
 )
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -153,7 +153,7 @@ def make_position_tools(bm: BuildingMap, state) -> list:
         device, route) and how many messages ago. Use it to name your assumption before a route or when the
         person asks where you think they are."""
         if state.position is None:
-            raise ToolError(NO_POSITION)
+            raise ToolError(no_position_error(state))
         return as_json(describe_position(bm, state.position, state.turn))
 
     @beta_tool
@@ -174,7 +174,7 @@ def make_position_tools(bm: BuildingMap, state) -> list:
             step_free: True for a wheelchair, pram or trolley.
         """
         if state.position is None:
-            raise ToolError(NO_POSITION)
+            raise ToolError(no_position_error(state))
         try:
             return as_json(nearest(bm, state.position, what, floor_level, exclude, step_free))
         except MapError as error:

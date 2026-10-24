@@ -127,6 +127,7 @@ class Agent(StarterAgent):
     def ask(self, user_text: str) -> str:
         """If the API call dies mid-turn, drop the half-written turn so the conversation stays valid."""
         self.guide.begin_turn()
+        self.guide.last_user_text = user_text
         mark = len(self.messages)
         try:
             return super().ask(user_text)

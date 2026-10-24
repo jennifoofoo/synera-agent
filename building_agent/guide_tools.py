@@ -14,7 +14,8 @@ from building_agent import edit_ops, routing
 from building_agent import walk as walking
 from building_agent.directions import DirectionsSession
 from building_agent.impact import analyse
-from building_agent.position import NO_POSITION, Position
+from building_agent.position import Position, no_position_error
+from building_agent.time_words import SCHEDULED_REPLY, names_a_time, when_is_later
 from building_agent.walk import Walk
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -51,6 +52,7 @@ class GuideState:
     log: list[dict] = field(default_factory=list)
     undo: deque = field(default_factory=lambda: deque(maxlen=UNDO_DEPTH))
     position: Position | None = None  # where the person stands; only the server sets it, one per conversation
+    last_user_text: str = ""  # the person's latest message, set by the agent: guards read it, not the model
     walk: Walk | None = None  # the route handed out last: room sequence, mode (overview, guided), current step
 
     def begin_turn(self) -> None:
@@ -296,18 +298,13 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 (the tool returns needs_confirmation when another destination is being guided).
         """
         if start is None and state.position is None:
-            raise ToolError(NO_POSITION)
+            raise ToolError(no_position_error(state))
         old = state.walk if state.walk is not None and state.walk.mode != "plain" else None
         try:
             target = bm.resolve_space(destination)
-            if old is not None and old.mode == "guided" and target != old.destination and not replace_guide:
-                return as_json(
-                    {
-                        "needs_confirmation": True,
-                        "question": f"I am guiding you to {bm.spaces[old.destination]['name']}. "
-                        f"Do you want to go to {bm.spaces[target]['name']} instead?",
-                    }
-                )
+            conflict = walking.guide_conflict(bm, state, target, replace_guide)
+            if conflict is not None:
+                return as_json(conflict)
             route = routing.route(bm, state.position.space_id if start is None else start, destination, step_free, via)
             walk = walking.remember_route(bm, state, route, [bm.resolve_space(stop) for stop in via or []])
             state.session = None
@@ -395,6 +392,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         Args:
             element: Name or id of the lift, staircase, door or room that is closed.
         """
+        if names_a_time(state.last_user_text):  # a closure for later cannot be scheduled: never close it now
+            return as_json(SCHEDULED_REPLY)
         try:
             target = bm.find_element(element)
         except MapError as error:
@@ -441,16 +440,11 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 a corner or a wall, back against the wall), {"near": "<room or asset>"} or {"point": [x, y]}
                 (metres, inside the room), plus optional {"rotation_deg": n}.
             when: Any time the person named for the change ("tomorrow", "from Monday", "next week", "morgen", "ab
-                Montag"). Scheduling does not exist: pass it and nothing is changed or proposed.
+                Montag"). Scheduling does not exist: pass it and nothing is changed or proposed. Not for now, today, jetzt or heute.
         """
-        if when and when.strip():
-            return as_json(
-                {
-                    "scheduled": False,
-                    "note": "The building can only be changed now, scheduling does not exist. Tell the person, "
-                    "offer to make the change now (then propose it) or to leave it. Change nothing.",
-                }
-            )
+        if when_is_later(when) or names_a_time(state.last_user_text):  # decided on the person's own words too
+            state.pending = None
+            return as_json(SCHEDULED_REPLY)
         if action not in ACTIONS:
             raise ToolError(f"action must be one of {ACTIONS}.")
         if state.pending is not None and state.pending.turn == state.turn:

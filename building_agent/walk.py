@@ -61,6 +61,18 @@ def spoken(text: str) -> str:
     return ID_IN_BRACKETS.sub("", text)
 
 
+def guide_conflict(bm: BuildingMap, state, target: str, replace: bool) -> dict | None:
+    """A second route while one is being guided asks first. None when the new route may go ahead."""
+    old = state.walk
+    if old is None or old.mode != "guided" or replace or target == old.destination:
+        return None
+    return {
+        "needs_confirmation": True,
+        "question": f"I am guiding you to {bm.spaces[old.destination]['name']}. "
+        f"Do you want to go to {bm.spaces[target]['name']} instead?",
+    }
+
+
 def room_positions(spaces: list[str], rooms: list[list[str]]) -> list[int]:
     """For each step, where on the room sequence the person stands before it (a room may occur twice)."""
     found, at = [], 0
@@ -218,8 +230,11 @@ def intent(said: str, mode: str) -> str | None:
             if action == "advance" and mode == "overview":
                 break
             return action
-    if mode == "overview" and re.search(YES, text) and not re.search(r"\b(no|nein|nicht)\b", text):
-        return "guide"
+    if mode == "overview":
+        if re.search(r"\b(no|nope|nein|nicht|no thanks|not now)\b", text):
+            return "decline"
+        if re.search(YES, text):
+            return "guide"
     return None
 
 
@@ -250,8 +265,19 @@ def apply(bm: BuildingMap, state, said: str) -> dict:
         walk.mode = "overview"
         return overview_payload(bm, walk)
     if walk.mode == "plain":
+        if action in ("repeat", "repeat_destination"):  # all steps again, in the same words
+            return {
+                "mode": "plain",
+                "steps": walk.steps,
+                "length_m": walk.length_m,
+                "destination": name_of(bm, walk.destination),
+                **({"say_destination": True} if action == "repeat_destination" else {}),
+            }
         return {"mode": "plain", "steps": [], "done": True, "note": "All steps were already given."}
     if walk.mode == "overview":
+        if action in ("stop", "decline"):
+            walk.mode = "stopped"
+            return {"mode": "stopped", "note": "No guiding. Say once that you will not guide; the route stays."}
         return {**overview_payload(bm, walk), "note": "Guiding has not started. Ask the offer, wait for a clear yes."}
     if walk.mode == "stopped":
         if action == "restart":
@@ -337,11 +363,14 @@ def follow(bm: BuildingMap, state, space_id: str) -> dict | None:
         return {"on_route": False}
     after = ahead[ahead.index(space_id) + 1 :] if on_route else ahead
     via_ahead = [stop for stop in walk.via if stop in after]
+    kept = bm.last_route  # the page keeps drawing the route that was asked for, not the rest of it
     try:
         fresh = routing.route(bm, space_id, walk.destination, walk.step_free, via_ahead or None)
     except MapError as error:
         state.walk = None
         return {"on_route": on_route, "note": str(error)}
+    finally:
+        bm.last_route = kept
     state.walk = build_walk(bm, fresh, via_ahead, walk.mode if walk.mode != "stopped" else "plain")
     if on_route:
         state.position = make_position(bm, space_id, None, "route", state.turn)
@@ -410,6 +439,7 @@ def after_change(bm: BuildingMap, state, before_left: float | None) -> dict | No
     here = room_at(walk, walk.index)
     ahead = walk.spaces[room_index(walk) :]
     via_ahead = [stop for stop in walk.via if stop in ahead[1:]]
+    kept = bm.last_route
     try:
         fresh = routing.route(bm, here, walk.destination, walk.step_free, via_ahead or None)
     except MapError as error:
@@ -418,6 +448,8 @@ def after_change(bm: BuildingMap, state, before_left: float | None) -> dict | No
             "note": f"{error} Say so honestly and offer the alternative if there is one.",
             "alternative": alternative(bm, state, walk),
         }
+    finally:
+        bm.last_route = kept
     same_length = before_left is None or abs(fresh.length_m - before_left) < 0.01
     if same_length and path_is_open(bm, ahead, walk.step_free):  # a tie to another way does not count as a change
         walk.left_cache.clear()
