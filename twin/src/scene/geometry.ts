@@ -177,7 +177,7 @@ class Builder {
 type Gap = [Point, Point];
 
 const PERP_TOL = 0.35; // a gap cuts an edge that runs within this distance of it
-const SHARED_TOL = 0.15; // two polygon edges count as one shared boundary within this distance
+const SHARED_TOL = 0.35; // two polygon edges count as one shared boundary within this distance
 const DOOR_REACH = 0.8; // a door or entrance belongs to the polygon edge within this distance of its position
 
 function pointOnEdge(a: Point, b: Point, s: number): Point {
@@ -261,7 +261,13 @@ function keptPieces(a: Point, b: Point, gaps: Gap[]): [number, number][] {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const length = Math.hypot(dx, dy);
-  if (length < 0.05 || !gaps.length) return [[0, 1]];
+  if (!gaps.length) return [[0, 1]];
+  if (length < 0.05) {
+    // A stub (data noise at a corner): its direction means nothing, so it goes when it sits inside a gap.
+    const mid: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const inside = gaps.some(([p, q]) => nearestOnEdge(p, q, mid).distance <= PERP_TOL);
+    return inside ? [] : [[0, 1]];
+  }
   const cuts: [number, number][] = [];
   for (const [p, q] of gaps) {
     const off = (r: Point) => Math.abs((r[0] - a[0]) * dy - (r[1] - a[1]) * dx) / length;
