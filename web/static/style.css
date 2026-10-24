@@ -84,6 +84,7 @@ button.danger { background: #fff; color: var(--closed); border-color: var(--clos
 button.ok { background: #fff; color: var(--added); border-color: var(--added); }
 button.link { background: none; border: 0; color: var(--accent); padding: 4px 6px; }
 button.small { padding: 3px 8px; font-size: 12px; }
+button:disabled { opacity: .45; cursor: not-allowed; }
 
 .side { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
 .tabs { display: flex; border-bottom: 1px solid var(--line); }
@@ -228,4 +229,53 @@ ol.steps li.floor-change { font-weight: 600; }
   .topbar { padding: 8px 12px; }
   .floor-tabs .name { display: none; }
   .anim-caption { top: auto; bottom: 14px; }
+}
+
+/* New building from floor plans (plan.js) */
+.new-building { margin-left: auto; }
+.draft-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 4; background: #fff7e6; color: #8a5a00; border: 1px solid #f3c77a; padding: 6px 12px; border-radius: 8px; font-size: 13px; white-space: nowrap; max-width: calc(100% - 120px); overflow: hidden; text-overflow: ellipsis; }
+.draft-banner button { margin-left: 6px; }
+.plan-step { display: flex; flex-direction: column; gap: 10px; }
+.plan-step[hidden], .plan-card[hidden], .draft-banner[hidden] { display: none; }
+.plan-step .row { display: flex; gap: 8px; align-items: center; }
+.plan-step .row.wrap { flex-wrap: wrap; }
+.drop { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 16px; text-align: center; color: var(--muted); cursor: pointer; background: #fbfaf7; }
+.drop.over, .drop:hover { border-color: var(--accent); color: var(--ink); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop b { color: var(--ink); }
+.plan-floors { display: flex; flex-direction: column; gap: 8px; }
+.plan-floor { display: grid; grid-template-columns: 64px 1fr auto; gap: 4px 10px; align-items: start; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+.plan-floor img { width: 64px; height: 64px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 4px; grid-row: span 2; }
+.plan-floor .file { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-floor .fields { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; }
+.plan-floor input[type=number] { width: 70px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.plan-floor select { padding: 3px 4px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 12px; }
+.plan-floor .remove { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 0 4px; }
+.plan-floor .check { display: inline-flex; align-items: center; gap: 4px; }
+.plan-floor .error { grid-column: 1 / -1; color: var(--closed); font-size: 12px; }
+.plan-name { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.plan-name input { padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.why { background: #f1f5fe; padding: 8px 10px; border-radius: 8px; }
+.progress { height: 8px; border-radius: 4px; background: #ecebe6; overflow: hidden; }
+.progress div { height: 100%; width: 0; background: var(--accent); transition: width .6s linear; }
+.plan-findings { margin: 0; padding-left: 18px; font-size: 13px; }
+.plan-findings li.error { color: var(--closed); }
+.plan-findings li.warning { color: #8a5a00; }
+.plan-scales { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.plan-scales .scale-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.plan-scales input { width: 80px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; }
+.plan-scales select { padding: 3px 4px; border: 1px solid var(--line); border-radius: 6px; background: #fff; font-size: 12px; }
+.plan-card { border: 2px solid var(--accent); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: #f8faff; }
+.plan-card h4 { margin: 0; font-size: 15px; }
+.plan-card ul { margin: 0; padding-left: 18px; }
+.plan-card .blocked { color: var(--closed); }
+.plan-card .check { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; }
+.popover select { width: 100%; margin-bottom: 8px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; }
+.space.suspect { fill: #fde2e2; stroke: var(--closed); stroke-width: 2.5; }
+.space.suspect.picked { stroke: var(--accent); }
+.opening .door.suspect { fill: var(--closed); stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+@media (max-width: 820px) {
+  .new-building { margin-left: 0; }
+  .draft-banner { top: auto; bottom: 10px; left: 10px; right: 56px; transform: none; max-width: none; white-space: normal; }
+  .tab { font-size: 13px; padding: 10px 2px; }
 }

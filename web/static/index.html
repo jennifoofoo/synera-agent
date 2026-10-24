@@ -15,6 +15,7 @@
     <select id="building-select" aria-label="Building"></select>
   </label>
   <div id="building-meta" class="building-meta"></div>
+  <button type="button" id="new-building" class="small secondary new-building">+ New building</button>
 </header>
 
 <main class="layout">
@@ -24,6 +25,9 @@
     <svg id="map" class="map" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan"></svg>
     <div id="popover" class="popover" hidden></div>
     <div id="mode-banner" class="mode-banner" hidden></div>
+    <div id="draft-banner" class="draft-banner" hidden>
+      <b>Draft</b> · not saved. Red = check this. <button type="button" id="draft-back" class="small secondary">Back to building</button>
+    </div>
     <div class="map-controls">
       <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
       <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
@@ -54,6 +58,7 @@
       <button class="tab" data-tab="route" role="tab">Route</button>
       <button class="tab" data-tab="find" role="tab">Find</button>
       <button class="tab" data-tab="changes" role="tab">Changes <span id="changes-count" class="count" hidden></span></button>
+      <button class="tab" data-tab="plan" role="tab">New</button>
     </nav>
 
     <div class="panel active" data-panel="chat">
@@ -116,9 +121,43 @@
       <p class="hint">Tap a door, room, stair or lift on the plan to close it, or a room to add a door to its neighbour.</p>
       <button id="reset" class="secondary">Reset building</button>
     </div>
+
+    <div class="panel" data-panel="plan">
+      <section id="plan-step-upload" class="plan-step">
+        <h3>New building from floor plans</h3>
+        <label id="plan-drop" class="drop">
+          <input type="file" id="plan-files" accept="image/png,image/jpeg" multiple>
+          <span><b>Drop floor plan images here</b> or tap to choose. One image per floor, PNG or JPG, up to 10 MB.</span>
+        </label>
+        <div id="plan-floors" class="plan-floors"></div>
+        <p id="plan-why" class="hint why" hidden>Why a length? A drawing has no metres in it. One length you know (the building width, a room width or a door) sets the scale, so routes and areas come out right. Skip it only if a scale bar is printed on the plan.</p>
+        <label class="plan-name">Name <input id="plan-name" maxlength="60" autocomplete="off" placeholder="e.g. Hall 7"></label>
+        <div class="row"><button type="button" id="plan-read" disabled>Read plans</button></div>
+      </section>
+      <section id="plan-progress" class="plan-step" hidden>
+        <div id="plan-progress-text" aria-live="polite"></div>
+        <div class="progress"><div id="plan-progress-bar"></div></div>
+        <p class="hint">One reading per floor, usually 10 to 20 seconds each. Nothing is saved yet.</p>
+      </section>
+      <section id="plan-review" class="plan-step" hidden>
+        <div id="plan-summary" class="summary"></div>
+        <ul id="plan-findings" class="plan-findings"></ul>
+        <h3>Scale</h3>
+        <div id="plan-scales" class="plan-scales"></div>
+        <h3>Fix</h3>
+        <p class="hint">Tap a room on the plan to add a door to its neighbour or set its type. Tap a door to remove it.</p>
+        <div id="plan-card" class="plan-card" hidden></div>
+        <div class="row wrap">
+          <button type="button" id="plan-save">Save building…</button>
+          <button type="button" id="plan-show" class="secondary" hidden>Show draft</button>
+          <button type="button" id="plan-discard" class="secondary">Start over</button>
+        </div>
+      </section>
+    </div>
   </aside>
 </main>
 <script src="app.js"></script>
 <script src="voice.js"></script>
+<script src="plan.js"></script>
 </body>
 </html>
