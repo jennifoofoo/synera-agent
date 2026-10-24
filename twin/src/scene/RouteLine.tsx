@@ -104,7 +104,10 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     }
   });
 
-  if (points.length < 2) return null;
+  if (points.length < 2 || !route?.segments) return null;
+  // On a single floor the line may only run to the stairs: the start dot and the destination belong to their own floor.
+  const startsHere = !onlyFloor || route.segments[0].floor_id === onlyFloor;
+  const endsHere = !onlyFloor || route.segments[route.segments.length - 1].floor_id === onlyFloor;
   const guided = !!legPoints;
   const lineColour = flat ? COLOURS.mapBlue : COLOURS.route;
   // 2D: the map blue on a white casing. 3D: the route colour on a translucent glow casing.
@@ -143,36 +146,33 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       {legPoints && <Line points={legPoints} color={lineColour} lineWidth={lineWidth} depthTest={false} renderOrder={22} />}
       {/* ends: constant size on screen, a small dot at the start and a ring at the destination (the room label
           moves above them, see Labels.tsx), never a filled blob on the text */}
-      <group position={points[0]} name="route-start">
-        <ScreenSized>
-          <EndDisc radius={START_DOT_PX + 2} colour="#ffffff" />
-          <EndDisc radius={START_DOT_PX} colour={lineColour} />
-        </ScreenSized>
-      </group>
-      <group position={points[points.length - 1]} name="route-end">
-        <ScreenSized>
-          <EndDisc radius={END_RING_PX + 1.5} colour="#ffffff" />
-          <EndRing radius={END_RING_PX} width={3} colour={flat ? COLOURS.mapRed : lineColour} />
-        </ScreenSized>
-      </group>
+      {startsHere && (
+        <group position={points[0]} name="route-start">
+          <ScreenSized>
+            <EndDisc radius={START_DOT_PX + 2} colour="#ffffff" />
+            <EndDisc radius={START_DOT_PX} colour={lineColour} order={24} />
+          </ScreenSized>
+        </group>
+      )}
+      {/* the destination: a red disc with a white rim and a dark centre, like a map app's pin seen from above */}
+      {endsHere && (
+        <group position={points[points.length - 1]} name="route-end">
+          <ScreenSized>
+            <EndDisc radius={END_RING_PX + 2} colour="#ffffff" />
+            <EndDisc radius={END_RING_PX} colour={COLOURS.destination} order={24} />
+            <EndDisc radius={END_RING_PX * 0.35} colour={COLOURS.destinationDark} order={25} />
+          </ScreenSized>
+        </group>
+      )}
     </group>
   );
 }
 
-function EndDisc({ radius, colour }: { radius: number; colour: string }) {
+function EndDisc({ radius, colour, order = 23 }: { radius: number; colour: string; order?: number }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} renderOrder={23}>
+    <mesh rotation-x={-Math.PI / 2} renderOrder={order}>
       <circleGeometry args={[radius, 32]} />
-      <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
-    </mesh>
-  );
-}
-
-function EndRing({ radius, width, colour }: { radius: number; width: number; colour: string }) {
-  return (
-    <mesh rotation-x={-Math.PI / 2} renderOrder={24}>
-      <ringGeometry args={[radius - width, radius, 32]} />
-      <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
+      <meshBasicMaterial color={colour} transparent depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
     </mesh>
   );
 }
