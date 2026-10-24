@@ -347,7 +347,7 @@ export function Omnibox() {
           aria-pressed={listening}
           title={listening ? "Tap to send" : "Tap and speak"}
         >
-          {listening ? <StopIcon /> : <MicIcon />}
+          <MicIcon />
         </button>
       </form>
 
@@ -377,7 +377,7 @@ export function Omnibox() {
             onContextMenu={(event) => event.preventDefault()}
             onClick={talkClick}
           >
-            {listening ? <StopIcon /> : <MicIcon />}
+            <MicIcon />
             {!voiceOut && !listening && (
               <span className="ob-badge" aria-hidden>
                 <MutedIcon />
@@ -391,12 +391,13 @@ export function Omnibox() {
 }
 
 const iconProps = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+// Filled pictograms in the standard Material shapes (as in Google Maps), so they read at a glance.
+const glyphProps = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true };
 
 function MicIcon() {
   return (
-    <svg {...iconProps}>
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    <svg {...glyphProps}>
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
     </svg>
   );
 }
@@ -409,33 +410,19 @@ function ChatIcon() {
   );
 }
 
-/** Filled square: tap to stop listening. */
-function StopIcon() {
-  return (
-    <svg {...iconProps}>
-      <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-// Speaker body shared by both speaker icons, so on and muted line up exactly.
-const SPEAKER_BODY = "M3.5 9.5h3l4.5-4v13l-4.5-4h-3z";
-
 function SpeakerIcon() {
   return (
-    <svg {...iconProps}>
-      <path d={SPEAKER_BODY} fill="currentColor" fillOpacity={0.15} />
-      <path d="M14.5 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" />
+    <svg {...glyphProps}>
+      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
     </svg>
   );
 }
 
-/** Standard "speaker muted": the same speaker with a full X where the sound waves were. */
+/** Standard "speaker muted": the speaker crossed by one full diagonal slash. */
 function MutedIcon() {
   return (
-    <svg {...iconProps}>
-      <path d={SPEAKER_BODY} fill="currentColor" fillOpacity={0.15} />
-      <path d="M15 9.5l5.5 5.5M20.5 9.5L15 15" strokeWidth={2} />
+    <svg {...glyphProps}>
+      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
     </svg>
   );
 }
