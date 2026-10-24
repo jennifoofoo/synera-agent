@@ -5,6 +5,8 @@ __pycache__/
 agent_output/
 *.csv.bak
 team_*.csv
+# the submission answers file is tracked on purpose (Synera reads it from the repo)
+!answers/team_synera.csv
 # Kit data is 300+ MB and re-downloadable from the kit repo
 data/
 

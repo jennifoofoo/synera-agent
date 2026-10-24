@@ -1,0 +1,291 @@
+question_id,answer
+osm-way363805324-H01,"The largest one is Generic room 1.02 with 162.33 square metres.
+Answer: Generic room 1.02, 162.33 m²"
+osm-way363805324-H02,"Together that is 54.77 square metres.
+Answer: 54.77"
+osm-way363805324-H03,"The walk is 44.90 metres in total.
+Answer: 44.90"
+osm-way363805324-H04,"The room directly below is Großer Saal (E01).
+Answer: Großer Saal (E01)"
+osm-way363805324-H07,"The room directly above is Generic room 1.10.
+Answer: Generic room 1.10"
+osm-way363805324-H10,"That makes 5 rooms.
+Answer: 5"
+osm-way363805324-H11,"The straight-line distance is 21.16 metres.
+Answer: 21.16"
+osm-way43035346-H01,"The largest one is Generic room N3806 with 115.03 square metres.
+Answer: Generic room N3806, 115.03 m²"
+osm-way43035346-H02,"Together that is 592.80 square metres.
+Answer: 592.80"
+osm-way43035346-H03,"The walk is 53.98 metres in total.
+Answer: 53.98"
+osm-way43035346-H04,"The room directly above is Generic room N0806.
+Answer: Generic room N0806"
+osm-way43035346-H05,"That makes 6 rooms.
+Answer: 6"
+osm-way43035346-H06,"The straight-line distance is 11.85 metres.
+Answer: 11.85"
+osm-way43035346-H07,"That makes 0 rooms.
+Answer: 0"
+osm-way50299584-H01,"The largest one is Generic room 0566 with 559.80 square metres.
+Answer: Generic room 0566, 559.80 m²"
+osm-way50299584-H02,"Together that is 959.75 square metres.
+Answer: 959.75"
+osm-way50299584-H03,"The walk is 103.36 metres in total.
+Answer: 103.36"
+osm-way50299584-H04,"The room directly above is Generic room 0583.
+Answer: Generic room 0583"
+osm-way50299584-H06,"The room directly below is Generic room -1530.
+Answer: Generic room -1530"
+osm-way50299584-H11,"The room directly above is Generic room 1530.
+Answer: Generic room 1530"
+osm-way50299584-H12,"That makes 4 rooms.
+Answer: 4"
+osm-way50299584-H13,"The straight-line distance is 62.01 metres.
+Answer: 62.01"
+osm-way50300147-H01,"The largest one is Generic room 0219 with 530.16 square metres.
+Answer: Generic room 0219, 530.16 m²"
+osm-way50300147-H02,"Together that is 1699.55 square metres.
+Answer: 1699.55"
+osm-way50300147-H03,"The walk is 78.24 metres in total.
+Answer: 78.24"
+osm-way50300147-H04,"The room directly above is Generic room 0260.
+Answer: Generic room 0260"
+osm-way50300147-H05,"The room directly below is Generic room 0219.
+Answer: Generic room 0219"
+osm-way50300147-H06,"The room directly above is Generic room 0209.
+Answer: Generic room 0209"
+osm-way50300147-H07,"That makes 6 rooms.
+Answer: 6"
+osm-way50300147-H08,"The straight-line distance is 45.49 metres.
+Answer: 45.49"
+osm-way50300147-H09,"That makes 47 rooms.
+Answer: 47"
+osm-way50300147-H10,"That makes 47 rooms.
+Answer: 47"
+proc-campus-test-000-H01,"The largest one is Toilet 1.25 with 34.02 square metres.
+Answer: Toilet 1.25, 34.02 m²"
+proc-campus-test-000-H02,"Together that is 105.42 square metres.
+Answer: 105.42"
+proc-campus-test-000-H03,"That makes 21 rooms.
+Answer: 21"
+proc-campus-test-000-H04,"The walk is 128.24 metres in total.
+Answer: 128.24"
+proc-campus-test-000-H05,"The straight-line distance is 41.31 metres.
+Answer: 41.31"
+proc-campus-test-004-H01,"The largest one is Meeting room 0.15 with 35.46 square metres.
+Answer: Meeting room 0.15, 35.46 m²"
+proc-campus-test-004-H02,"Together that is 184.14 square metres.
+Answer: 184.14"
+proc-campus-test-004-H03,"That makes 13 rooms.
+Answer: 13"
+proc-campus-test-004-H04,"The walk is 74.29 metres in total.
+Answer: 74.29"
+proc-campus-test-004-H05,"The straight-line distance is 15.06 metres.
+Answer: 15.06"
+proc-campus-test-005-H01,"The largest one is Meeting room 1.13 with 41.52 square metres.
+Answer: Meeting room 1.13, 41.52 m²"
+proc-campus-test-005-H02,"Together that is 456.72 square metres.
+Answer: 456.72"
+proc-campus-test-005-H03,"That makes 18 rooms.
+Answer: 18"
+proc-campus-test-005-H04,"The walk is 89.51 metres in total.
+Answer: 89.51"
+proc-campus-test-005-H05,"That makes 3 rooms.
+Answer: 3"
+proc-campus-test-005-H06,"The straight-line distance is 39.09 metres.
+Answer: 39.09"
+proc-campus-test-008-H01,"The largest one is Office 2.19 with 39.66 square metres.
+Answer: Office 2.19, 39.66 m²"
+proc-campus-test-008-H02,"Together that is 86.40 square metres.
+Answer: 86.40"
+proc-campus-test-008-H03,"That makes 11 rooms.
+Answer: 11"
+proc-campus-test-008-H04,"The walk is 78.91 metres in total.
+Answer: 78.91"
+proc-campus-test-008-H05,"The straight-line distance is 33.73 metres.
+Answer: 33.73"
+proc-campus-test-012-H01,"The largest one is Office 1.12 with 40.02 square metres.
+Answer: Office 1.12, 40.02 m²"
+proc-campus-test-012-H02,"Together that is 99.18 square metres.
+Answer: 99.18"
+proc-campus-test-012-H03,"That makes 16 rooms.
+Answer: 16"
+proc-campus-test-012-H04,"The walk is 43.83 metres in total.
+Answer: 43.83"
+proc-campus-test-012-H05,"The straight-line distance is 38.46 metres.
+Answer: 38.46"
+proc-campus-test-013-H01,"The largest one is Storage 5.26 with 40.86 square metres.
+Answer: Storage 5.26, 40.86 m²"
+proc-campus-test-013-H02,"Together that is 200.28 square metres.
+Answer: 200.28"
+proc-campus-test-013-H03,"That makes 15 rooms.
+Answer: 15"
+proc-campus-test-013-H04,"The walk is 116.61 metres in total.
+Answer: 116.61"
+proc-campus-test-013-H05,"The straight-line distance is 36.37 metres.
+Answer: 36.37"
+proc-factory-test-001-H01,"Together that is 92.10 square metres.
+Answer: 92.10"
+proc-factory-test-001-H02,"That makes 9 rooms.
+Answer: 9"
+proc-factory-test-001-H03,"That makes 6 rooms.
+Answer: 6"
+proc-factory-test-002-H01,"Together that is 126.50 square metres.
+Answer: 126.50"
+proc-factory-test-002-H02,"That makes 9 rooms.
+Answer: 9"
+proc-factory-test-002-H03,"That makes 4 rooms.
+Answer: 4"
+proc-factory-test-002-H04,"The straight-line distance is 111.98 metres.
+Answer: 111.98"
+proc-factory-test-003-H01,"The largest one is Meeting room 1.17 with 29.35 square metres.
+Answer: Meeting room 1.17, 29.35 m²"
+proc-factory-test-003-H02,"Together that is 154.20 square metres.
+Answer: 154.20"
+proc-factory-test-003-H03,"That makes 7 rooms.
+Answer: 7"
+proc-factory-test-003-H04,"The walk is 89.86 metres in total.
+Answer: 89.86"
+proc-factory-test-003-H05,"That makes 3 rooms.
+Answer: 3"
+proc-factory-test-003-H06,"The straight-line distance is 32.02 metres.
+Answer: 32.02"
+proc-factory-test-006-H01,"Together that is 203.30 square metres.
+Answer: 203.30"
+proc-factory-test-006-H02,"That makes 4 rooms.
+Answer: 4"
+proc-factory-test-006-H03,"That makes 3 rooms.
+Answer: 3"
+proc-factory-test-006-H04,"The straight-line distance is 53.09 metres.
+Answer: 53.09"
+proc-factory-test-007-H01,"The largest one is Kitchen 1.10 with 28.75 square metres.
+Answer: Kitchen 1.10, 28.75 m²"
+proc-factory-test-007-H02,"Together that is 413.40 square metres.
+Answer: 413.40"
+proc-factory-test-007-H03,"That makes 9 rooms.
+Answer: 9"
+proc-factory-test-007-H04,"The walk is 220.61 metres in total.
+Answer: 220.61"
+proc-factory-test-007-H05,"That makes 4 rooms.
+Answer: 4"
+proc-factory-test-007-H06,"The straight-line distance is 34.80 metres.
+Answer: 34.80"
+proc-factory-test-009-H01,"Together that is 1220.16 square metres.
+Answer: 1220.16"
+proc-factory-test-009-H02,"That makes 12 rooms.
+Answer: 12"
+proc-factory-test-009-H03,"That makes 4 rooms.
+Answer: 4"
+proc-factory-test-010-H01,"The largest one is Meeting room 0.40 with 29.95 square metres.
+Answer: Meeting room 0.40, 29.95 m²"
+proc-factory-test-010-H02,"Together that is 111.60 square metres.
+Answer: 111.60"
+proc-factory-test-010-H03,"That makes 10 rooms.
+Answer: 10"
+proc-factory-test-010-H04,"The walk is 113.02 metres in total.
+Answer: 113.02"
+proc-factory-test-010-H05,"That makes 4 rooms.
+Answer: 4"
+proc-factory-test-011-H01,"Together that is 2079.98 square metres.
+Answer: 2079.98"
+proc-factory-test-011-H02,"That makes 7 rooms.
+Answer: 7"
+proc-factory-test-011-H03,"That makes 4 rooms.
+Answer: 4"
+proc-factory-test-011-H04,"The straight-line distance is 51.42 metres.
+Answer: 51.42"
+resplan-1153-H01,"Together that is 71.29 square metres.
+Answer: 71.29"
+resplan-1153-H02,"That makes 3 rooms.
+Answer: 3"
+resplan-12469-H01,"Together that is 109.70 square metres.
+Answer: 109.70"
+resplan-12469-H02,"That makes 8 rooms.
+Answer: 8"
+resplan-12469-H03,"That makes 5 rooms.
+Answer: 5"
+resplan-12962-H01,"That makes 5 rooms.
+Answer: 5"
+resplan-14307-H01,"That makes 3 rooms.
+Answer: 3"
+resplan-3573-H01,"The largest one is Bathroom 0.06 with 6.98 square metres.
+Answer: Bathroom 0.06, 6.98 m²"
+resplan-3573-H02,"Together that is 17.65 square metres.
+Answer: 17.65"
+resplan-3573-H03,"That makes 6 rooms.
+Answer: 6"
+resplan-3573-H04,"The walk is 18.58 metres in total.
+Answer: 18.58"
+resplan-3573-H05,"That makes 6 rooms.
+Answer: 6"
+resplan-6532-H01,"That makes 3 rooms.
+Answer: 3"
+resplan-6532-H02,"That makes 3 rooms.
+Answer: 3"
+resplan-8357-H01,"That makes 4 rooms.
+Answer: 4"
+resplan-8357-H02,"That makes 5 rooms.
+Answer: 5"
+resplan-9751-H01,"That makes 5 rooms.
+Answer: 5"
+swiss-100-H01,"The largest one is Living room 1.05 (apartment 4) with 30.16 square metres.
+Answer: Living room 1.05 (apartment 4), 30.16 m²"
+swiss-100-H02,"Together that is 32.47 square metres.
+Answer: 32.47"
+swiss-100-H03,"The walk is 39.20 metres in total.
+Answer: 39.20"
+swiss-1195-H01,"Together that is 207.01 square metres.
+Answer: 207.01"
+swiss-1195-H02,"That makes 3 rooms.
+Answer: 3"
+swiss-1671-H01,"The largest one is Bedroom 0.05 (apartment 1) with 19.34 square metres.
+Answer: Bedroom 0.05 (apartment 1), 19.34 m²"
+swiss-1671-H02,"Together that is 133.95 square metres.
+Answer: 133.95"
+swiss-1671-H03,"The walk is 27.49 metres in total.
+Answer: 27.49"
+swiss-1671-H04,"That makes 3 rooms.
+Answer: 3"
+swiss-17033-H01,"Together that is 50.66 square metres.
+Answer: 50.66"
+swiss-1760-H01,"The largest one is Kitchen 0.06 (apartment 1) with 6.73 square metres.
+Answer: Kitchen 0.06 (apartment 1), 6.73 m²"
+swiss-1760-H02,"Together that is 61.12 square metres.
+Answer: 61.12"
+swiss-17736-H01,"The largest one is Bedroom 3.03 (apartment 8) with 19.44 square metres.
+Answer: Bedroom 3.03 (apartment 8), 19.44 m²"
+swiss-17736-H02,"Together that is 34.00 square metres.
+Answer: 34.00"
+swiss-17736-H03,"The walk is 34.14 metres in total.
+Answer: 34.14"
+swiss-1825-H01,"Together that is 20.54 square metres.
+Answer: 20.54"
+swiss-2-H01,"Together that is 42.31 square metres.
+Answer: 42.31"
+swiss-2080-H01,"The largest one is Bathroom 2.15 (apartment 8) with 4.13 square metres.
+Answer: Bathroom 2.15 (apartment 8), 4.13 m²"
+swiss-2080-H02,"Together that is 12.30 square metres.
+Answer: 12.30"
+swiss-2080-H03,"The walk is 38.28 metres in total.
+Answer: 38.28"
+swiss-2080-H04,"That makes 4 rooms.
+Answer: 4"
+swiss-2873-H01,"The largest one is Storage 2.14 (apartment 10) with 3.22 square metres.
+Answer: Storage 2.14 (apartment 10), 3.22 m²"
+swiss-2873-H02,"Together that is 12.53 square metres.
+Answer: 12.53"
+swiss-2873-H03,"The walk is 34.27 metres in total.
+Answer: 34.27"
+swiss-2873-H04,"That makes 3 rooms.
+Answer: 3"
+swiss-482-H01,"The largest one is Storage 4.12 (apartment 18) with 2.32 square metres.
+Answer: Storage 4.12 (apartment 18), 2.32 m²"
+swiss-482-H02,"Together that is 16.07 square metres.
+Answer: 16.07"
+swiss-482-H03,"The walk is 67.01 metres in total.
+Answer: 67.01"
+swiss-482-H04,"That makes 3 rooms.
+Answer: 3"
+swiss-6128-H01,"Together that is 74.92 square metres.
+Answer: 74.92"
