@@ -141,9 +141,9 @@ export function Scene() {
       )}
       <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
       {!flat && <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />}
-      <hemisphereLight args={["#ffffff", "#9fb4cc", 1.0]} />
-      <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
-      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />
+      <hemisphereLight args={["#ffffff", "#b8b4ac", 1.0]} />
+      <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#ffffff" />
+      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#e8e4dc" />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}
@@ -160,10 +160,10 @@ export function Scene() {
         args={[size * 6, size * 6]}
         cellSize={2}
         cellThickness={0.6}
-        cellColor="#c9d6e5"
+        cellColor="#dcd8d0"
         sectionSize={10}
         sectionThickness={1}
-        sectionColor="#afc2d8"
+        sectionColor="#cbc6bb"
         fadeDistance={size * 3.2}
         fadeStrength={1.2}
         infiniteGrid
@@ -174,7 +174,7 @@ export function Scene() {
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && !flat && (
         <GizmoHelper alignment="bottom-right" margin={[64, 64]} renderPriority={2}>
-          <GizmoViewcube color="#ffffff" hoverColor="#e8f0fe" textColor="#14305a" strokeColor="#9fb3cc" opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
+          <GizmoViewcube color="#fbfaf8" hoverColor="#eae7e1" textColor="#1d2430" strokeColor="#bdb7ab" opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
         </GizmoHelper>
       )}
       {ao && !worker && !flat && (

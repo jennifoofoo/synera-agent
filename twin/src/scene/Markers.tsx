@@ -107,7 +107,7 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
 }
 
 export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
-  const hereColour = flat ? COLOURS.mapBlue : COLOURS.here;
+  const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
