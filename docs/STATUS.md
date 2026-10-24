@@ -19,17 +19,26 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | what_if_door (3) | Leonie | gemergt | feat/q-what_if_door |
 | step_free_reachable_count (0 im Test) | Jennifer | gemergt (2 Labels) | feat/hardening |
 
+Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuerst, C und D als Spikes parallel.
+
 | Aufgabe | Wer | Status | Branch |
 |---|---|---|---|
-| Leitplanken: check.sh, ruff, Hooks | Jennifer | gemergt | chore/guardrails |
-| tools.py (aus Registry), find_space, agent.py, Cache und Retry | Jennifer | gemergt | feat/agent-tools |
-| Test "Text zu Parametern" (Haiku, alle gelabelten Fragen) | Jennifer | in Arbeit | feat/eval-params-full |
-| Interaction: Landmarken, 3er-Schritte, Verständniskarte | Jennifer | gemergt | feat/guide-tools |
-| Interaction: 6 Skripte als Tests (Live, mit LLM) | Jennifer | offen | |
-| 2D-Web-Seite (Chat + Etagenplan mit Route) | Leonie | gemergt (Chat jetzt mit Session, siehe Blocker) | feat/web-2d |
-| Abgabe-Tooling: make_submission, BENCHMARK.md, Format-Adapter | Leonie | offen | |
-| Abgabeformat klären (PDF answers.json vs README-CSV) | | offen | |
-| Demo-Video + Tech-Erklärung | beide | offen | |
+| Leitplanken, tools.py, find_space, agent.py, Cache, Session, Härtung, Sweep, Format | Jennifer | gemergt | |
+| Interaction: Landmarken, 3er-Schritte, Verständniskarte, 6 Skripte plus Gegner-Varianten (live) | Jennifer | gemergt | |
+| Test "Text zu Parametern" (Haiku, alle gelabelten und 145 Testfragen) | Jennifer | gemergt | |
+| A. Warm-up: `structured.py` (Route als Knotenliste, Länge, Raum-ID), Live-Auswertung der 6 Warm-up-Typen, Kosten festhalten (Tools allein: 369 von 369 in Dev) | Jennifer | offen | |
+| C. Voice-Spike (ElevenLabs mit eigenem LLM oder Browser-STT plus ElevenLabs-TTS), Ergebnis in `docs/specs/voice-spike.md` | Jennifer | offen | |
+| D. Level-4-Spike (Plan-Bild nach `building.json` mit Claude-Vision, Qualität gegen Original messen) | Jennifer | offen | |
+| Testlauf auf `data/test` (3 pro Typ), `docs/eval-log.md`, Tool-Schleife 20 auf 8 Runden | Jennifer | offen | |
+| 2D-Web-Seite (Chat, Etagenplan, Route, Sperren, Türen) | Leonie | gemergt (Chat mit Session, siehe Blocker) | feat/web-2d |
+| B. Abgabe: `run_benchmark <building_dir> <questions.json> <answers.json>`, `BENCHMARK.md`, `make_submission`, Format-Adapter (nutzt `structured.py`), Test-CSV, Tag `known-good` | Leonie | offen | |
+| B. `scripts/preflight.py <building_dir>`: neues Gebäude in Sekunden prüfen (Polygone, Schlüssel, alle Typen einmal) | Leonie | offen | |
+| 2D-Seite: Route animieren, Blocker bei `web/server.py` und `web/api.py` beheben | Leonie | offen | |
+| C. Voice-Oberfläche in der Seite (Mikrofon, Sprachausgabe), nach dem Spike | Leonie | offen (wartet auf Spike) | |
+| D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | offen (wartet auf Spike) | |
+| Fragen an Synera vor Ort: Format, Locate/Route, Level 3 mehrere Gebäude, Freeze, Zeitlimit | wer vor Ort ist | offen | |
+| E. Demo-Video, Technik-Text, Pitch (3 Minuten plus 1 Minute Fragen) | beide | offen | |
+| F. Creativity (höchstens zwei Dinge, Entscheidung nach den Spikes) | beide | offen | |
 
 ## Blocker
 - Jennifer an Leonie (`web/server.py`, `web/api.py`, deine Dateien): (1) Chat-Aufruf und Reset-Race: `session` und `chat` unter einem Lock zusammen holen, nach dem Aufruf prüfen, ob die Session noch dieselbe ist. (2) `adopt_agent_route` verliert `via`-Stopps und kann eine Seiten-Route überschreiben, wenn parallel geroutet wird. Ich habe in `web/chat.py` vier Zeilen geändert (Chat nutzt `building_agent.agent.Session`, Lock pro Gebäude, kein stilles Fallback mehr).
