@@ -312,7 +312,7 @@ def test_load_map_shares_the_walks_between_maps():
 
 
 def test_distances_from_matches_the_shortest_leg():
-    bm = load_map(sorted(Path("data/dev").glob("proc-factory-dev-*"))[0])
+    bm = load_map(min(Path("data/dev").glob("proc-factory-dev-*")))
     rg = routing.routing_graph(bm, False)
     spaces = [space_id for space_id in bm.spaces if space_id in rg.graph]
     start, targets = spaces[0], spaces[1:40]
