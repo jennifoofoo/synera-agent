@@ -25,7 +25,7 @@ def test_system_prompt_overview_lists_floor_ids():
 def test_answer_is_cached_and_retries_transient_errors(tmp_path, monkeypatch):
     from building_agent import agent as agent_module
 
-    building_dir, question = labelled_questions("errand")[0]
+    building_dir, _question = labelled_questions("errand")[0]
     monkeypatch.setattr(agent_module, "CACHE_DIRECTORY", tmp_path)
     monkeypatch.setattr(agent_module, "RETRYABLE", (ConnectionError,))
     monkeypatch.setattr(agent_module.time, "sleep", lambda seconds: None)
@@ -39,8 +39,8 @@ def test_answer_is_cached_and_retries_transient_errors(tmp_path, monkeypatch):
 
     monkeypatch.setattr(agent_module.Agent, "__init__", lambda self, *args, **kwargs: None)
     monkeypatch.setattr(agent_module.Agent, "ask", fake_ask)
-    first = agent_module.answer(Path(building_dir), question["question"])
-    second = agent_module.answer(Path(building_dir), question["question"])
+    first = agent_module.answer(Path(building_dir), "Please describe this building in one sentence.")
+    second = agent_module.answer(Path(building_dir), "Please describe this building in one sentence.")
     assert first == second == "ok\nAnswer: 1"
     assert len(calls) == 2  # one failed try, one success; the second answer() came from the cache
 
@@ -74,3 +74,16 @@ def test_failed_turn_leaves_the_conversation_valid(monkeypatch):
     except RuntimeError:
         pass
     assert agent.messages == []
+
+
+def test_known_question_template_is_answered_without_the_llm(monkeypatch):
+    from building_agent import agent as agent_module
+
+    building_dir, question = labelled_questions("errand")[0]
+
+    def must_not_run(self, text):
+        raise AssertionError("the LLM agent must not run for a parsed template question")
+
+    monkeypatch.setattr(agent_module.Agent, "ask", must_not_run)
+    reply = agent_module.answer(Path(building_dir), question["question"])
+    assert "Answer:" in reply

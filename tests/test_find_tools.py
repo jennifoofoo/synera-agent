@@ -207,11 +207,12 @@ def test_direction_word_in_connector_name_wins_over_geometry():
     bm = building("train", "osm-way58216509")
     lifts = [c for c in bm.connectors.values() if c["kind"] == "lift"]
     westmost = min(lifts, key=lambda c: lift_position(bm, c)[0])
+    original_name = westmost["name"]
     westmost["name"] = "Ost lift"
     try:
         assert find_connector(bm, "lift", "east")["chosen"]["id"] == westmost["id"]
     finally:
-        westmost["name"] = "restored"
+        westmost["name"] = original_name
 
 
 # ---------- state and tools ----------

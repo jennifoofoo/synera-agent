@@ -10,6 +10,7 @@ from pathlib import Path
 import anthropic
 
 from building_agent.guide_tools import GuideState
+from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
 from starter_agent.agent import SYSTEM_PROMPT as STARTER_PROMPT
@@ -55,6 +56,9 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 - Pass the person's answer word for word as user_reply to confirm_change. Only a plain yes to the card counts: 'mach einfach', 'ja ja', 'whatever' or a yes with a condition are not a yes, so ask once more.
 - For step-free routes always say the length and how it compares to the normal route (normal_route_length_m).
 - Never invent room numbers, names or examples. Only mention rooms that a tool returned. If a room does not exist, say so and offer similar rooms from a search result, or ask.
+- When the person names an item that could be one of several ('the second press', 'the printer', 'the press on line 4'), call find_asset first and never guess between groups. If find_asset or find_connector returns needs_choice true, ask its question in one short sentence and wait. Treat hints such as 'line 4 = zone H-B4' as suggestions to confirm, never as facts.
+- For compass words ('the east lift', 'the north stairs') call find_connector and state the returned assumption ('I take east as the right side of the plan'). If the person says left or right, ask which one they mean.
+- For 'what changes if X is closed or blocked' questions call what_changes and report its sentences in plain words.
 - If a place is ambiguous (for example 'WC' or 'toilet' exists on several floors), list the floors and ask before any route call."""
 
 
@@ -100,6 +104,9 @@ def cache_key(building_directory: Path, question_text: str) -> str:
 
 def answer(building_directory: Path, question_text: str) -> str:
     """Cached per (building, question, prompt version); retries transient API errors with backoff."""
+    fast = answer_deterministic(building_directory, question_text)
+    if fast is not None:  # a known question template: computed by the kind functions, no API call
+        return fast
     cache_file = CACHE_DIRECTORY / f"{cache_key(building_directory, question_text)}.txt"
     if cache_file.exists():
         return cache_file.read_text(encoding="utf-8")
