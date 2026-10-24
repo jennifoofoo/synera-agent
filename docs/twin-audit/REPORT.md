@@ -1,7 +1,7 @@
 # Twin audit: what is drawn versus what the data says
 
 Branch `fix/twin-openings` (on top of origin/main 765b9d7, which contains feat/twin). Scope: `twin/` plus `scripts/twin_audit.sh`,
-`tests/e2e/`, this folder. Evidence: screenshots in this folder, and the audit table at the end (125 checks, 0 mismatches on the tip).
+`tests/e2e/`, this folder. Evidence: screenshots in this folder, and the audit table at the end (0 mismatches on the tip).
 
 ## The bug that started it
 
@@ -16,6 +16,24 @@ Fix: gaps are computed once per opening and cut from wall pieces, slab outline l
   polygon corner both edges open (OSM entrances sit on vertices).
 - Before/after: `before-factory-003-*.png` / `after-factory-003-*.png` (desktop 2D and 3D, mobile 2D), same for `swiss-203`
   (doors 0.8 to 0.9 m, thin walls) and `osm-27326387` (rotated building). `after-resplan-1465-*.png` too.
+
+## Drawing spec for openings (decided with Jennifer)
+
+Data across all 280 buildings: door 20606 (median 0.9 m), opening 2155 (median 2.5 m, max 20), entrance 987. There is no swing or hinge side,
+so no swing arcs. Implemented in 2D and 3D:
+
+| Kind | Drawn |
+|---|---|
+| door | gap of width_m plus two jamb ticks (perpendicular hairlines, 0.2 m, on the floor at both gap ends) |
+| opening < 4 m | gap, no ticks |
+| opening >= 4 m (and at least 60 percent of the shared boundary; true for all 40 wide openings in the 10 audited buildings) | no wall on the whole shared boundary, a faint dashed zone line instead (own `zone-lines` geometry, 0.5 m dashes), no wall extrusion in 3D |
+| entrance | gap with ticks plus the existing exit pictogram |
+| step_free false | small step glyph (doors) or "not step-free" in the entrance title (b824288) |
+| closed in the session | short red bar across the gap (`OpeningMarks.tsx`) |
+
+Screenshots: `spec-before-*` / `spec-after-*` (proc-factory-dev-003, route Assembly zone H-A2 -> Additive zone H-A3; desktop 2D and 3D, mobile 2D;
+`*-zone-zoom-2d.png` shows the dashed zone lines and ticks, `*-closed-door-2d/3d.png` the red bar). Colours are existing tokens
+(`COLOURS.danger`, `COLOURS.edgeGhost`), no orange.
 
 ## Mismatch table
 
@@ -44,13 +62,14 @@ Fix: gaps are computed once per opening and cut from wall pieces, slab outline l
 | C4 | Doors/openings have no glyph, only gaps; entrances have a POI only in 2D and only if no label is near | n/a | screenshots | by design; not changed |
 | C5 | Opening positions far from any wall (osm Terminal 2: 32 of 33 openings, 6 in swiss-1689, 2 in N3) | position more than 0.8 m from both polygons | audit prints `off-wall in data` | data issue, nothing to cut; cannot fix in the twin |
 
-## Audit output on the tip (b824288)
+## Audit output on the tip
 
 ```
 building                   check                          data    drawn  result
 dev/proc-factory-dev-003   spaces                           79       79  ok
 dev/proc-factory-dev-003   connectors (all stops)            2        2  ok
 dev/proc-factory-dev-003   assets                          505      505  ok
+dev/proc-factory-dev-003   wide openings as zone lines       17       17  ok
 dev/proc-factory-dev-003   doors as gaps                    64       64  ok
 dev/proc-factory-dev-003   entrances as gaps                 4        4  ok
 dev/proc-factory-dev-003   openings as gaps                 17       17  ok
@@ -64,6 +83,7 @@ dev/proc-factory-dev-003   removed door drawn as wall        1        1  ok
 dev/proc-factory-dev-005   spaces                          132      132  ok
 dev/proc-factory-dev-005   connectors (all stops)            2        2  ok
 dev/proc-factory-dev-005   assets                          844      844  ok
+dev/proc-factory-dev-005   wide openings as zone lines       20       20  ok
 dev/proc-factory-dev-005   doors as gaps                   113      113  ok
 dev/proc-factory-dev-005   entrances as gaps                 4        4  ok
 dev/proc-factory-dev-005   openings as gaps                 20       20  ok
@@ -102,6 +122,7 @@ dev/swiss-203              removed door drawn as wall        1        1  ok
 dev/swiss-1689             spaces                          362      362  ok
 dev/swiss-1689             connectors (all stops)           13       13  ok
 dev/swiss-1689             assets                          940      940  ok
+dev/swiss-1689             wide openings as zone lines        2        2  ok
 dev/swiss-1689             doors as gaps                   363      363  ok
 dev/swiss-1689             entrances as gaps                 6        6  ok
 dev/swiss-1689             openings as gaps                 12        6  ok off-wall in data: 6
@@ -153,6 +174,7 @@ dev/osm-way360544293       removed door drawn as wall        1        1  ok
 dev/resplan-1465           spaces                           10       10  ok
 dev/resplan-1465           connectors (all stops)            0        0  ok
 dev/resplan-1465           assets                           35       35  ok
+dev/resplan-1465           wide openings as zone lines        1        1  ok
 dev/resplan-1465           doors as gaps                     6        6  ok
 dev/resplan-1465           entrances as gaps                 1        1  ok
 dev/resplan-1465           openings as gaps                  3        3  ok
@@ -174,7 +196,7 @@ dev/resplan-3832           added door drawn as gap           1        1  ok
 dev/resplan-3832           removed door drawn as wall        1        1  ok
 campus example             campus route legs drawn          14       14  ok
 
-125 checks, 0 mismatches
+129 checks, 0 mismatches
 ```
 
 ## How to run it after every push
@@ -212,5 +234,7 @@ The probes mirror the gap rule in an independent implementation (tests/e2e/twin_
 | 446d117 | doors between two spaces open their shared boundary; corner entrances open both edges | no |
 | f7bc935 | audit probes mirror that rule | no |
 | b824288 | step marker for not-step-free doors (2D) | no |
+| (spec commit) | jamb ticks, zone lines, red bar on closed doors; new `OpeningMarks.tsx`, one line in `Scene.tsx`; `Markers.tsx` untouched | no |
+| (audit commit) | audit: wide openings have no wall and a zone line, closed doors get a bar | no |
 
 No commit changes `store.ts`. `FloorMesh.tsx` (d56d07a) and `FloorRail.tsx` (62ccdaa) are Leonie's files: please review those two first.
