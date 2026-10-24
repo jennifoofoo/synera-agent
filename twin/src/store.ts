@@ -139,6 +139,9 @@ interface TwinState {
   startWalk: () => void;
   setWalkStep: (step: number) => void;
   stopWalk: () => void;
+  /** Auto-Pace while walking: "say" moves on by itself, "ask" asks "Are you there?" first. Off by default. */
+  autoPace: "off" | "say" | "ask";
+  setAutoPace: (mode: "off" | "say" | "ask") => void;
 
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
@@ -225,6 +228,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   campusRoute: false,
   directions: null,
   walkStep: null,
+  autoPace: "off",
 
   async loadBuildings() {
     try {
@@ -395,6 +399,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   stopWalk() {
     set({ walkStep: null });
+  },
+  setAutoPace(autoPace) {
+    set({ autoPace });
   },
 
   async route(start, destination, stepFree = false) {

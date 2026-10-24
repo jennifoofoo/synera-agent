@@ -151,6 +151,19 @@ export function isSpeaking(): boolean {
   return (!!audioUrl && !sharedAudio().paused) || !!window.speechSynthesis?.speaking;
 }
 
+/** Resolves once nothing is being spoken or queued any more (polled; gives up after `maxMs`). */
+export function speechEnded(maxMs = 60_000): Promise<void> {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const check = () => {
+      const busy = isSpeaking() || !!window.speechSynthesis?.pending;
+      if (!busy || Date.now() - started > maxMs) resolve();
+      else window.setTimeout(check, 200);
+    };
+    check();
+  });
+}
+
 const ANSWER_LINE = /^\s*\**\s*Answer:/i;
 const ID_TOKEN = /\s*[([]?`?\b[A-Za-z][\w.]*(?:-[\w.]+){2,}`?[)\]]?/g;
 
