@@ -15,3 +15,4 @@ Short list first. Details below each item if they ask.
 11. **Time and deliveries.** The deck mentions "Where is the steel drum delivered yesterday?". Will Sunday contain questions about history or deliveries (the data has no timestamps)?
 12. **Access rights.** Do the Sunday buildings or questions include access restrictions (rooms or doors that need a clearance, keycards, safety gear, escorted access)? The data has no such fields.
 13. **Time-dependent changes.** Will Sunday contain closures or maintenance with time windows, uploaded notices (PDF, image, calendar file) or questions "at a given time"? The data has no timestamps.
+14. **Plan format for Level 4.** Will the plans on Sunday come as PNG only, or also as SVG (as in the training data: floor_<n>.svg next to floor_<n>.png)? Are the plans in the same drawing style as the kit (flat colours, door dots) or real architect plans?
