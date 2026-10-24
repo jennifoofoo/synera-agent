@@ -49,8 +49,8 @@ class ChatAdapter:
         self.saved_paths: list[Path] = []  # buildings the agent saved during the current turn (Level 4 save_building)
         self.lock = threading.Lock()
 
-    def ask(self, text: str, selection=None) -> dict:
-        """selection: a validated web.selection.Selection, valid for this one turn only."""
+    def ask(self, text: str, selection=None, voice: bool = False) -> dict:
+        """selection: a validated web.selection.Selection, valid for this one turn only. voice: request-level flag."""
         if not chat_available():
             return {"reply": NO_KEY_MESSAGE, "backend": None, "error": "no_api_key"}
         backend = backend_name()
@@ -58,7 +58,7 @@ class ChatAdapter:
             with self.lock:  # one conversation per building: never two turns at once
                 self.saved_paths = []
                 if backend == "building_agent":
-                    result = {"reply": self.ask_building_agent(text, selection), "backend": backend}
+                    result = {"reply": self.ask_building_agent(text, selection, voice), "backend": backend}
                 else:
                     result = {"reply": self.ask_starter(text), "backend": backend}
                 if self.saved_paths:
@@ -67,7 +67,7 @@ class ChatAdapter:
         except Exception as error:  # noqa: BLE001 - the page must keep working whatever the API does
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
-    def ask_building_agent(self, text: str, selection=None) -> str:
+    def ask_building_agent(self, text: str, selection=None, voice: bool = False) -> str:
         from building_agent.agent import Session
 
         if self.session is None:
@@ -82,7 +82,7 @@ class ChatAdapter:
                 text = f"{note}\n{text}"
         self.session.guide.selection = selection
         try:
-            return self.session.ask(text)
+            return self.session.ask(text, **({"voice": True} if voice else {}))
         finally:
             self.session.guide.selection = None  # one-shot: never leaks into the next message
 

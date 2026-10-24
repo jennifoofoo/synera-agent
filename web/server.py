@@ -12,7 +12,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/close    {element, closed: true|false}       lift/stairs/door/room id or name
   POST /api/door     {first, second, step_free}
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
-  POST /api/chat     {message, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
+  POST /api/chat     {message, voice?: true, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 
 Level 4, new building from floor plans (web/level4_api.py; POSTs need a same-origin page):
@@ -39,6 +39,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from building_agent.structured import located_entries
+from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import MapError
 from web import api, level4_api, speech
 from web.chat import ChatAdapter, chat_available
@@ -205,7 +206,10 @@ class App:
             session.map.located_asset_ids = []  # so `located` below only holds what this turn found
             # Not under the lock: an API call takes seconds and must not freeze the map.
             check = check_selection(body.get("context"), session.map)
-            result = chat.ask(message, selection=check.selection) if check.selection else chat.ask(message)
+            extra = voice_kwargs(body)  # request-level spoken-reply flag, never read from the message text
+            result = (
+                chat.ask(message, selection=check.selection, **extra) if check.selection else chat.ask(message, **extra)
+            )
             if body.get("context") is not None and not check.selection:
                 result = {**result, "selection_ignored": check.reason}
             saved_path = result.pop("saved_path", None)

@@ -38,6 +38,8 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | gemergt (Upload, Vorschau, Korrektur, Bestätigen, Speichern; live 10,5 s, 0,03 $ pro Etage) | feat/level4-web |
 | W-L2a Seite routet mit `building_agent.routing` (Kit-Route bleibt im JSON), W-L1a Funde aus dem Chat auf dem Plan, W-L4b Gebäudewechsel nach Speichern im Chat, 3D-Basis (three.js lokal, Röntgen, aufgeklappt, Minimap, Steuer-API) | Leonie | gemergt (lokal) | feat/web-l2a, feat/web-l1a-l4b, feat/view3d |
 | Seite: Auswahl per Klick (Chip, `context` an /api/chat), Seite zeigt Asset-Änderungen (`added_assets` usw.) in 2D und 3D | Leonie | gemergt | feat/web-selection, feat/web-asset-edits |
+| Hands-free Teil A (Server): Flag `voice: true`, `VOICE_RULES` (`building_agent/voice_rules.py`), Tests offline und live | Jennifer | Test grün | feat/voice-rules |
+| Hands-free Teil B (Seite): Aktivierungswort "Hey Marco", Dauererkennung, Schalter, Handtest Abschnitt G in `docs/HANDTEST.md`; Vertrag in `docs/specs/voice-handsfree.md` | Leonie | offen, wartet auf Leonies Zusage | |
 | Fragen an Synera vor Ort: Format, Locate/Route, Level 3 mehrere Gebäude, Freeze, Zeitlimit | wer vor Ort ist | offen | |
 | G. Routen-Modell: Raumfolge mit Tür-zu-Tür-Distanz und Synera-Kosten (Spike: 92,4 % auf 99,6 % volle Punkte), Kit-Modell für errand und what_if_door behalten, siehe `docs/specs/route-metric-spike.md` | Jennifer | gemergt-bereit | feat/route-model |
 | E. Demo-Video, Technik-Text, Pitch (3 Minuten plus 1 Minute Fragen) | beide | offen | |

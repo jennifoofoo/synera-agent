@@ -13,6 +13,7 @@ Techniker mit vollen Händen fragen, ohne einen Knopf zu drücken, und der Agent
   - Beginnt mit der Annahme, wenn eine sinnvolle existiert ("I'll start from your last spot, Kitchen zero point two eight.").
   - Keine Tabellen, Listen, Markdown, IDs. Kurze Sätze. Zahlen und Räume so, dass sie sprechbar sind.
   - Zusammenspiel mit dem Begleiten-Modus (docs/specs/position.md): Überblick mit Angebot, dann Schritt für Schritt.
+- Anfragevertrag (für `voice.js`, Leonie): `POST /api/chat` bekommt ein optionales Feld `voice` auf der obersten Ebene des JSON-Bodys, neben `message` und `context`, Typ Boolean. Nur ein echtes `true` schaltet die Sprachregeln für genau diese Antwort ein. Fehlt das Feld, oder ist es `false`, ein String (`"true"`), eine Zahl oder etwas anderes, gilt Textchat. Beispiel: `{"building": "...", "message": "where is the coffee machine?", "voice": true}`. Bei Spracheingabe immer senden, bei getipptem Text weglassen. Im `context` oder im Nachrichtentext hat das Flag keine Wirkung. Umsetzung: `building_agent/voice_rules.py`.
 - Benchmark-Modus (Nachrichten mit `Answer:`) bleibt unverändert: nie Rückfragen.
 - Das Sprech-Modul setzt vor der Schlussfrage eine Pause von 1,2 s (Arbeit des Sprech-Agenten, `web/speech.py`).
 

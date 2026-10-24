@@ -36,5 +36,13 @@ Say every voice step in English, at normal speed, and wait for the spoken answer
 19. Upload one floor plan image, say: "Build this, the building is 40 metres wide." Expected: floors and scale questions only if needed, a preview card with room and door counts.
 20. Say "Yes, save it", then ask a route in the new building. Expected: saved, the page opens it, the route works.
 
+## G. Hands-free (needs Leonie's page part)
+Needs Chrome, the page in the foreground, localhost or https, and the "Hands-free" switch on.
+21. Say: "Hey Marco, where is the coffee machine?" Expected: a question is sent and answered. Say the same sentence without "Hey Marco": nothing happens.
+22. Say only: "Hey Marco." Expected: a short tone and a spoken "Polo!", then your next sentence is the question.
+23. While the answer is being spoken, say "Hey Marco". Expected: the speech stops at once.
+24. Leave the page quiet for 2 minutes, then say "Hey Marco, where is the toilet?" Expected: it still listens (restart worked, no double answers).
+25. Switch Hands-free off and talk. Expected: no permanent microphone, the mic symbol shows it is off, push-to-talk still works.
+
 ## Result log
 Write FAIL lines here with the exact words said and what appeared, then hand them to the agent as bugs.
