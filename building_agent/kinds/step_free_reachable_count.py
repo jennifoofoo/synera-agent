@@ -1,4 +1,5 @@
 import copy
+from collections.abc import Callable
 
 import networkx as nx
 
@@ -6,10 +7,17 @@ from building_agent.registry import Kind
 from starter_agent.building_map import BuildingMap, MapError
 
 
-def step_free_reachable_count(bm: BuildingMap, closed: str, start: str, floor_id: str) -> dict:
-    """Rooms on `floor_id` a wheelchair user can still reach from `start` while `closed` (a lift) is out of service.
+def _is_room(space: dict) -> bool:
+    return space["type"] == "room"
 
-    Step-free graph, no stairs or steps. Only spaces of type "room" count, not corridors, stairwells or lifts."""
+
+def step_free_reachable_count_with(
+    bm: BuildingMap, closed: str, start: str, floor_id: str, *, counted: Callable[[dict], bool] = _is_room
+) -> dict:
+    """step_free_reachable_count with an alternative set of counted spaces (scripts/rule_sensitivity.py).
+
+    The registered kind is this with the default. The tool signature of the registered function is exposed to
+    the LLM, so the reading does not live on it."""
     element = bm.find_element(closed)
     start = bm.resolve_space(start)
     if floor_id not in bm.floors:
@@ -25,11 +33,16 @@ def step_free_reachable_count(bm: BuildingMap, closed: str, start: str, floor_id
     rooms = sorted(
         space_id
         for space_id in reachable
-        if space_id in bm.spaces
-        and bm.spaces[space_id]["floor_id"] == floor_id
-        and bm.spaces[space_id]["type"] == "room"
+        if space_id in bm.spaces and bm.spaces[space_id]["floor_id"] == floor_id and counted(bm.spaces[space_id])
     )
     return {"count": len(rooms), "space_ids": rooms}
+
+
+def step_free_reachable_count(bm: BuildingMap, closed: str, start: str, floor_id: str) -> dict:
+    """Rooms on `floor_id` a wheelchair user can still reach from `start` while `closed` (a lift) is out of service.
+
+    Step-free graph, no stairs or steps. Only spaces of type "room" count, not corridors, stairwells or lifts."""
+    return step_free_reachable_count_with(bm, closed, start, floor_id)
 
 
 KIND = Kind(
