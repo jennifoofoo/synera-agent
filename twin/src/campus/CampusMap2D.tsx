@@ -208,7 +208,7 @@ export function CampusMap2D() {
         {line.length > 1 && (
           <g className="campus-route" pointerEvents="none">
             <path className="casing" d={path(line)} strokeWidth={9 * px} />
-            <path className="line" d={path(line)} strokeWidth={6 * px} />
+            <path className="line" data-audit="campus-route" d={path(line)} strokeWidth={6 * px} />
             {activeLeg?.kind === "link" && activeLeg.from.world_point && activeLeg.to.world_point && (
               <path className="active" d={path([activeLeg.from.world_point, activeLeg.to.world_point])} strokeWidth={6 * px} />
             )}

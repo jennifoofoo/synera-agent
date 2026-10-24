@@ -93,6 +93,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       />
       <Line
         ref={line}
+        name="route-line"
         points={points}
         color={lineColour}
         lineWidth={flat ? (guided ? 4 : 6) : guided ? 2 : 3.5}

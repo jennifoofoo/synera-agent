@@ -188,7 +188,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           const radius = 1.6 * Math.sqrt(d.names.length) + 0.6;
           const label = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
           return (
-            <group key={index} position={at(d.floor_id, d.point)}>
+            <group key={index} name="closed-marker" userData={{ count: d.names.length }} position={at(d.floor_id, d.point)}>
               <Disc radius={radius} colour={COLOURS.danger} opacity={0.28} through />
               <Pulse reducedMotion={reducedMotion}>
                 <Ring radius={radius} colour={COLOURS.danger} width={0.2} through />
