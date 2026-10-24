@@ -340,3 +340,20 @@ def test_tools_without_a_draft_are_tool_errors(rig):
     for name, args in calls:
         with pytest.raises(ToolError):
             rig.tools[name](**args)
+
+
+def test_accept_suggestions_proposes_then_adds_doors_and_invalidates_the_card(rig):
+    rig.build()
+    first, _second = rig.pairs()[0]
+    # remove every door of one room so it becomes isolated and a suggestion exists
+    for a, b in list(rig.pairs()):
+        if first in (a, b):
+            rig.call("fix_draft", action="remove_door", ref=a, other_ref=b)
+    rig.turn()
+    card = rig.call("preview_draft")
+    assert "proposal" in card and "suggest" in card["proposal"].lower()
+    with pytest.raises(ToolError, match="no door suggestions"):
+        # a second accept after the doors exist has nothing left to add
+        rig.call("fix_draft", action="accept_suggestions")
+        rig.call("fix_draft", action="accept_suggestions")
+    assert "proposal" not in rig.call("preview_draft")

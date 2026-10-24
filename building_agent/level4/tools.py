@@ -31,13 +31,14 @@ from building_agent.level4.convert import (
 )
 from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
+from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
 from building_agent.level4.validate import describe, validate
 from starter_agent.building_map import NEW_DOOR_WIDTH_M, BuildingMap, MapError
 from starter_agent.tools import as_json
 
 BUILDINGS_ROOT = Path("agent_output") / "buildings"
 ALONG = ("building_width", "room", "door")
-FIX_ACTIONS = ("add_door", "remove_door", "add_entrance", "set_room_type", "set_scale")
+FIX_ACTIONS = ("add_door", "remove_door", "add_entrance", "set_room_type", "set_scale", "accept_suggestions")
 SIDES = {"north": (0, 1), "south": (0, -1), "east": (1, 0), "west": (-1, 0)}
 MAX_CANDIDATES = 5
 ENTRANCE_ROOM_TYPES = {"lobby", "hall"}
@@ -182,6 +183,14 @@ def _add_entrance(building: dict, fix: tuple, to_metres) -> str:
 def apply_fix(building: dict, fix: tuple, to_metres=None) -> str:
     """Apply one deterministic fix to `building` in place and return what was done. Raises ToolError."""
     action = fix[0]
+    if action == "accept_suggestions":
+        suggestions = suggest_doors(building)
+        if not suggestions:
+            raise ToolError("There are no door suggestions for this draft.")
+        updated = apply_suggestions(building, suggestions)
+        building.clear()
+        building.update(updated)
+        return f"{len(suggestions)} suggested door(s) added."
     if action == "add_entrance":
         return _add_entrance(building, fix, to_metres)
     if action == "set_room_type":
@@ -409,7 +418,8 @@ def make_level4_tools(
         Args:
             action: "add_door" (ref, other_ref), "remove_door" (ref, other_ref), "add_entrance" (ref, optional
                 side or point_px, optional steps), "set_room_type" (ref, room_type) or "set_scale"
-                (known_length_m, along, optional level).
+                (known_length_m, along, optional level) or "accept_suggestions" (no other arguments: add the
+                doors proposed in the last card; only after the person said yes to the proposal).
             side: For add_entrance: "north", "south", "east" or "west" wall of the room (default: its longest
                 outside wall).
             point_px: For add_entrance: [x, y] in image pixels, the entrance goes to the outside wall nearest to it.
@@ -445,7 +455,9 @@ def make_level4_tools(
                 draft.floors[target] = old
                 raise
             return as_json({"done": f"Scale of floor {target}: {scale.note}.", "problems": describe(draft.findings)})
-        if action == "add_entrance":
+        if action == "accept_suggestions":
+            fix = ("accept_suggestions",)
+        elif action == "add_entrance":
             if not ref:
                 raise ToolError("add_entrance needs ref (the room with the entrance).")
             if side is not None:
@@ -516,6 +528,9 @@ def make_level4_tools(
         question = entrance_question(building)
         if question:
             card["question"] = question
+        suggestions = suggest_doors(building)
+        if suggestions:
+            card["proposal"] = describe_suggestions(suggestions)
         if draft.notes:
             card["notes"] = draft.notes
         draft.card_turn, draft.card_version, draft.card_blocked = state.turn, draft.version, not errors.ok
