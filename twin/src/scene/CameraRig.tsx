@@ -142,8 +142,9 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.touches.one = A.NONE;
     c.touches.two = flat ? A.TOUCH_ZOOM_ROTATE : A.TOUCH_DOLLY_ROTATE;
     if (flat) void c.rotateTo(0, PLAN_TILT, false);
-    c.smoothTime = 0.32;
-    c.draggingSmoothTime = 0.08;
+    // Light damping: camera-controls smooths critically (no overshoot, no drift after release).
+    c.smoothTime = 0.13;
+    c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
     const margin = size * 0.6;
