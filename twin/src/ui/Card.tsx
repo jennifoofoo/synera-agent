@@ -122,7 +122,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const select = useTwin((s) => s.select);
   const position = useTwin((s) => s.state?.position ?? null);
   const ask = useTwin((s) => s.ask);
-  const armHere = useTwin((s) => s.armHere);
+  const setHere = useTwin((s) => s.setHere);
   const openDirections = useTwin((s) => s.openDirections);
   const busy = useTwin((s) => s.chatBusy);
 
@@ -146,9 +146,12 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const hereAlready = !!position && position.space_id === roomId;
 
   const imHere = () => {
-    // context.here travels with this one message; the server validates it and sets the position (source "click").
-    armHere(true);
-    void ask("I'm here.");
+    // No agent call: the position is set on screen now and travels as context.here with the next chat message.
+    if (!roomId) return;
+    const floorId = selection.floor_id ?? model.spaceById.get(roomId)?.floor_id;
+    if (!floorId) return;
+    setHere({ space_id: roomId, floor_id: floorId, point: selection.kind === "point" || selection.kind === "space" ? (selection.point ?? null) : null });
+    select(null);
   };
 
   return (

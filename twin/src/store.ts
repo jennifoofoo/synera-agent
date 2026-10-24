@@ -109,6 +109,10 @@ interface TwinState {
   chatBusy: boolean;
   voiceOut: boolean;
   hereArmed: boolean;
+  /** "I'm here" set on screen, not yet told to the server: it travels as context.here with the next chat message. */
+  pendingHere: { space_id: string; floor_id: string; point?: Point | null } | null;
+  /** "I'm here" without the agent: the position is set at once on screen, the server learns it with the next message. */
+  setHere: (here: { space_id: string; floor_id: string; point?: Point | null }) => void;
   /** True while the "You are here" dot is dragged: camera gestures are off (set by scene/HerePin). */
   dragLock: boolean;
   setDragLock: (on: boolean) => void;
@@ -128,6 +132,13 @@ interface TwinState {
   editDirections: (field: "from" | "to" | null) => void;
   /** keepRoute: leave the drawn route (e.g. "Start" guidance); default clears it. */
   closeDirections: (keepRoute?: boolean) => void;
+
+  // --- walking (owner: phone session): "Start" steps through state.route.steps on the client, no agent call.
+  /** Index into state.route.steps while walking; null = not walking. */
+  walkStep: number | null;
+  startWalk: () => void;
+  setWalkStep: (step: number) => void;
+  stopWalk: () => void;
 
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
@@ -208,10 +219,12 @@ export const useTwin = create<TwinState>((set, get) => ({
   chatBusy: false,
   voiceOut: false,
   hereArmed: false,
+  pendingHere: null,
   dragLock: false,
   campusHook: null,
   campusRoute: false,
   directions: null,
+  walkStep: null,
 
   async loadBuildings() {
     try {
@@ -226,7 +239,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   async openBuilding(key) {
-    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null });
+    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null, walkStep: null });
     try {
       const building = await api.building(key);
       const model = buildModel(building);
@@ -313,6 +326,15 @@ export const useTwin = create<TwinState>((set, get) => ({
   setVoiceOut(voiceOut) {
     set({ voiceOut });
   },
+  setHere(here) {
+    set((s) => ({
+      state: s.state ? { ...s.state, position: { space_id: here.space_id, floor_id: here.floor_id, point: here.point ?? null, source: "click" } } : s.state,
+      pendingHere: here,
+      hereArmed: false,
+      focusedFloorId: here.floor_id,
+    }));
+  },
+
   armHere(hereArmed) {
     set({ hereArmed });
   },
@@ -359,6 +381,21 @@ export const useTwin = create<TwinState>((set, get) => ({
     directionsRun++;
     if (!keepRoute && get().state?.route) void get().clearRoute();
   },
+  startWalk() {
+    if (!get().state?.route?.ok) return;
+    set({ walkStep: 0, selection: null, popover: null, replyShown: false });
+    walkFloor(0);
+  },
+  setWalkStep(step) {
+    const steps = walkSteps();
+    if (get().walkStep === null || !steps.length) return;
+    const next = Math.max(0, Math.min(step, steps.length - 1));
+    set({ walkStep: next });
+    walkFloor(next);
+  },
+  stopWalk() {
+    set({ walkStep: null });
+  },
 
   async route(start, destination, stepFree = false) {
     const key = get().buildingKey;
@@ -393,8 +430,16 @@ export const useTwin = create<TwinState>((set, get) => ({
   async ask(message, voice = false, opts = {}) {
     const { buildingKey, selection, hereArmed, model } = get();
     if (!buildingKey || !message.trim()) return null;
+    if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
+      get().startWalk(); // the drawn route already has its steps; no agent call
+      return null;
+    }
     const context: ChatContext = {};
     if (opts.here) context.here = opts.here;
+    else if (get().pendingHere) {
+      const pending = get().pendingHere!;
+      context.here = { space_id: pending.space_id, floor_id: pending.floor_id, ...(pending.point ? { point: pending.point } : {}) };
+    }
     if (selection) {
       if (selection.kind === "space") context.space_id = selection.id;
       if (selection.kind === "asset") (context.asset_id = selection.id), (context.space_id = selection.space_id);
@@ -409,6 +454,7 @@ export const useTwin = create<TwinState>((set, get) => ({
       chat: [...s.chat, { id: ++messageId, role: "user", text: message }],
       chatBusy: true,
       hereArmed: false,
+      pendingHere: null,
     }));
     try {
       const reply = await api.chat(buildingKey, message, hasContext ? context : undefined, voice);
@@ -436,7 +482,8 @@ export const useTwin = create<TwinState>((set, get) => ({
         }
         if (reply.state.guide?.active) {
           const leg = reply.state.guide.leg;
-          const floorId = model?.spaceById.get(leg.from_space_id)?.floor_id;
+          // A stair or lift space belongs to several floors: the leg's first segment says where it starts.
+          const floorId = leg.segments?.[0]?.floor_id ?? model?.spaceById.get(leg.from_space_id)?.floor_id;
           if (floorId) set({ focusedFloorId: floorId });
         } else if (reply.state.position) {
           set({ focusedFloorId: reply.state.position.floor_id });
@@ -484,6 +531,25 @@ async function routeDirections(): Promise<void> {
   if (run !== directionsRun || !useTwin.getState().directions) return; // a newer pick or a close won
   useTwin.setState({ state: result.state, replyShown: false });
   if (result.route.ok && result.route.floors?.length) useTwin.setState({ focusedFloorId: result.route.floors[0] });
+}
+
+/** The steps to walk: the route's own (deterministic, from /api/route), else one line to the destination. */
+export function walkSteps(): string[] {
+  const { state, model } = useTwin.getState();
+  const route = state?.route;
+  if (!route?.ok) return [];
+  if (route.steps?.length) return route.steps;
+  const name = route.destination ? model?.spaceById.get(route.destination)?.name || route.destination : "the destination";
+  return [`Go to ${name}.`];
+}
+
+/** Show the floor a step starts on: the route's floors in order, one further after each ride ("Take …"/"Use … to …"). */
+function walkFloor(step: number): void {
+  const route = useTwin.getState().state?.route;
+  const floors = route?.floors ?? [];
+  if (!floors.length) return;
+  const rides = walkSteps().slice(0, step).filter((line) => /^(Take|Use) .+ to /.test(line)).length;
+  useTwin.setState({ focusedFloorId: floors[Math.min(rides, floors.length - 1)] });
 }
 
 if (typeof window !== "undefined") {

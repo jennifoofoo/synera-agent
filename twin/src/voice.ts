@@ -36,16 +36,23 @@ export function speechInputProblem(): string | null {
 }
 
 export interface Listener {
-  /** Stop listening and send what was heard so far. */
+  /** Stop listening and send what was heard so far (within a short grace for the final words). */
   stop: () => void;
   /** Stop listening and drop what was heard. */
   cancel: () => void;
 }
 
+// After stop(), wait this long for the engine's final result or onend; iOS Safari often sends neither.
+const STOP_GRACE_MS = 450;
+// Safety net: a listen that never ends on its own (iOS sometimes hangs) is stopped after this.
+const MAX_LISTEN_MS = 30_000;
+
 /**
  * Push-to-talk: listen once. `onInterim` gets the live transcript, `onFinal` the finished sentence (only when
- * something was heard), `onEnd` always runs last, with the raw recognition error code when something went wrong
- * (word it with `voiceHint(code)`); "no-speech" and "aborted" are not errors.
+ * something was heard), `onEnd` always runs last and exactly once, with the raw recognition error code when
+ * something went wrong (word it with `voiceHint(code)`); "no-speech" and "aborted" are not errors.
+ * The listener ends itself: it never waits on the engine's onend, and always aborts the recognition so the mic
+ * is released (iOS keeps it open after stop() until onend, which may never come).
  */
 export function listen(
   lang: string,
@@ -53,7 +60,8 @@ export function listen(
 ): Listener {
   const Ctor = recognitionCtor();
   if (!Ctor) {
-    handlers.onEnd("unsupported");
+    // Async, so the caller has stored the returned listener before onEnd clears it.
+    window.setTimeout(() => handlers.onEnd("unsupported"), 0);
     return { stop: () => {}, cancel: () => {} };
   }
   const recognition = new Ctor();
@@ -61,39 +69,61 @@ export function listen(
   recognition.interimResults = true;
   recognition.continuous = false;
   let heard = "";
-  let cancelled = false;
-  let ended = false;
+  let stopping = false;
+  let finished = false;
   let error: string | undefined;
+  let graceTimer = 0;
+
+  const finish = (send: boolean) => {
+    if (finished) return;
+    finished = true;
+    window.clearTimeout(graceTimer);
+    window.clearTimeout(maxTimer);
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    try {
+      recognition.abort();
+    } catch {
+      /* already ended */
+    }
+    if (send && heard) handlers.onFinal(heard);
+    handlers.onEnd(error);
+  };
+  const stop = () => {
+    if (finished || stopping) return;
+    stopping = true;
+    try {
+      recognition.stop();
+    } catch {
+      /* not started */
+    }
+    graceTimer = window.setTimeout(() => finish(true), STOP_GRACE_MS);
+  };
+  const maxTimer = window.setTimeout(stop, MAX_LISTEN_MS);
+
   recognition.onresult = (event) => {
-    heard = Array.from(event.results)
+    const results = Array.from(event.results);
+    heard = results
       .map((result) => result[0]?.transcript ?? "")
       .join(" ")
       .replace(/\s+/g, " ")
       .trim();
     handlers.onInterim?.(heard);
+    if (stopping && results.length > 0 && results[results.length - 1].isFinal) finish(true);
   };
   recognition.onerror = (event) => {
     if (event.error !== "no-speech" && event.error !== "aborted") error = event.error;
+    finish(true);
   };
-  recognition.onend = () => {
-    if (ended) return;
-    ended = true;
-    if (!cancelled && heard) handlers.onFinal(heard);
-    handlers.onEnd(error);
-  };
+  recognition.onend = () => finish(true);
   try {
     recognition.start();
   } catch {
-    ended = true;
-    handlers.onEnd("start-failed");
+    error = "start-failed";
+    window.setTimeout(() => finish(false), 0);
   }
-  return {
-    stop: () => recognition.stop(),
-    cancel: () => {
-      cancelled = true;
-      recognition.abort();
-    },
-  };
+  return { stop, cancel: () => finish(false) };
 }
 
 /** @deprecated kept for older callers; use `listen`. */

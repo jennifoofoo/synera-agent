@@ -5,6 +5,7 @@ export function ChangesPill() {
   const state = useTwin((s) => s.state);
   const reset = useTwin((s) => s.reset);
   const clearRoute = useTwin((s) => s.clearRoute);
+  const worker = useTwin((s) => s.profile === "worker");
   if (!state) return null;
   const parts: string[] = [];
   if (state.closed.length) parts.push(`${state.closed.length} closed`);
@@ -16,7 +17,7 @@ export function ChangesPill() {
     Object.keys(state.widened_openings ?? {}).length +
     state.added_doors.length;
   if (edits) parts.push(`${edits} edit${edits > 1 ? "s" : ""}`);
-  const hasRoute = !!state.route;
+  const hasRoute = !!state.route && !worker; // phone: the route's length and clear live in the bottom sheet
   if (!parts.length && !hasRoute) return null;
   return (
     <div className="pill">

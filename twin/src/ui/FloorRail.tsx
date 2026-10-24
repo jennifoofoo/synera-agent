@@ -65,9 +65,11 @@ export function FloorRail() {
           </button>
         );
       })}
-      <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view" aria-label="Home view">
-        ⌂
-      </button>
+      {profile !== "worker" && (
+        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view" aria-label="Home view">
+          ⌂
+        </button>
+      )}
     </div>
   );
 }
