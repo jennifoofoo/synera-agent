@@ -7,7 +7,10 @@ import { useTwin, walkSteps } from "../store";
 import { PhoneSheet } from "./PhoneSheet";
 import "./Walk.css";
 
-const WALK_M_PER_MIN = 72; // 1.2 m/s, indoor walking pace
+/** Walking time in whole minutes (1.2 m/s indoors, at least 1). */
+export function walkMinutes(lengthM: number): number {
+  return Math.max(1, Math.round(lengthM / 72));
+}
 
 export function Walk() {
   const model = useTwin((s) => s.model);
@@ -31,7 +34,7 @@ export function Walk() {
   const steps = walkSteps().map(readable);
   const last = step >= steps.length - 1;
   const length = route.length_m !== undefined ? Math.round(route.length_m) : null;
-  const minutes = length !== null ? Math.max(1, Math.round(length / WALK_M_PER_MIN)) : null;
+  const minutes = length !== null ? walkMinutes(length) : null;
   const end = () => {
     stopWalk();
     void clearRoute();
