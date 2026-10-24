@@ -195,7 +195,8 @@ def test_tap_pin_then_here_then_drag(page, server):
     page.get_by_role("button", name="I'm here").click()
     page.wait_for_function("window.__twinScene.getObjectByName('here-dot')", timeout=10000)
     page.wait_for_function("!window.__twinScene.getObjectByName('tap-pin')", timeout=10000)
-    state = get_json(f"{server}/api/building?key={key}")["state"]["position"]
+    # "I'm here" is set on screen at once (no agent call); the server learns it with the next chat message.
+    state = page.evaluate(PAGE_POSITION)
     assert state and state["point"] and state["source"] == "click"
     first = state["point"]
     assert abs(first[0] - float(match[1])) <= 0.06 and abs(first[1] - float(match[2])) <= 0.06
@@ -211,7 +212,7 @@ def test_tap_pin_then_here_then_drag(page, server):
         (touch_drag if page.kind == "phone" else mouse_drag)(page, start, end)
         deadline = time.time() + 3
         while time.time() < deadline:
-            now = get_json(f"{server}/api/building?key={key}")["state"]["position"]
+            now = page.evaluate(PAGE_POSITION)
             if now and now["point"] != first:
                 moved = now
                 break
@@ -226,6 +227,9 @@ def test_tap_pin_then_here_then_drag(page, server):
     page.wait_for_timeout(500)
     shot(page, "after-drag")
     assert not page.errors, page.errors
+
+
+PAGE_POSITION = "() => window.__twinAudit.store.getState().state.position"
 
 
 # Screen box (client px) of a marker drawn at a constant size: its centre projected, +- the radius in px.
