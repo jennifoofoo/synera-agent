@@ -303,3 +303,93 @@ Segmentation against the true polygons of 122 dev floors (all four sources, no A
 - Segment alone lifts room recall on the cached floors (swiss 0.80/0.78, osm 0.86 to 1.00) but not routes: added rooms have no doors. Segment + markers is what pays off: osm pairs >= 0.99 34% to 89% (94% with suggestions), swiss-203 3% to 19%, swiss-31 6% to 9%, invalid sequences 0 everywhere, clean floors unchanged. Suggestions only turn no-route into invalid on swiss (guessed doors that do not exist).
 - Swiss limit: the doors between apartment and stairwell are not drawn in the plain image, so no marker finds them (diagnosed on swiss-31: 5 of 31 true openings missing, 4 of them stairwell doors).
 - Segmentation limits: same-coloured rooms with no wall drawn between them (osm-way360544293, grey rooms inside a grey hall) cannot be separated; closets of about 10 px under door dots are lost; fills that are not flat (hatching, photos) are skipped via the fill-share guard. Swiss polygons run about 3% large (rotated walls are wider, IoU median 0.94).
+
+### Live test: two floors, furniture, other style (2026-10-24, claude-sonnet-5-5, prompt 9f2a64f5)
+
+Real vision calls through the real conversation tools (`build_from_plan`, `preview_draft`, `save_building`, same Rig wiring as `tests/test_level4_tools.py`), script `scripts/level4_live_test.py`. 11 vision calls, 0.240 USD in total (list price, not checked against an invoice), limits were 20 calls and 1.00 USD. The scale is the true floor width per call. No pipeline code was changed. Cached extractions: `agent_output/level4_cache/live_*`.
+
+#### A. Two floors (level 0 then level 1 from `floor_N_plain.png`, then card, then save)
+
+Per floor, against the original floor (same measures as the single-floor eval):
+
+| Building:floor | Rooms found/true | Doors found/true | Entrances found/true | Area err (median) | Judge pairs >= 0.99 | Judge invalid / no route | Seconds | Cost USD |
+|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 28/28 | 27/27 | 2/2 | 0.5% | 100% (156) | 0 / 0 | 10.3 | 0.0254 |
+| proc-campus-dev-000:1 | 31/31 | 30/30 | 0/0 | 0.6% | 100% (174) | 0 / 0 | 11.0 | 0.0269 |
+| swiss-1785:0 | 35/35 | 36/35 | 2/2 | 3.0% | 99% (197) | 0 / 0 | 15.4 | 0.0263 |
+| swiss-1785:1 | 35/35 | 36/35 | 0/0 | 2.7% | 94% (87) | 0 / 0 | 17.3 | 0.0248 |
+| osm-way360544293:0 | 9/20 | 0/18 | 7/7 | 0.7% | 0% (35) | 0 / 35 | 6.3 | 0.0186 |
+| osm-way360544293:1 | 11/19 | 0/18 | 8/11 | 1.3% | 0% (40) | 0 / 40 | 9.3 | 0.0190 |
+
+swiss-1785 was picked as the multi-floor Swiss building with stairs and a lift between levels 0 and 1. The first pick, osm-way360544293 (8 lifts), is the known hard OSM case (see the segmentation limits above), so it is reported as a second data point. Floor widths used as known length: proc 14.4 m, swiss 26.0 m on both floors, osm 260 m and 288 m.
+
+After saving and loading the building (`BuildingMap.load`): cross-floor routes between matched rooms of level 0 and level 1 with `routing.route`, scored with the judge rule (best length on the original / length of our room sequence, mapped back to original ids):
+
+| Building | Floors saved | Connectors original (0-1) | Connectors created | Cross-floor pairs | Pairs >= 0.99 | No route | Invalid | Step-free pairs reached by our route |
+|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000 | 2 | 6 (3 stairs, 3 lifts) | 0 | 292 | 0% | 292 | 0 | 0 of 292 |
+| swiss-1785 | 2 | 3 (2 stairs, 1 lift) | 0 | 350 | 0% | 350 | 0 | 0 of 225 (125 more pairs are not step-free in the original either) |
+| osm-way360544293 | 2 | 8 (lifts) | 0 | 96 | 0% | 96 | 0 | 0 of 90 |
+
+Result: all three buildings loaded with 2 floors and the right room counts, but no stairs or lifts were created, so there is no route between the floors at all, step-free included. Reason: the vision model typed every numbered stair and lift room as `room` (proc, swiss), and Swiss and OSM plans have no separate stair shape (numbered "stair hall" corridors). Connectors are only linked between rooms typed `stair` or `lift` (`convert._link_connectors`). Extraction of proc floor 0: 27 `room`, 1 `corridor`, no `stair`, no `lift`.
+
+What the person sees, proc as the example:
+- After the second `build_from_plan`: "31 rooms have no way out, doors are probably missing: 1.01, 1.02, ..." (floor 1 has no entrance of its own, floor 0 has two). The card has `can be saved: false` and "saving blocked".
+- `save_building` with "yes, save it" is refused (correctly) because of that error. Saving needs `accept_problems` and a reply with "anyway". After that the building is saved and active, with no way between the floors and no warning about missing stairs. The text blames missing doors, not missing stairs or lifts.
+- No `connector_single_floor` finding appears, because no room was typed as stair or lift.
+- Fix attempt: `fix_draft set_room_type` for all true stair and lift rooms (0.04, 1.04, 0.05, 1.05, ...) answers "0.04 is now a stairwell." each time, but the draft still has 0 connectors and the same "no way out" problem (swiss: the same). The fix changes only `room_type`, the linking reads the extraction `type`, so it cannot repair this, while the reply sounds like success.
+
+Upper bound (not what the person gets): the same cached extractions with the true stairs and lifts retyped as `stair` and `lift` (matched by ref and level), then the real tools again, no API call:
+
+| Building | Connectors created / original | Cross-floor pairs >= 0.99 | No route | Invalid | Step-free pairs >= 0.99 | Our length / original `route` length (median, max) | Card |
+|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000 | 6 / 6 (kinds right) | 100% (292) | 0 | 0 | 100% (292) | 0.95 (0.98), step-free 0.98 (0.99) | No problems found, plain yes saves |
+| swiss-1785 | 1 / 3 | 31% (350) | 240 | 0 | 0% (0 of 225) | 0.99 (1.01) | "1 stair or lift could not be matched to a room on another floor: 1.34", 20 rooms with no way out, blocked |
+
+So conversion and routing across floors work when the types are right (proc: every pair full marks, the step-free route over the lift works, our lengths are 2 to 5% shorter than the kit `route` because of the door-to-door model, the judge rule gives full marks). The Swiss case is only partly a typing problem: the true building hangs a stair and a lift on the same stair-hall space, and the hall number changes per floor (0.35, 1.34, 2.30), so ref-based linking links one connector. For osm the upper bound was not possible (no usable refs). Floor images are cropped per floor (osm 1387 and 936 px wide, proc 276 and 275), so overlap linking (`MIN_STAIR_OVERLAP`) depends on aligned frames; harmless on proc (1 px), untested on osm.
+
+OSM findings the person would also see (known extraction limits): 9 of 20 rooms on floor 0, 0 doors (5 door and 13 opening markers found but dropped with "does not join two rooms (0 rooms within 8 px)", the merged rooms are too big), "the building would be an unlikely size, the scale is probably wrong" and "4 rooms have an unlikely size" although the 260 m wide building is real, 17 pairs of overlapping rooms, 3 entrance markers left out. The image was downscaled from 1387x3119 to 1334x3000 px. The card proposed 17 doors.
+
+#### B. Plans with furniture (`floor_0.png` against `floor_0_plain.png`, level 0, true width as known length)
+
+| Building | Image | Model rooms/openings (before segment, markers) | Segments (fill share) | Markers door/opening/entrance | Rooms found/true | Doors found/true | Entrances found/true | Area err (median) | Judge pairs >= 0.99 | Seconds | Cost USD |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000 | plain | 28/29 | 28 (0.945) | 27/0/2 | 28/28 | 27/27 | 2/2 | 0.5% | 100% (156) | 10.3 | 0.0254 |
+| proc-campus-dev-000 | furniture | 28/25 | 28 (0.829) | 27/0/2 | 28/28 | 27/27 | 2/2 | 2.7% | 100% (156) | 10.0 | 0.0247 |
+| resplan-439 | plain | 8/8 | 8 (0.935) | 6/1/1 | 8/8 | 7/7 | 1/1 | 1.0% | 100% (30) | 5.1 | 0.0120 |
+| resplan-439 | furniture | 8/8 | 8 (0.785) | 6/1/1 | 8/8 | 7/7 | 1/1 | 1.3% | 100% (30) | 5.1 | 0.0120 |
+
+- Colour segmentation still works with furniture. The furniture colours (tan, blue, green pieces) did not become extra rooms (28 and 8 regions in both versions, no `room_added_from_image`). The flat-fill share drops from 0.95 to 0.83 and from 0.94 to 0.79 but stays far above the 0.5 guard. Marker detection finds exactly the same doors, openings and entrances as on the plain image (no false markers from furniture). Scale handling is identical (0.072 and 0.0386 m/px, same known length).
+- What changes: the model alone misses 4 of 27 doors on the proc furniture plan (23 doors, 2 entrances), the markers repair all of them (27/27). The median room area error rises from 0.5% to 2.7% on proc (1.0% to 1.3% on resplan). Not diagnosed; probably furniture ink inside the fills shrinks or notches the segmented outlines. Routes are not affected (judge 100%, 0 invalid).
+- The two resplan answers (plain and furniture) have identical counts; they are two separate calls (two cache files, slightly different token costs).
+
+#### C. Other drawing style (negative control, floor 0 of proc-campus-dev-000, palette swapped with PIL)
+
+| Image | Segments (fill share) | Markers door/opening/entrance | Card notes | Rooms found/true | Doors found/true | Entrances found/true | Area err (median) | Judge pairs >= 0.99 | Seconds | Cost USD |
+|---|---|---|---|---|---|---|---|---|---|---|
+| original | 28 (0.945) | 27/0/2 | none | 28/28 | 27/27 | 2/2 | 0.5% | 100% (156) | 10.3 | 0.0254 |
+| inverted colours | 0 (0.003), not usable | 0/0/0 | "segmentation_skipped: no regions" | 28/28 | 27/27 | 2/2 | 0.6% | 100% (156) | 10.8 | 0.0254 |
+| greyscale | 25 (0.904), usable | 0/0/0 | 3 x "room_without_region: ... keeps the model polygon" | 28/28 | 27/27 | 2/2 | 0.6% | 100% (156) | 13.7 | 0.0251 |
+
+- Clean fallback, no crash. Inverted: no flat fill is found, segmentation is skipped with a note on the card, marker detection finds nothing (silently, no note), the model polygons and doors are used. Greyscale: the fills are learned as extra colours (`fill_c0c0c0`, `fill_efefef`), 25 of 28 rooms get a region, 3 keep the model polygon (noted), the brown door dots turn dark grey and are not found as markers.
+- Quality is as good as the original (28/28, 27/27, 2/2, area error 0.6%) because the model reads the recoloured plan as well as the original and this plan is simple and clean. This is a palette swap, not a real other style (line drawing, photo, hatching). It shows the fallback is safe, not that arbitrary plans work. The swiss and osm runs above (rooms 9/20, 0 doors on osm) show what happens on harder plans.
+
+#### Defects found (report only, nothing fixed)
+
+| # | Severity | Defect |
+|---|---|---|
+| 1 | High | Two-floor builds create no stairs or lifts (0 of 6, 0 of 3, 0 of 8), so there is no route between floors at all, step-free included. The vision model types numbered stair and lift rooms as `room`, the linker needs `stair` or `lift`. No fallback by name, ref, colour or by asking. |
+| 2 | High | `fix_draft set_room_type` ("stairwell", "lift") cannot repair it: it answers "is now a stairwell" but changes only `room_type`, connectors are built from `type` in the conversion, so the connector count stays 0 and the problem stays. A silent no-op that looks like success. |
+| 3 | High | Misleading card: floors above the entrance level without connectors give "N rooms have no way out, doors are probably missing", saving is blocked, and the person can only save with "save anyway". There is no message like "no stairs or lifts between the floors found, which rooms are the stairs?". |
+| 4 | Medium | Stair halls (swiss, osm): stairs and lift hang on the same corridor-typed hall, with a different number per floor. A stair or lift cannot be its own room there, so even correct typing links 1 of 3 (swiss-1785). |
+| 5 | Medium | The unlikely-size check fires on real large buildings (osm 260 m and 288 m wide) and blocks saving, although the person gave the length. |
+| 6 | Medium | Floor frames are not aligned (each image has its own crop, osm 1387 vs 936 px). Overlap linking of stairs would fail there, ref linking needs equal numbers. Untestable because of defect 1. |
+| 7 | Low | Furniture raises the median area error from 0.5% to 2.7% (proc), and the model alone misses 4 of 27 doors (markers repair them). Not diagnosed. |
+| 8 | Low | A plan where marker detection finds nothing (inverted, greyscale) gives no card note, so the person does not learn that door checking ran on the model alone. |
+| 9 | Known | OSM floors: 9/20 rooms and 0 doors found (markers dropped as "0 rooms within 8 px"), as in the segmentation limits above. |
+
+#### What this implies
+
+- The single-floor numbers do not carry over to buildings: with 100% rooms and doors on both floors the person still gets a building without stairs, which can only be saved with "save anyway", and every cross-floor question fails. With the stairs typed right the same pipeline gives 100% cross-floor routes (proc, 292 pairs, step-free included), so the gap is the typing and the repair path, not routing.
+- Next steps in this order: (1) when 2 or more floors have no connector, ask on the card which rooms are the stairs and lifts, and make `set_room_type` with a stair or lift type set `type` and relink (test: two-floor draft, `fix_draft`, then `vertical_connectors` is not empty, currently red); (2) say "no stairs or lifts found between the floors" instead of "doors missing", and do not count upper floors as "no way out" before connectors exist; (3) let the prompt and the linker also use name and ref hints ("stair", "lift", "Treppe", "Aufzug"); (4) decide how stair halls with stairs and a lift on one space are represented; (5) relax the unlikely-size check when the person gave the length themselves.
+- Reproduce (cached, no API cost): `uv run python scripts/level4_live_test.py a --building proc-campus-dev-000` (also `swiss-1785`, `osm-way360544293`), `b --building resplan-439`, `c --building proc-campus-dev-000 --mode invert`. A changed image or prompt costs about 0.01 to 0.03 USD per floor and needs the key via `uv run --env-file`.
