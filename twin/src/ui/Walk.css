@@ -5,22 +5,7 @@
 .card-walk .walk-now p { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600; }
 .card-walk .walk-icon { flex: none; color: var(--walk-blue); }
 .card-walk button.primary { background: var(--walk-blue); border-color: var(--walk-blue); color: #fff; }
-.card-walk .walk-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
-.card-walk .walk-foot .walk-toggle { margin: 0; }
-/* Auto-Pace: one compact pill that cycles Off → Say → Ask; filled blue while on. */
-.card-walk button.walk-auto {
-  flex: none; margin-left: auto; display: inline-flex; gap: 6px; align-items: center; min-height: 32px; padding: 0 12px;
-  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600;
-}
-.card-walk button.walk-auto.say, .card-walk button.walk-auto.ask { border-color: var(--walk-blue); background: var(--walk-blue); color: #fff; }
-.card-walk button.walk-auto b { font-weight: 700; padding-left: 6px; border-left: 1px solid rgba(255, 255, 255, 0.5); }
-.card-walk .walk-pace { display: flex; flex-direction: column; justify-content: center; min-height: 32px; margin-top: 4px; }
-.card-walk .walk-pace-bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.card-walk .walk-pace-bar span { display: block; height: 100%; background: var(--walk-blue); transform-origin: left; animation: walk-pace linear forwards; }
-@keyframes walk-pace { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.card-walk .walk-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; font-size: 15px; font-weight: 600; color: var(--walk-blue); }
-.card-walk .walk-ask .card-muted { font-weight: 400; }
-.card-walk .walk-say-yes { margin-left: auto; }
+.card-walk .walk-toggle { display: block; margin: 8px auto 0; }
 .walk-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .walk-list button {
   display: flex; gap: 10px; align-items: baseline; width: 100%; min-height: 44px; padding: 10px 4px;
