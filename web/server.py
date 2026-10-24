@@ -61,7 +61,8 @@ from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 from web.selection import check_here, check_selection
 
-STATIC = Path(__file__).parent / "static"
+# The page is the React twin (twin/), built with `cd twin && npm run build`; the old plain-JS page is gone.
+STATIC = Path(__file__).resolve().parents[1] / "twin" / "dist"
 CAMPUS_ROOT = Path(__file__).resolve().parent.parent / "campuses"  # repo root, not the working directory
 DEFAULT_PORT = 8765
 DEFAULT_HOST = "127.0.0.1"
