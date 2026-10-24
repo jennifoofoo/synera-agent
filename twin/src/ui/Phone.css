@@ -12,14 +12,13 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
   overflow: hidden; overscroll-behavior: none;
 }
 
-/* header: Back · name · Search, one 44 px row under the notch */
+/* header: name · Search, one 44 px row under the notch */
 .worker { --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); --head-y: calc(var(--safe-t) + 8px); }
-.phone-back, .phone-search {
+.phone-search {
   position: absolute; top: var(--head-y); z-index: 4; width: 44px; height: 44px; min-height: 44px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
   background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
-.phone-back { left: calc(var(--safe-l) + 8px); }
 .phone-search { right: calc(var(--safe-r) + 8px); }
 .worker .topbar { top: var(--head-y); left: calc(var(--safe-l) + 60px); right: calc(var(--safe-r) + 60px); display: flex; justify-content: center; }
 .worker .building-name { height: 44px; max-width: 100%; padding: 0 14px; font-size: 16px; }
