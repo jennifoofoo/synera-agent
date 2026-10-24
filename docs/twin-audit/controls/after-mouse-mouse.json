@@ -1,0 +1,118 @@
+{
+ "webkit-desk": {
+  "mode": "3d",
+  "notch100": 1.175,
+  "in5x500": 0.446,
+  "out5x500": 2.243,
+  "pinch10x4": 0.54,
+  "pan_right": {
+   "dt": 22.1,
+   "dAz": 0
+  },
+  "pan_middle": {
+   "dt": 22.1,
+   "dAz": 0
+  },
+  "pan_shift-left": {
+   "dt": 22.1,
+   "dAz": 0
+  },
+  "leftDrag": {
+   "dAz": -1.309,
+   "dt": 0
+  },
+  "dblclick": {
+   "dDist": 0.373,
+   "dt": 18.12,
+   "req": "object"
+  },
+  "scrollY": 0
+ },
+ "webkit-ipad": {
+  "mode": "2d",
+  "notch100": 0.851,
+  "in5x500": 1.992,
+  "out5x500": 0.509,
+  "pinch10x4": 1.37,
+  "pan_right": {
+   "dt": 31.48,
+   "dAz": 0
+  },
+  "pan_middle": {
+   "dt": 31.48,
+   "dAz": 0
+  },
+  "pan_shift-left": {
+   "dt": 31.48,
+   "dAz": 0
+  },
+  "leftDrag": {
+   "dAz": 0,
+   "dt": 28.03
+  },
+  "dblclick": {
+   "dDist": 2,
+   "dt": 15.17,
+   "req": "home"
+  },
+  "scrollY": 0
+ },
+ "chromium-desk": {
+  "mode": "3d",
+  "notch100": 1.094,
+  "in5x500": 0.446,
+  "out5x500": 2.243,
+  "pinch10x4": 0.735,
+  "pan_right": {
+   "dt": 22.1,
+   "dAz": 0
+  },
+  "pan_middle": {
+   "dt": 22.1,
+   "dAz": 0
+  },
+  "pan_shift-left": {
+   "dt": 22.1,
+   "dAz": 0
+  },
+  "leftDrag": {
+   "dAz": -1.309,
+   "dt": 0
+  },
+  "dblclick": {
+   "dDist": 0.373,
+   "dt": 18.12,
+   "req": "object"
+  },
+  "scrollY": 0
+ },
+ "chromium-ipad": {
+  "mode": "2d",
+  "notch100": 0.914,
+  "in5x500": 2.175,
+  "out5x500": 0.366,
+  "pinch10x4": 1.016,
+  "pan_right": {
+   "dt": 38.6,
+   "dAz": 0
+  },
+  "pan_middle": {
+   "dt": 38.6,
+   "dAz": 0
+  },
+  "pan_shift-left": {
+   "dt": 38.6,
+   "dAz": 0
+  },
+  "leftDrag": {
+   "dAz": 0,
+   "dt": 35.84
+  },
+  "dblclick": {
+   "dDist": 2,
+   "dt": 16.9,
+   "req": "home"
+  },
+  "scrollY": 0
+ }
+}
