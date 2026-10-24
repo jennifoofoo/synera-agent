@@ -118,6 +118,11 @@ ol.steps { margin: 8px 0 0; padding-left: 22px; }
 ol.steps li { margin: 3px 0; }
 ol.steps li.floor-change { font-weight: 600; }
 
+.panel[data-panel="route"] { position: relative; }
+.suggest { position: absolute; z-index: 10; background: #fff; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; }
+.suggest-item { display: flex; justify-content: space-between; gap: 8px; padding: 7px 10px; cursor: pointer; }
+.suggest-item:hover, .suggest-item.active { background: #f1f5fe; }
+.suggest-item .kind { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .find-results { display: flex; flex-direction: column; gap: 4px; }
 .result { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; background: #fff; }
 .result:hover { border-color: var(--accent); }

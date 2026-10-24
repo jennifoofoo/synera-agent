@@ -65,10 +65,11 @@
     </div>
 
     <div class="panel" data-panel="route">
+      <div id="suggest" class="suggest" hidden></div>
       <form id="route-form" class="route-form">
-        <label>From <input id="route-from" list="space-names" autocomplete="off" placeholder="Click a room or type"></label>
+        <label>From <input id="route-from" autocomplete="off" placeholder="Click a room or type"></label>
         <div id="via-list"></div>
-        <label>To <input id="route-to" list="space-names" autocomplete="off" placeholder="Click a room or type"></label>
+        <label>To <input id="route-to" autocomplete="off" placeholder="Click a room or type"></label>
         <div class="row">
           <label class="check"><input type="checkbox" id="route-stepfree"> Step-free</label>
           <button type="button" id="add-via" class="link">+ stop</button>
@@ -100,7 +101,6 @@
     </div>
   </aside>
 </main>
-<datalist id="space-names"></datalist>
 <script src="app.js"></script>
 </body>
 </html>
