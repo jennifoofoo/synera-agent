@@ -1,0 +1,130 @@
+{
+ "webkit-3d": {
+  "W_600ms": 50.41,
+  "W_dir": {
+   "dx": 35.65,
+   "dz": -35.65
+  },
+  "D_600ms": 43.15,
+  "D_dir": {
+   "dx": 30.51,
+   "dz": 30.51
+  },
+  "ArrowLeft_600ms": 43.79,
+  "shiftW_600ms": 72.68,
+  "E_dAz": -0.768,
+  "Q_dAz": 0.78,
+  "R_ratio": 0.425,
+  "F_ratio": 2.366,
+  "blurDrift": 0,
+  "frames": 734,
+  "typedMoved": 0,
+  "inputValue": "wasdqe",
+  "homeResets": true,
+  "levels": "0,1",
+  "after1": true,
+  "afterG": true,
+  "T": "3d->2d",
+  "helpOpen": true,
+  "helpClosedByKey": true,
+  "helpKeySwallowed": true,
+  "helpEsc": true,
+  "listOpens": true
+ },
+ "webkit-2d": {
+  "W_600ms": 38.53,
+  "W_dir": {
+   "dx": 0,
+   "dz": -38.53
+  },
+  "D_600ms": 38.53,
+  "D_dir": {
+   "dx": 38.53,
+   "dz": 0
+  },
+  "ArrowLeft_600ms": 39.56,
+  "shiftW_600ms": 55.52,
+  "E_dAz": -0.801,
+  "Q_dAz": 0.78,
+  "R_ratio": 2.32,
+  "F_ratio": 0.431,
+  "blurDrift": 0,
+  "frames": 725,
+  "typedMoved": 0,
+  "inputValue": "wasdqe",
+  "homeResets": true,
+  "levels": "0,1",
+  "after1": true,
+  "afterG": true,
+  "T": "2d->3d",
+  "helpOpen": true,
+  "helpClosedByKey": true,
+  "helpKeySwallowed": true,
+  "helpEsc": true,
+  "listOpens": true
+ },
+ "chromium-3d": {
+  "W_600ms": 7.19,
+  "W_dir": {
+   "dx": 5.08,
+   "dz": -5.08
+  },
+  "D_600ms": 7.19,
+  "D_dir": {
+   "dx": 5.08,
+   "dz": 5.08
+  },
+  "ArrowLeft_600ms": 7.19,
+  "shiftW_600ms": 21.57,
+  "E_dAz": -0.26,
+  "Q_dAz": 0.26,
+  "R_ratio": 0.756,
+  "F_ratio": 1.323,
+  "blurDrift": 0,
+  "frames": 53,
+  "typedMoved": 0,
+  "inputValue": "wasdqe",
+  "homeResets": true,
+  "levels": "0,1",
+  "after1": true,
+  "afterG": true,
+  "T": "3d->2d",
+  "helpOpen": true,
+  "helpClosedByKey": true,
+  "helpKeySwallowed": true,
+  "helpEsc": true,
+  "listOpens": true
+ },
+ "chromium-2d": {
+  "W_600ms": 39.61,
+  "W_dir": {
+   "dx": 0,
+   "dz": -39.61
+  },
+  "D_600ms": 38.53,
+  "D_dir": {
+   "dx": 38.53,
+   "dz": 0
+  },
+  "ArrowLeft_600ms": 38.54,
+  "shiftW_600ms": 54.44,
+  "E_dAz": -0.791,
+  "Q_dAz": 0.8,
+  "R_ratio": 2.355,
+  "F_ratio": 0.415,
+  "blurDrift": 0,
+  "frames": 667,
+  "typedMoved": 0,
+  "inputValue": "wasdqe",
+  "homeResets": true,
+  "levels": "0,1",
+  "after1": true,
+  "afterG": true,
+  "T": "2d->3d",
+  "helpOpen": true,
+  "helpClosedByKey": true,
+  "helpKeySwallowed": true,
+  "helpEsc": true,
+  "listOpens": true
+ }
+}

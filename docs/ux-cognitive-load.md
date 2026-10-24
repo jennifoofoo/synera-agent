@@ -17,5 +17,8 @@ Synera (Bhushan Kotnis): UI/UX ist ein Bewertungskriterium, gutes UX senkt die k
 ## Routenkarte (Screenshot Jennifer 23:13)
 Für kurze Routen zu viel Text: Satz, Liste, Schlusssatz, "less"-Knopf und Fußzeile. Ziel: eine Zeile ("17 m to Main aisle H-B3 · 2 steps") plus "Guide me", die Schritte erst beim Aufklappen oder per Sprache. Text kommt aus dem Chat, die Karte zeigt ihn nur kompakt. Fehler im Text selbst ("door" bei offener Passage, "You're there" vor dem Losgehen) fixt `fix/route-wording`.
 
+## Gefundene Kleinigkeiten (für den UX-Durchgang)
+- Desktop 2D, Routenkarte offen: ein zweiter Griff (▬) liegt unten mitten auf dem "Guide me"-Knopf (Screenshot Jennifer 23:40). Nur ein Griff pro Sheet.
+
 ## Für die Demo (Interaction 25 Punkte)
 Ein Satz im Pitch: "Every screen has one job and at most two buttons; you can do everything by voice, so you never need to read the map while walking."

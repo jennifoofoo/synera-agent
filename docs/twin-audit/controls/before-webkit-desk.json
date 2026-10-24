@@ -1,0 +1,56 @@
+{
+ "tag": "before-webkit-desk",
+ "errors": [],
+ "routeOk": true,
+ "restDiff": 0,
+ "dragJumpMax": 0.0551,
+ "dragJumpMean": 0.0461,
+ "dragJumps": [
+  0.025,
+  0.041,
+  0.042,
+  0.0426,
+  0.0431,
+  0.043,
+  0.0434,
+  0.0441,
+  0.0449,
+  0.0456,
+  0.0456,
+  0.0459,
+  0.0463,
+  0.0468,
+  0.0477,
+  0.0488,
+  0.0451,
+  0.0541,
+  0.0504,
+  0.0468,
+  0.0551,
+  0.0521,
+  0.0532,
+  0.0539
+ ],
+ "dragFps": 48.6,
+ "motionFps": 51.4,
+ "restFps": 50,
+ "notchRatio": 1.67,
+ "afterIn": {
+  "d": 3.42,
+  "view": "3d",
+  "ortho": false
+ },
+ "afterOut": {
+  "d": 342,
+  "view": "3d",
+  "ortho": false
+ },
+ "cam": {
+  "x": -193.83,
+  "y": 223.83,
+  "z": 149.68,
+  "zoom": 1,
+  "ortho": false
+ },
+ "dpr": 2
+}
