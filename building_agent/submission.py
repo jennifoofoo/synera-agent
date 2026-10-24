@@ -121,7 +121,8 @@ def write_json(path: Path, questions: list[Question], replies: dict[str, str]) -
     """answers.json from the challenge brief: one entry per id with the full reply and its Answer: line."""
     entries = [
         {
-            "id": question.id,
+            "question_id": question.id,  # as in the kit's submission CSV and Synera's judge app
+            "id": question.id,  # as in the challenge brief
             "answer": committed_answer(replies.get(question.id, "")),
             "reply": replies.get(question.id, ""),
         }
