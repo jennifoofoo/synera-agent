@@ -193,42 +193,65 @@ export function sharedAudio(): HTMLAudioElement {
 /** Call once at start-up: the first pointer/key gesture plays a silent WAV on the shared element and warms
  * up speechSynthesis, so later replies can play after an await (iOS needs one gesture-started playback). */
 export function installAudioUnlock(): void {
+  // iOS counts a touch as a user gesture only on touchend / pointerup / click, not on pointerdown, so listen to all
+  // of them and stop only once a play() really went through (a refused one is tried again on the next tap).
+  const events = ["pointerdown", "pointerup", "touchend", "click", "keydown"] as const;
+  let done = false;
+  let warmed = false;
+  const stop = () => {
+    done = true;
+    for (const type of events) window.removeEventListener(type, unlock, true);
+  };
   const unlock = () => {
-    window.removeEventListener("pointerdown", unlock, true);
-    window.removeEventListener("keydown", unlock, true);
+    if (done) return;
     const audio = sharedAudio();
+    if (audioUrl) return stop(); // a reply is already playing on the element: it is unlocked
     audio.muted = false;
     audio.src = SILENT_WAV;
-    void audio.play().catch(() => {});
     try {
-      const warm = new SpeechSynthesisUtterance(" ");
-      warm.volume = 0;
-      window.speechSynthesis?.speak(warm);
+      const played = audio.play();
+      if (played) played.then(stop, () => {});
+      else stop();
     } catch {
-      /* no browser voice */
+      /* not allowed yet: next tap */
+    }
+    if (!warmed) {
+      try {
+        const warm = new SpeechSynthesisUtterance(" ");
+        warm.volume = 0;
+        window.speechSynthesis?.speak(warm);
+        warmed = true;
+      } catch {
+        /* no browser voice */
+      }
     }
   };
-  window.addEventListener("pointerdown", unlock, true);
-  window.addEventListener("keydown", unlock, true);
+  for (const type of events) window.addEventListener(type, unlock, true);
 }
 
 type WakeSentinel = { release: () => Promise<void>; addEventListener: (type: "release", listener: () => void) => void };
 const awakeReasons = new Set<string>();
 let sentinel: WakeSentinel | null = null;
+let requesting = false;
 
 async function syncWakeLock(): Promise<void> {
   const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<WakeSentinel> } };
   if (!nav.wakeLock) return;
   const want = awakeReasons.size > 0 && document.visibilityState === "visible";
   if (want && !sentinel) {
+    if (requesting) return;
+    requesting = true;
     try {
       const lock = await nav.wakeLock.request("screen");
       sentinel = lock;
       lock.addEventListener("release", () => {
         if (sentinel === lock) sentinel = null;
       });
+      if (awakeReasons.size === 0) void syncWakeLock(); // the reason ended while the request was pending
     } catch {
-      /* refused (battery saver, not visible): try again on the next change */
+      /* refused (battery saver, not visible, no gesture): try again on the next change or tap */
+    } finally {
+      requesting = false;
     }
   } else if (!want && sentinel) {
     const lock = sentinel;
@@ -247,4 +270,7 @@ export function keepAwake(reason: string, on: boolean): void {
 
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => void syncWakeLock());
+  // Guiding starts after an awaited reply, outside the tap. If the browser refused the lock then (it may want a
+  // user gesture), the next tap while guiding takes it.
+  document.addEventListener("pointerup", () => awakeReasons.size > 0 && !sentinel && void syncWakeLock(), true);
 }
