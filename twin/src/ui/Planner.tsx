@@ -13,7 +13,7 @@ import "./Planner.css";
 
 const IMPACT = "impact";
 const IMPACT_COLOUR = "#f43f5e";
-const IMPACT_QUESTION = "What changes for routes now? At most three short sentences, name the rooms hit hardest.";
+const IMPACT_QUESTION = "What changes for routes now, with the closures as they are? At most three short sentences; name only rooms that are worse off now.";
 const THING_CATEGORIES = new Set(["machine", "equipment"]);
 
 interface Row {
@@ -73,6 +73,7 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
   const sheetRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => searchRef.current?.focus(), []);
 
   const changes = useChangeRows(model, state);
@@ -82,6 +83,15 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
   const match = (row: Row) => !q || `${row.label} ${row.detail ?? ""}`.toLowerCase().includes(q);
   // Corridors only when searched for: they would bury the rooms.
   const shownRooms = rooms.filter((row) => (q ? match(row) : !row.key.startsWith("corridor:")));
+  const shownThings = things.filter(match);
+
+  // Without changes to show, open at the rooms of the floor in view (big buildings start in the basement).
+  useEffect(() => {
+    if (changes.length) return;
+    const floorId = useTwin.getState().focusedFloorId;
+    const group = bodyRef.current?.querySelector<HTMLElement>(`.planner-rooms [data-floor="${CSS.escape(floorId ?? "")}"]`);
+    if (group && bodyRef.current) bodyRef.current.scrollTop = group.offsetTop - 8;
+  }, []);
 
   // Up/Down move between rows (and from the search into the list), Enter on a row = tap.
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -110,7 +120,7 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
           ×
         </button>
       </div>
-      <div className="planner-body">
+      <div className="planner-body" ref={bodyRef}>
         {(!q || changes.some(match)) && (
           <section>
             <h3>Changes</h3>
@@ -118,16 +128,19 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
             <Impact model={model} />
           </section>
         )}
-        <section>
-          <h3>Rooms</h3>
-          {shownRooms.length ? <Rows model={model} rows={shownRooms} /> : <p className="planner-empty">No room matches.</p>}
-        </section>
-        {things.length > 0 && (
-          <section>
-            <h3>Things</h3>
-            {things.some(match) ? <Rows model={model} rows={things.filter(match)} /> : <p className="planner-empty">No thing matches.</p>}
+        {(!q || shownRooms.length > 0) && (
+          <section className="planner-rooms">
+            <h3>Rooms</h3>
+            <Rows model={model} rows={shownRooms} />
           </section>
         )}
+        {shownThings.length > 0 && (
+          <section>
+            <h3>Things</h3>
+            <Rows model={model} rows={shownThings} />
+          </section>
+        )}
+        {q && !shownRooms.length && !shownThings.length && !changes.some(match) && <p className="planner-empty">Nothing matches “{query.trim()}”.</p>}
       </div>
     </div>
   );
@@ -146,7 +159,7 @@ function Rows({ model, rows, grouped = true }: { model: BuildingModel; rows: Row
       {groups.map((group) => {
         const floor = model.floorById.get(group.floorId);
         return (
-          <div key={group.floorId + group.rows[0].key} className="planner-group">
+          <div key={group.floorId + group.rows[0].key} className="planner-group" data-floor={group.floorId}>
             {grouped && floor && <div className="planner-floor">{floorLabel(floor)}</div>}
             {group.rows.map((row) => (
               <div key={row.key} className="planner-line">
@@ -332,7 +345,7 @@ function Impact({ model }: { model: BuildingModel }) {
       return;
     }
     const text = withoutAnswerLine(reply.reply).replace(/\*\*|__|^#+\s*/gm, "");
-    const ids = roomsNamed(model, reply.reply);
+    const ids = roomsNamed(model, reply.reply).filter((id) => !closed.includes(id)); // closed rooms are listed above
     setAnswer({ text, for: closedKey, rooms: ids });
     setHighlight(IMPACT, ids.length ? { ids, colour: IMPACT_COLOUR } : null);
   };
