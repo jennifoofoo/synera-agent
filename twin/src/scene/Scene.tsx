@@ -8,7 +8,7 @@ import { floorElevation, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
-import { FloorMesh, buildTimes } from "./FloorMesh";
+import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { RouteLine } from "./RouteLine";
@@ -98,6 +98,7 @@ function Stats() {
   useEffect(() => {
     (window as unknown as { __twinMounted: number }).__twinMounted = Math.round(performance.now());
     (window as unknown as { __twinScene: unknown }).__twinScene = scene;
+    (window as unknown as { __twinControls: unknown }).__twinControls = controlsRef;
     (window as unknown as { __twinStats: () => unknown }).__twinStats = () => ({
       calls: gl.info.render.calls,
       triangles: gl.info.render.triangles,

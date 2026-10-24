@@ -83,7 +83,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, -1, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
     c.boundaryFriction = 0.2;
     invalidate();
-  }, [bounds, size, topY, flat, invalidate]);
+    // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
+  }, [bounds, size, topY, flat, invalidate, camera]);
 
   // Entering 2D or changing the floor in 2D frames the focused floor.
   useEffect(() => {
