@@ -9,6 +9,6 @@
 /* Walk with me: small "estimated" under the step-estimate dot */
 .walk-estimated {
   display: block; transform: translateY(20px); padding: 0 4px; border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--signal); font-size: 11px; line-height: 16px; white-space: nowrap;
-  border: 1px solid var(--hairline);
+  background: var(--glass-strong); color: var(--signal); font-size: 11px; line-height: 16px; white-space: nowrap;
+  border: 0; box-shadow: var(--shadow-soft); border-radius: var(--radius-pill);
 }

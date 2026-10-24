@@ -2,23 +2,22 @@
 .directions {
   position: absolute; z-index: 6; left: 60px; top: 56px; width: 340px;
   display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; padding: 10px 10px 8px 12px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: var(--shadow-float);
-  animation: dir-in 150ms ease-out;
+  background: var(--glass-strong); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float); border-radius: var(--radius);
+  animation: dir-in var(--t-base);
 }
 @keyframes dir-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 .dir-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dir-field {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 10px;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); text-align: left; color: var(--text);
+  border: 0; border-radius: var(--radius-sm); background: var(--paper-2); text-align: left; color: var(--text);
 }
 .dir-field.empty .dir-value { color: var(--muted); }
-.dir-field.editing { border-color: var(--ink); background: var(--surface); }
+.dir-field.editing { box-shadow: inset 0 0 0 1.5px var(--ink); background: var(--surface); }
 .dir-value { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dir-dot { flex: none; width: 10px; height: 10px; }
 .dir-dot.from { border-radius: 50%; background: var(--info); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--info); }
-.dir-dot.to { background: var(--signal); border-radius: 1px; }
+.dir-dot.to { background: var(--signal); border-radius: 50%; }
 
 .dir-accept { flex: none; min-height: 30px; min-width: 30px; padding: 0 6px; border: 0; background: transparent; color: var(--signal); font-weight: 700; }
 
@@ -34,11 +33,11 @@
 .worker .directions {
   position: fixed; left: 0; right: 0; top: 0; width: auto; z-index: 8;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px 14px;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-width: 0 0 1px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 .worker .dir-field { min-height: 46px; font-size: 16px; }
 .worker .dir-swap { width: 44px; min-width: 44px; min-height: 44px; }
 .worker .directions .x { min-width: 44px; min-height: 44px; }
 .worker .dir-toggle input { width: 20px; height: 20px; }
 @media (prefers-reduced-motion: reduce) { .directions { animation: none; } }
-.card-directions button.primary:disabled { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); opacity: 0.45; }
+.card-directions button.primary:disabled { background: var(--signal); color: var(--signal-ink); opacity: 0.45; }

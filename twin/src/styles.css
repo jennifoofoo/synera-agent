@@ -8,23 +8,25 @@ html, body, #root {
   background: var(--bg);
   color: var(--text);
   font: 14px/1.4 var(--font);
+  font-feature-settings: "tnum";
   touch-action: manipulation;
   overflow: hidden;
 }
 button, input, select { font: inherit; color: inherit; }
 button {
   cursor: pointer;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 0;
+  background: var(--paper-2);
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  min-height: 32px;
-  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  padding: 6px 12px;
+  min-height: 36px;
+  font-weight: 500;
+  transition: background-color var(--t-fast), box-shadow var(--t-fast), color var(--t-fast);
 }
-button:hover { background: var(--paper-2); }
+button:hover { background: var(--hairline-strong); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
-button.active { background: var(--signal-soft); border-color: var(--signal); }
-button.danger { border-color: var(--danger); color: var(--danger); }
+button.active { background: var(--signal-soft); box-shadow: inset 0 0 0 1.5px var(--signal); }
+button.danger { box-shadow: inset 0 0 0 1px var(--danger); color: var(--danger); }
 button:disabled { opacity: 0.45; cursor: default; }
 button.x { width: 28px; min-width: 28px; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 18px; }
 button.x:hover { color: var(--text); background: transparent; }
@@ -37,47 +39,47 @@ button.x:hover { color: var(--text); background: transparent; }
 .topbar { position: absolute; left: 12px; top: 12px; z-index: 3; }
 .building-name {
   position: relative; display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
-  font-weight: 600; cursor: pointer;
+  padding: 8px 14px; border-radius: var(--radius); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
+  font-weight: 600; font-size: var(--fs-20); letter-spacing: -0.01em; cursor: pointer;
 }
 .building-title { max-width: min(46vw, 420px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .building-name select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
-.brand-mark { width: 8px; height: 8px; border-radius: 1px; background: var(--signal); }
+.brand-mark { width: 10px; height: 10px; border-radius: 50%; background: var(--signal); }
 
 /* floors: one compact segmented control with shared hairlines (laptop: top right, see below) */
 .floorrail {
   position: absolute; left: 12px; top: 64px; z-index: 3; display: flex; flex-direction: column; gap: 0;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+  background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float); border-radius: var(--radius); overflow: hidden;
 }
 .rail-floor, .rail-toggle {
-  width: 34px; height: 30px; min-height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; min-height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
   background: transparent; border: 0; border-radius: 0; position: relative; font-weight: 600; font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
-.floorrail > button + button { border-top: 1px solid var(--line); }
+.floorrail > button + button { border-top: 1px solid var(--hairline-strong); }
 .rail-toggle { color: var(--muted); }
 .rail-view { color: var(--text); font-size: 12px; letter-spacing: 0.02em; }
 .rail-floor.active, .rail-toggle.active { background: var(--ink); color: var(--surface); }
 .rail-floor.active:hover { background: var(--ink); }
 .rail-floor.single { box-shadow: inset 0 0 0 2px var(--signal); }
-.rail-floor .dot { position: absolute; right: 4px; top: 4px; width: 5px; height: 5px; border-radius: 1px; background: var(--signal); }
+.rail-floor .dot { position: absolute; right: 5px; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: var(--signal); }
 
 /* bottom: card + input */
 .dock {
-  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 4;
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 4;
   width: min(560px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px;
 }
 .pill {
   position: absolute; right: 14px; top: 14px; z-index: 3; display: inline-flex; gap: 8px; align-items: center;
-  padding: 3px 4px 3px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
-  font-size: 13px; color: var(--muted);
+  min-height: 36px; padding: 4px 6px 4px 14px; border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
+  font-size: 13px; font-weight: 500; color: var(--muted);
 }
-.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: var(--radius-sm); border-color: transparent; background: transparent; color: var(--muted); }
+.pill button { min-height: 28px; padding: 2px 10px; font-size: 12.5px; border-radius: var(--radius-pill); background: transparent; color: var(--muted); }
 .pill button:hover { color: var(--text); background: var(--paper-2); }
 /* rarely used (List, the changes pill, step-free): quiet until hovered, so each state keeps at most two main actions */
-.planner-toggle:hover { color: var(--text); border-color: var(--line); }
+.planner-toggle:hover { color: var(--text); }
 
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(244, 242, 238, 0.7); z-index: 5; pointer-events: none; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(246, 245, 242, 0.7); z-index: 5; pointer-events: none; }
 .overlay.error { color: var(--danger); pointer-events: auto; }
 
 /* labels and chips inside the scene: flat rectangular tags */
@@ -107,15 +109,15 @@ button.x:hover { color: var(--text); background: transparent; }
 .poi svg { width: 13px; height: 13px; stroke: var(--ink-2); fill: none; stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; }
 .recenter {
   position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 3;
-  width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); font-size: 20px; color: var(--ink);
+  width: 44px; height: 44px; border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float); font-size: 20px; color: var(--ink);
 }
 /* Phone layout (also narrow windows and tablets, 2D and 3D alike): the floor picker on the right edge; Phone.css
    places it further (landscape phones: left).  */
 .app.worker .floorrail { left: auto; right: 12px; }
 /* Laptop: ONE home for the floor rail in 2D and 3D, top right under the List button. When the List sheet opens it
    slides left with the sheet's edge (150 ms), never jumps sides. */
-.app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); top: 56px; transition: right var(--t-fast, 150ms ease-out); }
-.app.worker.flat .pill { left: 10px; right: auto; }
+.app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); top: 64px; transition: right var(--t-fast, 150ms ease-out); }
+.app.worker .pill { left: 10px; right: auto; }
 
 /* Nothing overlaps: the insets (set by the sheets through the store) push the chrome out of the way. */
 .app.directions-open .floorrail { top: calc(var(--top-inset, 0px) + 8px); }
@@ -128,7 +130,7 @@ button.x:hover { color: var(--text); background: transparent; }
 .app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); transition: right var(--t-fast, 150ms ease-out); }
 @media (prefers-reduced-motion: reduce) { .app.planner .floorrail { transition: none; } }
 /* the List button (top right, about 44 px tall) must never cover the floor rail when a sheet pushes the rail up */
-.app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 56px); }
+.app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 64px); }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 7px;
   border-radius: 2px; white-space: nowrap; background: var(--ink); border: 1px solid var(--ink); color: var(--surface);
