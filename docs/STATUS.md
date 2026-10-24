@@ -17,7 +17,7 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | wide_delivery_count (18) | Leonie | gemergt | feat/q-wide_delivery_count |
 | room_stacked (9) | Leonie | gemergt | feat/q-room_stacked |
 | what_if_door (3) | Leonie | gemergt | feat/q-what_if_door |
-| step_free_reachable_count (0 im Test) | | offen | |
+| step_free_reachable_count (0 im Test) | Jennifer | Test grün (2 Labels) | feat/hardening |
 
 | Aufgabe | Wer | Status | Branch |
 |---|---|---|---|
