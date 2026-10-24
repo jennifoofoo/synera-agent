@@ -8,7 +8,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTwin } from "../store";
 import { keepAwake, listen, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { pauseHandsFree } from "../handsFree";
 import { Autocomplete, type PlaceHit } from "./Autocomplete";
+import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { voiceHint } from "./phoneHints";
 import "./Omnibox.css";
 
@@ -147,6 +149,7 @@ export function Omnibox() {
     setHeard("");
     setListening(true);
     keepAwake("listening", true);
+    pauseHandsFree(true); // one recognition at a time
     const listener: Listener = listen("en-US", {
       onInterim: (said) => {
         if (listenerRef.current === listener) setHeard(said);
@@ -155,6 +158,7 @@ export function Omnibox() {
       onEnd: (error) => {
         if (listenerRef.current === listener) listenerRef.current = null;
         keepAwake("listening", false);
+        pauseHandsFree(false);
         setListening(false);
         setHeard("");
         if (error) setNotice(voiceHint(error === "unsupported" ? undefined : error));
@@ -288,6 +292,8 @@ export function Omnibox() {
         </div>
       )}
 
+      {!busy && !listening && !notice && <HandsFreeStatus className="ob-hf-status" />}
+
       <form
         className={`omnibox-input ${listening ? "is-listening" : ""}`}
         onSubmit={(event) => event.preventDefault()}
@@ -353,6 +359,7 @@ export function Omnibox() {
 
       {!expanded && (
         <div className="ob-fabs">
+          <HandsFreeButton className="ob-fab" />
           <button
             type="button"
             className="ob-fab"

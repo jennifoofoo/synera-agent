@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
+import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import "./Walk.css";
 
@@ -59,9 +60,9 @@ export function Walk() {
   }, [walking]);
   const line = step !== null ? readable(walkSteps()[step] ?? "") : "";
   useEffect(() => {
-    const { voiceOut, speechAvailable } = useTwin.getState();
-    if (line && voiceOut) void speak(line, speechAvailable);
-  }, [line]);
+    const { voiceOut, handsFree, speechAvailable } = useTwin.getState();
+    if (line && (voiceOut || handsFree)) void speak(line, speechAvailable);
+  }, [line, step]);
   useEffect(() => () => stopSpeaking(), []);
 
   if (step === null || !model || !route?.ok) return null;
@@ -83,6 +84,7 @@ export function Walk() {
             Step {step + 1} of {steps.length}
             {length !== null && <span className="card-muted"> · {length} m left · {minutes} min</span>}
           </span>
+          <HandsFreeButton />
           <button className="x" onClick={end} aria-label="End directions">
             ×
           </button>
@@ -91,6 +93,7 @@ export function Walk() {
           <TurnIcon line={steps[step]} up={rideUp(route.floor_changes, steps, step)} />
           <p aria-live="polite">{steps[step]}</p>
         </div>
+        <HandsFreeStatus />
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back
