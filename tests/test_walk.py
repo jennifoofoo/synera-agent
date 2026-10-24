@@ -67,6 +67,20 @@ def guided(setup, said="guide me"):
     return first, step
 
 
+def neighbour_pair(bm: BuildingMap) -> tuple[str, str]:
+    """Two rooms with a door between them and a route of exactly two rooms (reachable, not through the outside)."""
+    for opening in bm.openings.values():
+        first, second = opening["space_ids"]
+        if OUTSIDE in (first, second) or first == second:
+            continue
+        try:
+            if len(routing.route(bm, first, second).space_path) == 2:
+                return first, second
+        except MapError:
+            continue
+    pytest.fail("no two neighbouring rooms with a route in this building")
+
+
 def connector_ahead(bm: BuildingMap, state: GuideState) -> dict:
     ahead = state.walk.spaces[walking.room_index(state.walk) :]
     return next(c for c in bm.connectors.values() if any(room in ahead for room in c["space_ids"]))
@@ -87,12 +101,7 @@ def test_a_long_route_starts_with_an_overview_and_one_offer(setup):
 
 def test_short_routes_are_read_out_at_once(setup):
     bm, state, tools, _start, _end = setup
-    pair = next(
-        (a, b)
-        for a in bm.spaces
-        for b in bm.spaces
-        if a != b and a != OUTSIDE and b != OUTSIDE and len(routing.route(bm, a, b).space_path) == 2
-    )
+    pair = neighbour_pair(bm)
     result = call(tools, "give_directions", start=pair[0], destination=pair[1])
     assert "mode" not in result and 1 <= len(result["steps"]) <= 2 and state.walk.mode == "plain"
     assert call(tools, "next_steps")["done"] is True
@@ -494,12 +503,7 @@ def test_closing_a_connector_that_ties_with_the_route_is_still_unaffected(setup)
 
 def test_plain_routes_repeat_in_full_after_find_route_too(setup):
     bm, state, tools, _start, _end = setup
-    pair = next(
-        (a, b)
-        for a in bm.spaces
-        for b in bm.spaces
-        if a != b and OUTSIDE not in (a, b) and len(routing.route(bm, a, b).space_path) == 2
-    )
+    pair = neighbour_pair(bm)
     first = call(tools, "find_route", start=pair[0], destination=pair[1])
     again = call(tools, "repeat_steps")
     assert state.walk.mode == "plain" and again["mode"] == "plain" and again["steps"] == state.walk.steps
