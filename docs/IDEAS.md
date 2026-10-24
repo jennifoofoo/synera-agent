@@ -281,3 +281,20 @@ Es gibt keine Wartungsdaten, Intervalle, Techniker oder Termine (geprüft). Alle
 - Wer darf Wartungen anmelden und aufheben? Ohne Rechteprüfung (Idee 4) darf es jeder, der den Agenten fragt. Hinweis in der Karte.
 - Sicherheit: Wartungsmeldungen nicht als Freigabe für gefährliche Arbeiten darstellen ("Sperrung für Planung", kein Sicherheitsfreigabe-System).
 - Einordnung: Gehört zu "Make things move" und zu "A building that never stops changing" in der Synera-Präsentation. Für die Jury eine glaubwürdige Alltagsgeschichte, aber keine Rubrik der Kernwertung. Beim Gate zusammen mit Live-Updates entscheiden, nicht einzeln.
+
+
+## 7. Sperrungen mit Zeitraum ("Merk dir: morgen ist der Aufzug kaputt") (Idee von Jennifer, 24.10.2026)
+
+Status: geparkt als Add-on, nicht für die Wertung. Ausführliche Spec: `docs/specs/live-updates.md` (Entwurf).
+
+### Idee
+Man sagt Wanda: "Merk dir, morgen ist der Aufzug kaputt" (oder "Halle A ist nächste Woche Montag bis Freitag Baustelle"). Der Agent versteht Ziel und Zeitraum, zeigt eine Karte mit dem ausgewerteten Datum und der Wirkung auf die Routen, speichert den Zeitraum nach einem klaren Ja und wendet die Sperrung automatisch zur richtigen Zeit an und hebt sie wieder auf. Wer morgen fragt, bekommt die Routen mit der Sperrung. Wer jetzt fragt, die ohne, plus Hinweis auf bald beginnende Sperrungen.
+
+### Stand
+Heute gibt es keine Zeit-Logik. Eine Sperrung gilt sofort und bleibt bis zum Zurücknehmen. Zeitwörter ("morgen", "ab Montag") lösen keine sofortige Sperrung aus, der Agent sagt, dass das Gebäude nur jetzt geändert werden kann.
+
+### Aufbau und Aufwand
+Kern (Zeitraum-Modell, austauschbare Uhr, wirksamer Stand zu einem Zeitpunkt, `when` in Routing und Werkzeugen, Karte und Ja, Live-Skripte): etwa 5 bis 6 Stunden. Für die Demo eine simulierte Uhr ("jetzt" einstellbar), sonst kann man "morgen" nicht zeigen. Seite (Zeitleiste, Schieberegler): Leonie, 3 bis 4 Stunden. Dokumente (Aushang, PDF, Kalenderdatei) als zweiter Block.
+
+### Risiken
+Zeitangaben sind fehleranfällig (immer das ausgewertete Datum mit Wochentag zeigen). Keine Rechteprüfung. Die Wertung am Sonntag prüft vermutlich keine Zeiträume (Synera-Frage 13), daher nur Creativity und Alltag.
