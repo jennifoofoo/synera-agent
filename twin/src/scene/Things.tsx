@@ -5,6 +5,7 @@ import type { Asset, BuildingState } from "../api/types";
 import type { FloorModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
+import { useMapZoom } from "./mapZoom";
 
 const unitBox = new THREE.BoxGeometry(1, 1, 1);
 unitBox.translate(0, 0.5, 0);
@@ -28,7 +29,8 @@ interface Props {
   y: number;
   state: BuildingState | null;
   limit: number;
-  /** 2D plan: only machines and equipment, in a quiet grey (a street map shows no furniture). */
+  /** 2D plan: only machines and equipment, in a quiet grey (a street map shows no furniture), and only at the
+   * near zoom tier (see mapZoom.ts). */
   flat?: boolean;
 }
 
@@ -46,6 +48,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
         .slice(0, limit),
     [floor, removed, limit, flat],
   );
+  const { tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
   const count = assets.length;
 
   useEffect(() => {
@@ -77,7 +80,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
   }, [assets, moved, count, flat]);
 
   const onClick = (event: ThreeEvent<MouseEvent>) => {
-    if (event.instanceId === undefined) return;
+    if (event.instanceId === undefined || (flat && tier !== "near")) return; // hidden at this zoom
     event.stopPropagation();
     const asset = assets[event.instanceId];
     if (!asset) return;
@@ -86,7 +89,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
 
   if (!count) return null;
   return (
-    <group position-y={y}>
+    <group position-y={y} visible={!flat || tier === "near"}>
       <instancedMesh ref={mesh} args={[unitBox, undefined, count]} onClick={onClick} frustumCulled={false}>
         <meshStandardMaterial roughness={0.8} metalness={0.05} />
       </instancedMesh>
