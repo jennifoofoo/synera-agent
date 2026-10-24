@@ -69,7 +69,7 @@ export function CampusMap2D() {
     const b = boundsOf(campusPoints(view, details));
     const top = 64;
     const bottom = Math.max(bottomInset, dockH, 90) + 16;
-    const usableW = Math.max(size.w - 48, 120);
+    const usableW = Math.max(size.w - Math.min(170, size.w * 0.36), 120); // room for the names beside the outlines
     const usableH = Math.max(size.h - top - bottom, 120);
     const k = Math.min(usableW / Math.max(b.maxX - b.minX, 10), usableH / Math.max(b.maxY - b.minY, 10));
     // centre of the usable area in metres: shift so the map sits between the bars
