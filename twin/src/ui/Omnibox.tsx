@@ -27,6 +27,7 @@ export function Omnibox() {
   const model = useTwin((s) => s.model);
   const ask = useTwin((s) => s.ask);
   const busy = useTwin((s) => s.chatBusy);
+  const handsFreeOn = useTwin((s) => s.handsFree);
   const chat = useTwin((s) => s.chat);
   const chatAvailable = useTwin((s) => s.chatAvailable);
   const speechAvailable = useTwin((s) => s.speechAvailable);
@@ -359,7 +360,8 @@ export function Omnibox() {
 
       {!expanded && (
         <div className="ob-fabs">
-          <HandsFreeButton className="ob-fab" />
+          {/* "Hey Wanda" is switched on in the step sheet; here only while it is on, to see and mute it */}
+          {handsFreeOn && <HandsFreeButton className="ob-fab" />}
           <button
             type="button"
             className="ob-fab"

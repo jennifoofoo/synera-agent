@@ -180,6 +180,22 @@ interface TwinState {
   ask: (message: string, voice?: boolean, opts?: { here?: ChatContext["here"] }) => Promise<ChatReply | null>;
 }
 
+/** The person muted "Hey Wanda" during guidance: remembered per browser, so the next guidance stays quiet too. */
+export function handsFreeMuted(): boolean {
+  try {
+    return localStorage.getItem("twin.handsFreeMuted") === "1";
+  } catch {
+    return false;
+  }
+}
+export function setHandsFreeMuted(muted: boolean): void {
+  try {
+    localStorage.setItem("twin.handsFreeMuted", muted ? "1" : "0");
+  } catch {
+    /* private mode: not remembered */
+  }
+}
+
 let messageId = 0;
 let cameraNonce = 0;
 
@@ -212,7 +228,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   topInset: 0,
   draft: false,
   offCentre: false,
-  floorMode: "stacked",
+  floorMode: "single", // only the chosen floor: a ghosted floor above read as a shadow copy
   focusedFloorId: null,
   thingsMode: "near",
   cutaway: true,
@@ -399,6 +415,8 @@ export const useTwin = create<TwinState>((set, get) => ({
     if (!get().state?.route?.ok) return;
     set({ walkStep: 0, selection: null, popover: null, replyShown: false });
     walkFloor(0);
+    // Guidance listens for "Hey Wanda" by itself, unless the person muted it last time.
+    if (!handsFreeMuted() && !get().handsFree) get().setHandsFree(true);
   },
   setWalkStep(step) {
     const steps = walkSteps();
@@ -409,6 +427,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   stopWalk() {
     set({ walkStep: null });
+    if (get().handsFree) get().setHandsFree(false);
   },
   setHandsFree(handsFree) {
     set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null });
