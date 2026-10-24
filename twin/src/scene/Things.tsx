@@ -101,10 +101,11 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
 
   const onClick = (event: ThreeEvent<MouseEvent>) => {
     // 2D: a tap on a shape only selects the thing when zoomed in; farther out it goes to the room below.
+    // Furniture never takes the tap in 2D (a tap on a desk means its room); machines and equipment do from near on.
     if (event.instanceId === undefined || (flat && tier !== "near")) return;
-    event.stopPropagation();
     const asset = assets[event.instanceId];
-    if (!asset) return;
+    if (!asset || (flat && asset.category !== "machine" && asset.category !== "equipment")) return;
+    event.stopPropagation();
     select({ kind: "asset", id: asset.id, floor_id: floor.id, space_id: asset.space_id }, [event.nativeEvent.clientX, event.nativeEvent.clientY]);
   };
 
