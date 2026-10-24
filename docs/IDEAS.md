@@ -367,3 +367,27 @@ Standort (gesagt, geklickt, am Gerät), Klick-Auswahl mit Validierung auf dem Se
 - **Bildlesen irrt sich:** Größen und Typen sind Schätzungen. Darum nur Vorschläge mit Karte und Ja, wie überall sonst.
 - **Datenmenge:** Fotos sind groß, Handy-Upload über schlechtes Netz in der Halle. Verkleinern vor dem Hochladen.
 - Wertung: Die Sonntagsfragen prüfen das vermutlich nicht. Gut für Creativity, Demo ("Capture on site" und "Make things move" aus den Level-5-Ideen) und für den Pitch.
+
+## 13. Gedächtnis pro Person mit mem0 (Idee von Jennifer, 25.10.2026 nachts)
+
+### Idee
+Wanda merkt sich über Gespräche hinweg, was zu einer Person gehört, mit einer Agent-Memory-Schicht wie mem0 (Open Source, merkt sich Fakten aus Gesprächen und holt die passenden bei der nächsten Frage wieder hervor).
+- "Mein Schreibtisch ist in Office 2.06" → später reicht "bring mich zu meinem Platz".
+- Vorlieben: "ich brauche immer stufenlose Wege", "ich nehme lieber die Treppe", Sprache, kurze Antworten.
+- Häufige Ziele ("wie immer zur Kantine"), wo das Auto oder der Wagen steht, wo man zuletzt war.
+- Facility Manager: "die Presse auf Linie 4 hat immer Wartung dienstags" als Notiz am Gerät.
+
+### Was heute schon da ist
+Position und letzter Standort pro Sitzung (), Sprachregeln, Karte-und-Ja für Änderungen. Kein Gedächtnis über die Sitzung hinaus.
+
+### Was gebaut werden müsste
+- Speicher pro Person (Schlüssel: angemeldete Person oder Gerät), mem0 als Bibliothek oder eigener kleiner Speicher (Fakten mit Zeitstempel, Quelle "gesagt").
+- Zwei Werkzeuge für den Agenten: `remember(fact)` (nur nach klarer Aussage der Person) und `recall(query)`; Fakten über Räume werden auf Raum-IDs aufgelöst, Wege kommen weiter nur aus dem Routing.
+- "Was weißt du über mich?" und "vergiss das" (Löschen muss gehen).
+- Aufwand grob: 2 bis 3 Stunden Server, 1 Stunde Seite (kleine Anzeige "remembered").
+
+### Risiken und Haken
+- **Datenschutz:** personenbezogene Daten, Löschpflicht, nur mit Zustimmung; im Betrieb mit Betriebsrat abstimmen.
+- **Falsche Erinnerungen:** ein veralteter Schreibtisch führt in den falschen Raum. Erinnerungen immer mit Alter nennen ("du hast vor 3 Tagen gesagt …") und bei Routen bestätigen lassen.
+- **Prinzip bleibt:** Fakten über das Gebäude kommen weiter nur aus dem deterministischen Kern, das Gedächtnis liefert nur Wünsche und Bezüge der Person.
+- Wertung: Benchmark prüft das nicht. Gut für Interaction und den Pitch ("Wanda kennt dich"). Nicht vor dem Freeze bauen.
