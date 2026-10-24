@@ -5,7 +5,7 @@ message. Everything here is plain Python on the building map: ranking hits by ro
 the remembered route with its room sequence. The model only chooses which tool to call and phrases the reply."""
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from building_agent import routing
 from building_agent.find_tools import matching_assets, parse_query, words_of
@@ -32,7 +32,9 @@ class Position:
     point: tuple[float, float] | None = None
     source: str = "said"
     turn: int = 0
-    set_at: float | None = None  # CLOCK() when set; None for a hand-built Position (age unknown)
+    set_at: float | None = field(
+        default=None, compare=False
+    )  # CLOCK() when set; None for a hand-built Position (age unknown)
 
     def view(self) -> dict:
         """What the page gets in state_view: {space_id, floor_id, point, source}."""
