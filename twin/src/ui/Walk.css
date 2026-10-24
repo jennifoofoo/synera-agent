@@ -1,0 +1,14 @@
+/* ===== Walk: step-by-step directions (owner: phone session). Layout only; colours come from the tokens. */
+.card-walk .walk-now { margin: 8px 0 0; font-size: 20px; line-height: 1.3; font-weight: 600; }
+.card-walk .walk-toggle { display: block; margin: 8px auto 0; }
+.walk-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.walk-list button {
+  display: flex; gap: 10px; align-items: baseline; width: 100%; min-height: 44px; padding: 10px 4px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text);
+  text-align: left; font-size: 15px;
+}
+.walk-list button.done { color: var(--muted); }
+.walk-list button.now { font-weight: 700; }
+.walk-list .walk-num { flex: none; width: 22px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.walk-list button.now .walk-num { color: var(--accent); }
+.phone-sheet.tall { max-height: 75vh; max-height: calc(var(--vvh, 100dvh) * 0.75); }

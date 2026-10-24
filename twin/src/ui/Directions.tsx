@@ -122,29 +122,20 @@ function facts(model: BuildingModel, route: Route) {
   return { length: route.length_m !== undefined ? `${Math.round(route.length_m)} m` : "", floors: route.floors?.length ?? 1, stepFree };
 }
 
-/** The bottom card while directions are open: summary and "Start" (= guided walking via the agent). */
+/** The bottom card while directions are open: summary and "Start" (= step-by-step on the client, see Walk). */
 export function DirectionsSummary({ model }: { model: BuildingModel }) {
   const directions = useTwin((s) => s.directions)!;
   const route = useTwin((s) => s.state?.route ?? null);
-  const position = useTwin((s) => s.state?.position ?? null);
-  const ask = useTwin((s) => s.ask);
   const close = useTwin((s) => s.closeDirections);
-  const busy = useTwin((s) => s.chatBusy);
-  const chatAvailable = useTwin((s) => s.chatAvailable);
+  const startWalk = useTwin((s) => s.startWalk);
   if (!directions.from || !directions.to || !route) return null;
   if (!route.ok) {
     return <div className="card-note dir-error">{route.error ?? "No route between these two."}</div>;
   }
   const f = facts(model, route);
-  const from = directions.from === HERE ? position?.space_id : directions.from;
   const start = () => {
-    const toName = placeName(model, directions.to);
-    const stepFree = directions.stepFree ? ", step-free" : "";
-    const message = directions.from === HERE ? `Guide me to ${toName}${stepFree}.` : `Guide me from ${placeName(model, directions.from)} to ${toName}${stepFree}.`;
-    // A start room picked here is where the person stands now: it travels as context.here (position, source click).
-    const here = directions.from !== HERE && from ? { space_id: from, floor_id: model.spaceById.get(from)?.floor_id } : undefined;
     close(true);
-    void ask(message, false, here ? { here } : undefined);
+    startWalk();
   };
   return (
     <>
@@ -156,7 +147,7 @@ export function DirectionsSummary({ model }: { model: BuildingModel }) {
         <span className={f.stepFree ? "ok" : "warn"}>{f.stepFree ? "step-free" : "has stairs"}</span>
       </div>
       <div className="card-actions">
-        <button className="primary" disabled={busy || !chatAvailable} onClick={start} title={chatAvailable ? "Step-by-step guidance" : "Guidance needs the agent (no API key on the server)"}>
+        <button className="primary" onClick={start} title="Step-by-step directions">
           Start
         </button>
       </div>
