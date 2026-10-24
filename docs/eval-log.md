@@ -303,3 +303,28 @@ Segmentation against the true polygons of 122 dev floors (all four sources, no A
 - Segment alone lifts room recall on the cached floors (swiss 0.80/0.78, osm 0.86 to 1.00) but not routes: added rooms have no doors. Segment + markers is what pays off: osm pairs >= 0.99 34% to 89% (94% with suggestions), swiss-203 3% to 19%, swiss-31 6% to 9%, invalid sequences 0 everywhere, clean floors unchanged. Suggestions only turn no-route into invalid on swiss (guessed doors that do not exist).
 - Swiss limit: the doors between apartment and stairwell are not drawn in the plain image, so no marker finds them (diagnosed on swiss-31: 5 of 31 true openings missing, 4 of them stairwell doors).
 - Segmentation limits: same-coloured rooms with no wall drawn between them (osm-way360544293, grey rooms inside a grey hall) cannot be separated; closets of about 10 px under door dots are lost; fills that are not flat (hatching, photos) are skipped via the fill-share guard. Swiss polygons run about 3% large (rotated walls are wider, IoU median 0.94).
+
+### Swiss stair doors and SVG check 2026-10-24 (no API)
+
+SVG check (all 48 Swiss dev floors, `floor_<n>.svg` next to the png, matplotlib output):
+- The svg holds room patches (stroke #333333, fill by class: room #f3efe6, balcony #cfe8c4, stairwell and corridor both #dcdcdc), furniture patches (opacity 0.75), the markers as `line2d` points (door #8b4513, opening #9e9e9e, entrance #d32f2f) and room refs as comments (`<!-- 1.01 -->`, no text elements, only for about 4 of 5 rooms). No groups with ids or classes beyond matplotlib's running numbers, no hidden or white elements, no stair symbols, no stair hall label (a landing is a plain grey patch).
+- Every true opening is drawn as a marker: 1634 of 1634 building.json openings match an svg marker within 4 px, including all 266 that touch a stairwell. So the stairwell doors are drawn (also in the plain png: detect_markers finds them). The eval log line "not drawn" above is wrong for swiss-31:0: the 4 missing doors (kitchen or corridor to landing) are detected but merge_markers keeps the outline pair, and with the model's rooms that pair is another one ("The model joined r17 and r21 ... but the outlines say r21 and r24").
+- Extra information in the svg compared with the png: exact room polygons (png segmentation: IoU median 0.94 on swiss) and marker positions to the pixel (png: 98% recall). Nothing else.
+- A deterministic reader (two nearest outlines per marker, entrance = nearest outline plus outside) finds 1632 of 1634 true doors (99.9%, 0 invalid; the 2 misses are swiss-5097 floors -1 and 0) and all 48 floors have the right room count. Implemented as `building_agent/level4/svg_read.py` (optional, not wired in; only useful if the Sunday input carries a kit-style svg, which is unknown).
+
+Stair hall rule (`building_agent/level4/stair_doors.py`), `uv run python scripts/eval_suggest.py --stairs`. Artificial floors: every Swiss floor with all doors that touch a stair or lift space dropped (entrances stay), precision = suggested door equals a real door by room pair. Dev 48 floors, train 361 floors (85 buildings).
+
+| Source | Variant | Suggestions | Real | Precision | Dropped doors restored | Judge >= 0.99 before | after |
+|---|---|---|---|---|---|---|---|
+| dev | generic suggest_doors | 230 | 124 | 54% | 56% | 36% | 59% |
+| dev | stair rule | 138 | 138 | 100% | 62% | 36% | 61% |
+| dev | stair, then generic | 233 | 145 | 62% | 65% | 36% | 63% |
+| train | generic suggest_doors | 1380 | 752 | 54% | 53% | 33% | 55% |
+| train | stair rule | 774 | 760 | 98% | 54% | 33% | 54% |
+| train | stair, then generic | 1397 | 871 | 62% | 62% | 33% | 61% |
+
+- Precision target 0.9 met (100% dev, 98% train). The rule only proposes a door when a stair hall (type stair or lift, room_type stairwell or lift, or a name like Treppenhaus, stair, landing) is the neighbour, one per room group, at most 3 per hall, living room before kitchen, corridors before plain rooms, wet rooms and balconies last. The weights were tuned on train, dev stayed untouched until the final run.
+- Recall is capped at about 54 to 62%: of the dropped doors about 11% are landing to landing doors (a landing next to a landing, no apartment involved) and the rest are apartments that already have a second door to the stair side or a cluster that lost its hall to another one (not analysed further). The judge gain is largest on the ground floors (swiss-31:0 9 to 100%, swiss-203:0 17 to 100%, swiss-2074:0 28 to 100%); on upper floors the landing to landing doors are missing, so the gain is 5 to 10 points.
+- The generic rule on its own already reaches 59% (dev) because any door that connects a cluster to the rest lifts the judge pairs a bit, even a wrong one; the stair rule is the same judge result with 100% instead of 54% precision, and stair then generic is best (63% and 61%).
+- Cached real extractions (segment + markers): no gain. swiss-31:0 and swiss-203:0 judge pairs stay at 9% and 19% with the stair rule (0 suggestions on swiss-203:0, 2 wrong ones on swiss-31:0 if entrance rooms are treated as halls, which is why that was left out). In swiss-203:0 the 4 missing true doors are the landing to outside entrances, which the pairing attaches to other rooms; in swiss-31:0 they are the 4 kitchen or corridor to landing doors, the model gave no types that identify the landings. Target "clear gain on swiss-31 and swiss-203" is not reached on the real extractions; the cause is the marker pairing on imperfect rooms, not the missing door.
+- osm and the clean floors: the rule does nothing (no stair hall without a door, 0 suggestions), unchanged numbers.
