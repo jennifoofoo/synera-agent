@@ -182,6 +182,62 @@ def describe_leg(bm: BuildingMap, rg: RoutingGraph, nodes: list[tuple]) -> list[
     return steps
 
 
+def _unreachable(bm: BuildingMap, leg_start: str, leg_end: str, step_free: bool) -> MapError:
+    reason = "step-free " if step_free else ""
+    return MapError(
+        f"No {reason}route from {bm.describe_space(leg_start)} to "
+        f"{bm.describe_space(leg_end)} with the current closures {sorted(bm.closed)}."
+    )
+
+
+def tour_legs(bm: BuildingMap, rg: RoutingGraph, stops: list[str], step_free: bool) -> tuple[float, list[list[tuple]]]:
+    """Joint plan over all stops: one stage per stop, the doors of a stop start with the cost to reach them.
+
+    Walking across a stop space (in through one door, out through another) is paid, and the door chosen at each
+    stop is the globally best one. The first stop costs nothing at any door, like judge_score.best_length."""
+    for previous, stop in itertools.pairwise(stops):
+        if previous in bm.closed or stop in bm.closed:
+            raise _unreachable(bm, previous, stop, step_free)
+    reached: dict[tuple, float] = {node: 0.0 for node in rg.members.get(stops[0], [])}
+    stages: list[tuple[dict | None, tuple | None]] = []  # (predecessor tree, source node) per stage
+    legs: list[list[tuple]] = []
+    graph = rg.graph
+    with _LEG_LOCK:
+        for index, stop in enumerate(stops[1:], start=1):
+            if stop == stops[index - 1]:
+                stages.append((None, None))
+                continue
+            source = ("source", index)
+            members = rg.members.get(stop, [])
+            try:
+                for node, cost in reached.items():
+                    graph.add_edge(source, node, weight=cost)
+                if source not in graph:
+                    raise _unreachable(bm, stops[index - 1], stop, step_free)
+                pred, dist = nx.dijkstra_predecessor_and_distance(graph, source, weight="weight")
+            finally:
+                graph.remove_nodes_from([source])
+            reached = {node: dist[node] for node in members if node in dist}
+            if not reached:
+                raise _unreachable(bm, stops[index - 1], stop, step_free)
+            stages.append((pred, source))
+    node = min(reached, key=reached.__getitem__)
+    length = reached[node]
+    for pred, source in reversed(stages):
+        if pred is None:
+            legs.append([])
+            continue
+        chain = []
+        while node != source:
+            chain.append(node)
+            node = pred[node][0]
+        chain.reverse()  # first door of the stage (reached from the previous stop) ... door of this stop
+        legs.append(chain)
+        node = chain[0]
+    legs.reverse()
+    return length, legs
+
+
 def route(
     bm: BuildingMap, start: str, destination: str, step_free: bool = False, via: list[str] | None = None
 ) -> RouteResult:
@@ -191,21 +247,17 @@ def route(
     length = 0.0
     spaces: list[str] = []
     legs: list[list[tuple]] = []
-    for leg_start, leg_end in itertools.pairwise(stops):
-        found = shortest_leg(bm, rg, leg_start, leg_end)
+    if len(stops) == 2:
+        found = shortest_leg(bm, rg, stops[0], stops[1])
         if found is None:
-            reason = "step-free " if step_free else ""
-            raise MapError(
-                f"No {reason}route from {bm.describe_space(leg_start)} to "
-                f"{bm.describe_space(leg_end)} with the current closures {sorted(bm.closed)}."
-            )
-        leg_length, nodes = found
-        length += leg_length
+            raise _unreachable(bm, stops[0], stops[1], step_free)
+        length, nodes = found
+        legs = [nodes]
+    else:
+        length, legs = tour_legs(bm, rg, stops, step_free)
+    for (leg_start, leg_end), nodes in zip(itertools.pairwise(stops), legs, strict=True):
         leg = leg_spaces(leg_start, leg_end, nodes)
         spaces += leg if not spaces else leg[1:]
-        legs.append(nodes)
-    if len(stops) == 1:
-        spaces = [stops[0]]
     result = RouteResult(
         start_space_id=stops[0],
         destination_space_id=stops[-1],
