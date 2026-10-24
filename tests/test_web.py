@@ -227,3 +227,60 @@ def test_reset_during_chat_returns_the_fresh_building(app, key, monkeypatch):
     _, reply = app.post("/api/chat", {"building": key, "message": "close the lift"})
     assert reply["stale"] is True
     assert reply["state"] == {"closed": [], "added_doors": [], "route": None}
+
+
+# ---------- click selection through /api/chat ----------
+
+
+def selection_probe(monkeypatch) -> list:
+    """Fake chat that records the selection each turn sees."""
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    seen: list = []
+
+    def ask(adapter, text: str, selection=None) -> dict:
+        seen.append(selection)
+        return {"reply": "ok", "backend": "fake"}
+
+    monkeypatch.setattr("web.chat.ChatAdapter.ask", ask)
+    return seen
+
+
+def test_chat_passes_a_validated_selection_and_drops_an_invalid_one(app, key, monkeypatch):
+    seen = selection_probe(monkeypatch)
+    room = next(s for s in app.session(key).map.spaces.values() if s["type"] == "room")
+    body = {"building": key, "message": "move it here", "context": {"space_id": room["id"]}}
+    status, reply = app.post("/api/chat", body)
+    assert status == 200 and seen[-1].space_id == room["id"] and "selection_ignored" not in reply
+    status, reply = app.post("/api/chat", {"building": key, "message": "x", "context": {"space_id": "nope"}})
+    assert status == 200 and seen[-1] is None and reply["selection_ignored"] == "unknown space"
+    for junk in ("text", 5, [1], {"point": float("nan")}):
+        status, _ = app.post("/api/chat", {"building": key, "message": "x", "context": junk})
+        assert status == 200 and seen[-1] is None
+    app.post("/api/chat", {"building": key, "message": "no context"})
+    assert seen[-1] is None
+
+
+def test_selection_is_cleared_after_the_turn(app, key, monkeypatch):
+    from types import SimpleNamespace
+
+    from web.selection import Selection
+
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.backend_name", lambda: "building_agent")
+    during = []
+    guide = SimpleNamespace(selection="unset")
+
+    def ask(text: str) -> str:
+        during.append(guide.selection)
+        return "ok"
+
+    adapter = app.chat(key)
+    adapter.session = SimpleNamespace(guide=guide, ask=ask, tools=[])
+    adapter.level4 = None
+    selection = Selection(space_id="s")
+    adapter.ask("here", selection=selection)
+    adapter.ask("again")
+    assert during == [selection, None] and guide.selection is None
+    adapter.session.ask = lambda text: (_ for _ in ()).throw(RuntimeError("boom"))
+    assert adapter.ask("fail", selection=selection)["error"] == "agent" and guide.selection is None

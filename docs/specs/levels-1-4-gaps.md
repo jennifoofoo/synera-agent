@@ -71,3 +71,8 @@ Regeln wie überall: Spec zuerst, Tests als Vertrag, ein Modul pro Agent, Review
 - Das Campus-Format ist unsere Annahme. Der Adapter-Aufwand ist gering, solange die interne Struktur stimmt.
 - Segmentierung und Marker funktionieren nur für Pläne im Kit-Stil. Rückfall auf das Modell bleibt.
 - Die Seite ist der Engpass (viele Pakete bei Leonie). Mein Vorschlag: Ihre Reihenfolge W-L2a, W-L1a, W-L4b, dann Upload und 3D.
+
+### Page contract (Auswahl und Zustand)
+- `POST /api/chat` nimmt optional `context: {space_id, asset_id, point: [x, y], floor_id}` (Modellmeter, +y Norden). Alles optional, unbekannte Felder werden ignoriert. Der Server prüft gegen das Gebäude: unbekannte Ids, falsches Stockwerk, NaN/inf/riesige Zahlen, falsche Typen verwerfen die ganze Auswahl (Antwort bleibt 200, mit `selection_ignored: "<Grund>"`). Ein Punkt außerhalb des Raums wird allein verworfen. Die Auswahl gilt nur für diese eine Nachricht.
+- Der Agent liest sie mit `get_selection`, es stehen keine Ids im Nachrichtentext.
+- `state` (in jeder Antwort mit `state`) enthält zusätzlich, nur wenn nicht leer: `added_assets {id: {space_id, floor_id, position, name, rotation_deg, type, category}}`, `moved_assets {id: {space_id, floor_id, position, name, rotation_deg}}`, `removed_assets [ids]`, `removed_openings [ids]`, `widened_openings {id: width_m}`. Das ist der Stand seit dem Laden, nicht nur die Änderung seit der letzten Antwort: die Seite ersetzt ihr Asset- und Türbild damit. Nach Undo eines hinzugefügten Assets steht seine Id in `removed_assets`.
