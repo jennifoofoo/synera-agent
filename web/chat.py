@@ -48,19 +48,20 @@ class ChatAdapter:
         self.session = None
         self.lock = threading.Lock()
 
-    def ask(self, text: str) -> dict:
+    def ask(self, text: str, selection=None) -> dict:
+        """selection: a validated web.selection.Selection, valid for this one turn only."""
         if not chat_available():
             return {"reply": NO_KEY_MESSAGE, "backend": None, "error": "no_api_key"}
         backend = backend_name()
         try:
             with self.lock:  # one conversation per building: never two turns at once
                 if backend == "building_agent":
-                    return {"reply": self.ask_building_agent(text), "backend": backend}
+                    return {"reply": self.ask_building_agent(text, selection), "backend": backend}
                 return {"reply": self.ask_starter(text), "backend": backend}
         except Exception as error:  # noqa: BLE001 - the page must keep working whatever the API does
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
-    def ask_building_agent(self, text: str) -> str:
+    def ask_building_agent(self, text: str, selection=None) -> str:
         from building_agent.agent import Session
 
         if self.session is None:
@@ -72,7 +73,11 @@ class ChatAdapter:
             note = self.level4.chat_context()
             if note:
                 text = f"{note}\n{text}"
-        return self.session.ask(text)
+        self.session.guide.selection = selection
+        try:
+            return self.session.ask(text)
+        finally:
+            self.session.guide.selection = None  # one-shot: never leaks into the next message
 
     def ask_starter(self, text: str) -> str:
         if self.starter is None:

@@ -193,7 +193,31 @@ def state_view(session: Session) -> dict:
         "closed": sorted(bm.closed),
         "added_doors": [opening_summary(bm, opening_id) for opening_id in session.added_door_ids],
         "route": current_route(session),
+        **edit_state(bm),
     }
+
+
+def edit_state(bm: BuildingMap) -> dict:
+    """Asset and door edits since loading; only keys with content are present. Positions: model metres, +y north.
+
+    added_assets   {id: {space_id, floor_id, position, name, rotation_deg, type, category}} (latest position)
+    moved_assets   {id: {space_id, floor_id, position, name, rotation_deg}} (also restored values after undo)
+    removed_assets [ids] that no longer exist (an added asset after undo)
+    removed_openings [ids], widened_openings {id: width_m}"""
+    moved = {
+        key: {**item, "position": rounded(item["position"])} for key, item in getattr(bm, "moved_assets", {}).items()
+    }
+    added = {}
+    for key, item in getattr(bm, "added_assets", {}).items():
+        added[key] = {**item, **moved.get(key, {}), "position": rounded(moved.get(key, item)["position"])}
+    found = {
+        "added_assets": added,
+        "moved_assets": {key: item for key, item in moved.items() if key not in added},
+        "removed_assets": [str(item) for item in getattr(bm, "removed_assets", [])],
+        "removed_openings": [str(item) for item in getattr(bm, "removed_openings", [])],
+        "widened_openings": {str(key): float(width) for key, width in getattr(bm, "widened_openings", {}).items()},
+    }
+    return {key: value for key, value in found.items() if value}
 
 
 def opening_summary(bm: BuildingMap, opening_id: str) -> dict:
