@@ -42,7 +42,7 @@ def test_markdown_and_answer_line_are_removed():
 def test_only_three_steps_then_german_tail():
     reply = "Route found:\n1. Go left.\n2. Take the lift.\n3. Turn right.\n4. Walk on.\n5. Arrive."
     spoken = spoken_version(reply)
-    assert "Go left." in spoken and "Turn right." in spoken
+    assert "go left." in spoken and "turn right." in spoken
     assert "Walk on" not in spoken
     assert spoken.endswith("and 2 more steps, see the screen.")
     assert spoken_version(reply, lang="de").endswith("und 2 weitere Schritte, siehe Bildschirm.")
@@ -68,7 +68,7 @@ def test_dates_and_refs_are_kept_but_dataset_ids_go():
 
 def test_markdown_links_tables_rules_and_bold_steps():
     reply = "See [the plan](http://x.y/z).\n---\n| a | b |\n|---|---|\n**1.** Go left.\n**2.** Go on."
-    assert spoken_version(reply) == "See the plan. Go left. Go on."
+    assert spoken_version(reply) == "See the plan. Step one, go left. Step two, go on."
 
 
 def test_abbreviations_do_not_end_sentences():
@@ -156,7 +156,7 @@ def test_pauses_after_headline_and_between_steps():
     spoken = tagged_version(ROUTE)
     assert spoken == (
         "Route to Kitchen zero point two eight, about 36 metres. "
-        '<break time="0.8s" /> Leave the office. <break time="0.8s" /> Turn left. <break time="0.8s" /> Go on.'
+        '<break time="0.8s" /> Step one, leave the office. <break time="0.8s" /> Step two, turn left. <break time="0.8s" /> Step three, go on.'
     )
     assert [float(x) for x in BREAK.findall(spoken)] == [speech.PAUSE_HEADLINE, speech.PAUSE_ITEM, speech.PAUSE_ITEM]
 
@@ -186,19 +186,38 @@ def test_forged_tags_in_the_reply_are_stripped():
 
 
 def test_tags_do_not_count_towards_max_chars():
-    plain = "Route to the lab. " + " ".join(f"{i}. Walk {i}." for i in range(1, 4))
     reply = "Route to the lab.\n" + "\n".join(f"{i}. Walk {i}." for i in range(1, 4))
-    spoken = tagged_version(reply, max_chars=len("Route to the lab. Walk 1. Walk 2. Walk 3."))
-    assert BREAK.sub(" ", spoken).count("Walk") == 3 and len(spoken) > len(plain) - 5
-    assert "Walk 3" not in tagged_version(reply, max_chars=len("Route to the lab. Walk 1. Walk 2."))
-    assert "Walk 2" in tagged_version(reply, max_chars=len("Route to the lab. Walk 1. Walk 2."))
+    full = "Route to the lab. Step one, walk 1. Step two, walk 2. Step three, walk 3."
+    two = "Route to the lab. Step one, walk 1. Step two, walk 2."
+    spoken = tagged_version(reply, max_chars=len(full))
+    assert BREAK.sub(" ", spoken).count("walk") == 3 and len(spoken) > len(full) + 10
+    assert "walk 3" not in tagged_version(reply, max_chars=len(two))
+    assert "walk 2" in tagged_version(reply, max_chars=len(two))
 
 
 def test_more_steps_remark_follows_the_last_shown_step():
     steps = "\n".join(f"{i}. Step {i}." for i in range(1, 6))
     spoken = tagged_version(f"Route found.\n{steps}")
-    assert spoken.endswith("Step 3. and 2 more steps, see the screen.")
+    assert spoken.endswith("Step three, step 3. and 2 more steps, see the screen.")
     assert "Step 4" not in spoken
+
+
+def test_route_steps_are_steps_and_lists_are_ordinals():
+    steps = "Route to the lab.\n1. Go left.\n2. Take the lift."
+    assert spoken_version(steps) == "Route to the lab. Step one, go left. Step two, take the lift."
+    assert spoken_version("Route zum Labor.\n1. Links.\n2. Zum Aufzug.", lang="de") == (
+        "Route zum Labor. Schritt eins, links. Schritt zwei, zum Aufzug."
+    )
+    # "Step N:" lines are steps too, and the written number is replaced by our own counting.
+    assert spoken_version("Route:\nStep 1: Go left.\nStep 2: Go on.") == "Route: Step one, go left. Step two, go on."
+    assert spoken_version("Weg:\nSchritt 1: Links.\nSchritt 2: Weiter.", lang="de") == (
+        "Weg: Schritt eins, links. Schritt zwei, weiter."
+    )
+    assert spoken_version("Route:\n1. Go on.") == "Route: Go on."  # one step needs no numbering
+    welding = "Welding station H-A1 in zone H-A1 Welding station H-A4 in zone H-A4"
+    assert spoken_version(welding).startswith("First, welding") and "Step" not in spoken_version(welding)
+    assert spoken_version("Two:\n- Press 1\n- Press 2", lang="de").count("Erstens") == 1
+    assert "Schritt" not in spoken_version("Two:\n- Press 1\n- Press 2", lang="de")
 
 
 def test_room_numbers_and_codes_english():

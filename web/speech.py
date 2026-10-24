@@ -31,7 +31,11 @@ class SpeechError(Exception):
 # ---------- shortening for speech ----------
 
 ANSWER_LINE = re.compile(r"^\s*(?:[-*]\s*)?(?:\*\*)?answer(?:\*\*)?\s*:", re.IGNORECASE)
-NUMBERED = re.compile(r"^\s*\d+[.)]\s+(.*)$")
+# A route step: "1. Go left" or "Step 1: Go left". Steps are read as "Step one, ..." (a sequence of actions),
+# unlike list items ("First, ...").
+NUMBERED = re.compile(r"^\s*(?:[-*]\s*)?(?:\d+[.)]|(?:step|schritt)\s+\d+\s*[:.)-]?)\s+(.*)$", re.IGNORECASE)
+STEP_LABEL = re.compile(r"^(?:step|schritt)\s+\d+\s*[:.)-]?\s+", re.IGNORECASE)
+STEP_WORD = {"en": "Step", "de": "Schritt"}
 BULLET = re.compile(r"^\s*[-*+]\s+")
 HEADING = re.compile(r"^\s*#{1,6}\s*")
 # Dataset ids: a source prefix plus hyphenated segments with a digit, or a trailing -F<n>-S<nnn> shape.
@@ -323,7 +327,7 @@ def _blocks(reply: str) -> list[tuple[str, str]]:
             continue
         numbered = NUMBERED.match(raw.replace("**", "").replace("__", ""))
         if numbered:
-            step = _remove_ids(_strip_markdown(numbered.group(1)))
+            step = _remove_ids(STEP_LABEL.sub("", _strip_markdown(numbered.group(1))))
             if step:
                 blocks.append(("step", _end_sentence(step)))
             continue
@@ -386,7 +390,23 @@ def _units(reply: str, lang: str) -> list[Unit]:
                 pieces = pieces[1:]
             units.extend((item, "item") for item in _number_items([_end_sentence(p) for p in pieces], lang))
     flush_run()
-    return units
+    return _number_steps(units, lang)
+
+
+def _number_steps(units: list[Unit], lang: str) -> list[Unit]:
+    """Prefix route steps with "Step one, ..." when there are at least two of them."""
+    if sum(kind == "step" for _, kind in units) < 2:
+        return units
+    word = STEP_WORD.get(lang, STEP_WORD[DEFAULT_LANG])
+    out: list[Unit] = []
+    count = 0
+    for text, kind in units:
+        if kind == "step":
+            count += 1
+            head = text[0].lower() + text[1:] if text[1:2].islower() else text
+            text = f"{word} {_int_words(count, lang if lang in UNITS else DEFAULT_LANG)}, {head}"
+        out.append((text, kind))
+    return out
 
 
 def _gaps(units: list[Unit]) -> list[float]:
