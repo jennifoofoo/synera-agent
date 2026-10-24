@@ -12,6 +12,7 @@ import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
+import { Pulse } from "./markerLayout";
 import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
 
@@ -62,16 +63,7 @@ export function clusterDisruptions(model: BuildingModel, closed: string[]): Disr
   return clusters;
 }
 
-export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
-  const group = useRef<THREE.Group>(null);
-  useFrame(({ clock, invalidate }) => {
-    if (!group.current || reducedMotion) return;
-    invalidate();
-    const s = 1 + amount * (0.5 + 0.5 * Math.sin(clock.elapsedTime * speed * Math.PI));
-    group.current.scale.set(s, 1, s);
-  });
-  return <group ref={group}>{children}</group>;
-}
+export { Pulse };
 
 export function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false, order }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean; order?: number }) {
   return (
@@ -126,7 +118,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
   return (
     <group>
       {/* You are here (draggable) and the pin of the last floor tap */}
-      <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} colour={hereColour} />
+      <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} worker={worker} colour={hereColour} />
       <TapPin model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} />
 
       {/* floor changes of the route in 3D: one small "↑ 1" badge where to go up or down (2D: Labels.tsx lays it out) */}

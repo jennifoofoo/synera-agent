@@ -67,7 +67,7 @@ function Building({ model }: { model: BuildingModel }) {
         );
       })}
       {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
-      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} />
+      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} worker={worker} />
       <Markers
         model={model}
         state={state}
