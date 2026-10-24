@@ -274,7 +274,8 @@ function render() {
     const [x, y] = svgPoint(a.position);
     const hit = app.highlight?.assetIds?.has(a.id);
     const selected = app.selection?.asset_id === a.id;
-    el("circle", { cx: x, cy: y, r: hit || selected ? 0.45 : 0.22, class: `asset ${a.category || ""}${hit ? " hit" : ""}${selected ? " selected" : ""}` }, assetLayer);
+    const dot = el("circle", { cx: x, cy: y, r: hit || selected ? 0.45 : 0.22, class: `asset ${a.category || ""}${hit ? " hit" : ""}${selected ? " selected" : ""} ${window.edits?.assetClass(a.id) || ""}` }, assetLayer);
+    window.edits?.glide(a.id, dot);
     const target = el("circle", { cx: x, cy: y, r: 0.5, class: "asset-hit", "data-asset": a.id }, assetLayer);
     el("title", {}, target).textContent = a.name;
   }
@@ -283,6 +284,7 @@ function render() {
     const [x, y] = svgPoint(sel.point);
     el("circle", { cx: x, cy: y, r: 0.4, class: "select-point" }, assetLayer);
   }
+  window.edits?.drawEffects(assetLayer, floorId);
 
   for (const o of app.building.openings) {
     if (o.floor_id !== floorId) continue;
@@ -330,6 +332,7 @@ function drawOpening(layer, o) {
     const d = r * 1.3;
     el("path", { d: `M${x - d},${y - d}L${x + d},${y + d}M${x - d},${y + d}L${x + d},${y - d}`, class: "x" }, g);
   }
+  window.edits?.decorateOpening(g, o, x, y, r);
   const title = el("title", {}, g);
   const sides = o.space_ids.map((id) => (id === "outside" ? "outside" : spaceName(id))).join(" ↔ ");
   title.textContent = `${o.added ? "New door" : o.kind}: ${sides}${o.step_free ? "" : " (step)"}${isClosed(o.id) ? " · CLOSED" : ""}`;
@@ -590,6 +593,7 @@ function setAnimCaption(text) {
 function applyState(state, { silent = false, cause = "", animate = true } = {}) {
   const before = app.state.route;
   app.state = state;
+  window.edits?.apply(state, { animate });  // things and doors the agent changed (edits.js)
   // Mirror closures/new doors into the building copy used for drawing.
   for (const door of state.added_doors) {
     if (!app.openings.has(door.id)) {
@@ -710,7 +714,7 @@ function renderChanges() {
     row.onclick = () => focusPoint(door.floor_id, door.position);
     doorList.appendChild(row);
   }
-  const count = app.state.closed.length + app.state.added_doors.length;
+  const count = app.state.closed.length + app.state.added_doors.length + (window.edits?.count() || 0);
   $("#changes-count").hidden = count === 0;
   $("#changes-count").textContent = count;
 }

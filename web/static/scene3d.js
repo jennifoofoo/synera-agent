@@ -477,8 +477,35 @@ export class Scene3D {
     this.requestRender();
   }
 
+  // What the agent changed: {ghosts: [{floor_id, position, footprint, category, kind: "moved" | "removed"}], news: [asset]}.
+  setEditMarks(marks) {
+    this.editMarks = marks || { ghosts: [], news: [] };
+    for (const record of this.floors.values()) if (record.built) this.refreshFloorState(record);
+    this.requestRender();
+  }
+
+  editMarkMeshes(record) {
+    const out = [];
+    const marks = this.editMarks || { ghosts: [], news: [] };
+    for (const g of marks.ghosts) {
+      if (g.floor_id !== record.floor.id) continue;
+      const mesh = this.assetHalo({ ...g, footprint: g.footprint || undefined }, g.kind === "removed" ? COLOURS.closed : 0x6b7280, record);
+      mesh.userData.pulse = false;
+      mesh.material.opacity = 0.28;
+      out.push(mesh);
+    }
+    for (const a of marks.news) {
+      if (a.floor_id !== record.floor.id) continue;
+      const mesh = this.assetHalo(a, COLOURS.added, record);
+      mesh.userData.pulse = false;
+      out.push(mesh);
+    }
+    return out;
+  }
+
   refreshFloorState(record) {
     this.clearGroup(record.stateGroup);
+    for (const mesh of this.editMarkMeshes(record)) record.stateGroup.add(mesh);
     const { closed, suspectSpaces, suspectOpenings } = this.stateData;
     const h = record.wallHeight + 0.04;
     const closedRings = [], suspectRings = [];
