@@ -37,6 +37,7 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
     built.solid.disposeBoundsTree?.();
     built.solid.dispose();
     built.edges.dispose();
+    built.zones.dispose();
   }, [built]);
 
   const materials = useMemo(() => {
@@ -53,12 +54,14 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
       side: THREE.DoubleSide,
     });
     const ghostEdges = new THREE.LineBasicMaterial({ color: COLOURS.edgeGhost, transparent: true, opacity: 0.35, depthWrite: false });
-    return { solid, edges, ghostSolid, ghostEdges };
+    const zones = new THREE.LineBasicMaterial({ color: COLOURS.edgeGhost, transparent: true, opacity: 0.8 });
+    return { solid, edges, ghostSolid, ghostEdges, zones };
   }, []);
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
   useEffect(() => {
     materials.edges.color.set(flat ? "#a39e94" : COLOURS.edge);
     materials.edges.opacity = flat ? 1 : 0.85;
+    materials.zones.color.set(flat ? "#b6b6b1" : COLOURS.edgeGhost);
     materials.solid.roughness = flat ? 1 : 0.92;
   }, [flat, materials]);
 
@@ -114,6 +117,7 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
         frustumCulled
       />
       <lineSegments geometry={built.edges} material={ghost ? materials.ghostEdges : materials.edges} renderOrder={ghost ? 11 : 1} layers-mask={ghost ? 2 : 1} />
+      {!ghost && <lineSegments name="zone-lines" geometry={built.zones} material={materials.zones} renderOrder={1} layers-mask={1} />}
     </group>
   );
 }
