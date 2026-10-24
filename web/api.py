@@ -5,6 +5,7 @@ give_directions use), so map and chat show the same rooms. Every other number co
 
 import csv
 import itertools
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -462,7 +463,45 @@ def compact_steps(steps: list[str]) -> list[str]:
             compact[-1] = step
         else:
             compact.append(step)
-    return compact
+    return merge_short_walks(compact)
+
+
+SHORT_WALK_M = 3
+WALK_STEP = re.compile(r"^Walk about (\d+) m (?:through the door|through the opening) into (.+)\.$")
+WALK_ON = re.compile(r"^Walk about (\d+) m(?: (through the door|through the opening))?(.*)$")
+
+
+def merge_short_walks(steps: list[str]) -> list[str]:
+    """A walk of under SHORT_WALK_M metres into a room is folded into the next walk: 'Walk about 1 m … into A.' and
+    'Walk about 2 m … into B.' read as 'Walk about 3 m via A into B.' (several 1 m steps in a row look broken).
+    Lift and stair steps and the first and last lines stay as they are."""
+    merged: list[str] = []
+    carry: tuple[int, list[str]] | None = None  # metres and rooms passed that still wait for the next walk
+    for step in steps:
+        short = WALK_STEP.match(step)
+        if short and int(short.group(1)) < SHORT_WALK_M:
+            metres, rooms = carry or (0, [])
+            carry = (metres + int(short.group(1)), [*rooms, short.group(2)])
+            continue
+        walk = WALK_ON.match(step) if carry else None
+        if carry and walk:
+            metres, rooms = carry
+            rest = walk.group(3)
+            step = f"Walk about {metres + int(walk.group(1))} m via {', '.join(rooms)}{rest}"
+            carry = None
+        elif carry:  # a lift or stair line follows: keep the short walks as one line before it
+            metres, rooms = carry
+            merged.append(
+                f"Walk about {max(metres, 1)} m into {rooms[-1]}."
+                if len(rooms) == 1
+                else f"Walk about {max(metres, 1)} m via {', '.join(rooms[:-1])} into {rooms[-1]}."
+            )
+            carry = None
+        merged.append(step)
+    if carry:
+        metres, rooms = carry
+        merged.append(f"Walk about {max(metres, 1)} m into {rooms[-1]}.")
+    return merged
 
 
 def route_legs(

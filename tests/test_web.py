@@ -404,3 +404,31 @@ def test_agent_saving_a_building_in_the_chat_opens_it_on_the_page(tmp_path, key,
     rooms = [s["id"] for s in bm.spaces.values() if s["type"] == "room"]
     status, routed = app.post("/api/route", {"building": reply["opened"], "start": rooms[0], "destination": rooms[-1]})
     assert status == 200 and "route" in routed
+
+
+def test_short_walks_fold_into_the_next_walk():
+    from web.api import merge_short_walks
+
+    steps = [
+        "Start in Office 1.01 on Floor 1.",
+        "Walk about 1 m through the door into Corridor 1.02.",
+        "Walk about 2 m through the opening into Landing 0.07.",
+        "Walk about 11 m through the door into Kitchen 1.06.",
+        "Walk about 3 m. You have arrived at Kitchen 1.06.",
+    ]
+    assert merge_short_walks(steps) == [
+        "Start in Office 1.01 on Floor 1.",
+        "Walk about 14 m via Corridor 1.02, Landing 0.07 into Kitchen 1.06.",
+        "Walk about 3 m. You have arrived at Kitchen 1.06.",
+    ]
+
+
+def test_a_short_walk_before_a_stair_stays_its_own_line():
+    from web.api import merge_short_walks
+
+    steps = ["Start in A.", "Walk about 1 m through the door into Stairwell 1.", "Take Stairs 1 (stairs) to Floor 2."]
+    assert merge_short_walks(steps) == [
+        "Start in A.",
+        "Walk about 1 m into Stairwell 1.",
+        "Take Stairs 1 (stairs) to Floor 2.",
+    ]
