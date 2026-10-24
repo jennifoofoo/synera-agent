@@ -12,6 +12,7 @@ from shapely.geometry import Polygon
 
 from building_agent import routing
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
+from web import route_draw
 
 COORD_DIGITS = 2
 KEPT_ROUTE_REQUESTS = 8
@@ -31,8 +32,12 @@ class RecordingMap(BuildingMap):
         self.remember_route(start, destination, step_free, via, result)
         return result
 
-    def remember_route(self, start: str, destination: str, step_free: bool, via, result) -> None:
+    def remember_route(
+        self, start: str, destination: str, step_free: bool, via, result, start_point=None, destination_point=None
+    ) -> None:
         request = {
+            "start_point": list(start_point) if start_point else None,
+            "destination_point": list(destination_point) if destination_point else None,
             "start": start,
             "destination": destination,
             "step_free": step_free,
@@ -57,10 +62,12 @@ def record_people_routes() -> None:
     if getattr(routing.route, "records_route_requests", False):
         return
 
-    def recorded_route(bm, start, destination, step_free=False, via=None):
-        result = people_route(bm, start, destination, step_free, via)
+    def recorded_route(
+        bm, start, destination, step_free=False, via=None, start_point=None, start_floor=None, destination_point=None
+    ):
+        result = people_route(bm, start, destination, step_free, via, start_point, start_floor, destination_point)
         if isinstance(bm, RecordingMap):
-            bm.remember_route(start, destination, step_free, via, result)
+            bm.remember_route(start, destination, step_free, via, result, start_point, destination_point)
         return result
 
     recorded_route.records_route_requests = True
@@ -106,6 +113,8 @@ class Session:
             "destination": route.destination_space_id,
             "step_free": route.step_free,
             "via": via,
+            "start_point": recorded.get("start_point") if recorded else None,
+            "destination_point": recorded.get("destination_point") if recorded else None,
         }
         self.route_version += 1
         return True
@@ -336,32 +345,63 @@ def opening_summary(bm: BuildingMap, opening_id: str) -> dict:
 PEOPLE_MODEL = "people"  # building_agent.routing: door to door, Synera's vertical costs (what the agent tells people)
 
 
-def route_view(session: Session, start: str, destination: str, step_free: bool = False, via=None) -> dict:
-    """A route the page asks for: remembered (newest wins over the chat agent's), then drawn."""
+def route_view(
+    session: Session,
+    start: str,
+    destination: str,
+    step_free: bool = False,
+    via=None,
+    start_point=None,
+    destination_point=None,
+) -> dict:
+    """A route the page asks for: remembered (newest wins over the chat agent's), then drawn.
+    start_point / destination_point are [x, y] in model metres, already checked against their rooms."""
     via = [stop for stop in via or [] if stop]
     # Remember the request even if it fails, so the page shows "no route" instead of a stale line.
-    session.route_request = {"start": start, "destination": destination, "step_free": step_free, "via": via}
+    session.route_request = {
+        "start": start,
+        "destination": destination,
+        "step_free": step_free,
+        "via": via,
+        "start_point": start_point,
+        "destination_point": destination_point,
+    }
     session.route_version += 1
-    return draw_route(session, start, destination, step_free, via)
+    return draw_route(session, start, destination, step_free, via, start_point, destination_point)
 
 
-def draw_route(session: Session, start: str, destination: str, step_free: bool, via: list[str]) -> dict:
+def draw_route(
+    session: Session,
+    start: str,
+    destination: str,
+    step_free: bool,
+    via: list[str],
+    start_point=None,
+    destination_point=None,
+) -> dict:
     """Shortest route in the people model (the one the agent's find_route and give_directions use), plus per-floor
     polylines (start anchor -> doors -> end anchor) and floor changes.
     Leaves map.last_route alone: that slot belongs to the chat agent, so redrawing never looks like a new agent route."""
     bm = session.map
     kept = (bm.last_route, getattr(bm, "last_route_request", None), list(getattr(bm, "route_requests", None) or []))
     try:
-        result = people_route(bm, start, destination, step_free, via)
+        result = people_route(
+            bm, start, destination, step_free, via, start_point=start_point, destination_point=destination_point
+        )
+        used = list(bm.last_route_points)  # the kit route below overwrites it
         kit = kit_route(bm, start, destination, step_free, via)
     finally:
         bm.last_route = kept[0]
         if isinstance(bm, RecordingMap):
             bm.last_route_request, bm.route_requests = kept[1], kept[2]
     stops = [result.start_space_id, *[bm.resolve_space(stop) for stop in via], result.destination_space_id]
-    legs = route_legs(bm, stops, step_free, result.space_path)
+    # the same checked (maybe moved in) points the route used
+    ends = (used[0][1] if start_point else None, used[-1][1] if destination_point else None)
+    legs = route_legs(bm, stops, step_free, result.space_path, ends[0], ends[1])
     line_stops = stops if legs is not None else [stops[0], stops[-1]]
-    geometry = route_geometry(bm, line_stops, legs if legs is not None else anchor_legs(bm, result.space_path))
+    geometry = route_geometry(
+        bm, line_stops, legs if legs is not None else anchor_legs(bm, result.space_path), ends[0], ends[1]
+    )
     return {
         "ok": True,
         "model": PEOPLE_MODEL,
@@ -395,7 +435,15 @@ def current_route(session: Session) -> dict | None:
         return None
     request = session.route_request
     try:
-        return draw_route(session, request["start"], request["destination"], request["step_free"], request["via"])
+        return draw_route(
+            session,
+            request["start"],
+            request["destination"],
+            request["step_free"],
+            request["via"],
+            request.get("start_point"),
+            request.get("destination_point"),
+        )
     except MapError as error:
         return {"ok": False, "error": str(error), **request}
 
@@ -417,10 +465,17 @@ def compact_steps(steps: list[str]) -> list[str]:
     return compact
 
 
-def route_legs(bm: BuildingMap, stops: list[str], step_free: bool, space_path: list[str]) -> list[list[tuple]] | None:
+def route_legs(
+    bm: BuildingMap,
+    stops: list[str],
+    step_free: bool,
+    space_path: list[str],
+    start_point=None,
+    destination_point=None,
+) -> list[list[tuple]] | None:
     """The door and connector nodes of each leg, from the same graph and search as routing.route (which only
     returns spaces). None if there is none; the line then runs through room anchors."""
-    return routing.leg_portals(bm, step_free, stops)
+    return routing.leg_portals(bm, step_free, stops, start_point, destination_point)
 
 
 def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:
@@ -440,15 +495,26 @@ def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:
     return [nodes]
 
 
-def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -> dict:
+def route_geometry(
+    bm: BuildingMap, stops: list[str], legs: list[list[tuple]], start_point=None, destination_point=None
+) -> dict:
     """Drawable segments per floor plus markers where the route changes floor.
 
     The people model walks door to door: the line starts at the start room's anchor, runs through every door
     (and connector stop, which sits at its room's anchor), touches the anchor of each via stop, and ends at the
-    destination's anchor. Walking outside between two entrances is its own dashed segment."""
-    path: list[tuple] = [("a", None, stops[0])]
+    destination's anchor. Walking outside between two entrances is its own dashed segment. An exact start (end)
+    point replaces the first (last) anchor vertex, so the line begins where the person stands.
+
+    Drawing only (web/route_draw.py): a room anchor that sits on an asset moves to the nearest free point, and
+    the line ends (and starts) at the door of a big hall or zone instead of crossing it to its anchor (never at an
+    exact point)."""
+    path: list[tuple] = [("x", start_point, stops[0]) if start_point else ("a", None, stops[0])]
     for stop, nodes in zip(stops[1:], legs, strict=True):
         path += [*nodes, ("a", None, stop)]
+    if destination_point:
+        path[-1] = ("x", destination_point, stops[-1])
+    path = trim_big_room_ends(bm, path)
+    drawing = route_draw.draw_index(bm)  # once per line: its signature check walks every asset
     segments: list[dict] = []
     floor_changes: list[dict] = []
     current: dict | None = None
@@ -458,9 +524,11 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
         if kind == "o":
             opening = bm.openings[element]
             return opening["floor_id"], rounded(opening["position"])
+        if kind == "x":
+            return bm.spaces[space_id]["floor_id"], rounded(element)
         if space_id == OUTSIDE or space_id not in bm.spaces:
             return None
-        return bm.spaces[space_id]["floor_id"], rounded(bm.anchor(space_id))
+        return bm.spaces[space_id]["floor_id"], rounded(route_draw.drawn_anchor(bm, space_id, drawing))
 
     def add_point(node: tuple, kind: str = "walk") -> None:
         nonlocal current
@@ -487,7 +555,7 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
                 # Riding on past a floor: one change F0 -> F4, no stub drawn on the floors in between.
                 if current is not None and len(current["points"]) == 1:
                     segments.remove(current)
-                last.update(to_floor=to_floor, to_point=rounded(bm.anchor(node[2])))
+                last.update(to_floor=to_floor, to_point=rounded(route_draw.drawn_anchor(bm, node[2], drawing)))
             else:
                 floor_changes.append(
                     {
@@ -496,8 +564,8 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
                         "name": connector["name"],
                         "from_floor": from_floor,
                         "to_floor": to_floor,
-                        "from_point": rounded(bm.anchor(previous[2])),
-                        "to_point": rounded(bm.anchor(node[2])),
+                        "from_point": rounded(route_draw.drawn_anchor(bm, previous[2], drawing)),
+                        "to_point": rounded(route_draw.drawn_anchor(bm, node[2], drawing)),
                     }
                 )
             current = None
@@ -510,6 +578,25 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
         going_up = bm.floors[change["to_floor"]]["level"] > bm.floors[change["from_floor"]]["level"]
         change["direction"] = "up" if going_up else "down"
     return {"segments": segments, "floor_changes": floor_changes}
+
+
+def trim_big_room_ends(bm: BuildingMap, path: list[tuple]) -> list[tuple]:
+    """Drop the anchor at either end of the line when that room is a big hall or zone and the line leaves or
+    enters it by a door; the end then sits on the door. The destination wins: if trimming both ends would leave
+    no line, only the destination end is trimmed."""
+
+    def trimmable(end: tuple, door: tuple) -> bool:
+        return end[0] == "a" and door[0] == "o" and door[2] == end[2] and route_draw.ends_at_door(bm, end[2])
+
+    def drawn_points(nodes: list[tuple]) -> int:
+        return len({tuple(bm.openings[n[1]]["position"][:2]) if n[0] == "o" else (n[0], n[2]) for n in nodes})
+
+    if len(path) < 3:
+        return path
+    trimmed = path[:-1] if trimmable(path[-1], path[-2]) else path
+    if trimmable(trimmed[0], trimmed[1]) and drawn_points(trimmed[1:]) >= 2:
+        trimmed = trimmed[1:]
+    return trimmed if drawn_points(trimmed) >= 2 else path
 
 
 # ---------- changes ----------

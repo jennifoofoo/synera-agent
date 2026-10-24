@@ -4,7 +4,7 @@ import type { Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
-import { LABEL_LIFT } from "./markerLayout";
+import { LABEL_LIFT, guideNextPoint } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { PoiBadge, POI_PX, type PoiKind } from "./poiIcons";
 
@@ -62,6 +62,24 @@ function segmentHitsBox(p: Point, q: Point, box: Box): boolean {
     if (t0 > t1) return false;
   }
   return true;
+}
+
+function insidePolygon([x, y]: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Does the box lie on the polygon (a sample point of the box inside it, or a polygon corner inside the box)? */
+function boxOnPolygon(box: Box, polygon: Point[]): boolean {
+  const xs = [box.x0, (box.x0 + box.x1) / 2, box.x1];
+  const ys = [box.y0, (box.y0 + box.y1) / 2, box.y1];
+  if (xs.some((x) => ys.some((y) => insidePolygon([x, y], polygon)))) return true;
+  return polygon.some(([x, y]) => x > box.x0 && x < box.x1 && y > box.y0 && y < box.y1);
 }
 
 function spanOf(polygon: Point[]): [number, number] {
@@ -122,6 +140,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
   const state = useTwin((s) => s.state);
   const route = state?.route ?? null;
+  // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
+  const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
@@ -133,15 +153,17 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     if (route?.ok && route.segments?.length) {
       const first = route.segments[0];
       const last = route.segments[route.segments.length - 1];
-      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.end, ROUTE_LIFT);
+      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.start, ROUTE_LIFT);
       if (last.floor_id === floor.id) put(route.destination, last.points[last.points.length - 1], LABEL_LIFT.end, ROUTE_LIFT);
     }
     const guide = state?.guide;
-    if (guide?.active) put(guide.leg.to_space_id, model.spaceById.get(guide.leg.to_space_id)?.anchor, LABEL_LIFT.guide);
+    const next = guide?.active && guide.leg.to_space_id !== route?.destination ? model.spaceById.get(guide.leg.to_space_id) : undefined;
+    if (guide && next) put(next.id, guideNextPoint(guide, next), LABEL_LIFT.guide);
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
+    if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
     return out;
-  }, [route, state?.guide, state?.position, model, floor.id]);
+  }, [route, state?.guide, state?.position, model, floor.id, selectedId]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -164,12 +186,15 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2, LABEL_H_PX / 2, marks.get(item.id)!.lift),
     );
     const result: Item[] = [...markedItems];
+    const selected = selectedId ? model.spaceById.get(selectedId) : undefined;
+    const selectedPx = selected && selected.floor_id === floor.id ? selected.polygon.map(px) : null;
     for (const item of candidates(floor, model, tier, scale, limit)) {
       if (marks.has(item.id)) continue;
       const halfW = item.kind === "poi" ? POI_PX / 2 : (item.space.name.length * CHAR_PX) / 2;
       const halfH = item.kind === "poi" ? POI_PX / 2 : LABEL_H_PX / 2;
       const box = boxOf(item.point, halfW, halfH);
       if (kept.some((other) => overlaps(box, other))) continue;
+      if (item.kind === "room" && selectedPx && boxOnPolygon(box, selectedPx)) continue;
       if (item.kind === "room") {
         const clear = { x0: box.x0 - ROUTE_CLEAR_PX, y0: box.y0 - ROUTE_CLEAR_PX, x1: box.x1 + ROUTE_CLEAR_PX, y1: box.y1 + ROUTE_CLEAR_PX };
         if (routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)))) continue;
@@ -178,13 +203,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return result;
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, selectedId]);
 
   return (
     <group position-y={y + 0.5}>
       {shown.map((item) =>
         item.kind === "room" ? (
-          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} />
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             <PoiBadge kind={item.poi} title={item.title} />
@@ -195,7 +220,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   );
 }
 
-function RoomLabel({ item, mark, flat }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean }) {
+function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean }) {
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
@@ -204,7 +229,7 @@ function RoomLabel({ item, mark, flat }: { item: Extract<Item, { kind: "room" }>
       style={{ pointerEvents: "none" }}
     >
       <div
-        className={`label label-halo ${flat ? "label-plan" : ""}`}
+        className={`label label-halo ${flat ? "label-plan" : ""} ${selected ? "label-selected" : ""}`}
         data-label-space={item.space.id}
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >

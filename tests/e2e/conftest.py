@@ -53,13 +53,26 @@ def _pick_buildings(target: Path) -> None:
 
 @pytest.fixture(scope="session")
 def base_url(tmp_path_factory):
-    """Start `python -m web` on a free port with 2 dev buildings and no API key; always shut it down."""
+    """Start the web server with the fake chat turn (tests/e2e/fake_chat_server.py: "I'm here" sets the position,
+    every other message gets "ok") on a free port with 2 dev buildings and no API key; always shut it down."""
+    if not (REPO / "twin" / "dist" / "index.html").exists():
+        pytest.skip("twin/dist is missing (scripts/build_twin.sh)")
     data = tmp_path_factory.mktemp("mobile_data")
     _pick_buildings(data)
     port = _free_port()
     env = {k: v for k, v in os.environ.items() if "API_KEY" not in k and not k.startswith("ANTHROPIC")}
     proc = subprocess.Popen(
-        [sys.executable, "-m", "web", "--data", str(data), "--port", str(port), "--env-file", str(data / "no.env")],
+        [
+            sys.executable,
+            "-m",
+            "tests.e2e.fake_chat_server",
+            "--data",
+            str(data),
+            "--port",
+            str(port),
+            "--env-file",
+            str(data / "no.env"),
+        ],
         cwd=REPO,
         env=env,
         stdout=subprocess.DEVNULL,
@@ -117,21 +130,32 @@ def device(request, playwright_instance, _browsers):
 
 @pytest.fixture
 def open_page(device, base_url):
-    """Factory: open the page on the phone profile, optionally with an init script. Contexts are closed afterwards."""
+    """Factory: open the twin on the phone profile (optionally landscape, optionally with an init script), wait for
+    the plan and the camera to settle. Contexts are closed afterwards."""
     contexts = []
 
-    def _open(init_script: str | None = None, wait_plan: bool = True):
+    def _open(init_script: str | None = None, wait_plan: bool = True, landscape: bool = False):
         _, descriptor, browser = device
-        context = browser.new_context(**descriptor)
+        options = dict(descriptor)
+        if landscape:
+            options["viewport"] = {"width": descriptor["viewport"]["height"], "height": descriptor["viewport"]["width"]}
+        context = browser.new_context(**options)
         contexts.append(context)
         if init_script:
             context.add_init_script(init_script)
         page = context.new_page()
         page.errors = []
+        page.console_errors = []
         page.on("pageerror", lambda e: page.errors.append(str(e)))
+        page.on("console", lambda m: m.type == "error" and page.console_errors.append(m.text))
         page.goto(base_url)
         if wait_plan:
-            page.wait_for_selector("#map [data-space]", state="attached", timeout=15000)
+            page.wait_for_function(
+                "() => !!(window.__twinScene && window.__twinStore && window.__twinStore.getState().model"
+                " && window.__twinCamera && document.querySelector('.worker .topbar'))",
+                timeout=20000,
+            )
+            page.wait_for_timeout(1500)  # the camera flies to the floor first
         return page
 
     yield _open

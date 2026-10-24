@@ -264,7 +264,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   applyState(state) {
-    set({ state: withHere(state) });
+    set({ state: withPendingHere(state) });
   },
 
   setProfile(profile) {
@@ -406,24 +406,24 @@ export const useTwin = create<TwinState>((set, get) => ({
     const key = get().buildingKey;
     if (!key) return;
     const result = await api.route(key, start, destination, stepFree);
-    set({ state: withHere(result.state) });
+    set({ state: withPendingHere(result.state) });
     if (result.route.ok && result.route.floors?.length) set({ focusedFloorId: result.route.floors[0] });
   },
   async clearRoute() {
     if (get().campusHook?.clearRoute()) return;
     const key = get().buildingKey;
     if (!key) return;
-    set({ state: withHere((await api.clearRoute(key)).state) });
+    set({ state: withPendingHere((await api.clearRoute(key)).state) });
   },
   async setClosed(element, closed) {
     const key = get().buildingKey;
     if (!key) return;
-    set({ state: withHere((await api.close(key, element, closed)).state) });
+    set({ state: withPendingHere((await api.close(key, element, closed)).state) });
   },
   async addDoor(first, second) {
     const key = get().buildingKey;
     if (!key) return;
-    set({ state: withHere((await api.addDoor(key, first, second)).state) });
+    set({ state: withPendingHere((await api.addDoor(key, first, second)).state) });
   },
   async reset() {
     const key = get().buildingKey;
@@ -526,13 +526,11 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 }));
 
-/** A server state, keeping an "I'm here" the server does not know yet: setHere is client-side until the next chat
- * message carries it (pendingHere), so a route, clear or close reply in between must not wipe "You are here"
- * (it would also lose the default start "Your location" of the directions). */
-function withHere(state: BuildingState): BuildingState {
-  const pending = useTwin.getState().pendingHere;
-  if (!pending || state.position) return state;
-  return { ...state, position: { space_id: pending.space_id, floor_id: pending.floor_id, point: pending.point ?? null, source: "click" } };
+/** "I'm here" is local until the next chat message (pendingHere): a state from another endpoint (route, close,
+ * door) does not know it yet, so the position on screen is kept instead of being wiped (mobile session). */
+function withPendingHere(next: BuildingState): BuildingState {
+  const { pendingHere, state } = useTwin.getState();
+  return pendingHere && !next.position && state?.position ? { ...next, position: state.position } : next;
 }
 
 /** Identity of a drawn route (same ends and length = same route). */
@@ -558,12 +556,12 @@ async function routeDirections(): Promise<void> {
     return;
   }
   if (!start || !destination || start === destination) {
-    if (state?.route) useTwin.setState({ state: withHere((await api.clearRoute(buildingKey)).state) });
+    if (state?.route) useTwin.setState({ state: withPendingHere((await api.clearRoute(buildingKey)).state) });
     return;
   }
   const result = await api.route(buildingKey, start, destination, directions.stepFree);
   if (run !== directionsRun || !useTwin.getState().directions) return; // a newer pick or a close won
-  useTwin.setState({ state: withHere(result.state), replyShown: false });
+  useTwin.setState({ state: withPendingHere(result.state), replyShown: false });
   if (result.route.ok && result.route.floors?.length) useTwin.setState({ focusedFloorId: result.route.floors[0] });
 }
 

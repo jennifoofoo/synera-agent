@@ -3,7 +3,9 @@
 Thin layer over building_agent.level4.tools: every step calls the same tools the chat agent uses (build_from_plan,
 fix_draft, preview_draft, save_building), so the confirmation rules and all geometry stay in one place.
 Security: uploads are PNG/JPG only (magic bytes, Pillow), at most 10 MB, stored under a server-made name in the
-upload folder. The browser only ever names an upload by its id; it never sends a path."""
+upload folder. The browser only ever names an upload by its id; it never sends a path.
+A plan may come with its vector file (svg) and a building.json (scale): `attach` stores them next to the image under
+the same server-made name, where build_from_plan looks for them; both are checked before they are kept."""
 
 import copy
 import io
@@ -28,7 +30,9 @@ from building_agent.level4.extract import (
     MIN_SIDE_PX,
     ExtractResult,
 )
+from building_agent.level4.scale_source import MAX_JSON_BYTES, find_building_width, find_scale, load_building_json
 from building_agent.level4.schema import OUTSIDE, ExtractedDoor, ExtractedRoom, Extraction
+from building_agent.level4.svg_read import MAX_SVG_BYTES, read_svg
 from building_agent.level4.tools import ALONG, BMHolder, make_level4_tools
 from building_agent.level4.validate import describe, room_label
 from starter_agent.building_map import BuildingMap
@@ -45,6 +49,11 @@ NAME_MAX = 60
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 JPEG_MAGIC = b"\xff\xd8\xff"
 UPLOAD_ID = re.compile(r"^plan-[0-9a-f]{12}$")
+# what can be attached to an uploaded plan: kind -> (file name ending, content type, size limit)
+ATTACHMENTS = {
+    "svg": (".svg", "image/svg+xml", MAX_SVG_BYTES),
+    "building_json": (".building.json", "application/json", MAX_JSON_BYTES),
+}
 SECONDS_PER_FLOOR = "10 to 20 s"
 FIX_ACTIONS = ("add_door", "remove_door", "set_room_type", "set_scale")
 # finding code -> what to mark red on the plan
@@ -232,6 +241,42 @@ class PlanStudio:
             self.uploads[upload_id] = Upload(upload_id, path, media_type, width, height, len(data))
         return {"upload_id": upload_id, "width": width, "height": height, "bytes": len(data), "type": media_type}
 
+    def attach(self, upload_id: object, kind: object, data: bytes) -> dict:
+        """Keep the vector file (kind "svg") or the building.json (kind "building_json") of an uploaded plan. The
+        file name is made here from the upload id; the content is checked before it is kept."""
+        with self.lock:
+            upload = self._upload(upload_id)
+        if not isinstance(kind, str) or kind not in ATTACHMENTS:
+            raise Level4Error(f"kind must be one of {', '.join(ATTACHMENTS)}.")
+        ending, _, limit = ATTACHMENTS[str(kind)]
+        if not data:
+            raise Level4Error("The file is empty.")
+        if len(data) > limit:
+            raise Level4Error(f"The file is larger than {limit // (1024 * 1024)} MB.", 413)
+        final = upload.path.with_name(upload.upload_id + ending)
+        temp = upload.path.with_name(f".{upload.upload_id}{ending}.{uuid.uuid4().hex[:8]}.part")  # unique per call
+        temp.write_bytes(data)
+        try:
+            if kind == "svg":
+                plan = read_svg(temp)
+                if plan is None:
+                    raise Level4Error("This is not a floor plan svg in the kit's drawing style.", 415)
+                info = {"rooms": len(plan.rooms), "doors": len(plan.doors)}
+            else:
+                if load_building_json(temp) is None:
+                    raise Level4Error("This is not a usable JSON file.", 415)
+                info = {}
+            temp.replace(final)
+        finally:
+            temp.unlink(missing_ok=True)
+        return {"upload_id": upload.upload_id, "kind": kind, "bytes": len(data), **info}
+
+    def _has_building_json(self, upload: Upload) -> bool:
+        """True only for an attached building.json that is an object holding a usable scale or building width (an
+        empty `{}` or `[]` does not take away the need to give a length)."""
+        data = load_building_json(upload.path.with_name(upload.upload_id + ATTACHMENTS["building_json"][0]))
+        return isinstance(data, dict) and (find_scale(data) is not None or find_building_width(data) is not None)
+
     def _upload(self, upload_id: object) -> Upload:
         text = str(upload_id or "")
         if not UPLOAD_ID.match(text) or text not in self.uploads:
@@ -257,7 +302,7 @@ class PlanStudio:
                 raise Level4Error(f"'along' must be one of {', '.join(ALONG)}.")
             scale_bar = bool(item.get("scale_bar"))
             known = item.get("known_length_m")
-            if known in (None, "") and not scale_bar:
+            if known in (None, "") and not scale_bar and not self._has_building_json(upload):
                 raise Level4Error(
                     f"Floor {level}: give one length you know in metres (for example the building width), "
                     "or tick 'scale bar printed'."

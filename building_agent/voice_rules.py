@@ -1,5 +1,7 @@
 """Rules for replies that are spoken aloud, switched on per turn by the page's request-level `voice` flag."""
 
+import re
+
 VOICE_RULES = """
 
 Spoken reply (heard, not read). These rules win over any earlier advice:
@@ -33,3 +35,14 @@ def with_voice_rules(prompt: str, voice, user_text: str) -> str:
 
 def without_voice_rules(prompt: str) -> str:
     return prompt.removesuffix(VOICE_RULES)
+
+
+def question_last(reply: str) -> str:
+    """A spoken reply with exactly one question ends on it: sentences after the question ('Where are you? I'll find
+    the nearest one.') move in front of it, so the listener hears the question last. Anything else is unchanged."""
+    sentences = re.split(r"(?<=[.!?])\s+", reply.strip())
+    asked = [i for i, sentence in enumerate(sentences) if sentence.endswith("?")]
+    if len(asked) != 1 or asked[0] == len(sentences) - 1:
+        return reply
+    question = sentences.pop(asked[0])
+    return " ".join([*sentences, question])

@@ -14,7 +14,7 @@ from building_agent import edit_ops, routing
 from building_agent import walk as walking
 from building_agent.directions import DirectionsSession
 from building_agent.impact import analyse
-from building_agent.position import Position, no_position_error
+from building_agent.position import EXACT_POSITION_NOTE, Position, exact_start_point, no_position_error
 from building_agent.time_words import SCHEDULED_REPLY, names_a_time, when_is_later
 from building_agent.walk import Walk
 from starter_agent.building_map import BuildingMap, MapError
@@ -300,19 +300,35 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         if start is None and state.position is None:
             raise ToolError(no_position_error(state))
         old = state.walk if state.walk is not None and state.walk.mode != "plain" else None
+        point = None
         try:
             target = bm.resolve_space(destination)
             conflict = walking.guide_conflict(bm, state, target, replace_guide)
             if conflict is not None:
                 return as_json(conflict)
-            route = routing.route(bm, state.position.space_id if start is None else start, destination, step_free, via)
+            point = exact_start_point(bm, state) if start is None else None
+            route = routing.route(
+                bm,
+                state.position.space_id if start is None else start,
+                destination,
+                step_free,
+                via,
+                **({"start_point": point, "start_floor": state.position.floor_id} if point else {}),
+            )
             walk = walking.remember_route(bm, state, route, [bm.resolve_space(stop) for stop in via or []])
             state.session = None
             state.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
         result = {
-            **({"start_assumed": bm.describe_space(route.start_space_id)} if start is None else {}),
+            **(
+                {
+                    "start_assumed": bm.describe_space(route.start_space_id)
+                    + (f" ({EXACT_POSITION_NOTE})" if point else "")
+                }
+                if start is None
+                else {}
+            ),
             **({"replaced_previous": bm.spaces[old.destination]["name"]} if old and old.destination != target else {}),
             "length_m": route.length_m,
             "step_free": route.step_free,
