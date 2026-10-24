@@ -19,7 +19,9 @@ def test_every_file_in_kinds_exports_a_kind_named_like_the_file():
         module = importlib.import_module(f"building_agent.kinds.{module_name}")
         kind = getattr(module, "KIND", None)
         assert kind is not None, f"kinds/{module_name}.py has no KIND, so it is not registered"
-        assert kind.name == module_name, f"kinds/{module_name}.py registers '{kind.name}', file and kind name must match"
+        assert kind.name == module_name, (
+            f"kinds/{module_name}.py registers '{kind.name}', file and kind name must match"
+        )
 
 
 def test_every_kind_has_the_contract_shape():

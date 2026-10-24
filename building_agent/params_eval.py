@@ -85,7 +85,6 @@ def group_mismatches(bm_for: dict, mismatches: list[tuple[str, str, str, object,
     return dict(sorted(groups.items(), key=lambda item: -len(item[1])))
 
 
-
 SPACE_PARAMS = {"start", "first", "second"}
 
 
@@ -142,5 +141,7 @@ def check_unlabelled(bm: BuildingMap, kind: str, question: str, response: dict, 
             try:
                 resolve_type(bm, name, value)
             except MapError as error:
-                reasons.append(f"unknown type {value!r} for {name} ({str(error).split('Valid values here: ')[-1][:120]})")
+                reasons.append(
+                    f"unknown type {value!r} for {name} ({str(error).split('Valid values here: ')[-1][:120]})"
+                )
     return reasons

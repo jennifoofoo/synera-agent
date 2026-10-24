@@ -19,10 +19,14 @@ from tests.live.test_script_1_3 import (
 from tests.live.test_script_4_6 import lift_case, long_route_case, rooms_by_floor, step_lists, wheelchair_case
 
 METERS = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:m\b|meter|metre)", re.IGNORECASE)
-NO_ROUTE_WORDS = re.compile(r"no route|no way|not possible|impossible|no longer|unreachable|keine route|nicht mehr|nicht möglich", re.IGNORECASE)
-UNCHANGED_WORDS = re.compile(r"same|unchanged|not affect|no effect|no change|unaffected|keine auswirkung|unverändert|nicht betroffen", re.IGNORECASE)
+NO_ROUTE_WORDS = re.compile(
+    r"no route|no way|not possible|impossible|no longer|unreachable|keine route|nicht mehr|nicht möglich", re.IGNORECASE
+)
+UNCHANGED_WORDS = re.compile(
+    r"same|unchanged|not affect|no effect|no change|unaffected|keine auswirkung|unverändert|nicht betroffen",
+    re.IGNORECASE,
+)
 LONGER_WORDS = re.compile(r"longer|detour|further|farther|extra|umweg|länger", re.IGNORECASE)
-
 
 
 def meters_in(reply: str) -> list[float]:
@@ -47,11 +51,15 @@ def assert_card_first(transcript: Transcript, lift: str) -> None:
 @pytest.mark.parametrize(
     "answers",
     [
-        pytest.param(["mach einfach"], ),
+        pytest.param(
+            ["mach einfach"],
+        ),
         ["ok whatever"],
         ["ja, aber nicht {lift}"],
         ["yes... no wait, no"],
-        pytest.param(["ja ja", "ja ja"], ),
+        pytest.param(
+            ["ja ja", "ja ja"],
+        ),
     ],
     ids=["mach-einfach", "ok-whatever", "yes-but-not", "yes-no-wait", "ja-ja-twice"],
 )
@@ -64,7 +72,9 @@ def test_manager_ambiguous_answer_never_applies(answers):
     assert transcript.applied_changes() == [], f"change applied on {answers}: {transcript.replies()[1:]}"
     second = transcript.turns[1]
     dropped = any(call.args.get("confirmed") is False for call in second.called("confirm_change"))
-    assert "?" in second.reply or second.called("propose_change") or dropped, "neither re-asked, re-proposed nor dropped"
+    assert "?" in second.reply or second.called("propose_change") or dropped, (
+        "neither re-asked, re-proposed nor dropped"
+    )
 
 
 @pytest.mark.live
@@ -139,7 +149,11 @@ def test_change_of_mind_after_next_restarts_from_same_start_in_chunks_of_three()
     other = next(name for name in candidates if bm.route(start, name).steps)
     transcript = run_script(
         building,
-        [f"I'm carrying boxes, keep it short. How do I get from {start} to {destination}?", "weiter", f"no, go to {other} instead"],
+        [
+            f"I'm carrying boxes, keep it short. How do I get from {start} to {destination}?",
+            "weiter",
+            f"no, go to {other} instead",
+        ],
     )
     assert_no_invented_places(bm, transcript)
     assert all(len(steps) <= 3 for _, _, steps in step_lists(transcript))
@@ -148,7 +162,9 @@ def test_change_of_mind_after_next_restarts_from_same_start_in_chunks_of_three()
     for call in fresh:
         assert resolve(bm, call.args["start"]) == bm.resolve_space(start), "start changed"
     assert resolve(bm, fresh[-1].args["destination"]) == bm.resolve_space(other)
-    assert not re.search(r"\b(where are you|where do you start|wo bist du|wo starten)\b", transcript.turns[2].reply, re.IGNORECASE)
+    assert not re.search(
+        r"\b(where are you|where do you start|wo bist du|wo starten)\b", transcript.turns[2].reply, re.IGNORECASE
+    )
 
 
 @pytest.mark.live
@@ -221,6 +237,8 @@ def test_manager_confirmation_reply_states_the_concrete_route_consequence():
     if after is None:
         assert NO_ROUTE_WORDS.search(reply), f"reply hides that no route remains: {reply}"
     elif abs(after - effect["length_before_m"]) <= 1.5:
-        assert UNCHANGED_WORDS.search(reply) or mentions(reply, after), f"reply does not state the route is unchanged: {reply}"
+        assert UNCHANGED_WORDS.search(reply) or mentions(reply, after), (
+            f"reply does not state the route is unchanged: {reply}"
+        )
     else:
         assert mentions(reply, after), f"new length {after:.1f} m not in reply: {reply}"

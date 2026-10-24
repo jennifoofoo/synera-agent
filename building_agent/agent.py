@@ -57,7 +57,9 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 
 
 class Agent(StarterAgent):
-    def __init__(self, building_map: BuildingMap, output_directory: Path, client: anthropic.Anthropic | None = None) -> None:
+    def __init__(
+        self, building_map: BuildingMap, output_directory: Path, client: anthropic.Anthropic | None = None
+    ) -> None:
         super().__init__(building_map, output_directory, client)
         self.guide = GuideState()
         self.tools = make_tools(building_map, output_directory, self.guide)
@@ -85,7 +87,11 @@ class Session(Agent):
 
 def cache_key(building_directory: Path, question_text: str) -> str:
     """Changes whenever the prompt or any kind description changes, so stale answers are never reused."""
-    version = CALCULATION_RULES + CONVERSATION_RULES + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
+    version = (
+        CALCULATION_RULES
+        + CONVERSATION_RULES
+        + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
+    )
     raw = f"{building_directory.name}\n{question_text}\n{version}"
     return hashlib.sha256(raw.encode()).hexdigest()
 

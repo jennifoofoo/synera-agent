@@ -31,9 +31,7 @@ def space_area(bm: BuildingMap, space_id: str) -> float:
 def largest_space_id(bm: BuildingMap, floor_id: str, room_type: str) -> str:
     """Largest space of one room_type on one floor, by polygon area."""
     candidates = [
-        space["id"]
-        for space in bm.spaces.values()
-        if space["floor_id"] == floor_id and space["room_type"] == room_type
+        space["id"] for space in bm.spaces.values() if space["floor_id"] == floor_id and space["room_type"] == room_type
     ]
     if not candidates:
         raise MapError(f"No {room_type} on floor {floor_id}.")

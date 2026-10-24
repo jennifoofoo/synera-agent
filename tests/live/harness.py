@@ -88,14 +88,18 @@ def calls_in(new_messages: list[dict]) -> list[Call]:
 
 
 def cache_file(building_directory: Path, user_turns: list[str], model: str) -> Path:
-    version = agent_module.CALCULATION_RULES + agent_module.CONVERSATION_RULES + json.dumps(
-        {name: kind.description for name, kind in load_kinds().items()}, sort_keys=True
+    version = (
+        agent_module.CALCULATION_RULES
+        + agent_module.CONVERSATION_RULES
+        + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
     )
     raw = json.dumps([building_directory.name, user_turns, model, version])
     return LIVE_CACHE / f"{hashlib.sha256(raw.encode()).hexdigest()}.json"
 
 
-def run_script(building_directory: Path, user_turns: list[str], model: str = LIVE_MODEL, use_cache: bool = True) -> Transcript:
+def run_script(
+    building_directory: Path, user_turns: list[str], model: str = LIVE_MODEL, use_cache: bool = True
+) -> Transcript:
     """Play the user turns in order against one fresh agent on one building."""
     path = cache_file(building_directory, user_turns, model)
     if use_cache and path.exists():
@@ -104,9 +108,7 @@ def run_script(building_directory: Path, user_turns: list[str], model: str = LIV
     previous_model = starter_module.MODEL
     starter_module.MODEL = model
     try:
-        agent = agent_module.Agent(
-            BuildingMap.load(building_directory), Path("agent_output") / "live_scratch"
-        )
+        agent = agent_module.Agent(BuildingMap.load(building_directory), Path("agent_output") / "live_scratch")
         turns = []
         for user_text in user_turns:
             seen = len(agent.messages)

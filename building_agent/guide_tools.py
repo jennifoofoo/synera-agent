@@ -82,13 +82,17 @@ def route_effect(before: BuildingMap, after: BuildingMap) -> dict | None:
     if last is None:
         return None
     ends = (last.start_space_id, last.destination_space_id, last.step_free)
-    effect = {"route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}"}
+    effect = {
+        "route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}"
+    }
     for label, building in (("length_before_m", copy.deepcopy(before)), ("length_after_m", after)):
         try:
             effect[label] = building.route(*ends).length_m
         except MapError:
             effect[label] = None
-            effect.setdefault("note", "There is no route " + ("now." if label == "length_before_m" else "after this change."))
+            effect.setdefault(
+                "note", "There is no route " + ("now." if label == "length_before_m" else "after this change.")
+            )
     return effect
 
 
@@ -130,8 +134,12 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             state.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
-        result = {"length_m": route.length_m, "step_free": route.step_free, "steps": state.session.next(),
-                  "steps_remaining": state.session.remaining()}
+        result = {
+            "length_m": route.length_m,
+            "step_free": route.step_free,
+            "steps": state.session.next(),
+            "steps_remaining": state.session.remaining(),
+        }
         if step_free:
             result["normal_route_length_m"] = compare_normal_length(bm, route)
         return as_json(result)
@@ -170,8 +178,11 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             what = apply_change(preview, action, element, other, step_free)
         except MapError as error:
             raise ToolError(str(error)) from error
-        card = {"I understood": what, "effect on your last route": route_effect(bm, preview),
-                "status": "nothing changed yet, waiting for the person's yes"}
+        card = {
+            "I understood": what,
+            "effect on your last route": route_effect(bm, preview),
+            "status": "nothing changed yet, waiting for the person's yes",
+        }
         state.pending = Pending(action, element, other, step_free, card, state.turn, building_signature(bm))
         return as_json(card)
 
@@ -204,7 +215,13 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             output_directory.mkdir(parents=True, exist_ok=True)
             bm.save(output_directory / "building_edited.json")
         state.log.append({"turn": state.turn, "change": what})
-        return as_json({"applied": True, "change": what, "effect": pending.card["effect on your last route"],
-                        "all_closed": sorted(bm.closed)})
+        return as_json(
+            {
+                "applied": True,
+                "change": what,
+                "effect": pending.card["effect on your last route"],
+                "all_closed": sorted(bm.closed),
+            }
+        )
 
     return [give_directions, next_steps, repeat_steps, propose_change, confirm_change]

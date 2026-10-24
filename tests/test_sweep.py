@@ -21,6 +21,7 @@ TIMING_LIMIT_S = 10.0
 SPACE_KEYS = {"space_id", "via", "target"}
 COORDINATE_KEYS = {"door_position", "first", "second"}
 
+
 def _name(path: str) -> str:
     return Path(path).name
 

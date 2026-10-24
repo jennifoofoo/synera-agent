@@ -128,9 +128,7 @@ class DirectionsSession:
         self.position = 0  # number of chunks handed out so far
 
     @classmethod
-    def from_route(
-        cls, bm: BuildingMap, route: RouteResult, max_steps: int = MAX_STEPS
-    ) -> "DirectionsSession":
+    def from_route(cls, bm: BuildingMap, route: RouteResult, max_steps: int = MAX_STEPS) -> "DirectionsSession":
         return cls(landmark_directions(bm, route), max_steps)
 
     def next(self) -> list[str]:

@@ -6,9 +6,7 @@ from starter_agent.building_map import BuildingMap, MapError
 def floor_area_total(bm: BuildingMap, floor_id: str, room_type: str) -> dict:
     """Sum of polygon areas (m2) of all spaces of `room_type` on floor `floor_id`."""
     space_ids = [
-        space["id"]
-        for space in bm.spaces.values()
-        if space["floor_id"] == floor_id and space["room_type"] == room_type
+        space["id"] for space in bm.spaces.values() if space["floor_id"] == floor_id and space["room_type"] == room_type
     ]
     if not space_ids:
         raise MapError(f"No {room_type} on floor {floor_id}.")

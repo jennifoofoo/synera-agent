@@ -9,11 +9,7 @@ ROOM_TYPE = "room"
 def wide_delivery_count(bm: BuildingMap, start: str, floor_id: str, min_width: float) -> dict:
     """Rooms on `floor_id` reachable from `start` step-free (no stairs, lifts fine) through openings >= min_width."""
     graph = bm.graph(step_free=True)
-    narrow = [
-        DOOR_PREFIX + opening["id"]
-        for opening in bm.openings.values()
-        if opening["width_m"] < min_width - 1e-9
-    ]
+    narrow = [DOOR_PREFIX + opening["id"] for opening in bm.openings.values() if opening["width_m"] < min_width - 1e-9]
     graph.remove_nodes_from(narrow)
     reachable = nx.node_connected_component(graph, start)
     space_ids = sorted(

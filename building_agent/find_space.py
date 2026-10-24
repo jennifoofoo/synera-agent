@@ -23,11 +23,7 @@ def find_space(bm: BuildingMap, name: str, floor_level: int | None = None) -> di
     ]
     if len(exact) == 1:
         return {"match": describe(bm, exact[0])}
-    found = exact or [
-        bm.spaces[result["id"]]
-        for result in bm.search(name, floor_level)
-        if result["kind"] == "space"
-    ]
+    found = exact or [bm.spaces[result["id"]] for result in bm.search(name, floor_level) if result["kind"] == "space"]
     if not found:
         raise MapError(f"No room matches '{name}'" + (f" on level {floor_level}." if floor_level is not None else "."))
     return {"total": len(found), "candidates": [describe(bm, space) for space in found[:MAX_SEARCH_RESULTS]]}

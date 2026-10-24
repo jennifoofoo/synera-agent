@@ -35,6 +35,7 @@ Replies must end with exactly one `Answer:` line (the scorer reads only that).
 
 ## Commands
 - `uv sync`
+- `scripts/check.sh` (ruff format check, ruff lint, tests; run `uv run ruff format .` to fix formatting)
 - `uv run pytest`
 - `uv run --env-file .env python -m benchmark.evaluate data/dev --agent building_agent.agent:answer --per-kind 3`
 

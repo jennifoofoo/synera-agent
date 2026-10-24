@@ -26,9 +26,7 @@ def coffee_space_ids(bm: BuildingMap) -> set[str]:
 
 
 def coffee_asset_space_ids(bm: BuildingMap) -> set[str]:
-    return {
-        asset["space_id"] for asset in bm.assets.values() if asset["type"] == "coffee_machine"
-    }
+    return {asset["space_id"] for asset in bm.assets.values() if asset["type"] == "coffee_machine"}
 
 
 def building_with_one_coffee_machine() -> tuple[Path, BuildingMap]:
@@ -70,9 +68,7 @@ def resolve(bm: BuildingMap, reference) -> str | None:
 
 
 def routing_calls(transcript: Transcript) -> list[tuple[int, Call]]:
-    return sorted(
-        (pair for name in ROUTING for pair in transcript.calls(name)), key=lambda pair: pair[0]
-    )
+    return sorted((pair for name in ROUTING for pair in transcript.calls(name)), key=lambda pair: pair[0])
 
 
 def first_index(transcript: Transcript, names: tuple[str, ...]) -> int | None:
@@ -95,7 +91,9 @@ def assert_no_invented_places(bm: BuildingMap, transcript: Transcript) -> None:
         if call.is_error:
             continue
         for key in ("start", "destination"):
-            assert resolve(bm, call.args.get(key)) is not None, f"{call.name} {key}={call.args.get(key)!r} is not in the building"
+            assert resolve(bm, call.args.get(key)) is not None, (
+                f"{call.name} {key}={call.args.get(key)!r} is not in the building"
+            )
         for place in call.args.get("via") or []:
             assert resolve(bm, place) is not None, f"via {place!r} is not in the building"
 
@@ -114,7 +112,9 @@ def known_room_numbers(bm: BuildingMap) -> set[str]:
 def test_script_1_vague_coffee_searches_then_routes_or_asks(pick):
     """Script 1 (vague): 'where can I get coffee' searches first, routes on a clear hit, asks briefly otherwise."""
     path, bm = pick()
-    start = unique_name_space(bm, "office" if any(s["room_type"] == "office" for s in bm.spaces.values()) else "living_room")
+    start = unique_name_space(
+        bm, "office" if any(s["room_type"] == "office" for s in bm.spaces.values()) else "living_room"
+    )
     plausible = coffee_space_ids(bm)
     transcript = run_script(path, [f"I'm in {start['name']}. Where can I get coffee around here?"])
     turn = transcript.turns[0]
@@ -166,7 +166,10 @@ def test_script_3_change_of_mind_keeps_the_start():
 
     transcript = run_script(
         path,
-        [f"I'm in {start['name']}. How do I get to {first['name']}?", f"Actually, I want to go to {second['name']} instead."],
+        [
+            f"I'm in {start['name']}. How do I get to {first['name']}?",
+            f"Actually, I want to go to {second['name']} instead.",
+        ],
     )
     assert_no_invented_places(bm, transcript)
 
@@ -181,6 +184,7 @@ def test_script_3_change_of_mind_keeps_the_start():
     asks_for_start = [
         sentence
         for sentence in re.split(r"(?<=[?.!])\s+", transcript.turns[1].reply)
-        if sentence.endswith("?") and re.search(r"\b(where|start|located|currently|position)\b", sentence, re.IGNORECASE)
+        if sentence.endswith("?")
+        and re.search(r"\b(where|start|located|currently|position)\b", sentence, re.IGNORECASE)
     ]
     assert not asks_for_start, f"asked for the start again: {asks_for_start}"

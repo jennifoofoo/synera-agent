@@ -100,7 +100,9 @@ def run_test_split(client: anthropic.Anthropic, tools: list[dict], max_calls: in
             run_tokens[1] += response["usage"]["output_tokens"]
         all_tokens[0] += response["usage"]["input_tokens"]
         all_tokens[1] += response["usage"]["output_tokens"]
-        reasons = check_unlabelled(bm, question["kind"], question["question"], response, schemas.get(question["kind"], {}))
+        reasons = check_unlabelled(
+            bm, question["kind"], question["question"], response, schemas.get(question["kind"], {})
+        )
         results.append((question, response, reasons))
 
     for title, key in (("kind", lambda q: q["kind"]), ("source", lambda q: building_source(q["building_id"]))):
@@ -118,7 +120,9 @@ def run_test_split(client: anthropic.Anthropic, tools: list[dict], max_calls: in
             print(f"      reason: {reason}")
     print(f"\nAPI calls this run: {calls} (cache: {CACHE})")
     print(f"Tokens this run: {run_tokens[0]} in / {run_tokens[1]} out, est. ${estimate_cost(*run_tokens):.4f}")
-    print(f"Tokens incl. cached responses: {all_tokens[0]} in / {all_tokens[1]} out, est. ${estimate_cost(*all_tokens):.4f} ({MODEL})")
+    print(
+        f"Tokens incl. cached responses: {all_tokens[0]} in / {all_tokens[1]} out, est. ${estimate_cost(*all_tokens):.4f} ({MODEL})"
+    )
     if stopped:
         print(f"STOPPED: {stopped}")
         return 1
@@ -131,7 +135,12 @@ def main() -> int:
     parser.add_argument("--all", action="store_true", help="same as --per-kind all")
     parser.add_argument("--max-calls", type=int, default=60)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--split", choices=["train", "test"], default="train", help="train = labelled train/dev, test = unlabelled test questions")
+    parser.add_argument(
+        "--split",
+        choices=["train", "test"],
+        default="train",
+        help="train = labelled train/dev, test = unlabelled test questions",
+    )
     args = parser.parse_args()
     per_kind = None if args.all or args.per_kind == "all" else int(args.per_kind)
 
@@ -152,7 +161,9 @@ def main() -> int:
 
     for name in kinds:
         questions = labelled_questions(name)
-        sample = questions if per_kind is None else random.Random(args.seed).sample(questions, min(per_kind, len(questions)))
+        sample = (
+            questions if per_kind is None else random.Random(args.seed).sample(questions, min(per_kind, len(questions)))
+        )
         tool_ok = params_ok = done = 0
         mismatches = []
         for building, question in sample:
@@ -202,7 +213,9 @@ def main() -> int:
             print(f"          e.g. {kind} {question_id} {key}: expected {expected!r}, got {got!r}")
     print(f"\nAPI calls this run: {calls} (cache: {CACHE})")
     print(f"Tokens this run: {run_tokens[0]} in / {run_tokens[1]} out, est. ${estimate_cost(*run_tokens):.4f}")
-    print(f"Tokens incl. cached responses: {all_tokens[0]} in / {all_tokens[1]} out, est. ${estimate_cost(*all_tokens):.4f} ({MODEL})")
+    print(
+        f"Tokens incl. cached responses: {all_tokens[0]} in / {all_tokens[1]} out, est. ${estimate_cost(*all_tokens):.4f} ({MODEL})"
+    )
     if stopped:
         print(f"STOPPED: {stopped}")
         return 1
