@@ -129,7 +129,7 @@ def landmark_directions(bm: BuildingMap, route: RouteResult) -> list[str]:
             floor = bm.floor_name(bm.spaces[current]["floor_id"])
             steps.append(f"Take {name} ({kind}) to {floor}.{hint}")
         else:
-            steps.append(f"Go through the door into {bm.spaces[current]['name']}.{hint}")
+            steps.append(f"Go into {bm.spaces[current]['name']}.{hint}")
     steps.append(f"You have arrived at {bm.describe_space(path[-1])}.{_hint(landmarks[-1])}")
     return steps
 
@@ -264,7 +264,7 @@ def _door_text(bm: BuildingMap, move: _Move, landmark: Landmark | None) -> str:
         return f"Go straight on{_at(landmark, 'past')} into {name}."
     if move.turn == "around":
         return f"Turn around{_at(landmark)} and go into {name}."
-    return f"Go through the door{_at(landmark)} into {name}."
+    return f"Continue{_at(landmark, 'past')} into {name}."
 
 
 def _vertical_step(bm: BuildingMap, move: _Move, used: set[str]) -> TurnStep:
@@ -325,8 +325,8 @@ def turn_plan(bm: BuildingMap, route: RouteResult) -> list[TurnStep]:
                 used.add(landmark.id)
             if group[0] == 0:
                 text = (
-                    f"Leave {bm.spaces[first.previous]['name']} through the door{_at(landmark, 'by')} "
-                    f"into {bm.spaces[first.current]['name']}."
+                    f"Leave {bm.spaces[first.previous]['name']}{_at(landmark, 'by')} "
+                    f"and go into {bm.spaces[first.current]['name']}."
                 )
             else:
                 text = _door_text(bm, first, landmark)

@@ -135,3 +135,30 @@ def check_here(raw, bm: BuildingMap) -> HereCheck:
     if point is not None and not Polygon(bm.spaces[space_id]["polygon"]).buffer(1e-6).contains(Point(point)):
         point, note = None, "The point is outside the room and was dropped."
     return HereCheck(space_id, bm.spaces[space_id]["floor_id"], point, note=note)
+
+
+@dataclass(frozen=True)
+class RoutePointCheck:
+    """An exact start or destination point of POST /api/route, checked against the room it belongs to."""
+
+    point: tuple[float, float] | None = None
+    note: str = ""
+
+
+def check_route_point(raw, bm: BuildingMap, space_id: str, label: str) -> RoutePointCheck:
+    """Validate {x, y, floor_id?} like context.here: finite numbers, the floor matches the room, the point lies in
+    the room. Never raises; a bad point is ignored (the route then uses the room's anchor) with a note."""
+    if raw is None:
+        return RoutePointCheck()
+    if not isinstance(raw, dict):
+        return RoutePointCheck(note=f"The {label} was ignored: it must be an object {{x, y}}.")
+    try:
+        point = read_point([raw.get("x"), raw.get("y")])
+        floor_id = text_id(raw, "floor_id")
+    except ValueError as error:
+        return RoutePointCheck(note=f"The {label} was ignored: {error}.")
+    if floor_id is not None and floor_id != bm.spaces[space_id]["floor_id"]:
+        return RoutePointCheck(note=f"The {label} was ignored: the floor does not match the room.")
+    if not Polygon(bm.spaces[space_id]["polygon"]).buffer(1e-6).contains(Point(point)):
+        return RoutePointCheck(note=f"The {label} was ignored: it is outside the room.")
+    return RoutePointCheck(point)
