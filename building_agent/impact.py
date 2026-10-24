@@ -1,7 +1,9 @@
 """Building-wide impact of a change: which rooms get cut off, lose step-free access or walk further.
 
-Works on a copy of the map and only uses BuildingMap.graph, so a new routing model needs one change: build_graph."""
+Works on a copy of the map. Only `build_graph` knows how the building becomes a graph, so a new
+routing model is a one-line change there."""
 
+import itertools
 import statistics
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
@@ -15,7 +17,8 @@ from starter_agent.tools import as_json
 
 MIN_CHANGE_M = 1.0
 WORST_COUNT = 5
-SHOWN_ROOMS = 8
+SHOWN_ROOMS = 6
+MAX_SENTENCES = 5
 
 
 def build_graph(bm: BuildingMap, step_free: bool) -> nx.MultiGraph:
@@ -36,16 +39,17 @@ class RoomChange:
 class ImpactReport:
     change: str
     reopening: bool = False
-    lost_route: list[str] = field(default_factory=list)  # rooms with no way out any more
-    lost_step_free: list[str] = field(default_factory=list)  # rooms that had step-free access and lost it
+    lost_route: list[str] = field(default_factory=list)  # rooms with no way out of the building any more
+    lost_step_free: list[str] = field(default_factory=list)  # had step-free access, lost it, still reachable by stairs
     gained_route: list[str] = field(default_factory=list)
     gained_step_free: list[str] = field(default_factory=list)
-    other_lost_route: list[str] = field(default_factory=list)  # corridors, stairwells, lifts
+    other_lost_route: list[str] = field(default_factory=list)  # corridors, stairwells, lifts cut off
     other_lost_step_free: list[str] = field(default_factory=list)
     floors_cut_off: list[str] = field(default_factory=list)
     floors_cut_off_step_free: list[str] = field(default_factory=list)
     floors_regained: list[str] = field(default_factory=list)
     floors_regained_step_free: list[str] = field(default_factory=list)
+    step_free_rooms_by_floor: dict[str, dict[str, int]] = field(default_factory=dict)  # floor id -> before/after
     longer_count: int = 0
     longer_median_m: float = 0.0
     longer_worst: list[RoomChange] = field(default_factory=list)
@@ -62,73 +66,83 @@ class ImpactReport:
 
     def sentences(self) -> list[str]:
         subject = self.change[0].upper() + self.change[1:]
-        out = []
-        out += self.access_sentences(subject, self.lost_route, self.floors_cut_off, "loses every route out of")
-        out += self.step_free_sentences(subject)
-        out += self.walk_sentences(subject)
+        out = self.route_sentences(subject) + self.step_free_sentences(subject)
+        out += self.walk_sentences(None if out else subject)
         if not out:
-            return [f"{subject} changes nothing for the rooms.", "No rooms are affected."]
-        return out[:5]
+            return [f"{subject} changes nothing for any room.", "No rooms are affected."]
+        if len(out) == 1:
+            out.append(
+                "Every room still has a way out of the building."
+                if not self.lost_route and not self.reopening
+                else "No other room's walk to the entrance changes by more than 1 m."
+            )
+        return out[:MAX_SENTENCES]
 
-    def access_sentences(self, subject: str, rooms: list[str], floors: list[str], _verb: str) -> list[str]:
+    def route_sentences(self, subject: str) -> list[str]:
         if self.reopening:
-            if not self.gained_route:
+            count = len(self.gained_route)
+            if not count:
                 return []
-            lead = f"{subject} brings {len(self.gained_route)} {plural(len(self.gained_route), 'room')} back in reach"
-            return [lead + self.floor_tail(self.floors_regained, "all of") + "."]
-        if not rooms and not self.other_lost_route:
+            floors = f", {join(self.floors_regained)} included" if self.floors_regained else ""
+            return [f"{subject} brings {count} {plural(count, 'room')} back in reach{floors}."]
+        count = len(self.lost_route)
+        if not count and not self.other_lost_route:
             return []
-        parts = f"{subject} leaves {len(rooms)} {plural(len(rooms), 'room')} with no way out of the building"
-        if floors:
-            parts += f", {join(floors)} {'is' if len(floors) == 1 else 'are'} completely cut off"
-        if rooms:
-            parts += f" ({self.some_rooms(rooms)})"
-        elif self.other_lost_route:
-            parts += f" ({len(self.other_lost_route)} corridors or stairwells are cut off too)"
-        return [parts + "."]
+        if not count:
+            extra = len(self.other_lost_route)
+            return [
+                f"{subject} cuts off {extra} {plural(extra, 'corridor or stairwell')}, but no room loses its way out."
+            ]
+        floors = f"{join(self.floors_cut_off)} is completely cut off. " if self.floors_cut_off else ""
+        text = (
+            f"{subject} leaves {count} {plural(count, 'room')} with no way out of the building. "
+            f"{floors}Affected: {self.some_rooms(self.lost_route)}."
+        )
+        return [text]
 
     def step_free_sentences(self, subject: str) -> list[str]:
         if self.reopening:
-            if not self.gained_step_free:
-                return []
             count = len(self.gained_step_free)
-            floors = self.floors_regained_step_free
-            where = f"{join(floors)} is reachable for wheelchair users again: " if floors else ""
-            return [f"{where}{count} {plural(count, 'room')} can be reached step-free again.".capitalize_first()]
-        if not self.lost_step_free:
-            return []
+            if not count:
+                return []
+            where = (
+                f"{join(self.floors_regained_step_free)} is open to wheelchair users again: "
+                if self.floors_regained_step_free
+                else ""
+            )
+            return [f"{where}{count} {plural(count, 'room')} can be reached step-free again."]
         count = len(self.lost_step_free)
-        floors = self.floors_cut_off_step_free
-        if floors:
-            return [
-                f"{subject} cuts {join(floors)} off for wheelchair users: "
+        if not count:
+            return []
+        if self.floors_cut_off_step_free:
+            text = (
+                f"{subject} cuts {join(self.floors_cut_off_step_free)} off for wheelchair users: "
                 f"{count} {plural(count, 'room')} can no longer be reached step-free."
-            ]
-        return [
+            )
+            return [text]
+        text = (
             f"{subject} means {count} {plural(count, 'room')} can no longer be reached step-free "
             f"({self.some_rooms(self.lost_step_free)})."
-        ]
+        )
+        return [text]
 
-    def walk_sentences(self, subject: str) -> list[str]:
+    def walk_sentences(self, subject: str | None) -> list[str]:
         out = []
-        if self.longer_count:
-            worst = self.longer_worst[0]
+        for count, median, items, sign, noun in (
+            (self.longer_count, self.longer_median_m, self.longer_worst, "+", "longer"),
+            (self.shorter_count, self.shorter_median_m, self.shorter_best, "-", "shorter"),
+        ):
+            if not count:
+                continue
+            top = items[0]
+            via = f" via {top.via}" if top.via else ""
+            lead = f"{subject}: " if subject and not out else ""
             out.append(
-                f"{self.longer_count} {plural(self.longer_count, 'room')} get a longer walk to the nearest "
-                f"entrance (median +{self.longer_median_m:g} m), the worst is {worst.name} "
-                f"(+{worst.delta_m:g} m{f' via {worst.via}' if worst.via else ''})."
-            )
-        if self.shorter_count:
-            best = self.shorter_best[0]
-            out.append(
-                f"{self.shorter_count} {plural(self.shorter_count, 'room')} get a shorter walk to the nearest "
-                f"entrance (median -{self.shorter_median_m:g} m), the best is {best.name} "
-                f"(-{abs(best.delta_m):g} m{f' via {best.via}' if best.via else ''})."
+                f"{lead}{count} {plural(count, 'room')} get a {noun} walk to the nearest entrance "
+                f"(median {sign}{median:g} m), the {'worst' if noun == 'longer' else 'best'} is {top.name} "
+                f"({sign}{abs(top.delta_m):g} m{via})."
             )
         return out
-
-    def floor_tail(self, floors: list[str], _prefix: str) -> str:
-        return f", {join(floors)} included" if floors else ""
 
     def some_rooms(self, ids: list[str]) -> str:
         names = [self.room_names.get(room, room) for room in ids[:SHOWN_ROOMS]]
@@ -145,7 +159,7 @@ def join(items: list[str]) -> str:
 
 
 def copy_map(bm: BuildingMap) -> BuildingMap:
-    """Own closed set, openings dict and openings list; spaces and connectors are only read."""
+    """Own closed set, openings dict and openings list; everything else is only read."""
     clone = object.__new__(BuildingMap)
     clone.__dict__.update(bm.__dict__)
     clone.data = {**bm.data, "openings": list(bm.data["openings"])}
@@ -164,45 +178,7 @@ def label(bm: BuildingMap, element: str) -> str:
     return element
 
 
-def distances(graph: nx.MultiGraph) -> dict[str, float]:
-    if OUTSIDE not in graph:
-        return {}
-    return nx.single_source_dijkstra_path_length(graph, OUTSIDE, weight="weight")
-
-
-def connector_via(bm: BuildingMap, graph: nx.MultiGraph, space_id: str, avoid: set[str]) -> str | None:
-    """Name of the first lift or staircase on the shortest way out that the old route did not use."""
-    try:
-        path = nx.dijkstra_path(graph, OUTSIDE, space_id, weight="weight")
-    except (nx.NetworkXNoPath, nx.NodeNotFound):
-        return None
-    used = []
-    for first, second in zip(path, path[1:], strict=False):
-        edge = min(graph[first][second].values(), key=lambda candidate: candidate["weight"])
-        if edge["via"] in bm.connectors:
-            used.append(edge["via"])
-    fresh = [item for item in used if item not in avoid] or used
-    return label(bm, fresh[0]) if fresh else None
-
-
-def route_connectors(bm: BuildingMap, graph: nx.MultiGraph, space_id: str) -> set[str]:
-    return {item for item in connectors_on_path(bm, graph, space_id)}
-
-
-def connectors_on_path(bm: BuildingMap, graph: nx.MultiGraph, space_id: str) -> list[str]:
-    try:
-        path = nx.dijkstra_path(graph, OUTSIDE, space_id, weight="weight")
-    except (nx.NetworkXNoPath, nx.NodeNotFound):
-        return []
-    found = []
-    for first, second in zip(path, path[1:], strict=False):
-        edge = min(graph[first][second].values(), key=lambda candidate: candidate["weight"])
-        if edge["via"] in bm.connectors:
-            found.append(edge["via"])
-    return found
-
-
-def describe_change(bm: BuildingMap, closed_add, closed_remove, doors_add, doors_remove) -> str:
+def describe_change(bm, closed_add, closed_remove, doors_add, doors_remove) -> str:
     parts = []
     if closed_add:
         parts.append("closing " + join([label(bm, item) for item in closed_add]))
@@ -215,8 +191,49 @@ def describe_change(bm: BuildingMap, closed_add, closed_remove, doors_add, doors
     return " and ".join(parts) if parts else "no change"
 
 
-def is_room(bm: BuildingMap, space_id: str) -> bool:
-    return bm.spaces[space_id]["type"] == "room"
+def distances(graph: nx.MultiGraph) -> dict[str, float]:
+    if OUTSIDE not in graph:
+        return {}
+    return nx.single_source_dijkstra_path_length(graph, OUTSIDE, weight="weight")
+
+
+def first_connector(bm: BuildingMap, graph: nx.MultiGraph, space_id: str) -> str | None:
+    """Name of the first lift or staircase on the shortest way out of `space_id`."""
+    try:
+        path = nx.dijkstra_path(graph, space_id, OUTSIDE, weight="weight")
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
+        return None
+    for first, second in itertools.pairwise(path):
+        edge = min(graph[first][second].values(), key=lambda candidate: candidate["weight"])
+        if edge["via"] in bm.connectors:
+            return bm.connectors[edge["via"]]["name"]
+    return None
+
+
+def cut_off_floors(bm: BuildingMap, before: dict, after: dict, skip: set[str]) -> list[str]:
+    """Floors with at least one space reachable before and none reachable after."""
+    names = []
+    for floor in sorted(bm.floors.values(), key=lambda item: item["level"]):
+        ids = [s for s, space in bm.spaces.items() if space["floor_id"] == floor["id"] and s not in skip]
+        if any(s in before for s in ids) and not any(s in after for s in ids):
+            names.append(floor["name"])
+    return names
+
+
+def median_delta(items: list[tuple[str, float, float]]) -> float:
+    return round(statistics.median(abs(after - before) for _, before, after in items), 1) if items else 0.0
+
+
+def validate(bm: BuildingMap, closed_add, closed_remove, doors_remove) -> None:
+    for item in [*closed_add, *doors_remove]:
+        if item in bm.closed:
+            raise MapError(f"{label(bm, item)} is already closed.")
+    for item in closed_remove:
+        if item not in bm.closed:
+            raise MapError(f"{label(bm, item)} is not closed, so it cannot be reopened.")
+    for item in doors_remove:
+        if item not in bm.openings:
+            raise MapError(f"{item} is not a door or opening.")
 
 
 def analyse(
@@ -229,104 +246,80 @@ def analyse(
     """Compare the building as it is with the building after the change. Never touches `bm`."""
     closed_add = [bm.find_element(item) for item in closed_add]
     closed_remove = [bm.find_element(item) for item in closed_remove]
-    doors_add = [(bm.resolve_space(a), bm.resolve_space(b)) for a, b in doors_add]
+    doors_add = [(bm.resolve_space(first), bm.resolve_space(second)) for first, second in doors_add]
     doors_remove = [bm.find_element(item) for item in doors_remove]
-    for item in closed_add + doors_remove:
-        if item in bm.closed:
-            raise MapError(f"{label(bm, item)} is already closed.")
-    for item in closed_remove:
-        if item not in bm.closed:
-            raise MapError(f"{label(bm, item)} is not closed, so it cannot be reopened.")
-    for item in doors_remove:
-        if item not in bm.openings:
-            raise MapError(f"{item} is not a door or opening.")
+    validate(bm, closed_add, closed_remove, doors_remove)
 
     after_map = copy_map(bm)
-    after_map.closed |= set(closed_add) | set(doors_remove)
+    after_map.closed |= {*closed_add, *doors_remove}
     after_map.closed -= set(closed_remove)
     for first, second in doors_add:
         after_map.add_door(first, second)
-    changed = set(closed_add) | set(closed_remove)
+    skip = {*closed_add, *closed_remove, *doors_remove}  # a closed room is not "cut off", it is closed
 
     report = ImpactReport(
         change=describe_change(bm, closed_add, closed_remove, doors_add, doors_remove),
-        reopening=bool(closed_remove) and not (closed_add or doors_remove),
+        reopening=bool(closed_remove) and not (closed_add or doors_remove or doors_add),
     )
-    graphs = {}
-    for step_free in (False, True):
-        graphs[step_free] = (build_graph(bm, step_free), build_graph(after_map, step_free))
-    before_any, after_any = (distances(graph) for graph in graphs[False])
-    before_free, after_free = (distances(graph) for graph in graphs[True])
+    old_any, new_any = build_graph(bm, False), build_graph(after_map, False)
+    old_free, new_free = build_graph(bm, True), build_graph(after_map, True)
+    before_any, after_any = distances(old_any), distances(new_any)
+    before_free, after_free = distances(old_free), distances(new_free)
 
-    def in_scope(space_id: str) -> bool:
-        return space_id in bm.spaces and space_id not in changed
-
-    for space_id in sorted(bm.spaces):
-        if not in_scope(space_id):
+    for space_id, space in sorted(bm.spaces.items()):
+        if space_id in skip:
             continue
-        room = is_room(bm, space_id)
-        report.room_names[space_id] = bm.spaces[space_id]["name"]
-        if space_id in before_any and space_id not in after_any:
+        room = space["type"] == "room"
+        report.room_names[space_id] = space["name"]
+        lost_any = space_id in before_any and space_id not in after_any
+        lost_free = space_id in before_free and space_id not in after_free
+        if lost_any:
             (report.lost_route if room else report.other_lost_route).append(space_id)
-        if space_id not in before_any and space_id in after_any:
-            report.gained_route.append(space_id) if room else None
-        if space_id in before_free and space_id not in after_free:
+        elif lost_free:
             (report.lost_step_free if room else report.other_lost_step_free).append(space_id)
-        if space_id not in before_free and space_id in after_free and room:
+        if room and space_id not in before_any and space_id in after_any:
+            report.gained_route.append(space_id)
+        if room and space_id not in before_free and space_id in after_free:
             report.gained_step_free.append(space_id)
-    report.floors_cut_off = floors_where(bm, in_scope, before_any, after_any, lost=True)
-    report.floors_cut_off_step_free = floors_where(bm, in_scope, before_free, after_free, lost=True)
-    report.floors_regained = floors_where(bm, in_scope, after_any, before_any, lost=True)
-    report.floors_regained_step_free = floors_where(bm, in_scope, after_free, before_free, lost=True)
+        if room:
+            counts = report.step_free_rooms_by_floor.setdefault(space["floor_id"], {"before": 0, "after": 0})
+            counts["before"] += space_id in before_free
+            counts["after"] += space_id in after_free
+
+    report.floors_cut_off = cut_off_floors(bm, before_any, after_any, skip)
+    report.floors_cut_off_step_free = cut_off_floors(bm, before_free, after_free, skip)
+    report.floors_regained = cut_off_floors(bm, after_any, before_any, skip)
+    report.floors_regained_step_free = cut_off_floors(bm, after_free, before_free, skip)
 
     changes = [
         (space_id, before_any[space_id], after_any[space_id])
-        for space_id in sorted(bm.spaces)
-        if in_scope(space_id)
-        and is_room(bm, space_id)
+        for space_id, space in sorted(bm.spaces.items())
+        if space_id not in skip
+        and space["type"] == "room"
         and space_id in before_any
         and space_id in after_any
         and abs(after_any[space_id] - before_any[space_id]) > MIN_CHANGE_M
     ]
-    longer = sorted((c for c in changes if c[2] > c[1]), key=lambda c: (c[1] - c[2], c[0]))
+    longer = sorted((c for c in changes if c[2] > c[1]), key=lambda c: (c[1] - c[2], c[0]))[:]
     shorter = sorted((c for c in changes if c[2] < c[1]), key=lambda c: (c[2] - c[1], c[0]))
-    report.longer_count = len(longer)
-    report.longer_median_m = median_delta(longer)
-    report.longer_worst = [room_change(bm, graphs[False], c) for c in longer[:WORST_COUNT]]
-    report.shorter_count = len(shorter)
-    report.shorter_median_m = median_delta(shorter)
-    report.shorter_best = [room_change(bm, graphs[False], c) for c in shorter[:WORST_COUNT]]
+
+    def room_change(entry: tuple[str, float, float]) -> RoomChange:
+        space_id, before, after = entry
+        return RoomChange(
+            id=space_id,
+            name=bm.spaces[space_id]["name"],
+            before_m=round(before, 1),
+            after_m=round(after, 1),
+            delta_m=round(after - before, 1),
+            via=first_connector(bm, new_any, space_id) if after > before else None,
+        )
+
+    report.longer_count, report.longer_median_m = len(longer), median_delta(longer)
+    report.longer_worst = [room_change(entry) for entry in longer[:WORST_COUNT]]
+    report.shorter_count, report.shorter_median_m = len(shorter), median_delta(shorter)
+    report.shorter_best = [room_change(entry) for entry in shorter[:WORST_COUNT]]
     report.verdict = report.sentences()[0]
     return report
-
-
-def floors_where(bm: BuildingMap, in_scope, before: dict, after: dict, lost: bool) -> list[str]:
-    """Floors that had at least one reachable space in `before` and none in `after`."""
-    names = []
-    for floor in sorted(bm.floors.values(), key=lambda item: item["level"]):
-        ids = [s for s, space in bm.spaces.items() if space["floor_id"] == floor["id"] and in_scope(s)]
-        if any(s in before for s in ids) and not any(s in after for s in ids):
-            names.append(floor["name"])
-    return names
-
-
-def median_delta(items: list[tuple[str, float, float]]) -> float:
-    return round(statistics.median(abs(after - before) for _, before, after in items), 1) if items else 0.0
-
-
-def room_change(bm: BuildingMap, graphs: tuple, entry: tuple[str, float, float]) -> RoomChange:
-    space_id, before, after = entry
-    old_graph, new_graph = graphs
-    old_used = set(connectors_on_path(bm, old_graph, space_id))
-    via = connector_via(bm, new_graph, space_id, old_used)
-    return RoomChange(
-        id=space_id,
-        name=bm.spaces[space_id]["name"],
-        before_m=round(before, 1),
-        after_m=round(after, 1),
-        delta_m=round(after - before, 1),
-        via=via,
-    )
 
 
 def make_impact_tools(bm: BuildingMap, state=None) -> list:
@@ -334,7 +327,7 @@ def make_impact_tools(bm: BuildingMap, state=None) -> list:
     def what_changes(element: str, action: str = "close") -> str:
         """What changes for the whole building if a lift, staircase, door or room is closed or reopened.
         Use this for questions like "the east lift is closed for maintenance, what changes?" or "what happens if
-        Staircase 2 is blocked / reopened?". Nothing is changed: it only compares the building before and after.
+        Staircase 2 is blocked / opened again?". Nothing is changed: it only compares the building before and after.
         Reports rooms with no way out, rooms that lose step-free access, longer walks and cut-off floors.
         Read the `sentences` out; they are already in plain words.
 
@@ -345,9 +338,11 @@ def make_impact_tools(bm: BuildingMap, state=None) -> list:
         if action not in ("close", "reopen"):
             raise ToolError('action must be "close" or "reopen".')
         try:
-            report = analyse(bm, closed_add=[element]) if action == "close" else analyse(bm, closed_remove=[element])
+            args: dict[str, list[str]] = {"closed_add" if action == "close" else "closed_remove": [element]}
+            return as_json(analyse(bm, **args).to_dict())
         except MapError as error:
             raise ToolError(str(error)) from error
-        return as_json(report.to_dict())
+        except (KeyError, ValueError, nx.NetworkXException) as error:
+            raise ToolError(f"Cannot analyse '{element}': {error}") from error
 
     return [what_changes]
