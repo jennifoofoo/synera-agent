@@ -7,6 +7,7 @@ from collections import defaultdict
 
 import networkx as nx
 from shapely.geometry import Point, Polygon
+from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 from building_agent.level4.schema import Finding, Findings
@@ -18,6 +19,8 @@ PLAUSIBLE_DOOR_WIDTH_M = (0.7, 2.5)
 PLAUSIBLE_FOOTPRINT_M = (4.0, 400.0)
 OVERLAP_SHARE = 0.25
 LARGE_ROOM_TYPES = {"hall", "outdoor", "corridor"}
+OUTER_WALL_TOLERANCE_M = 0.6
+OUTER_CLOSE_GAP_M = 0.3
 
 # code -> (level, template). {s}, {have} and {is} adapt to the count {n}.
 CODES: dict[str, tuple[str, str]] = {
@@ -33,6 +36,9 @@ CODES: dict[str, tuple[str, str]] = {
     "door_not_on_wall": ("error", "{n} door{s} {is} not on a wall the two rooms share."),
     "door_bad_position": ("warning", "{n} door{s} without a usable position {is} left out."),
     "door_moved": ("warning", "{n} door{s} {is} more than 0.5 m from the wall in the plan and moved onto it."),
+    "entrance_not_on_outer_wall": ("warning", "{n} entrance{s} {is} not on the outer wall of the floor."),
+    "entrance_dropped": ("warning", "{n} entrance marker{s} in the plan {is} not on the outer wall and {is} left out."),
+    "entrance_reattached": ("warning", "{n} entrance{s} {is} moved to the room that touches the outer wall there."),
     "no_entrance": ("error", "The building has no entrance to the outside."),
     "room_unreachable": ("error", "{n} room{s} {have} no way out, doors are probably missing."),
     "area_implausible": ("warning", "{n} room{s} {have} an unlikely size (not 2 to 300 m2)."),
@@ -114,6 +120,37 @@ def _check_overlaps(building: dict, polygons: dict[str, Polygon], found: Collect
                 if smaller > 0 and shape.intersection(shapes[other]).area / smaller > OVERLAP_SHARE:
                     first, second = spaces[ids[index]], spaces[ids[other]]
                     found.add("room_overlap", f"{room_label(first)}/{room_label(second)}")
+
+
+def outer_boundary(shapes: list[Polygon]):
+    """Outline of the whole floor: union of the rooms with small gaps closed, courtyards count as outside."""
+    if not shapes:
+        return None
+    union = unary_union([shape.buffer(OUTER_CLOSE_GAP_M / 2) for shape in shapes]).buffer(-OUTER_CLOSE_GAP_M / 2)
+    return None if union.is_empty else union.boundary
+
+
+def _check_entrances(building: dict, polygons: dict[str, Polygon], found: Collector) -> None:
+    spaces = {space["id"]: space for space in building["spaces"]}
+    outlines: dict[str, object] = {}
+    for opening in building["openings"]:
+        if OUTSIDE not in opening["space_ids"]:
+            continue
+        floor_id = opening.get("floor_id")
+        if floor_id not in outlines:
+            outlines[floor_id] = outer_boundary(
+                [polygons[s["id"]] for s in building["spaces"] if s["floor_id"] == floor_id and s["id"] in polygons]
+            )
+        outline = outlines[floor_id]
+        room_id = next((end for end in opening["space_ids"] if end != OUTSIDE), None)
+        if outline is None or room_id not in polygons:
+            continue
+        point = Point(opening["position"])
+        if (
+            outline.distance(point) > OUTER_WALL_TOLERANCE_M
+            or outline.distance(polygons[room_id]) > ADJACENT_DISTANCE_M
+        ):
+            found.add("entrance_not_on_outer_wall", room_label(spaces[room_id]))
 
 
 def _check_doors(building: dict, polygons: dict[str, Polygon], found: Collector) -> None:
@@ -202,6 +239,7 @@ def validate(building: dict) -> Findings:
         polygons = _check_rooms(building, found)
         _check_overlaps(building, polygons, found)
         _check_doors(building, polygons, found)
+        _check_entrances(building, polygons, found)
         _check_connectors(building, found)
         _check_scale(polygons, found)
         _check_reachability(_usable_part(building), found)

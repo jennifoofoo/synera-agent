@@ -15,7 +15,7 @@ from shapely.ops import linemerge, nearest_points, unary_union
 
 from building_agent.geometry import repaired
 from building_agent.level4.schema import DOOR_KINDS, OUTSIDE, ROOM_TYPES, Extraction, Findings, Scale
-from building_agent.level4.validate import Collector, room_label
+from building_agent.level4.validate import OUTER_WALL_TOLERANCE_M, Collector, outer_boundary, room_label
 from starter_agent.building_map import ADJACENT_DISTANCE_M
 
 MIN_DOOR_WIDTH_M = 0.7
@@ -29,6 +29,10 @@ WALL_BUFFER_M = 0.25
 SHARED_WALL_GAP_M = 0.1
 MIN_EXTERIOR_STRETCH_M = 0.3
 MIN_ROOM_AREA_M2 = 0.05
+ENTRANCE_SNAP_M = 1.5
+ENTRANCE_ROOM_REACH_M = 0.15
+ENTRANCE_LIMIT_MIN = 8
+ENTRANCE_LIMIT_ROOM_SHARE = 3
 FLOOR_HEIGHT_M = 3.0
 MIN_STAIR_OVERLAP = 0.3
 CONNECTOR_KIND = {"stair": "stairs", "lift": "lift"}
@@ -223,6 +227,30 @@ def point_on_wall(stretches: list[LineString], point: Point, width_m: float = 0.
     return line.interpolate(along)
 
 
+def snap_entrance(
+    room: "_Room", point: Point, rooms: list["_Room"], outline, width_m: float = 0.0
+) -> tuple["_Room", list[float]] | None:
+    """Put an entrance on the outer wall: nearest outer-wall point to the marker (at most ENTRANCE_SNAP_M away),
+    attached to the room that touches that point (the given room if it does). None when it cannot be placed."""
+    if outline is None or outline.distance(point) > ENTRANCE_SNAP_M:
+        return None
+    target = nearest_points(outline, point)[0]
+    touching = [r for r in rooms if r.polygon.distance(target) <= ENTRANCE_ROOM_REACH_M]
+    if not touching:
+        return None
+    chosen = room if room in touching else min(touching, key=lambda r: r.polygon.distance(point))
+    if chosen is not room and room.polygon.distance(point) > MAX_DOOR_SNAP_M:
+        return None  # the marker is not even next to the room the model named: a guess, not a neighbour mix-up
+    others = [r.polygon for r in rooms if r is not chosen]
+    spot = point_on_wall(exterior_wall(chosen.polygon, others), point if chosen is room else target, width_m)
+    reach = ENTRANCE_SNAP_M if chosen is room else OUTER_WALL_TOLERANCE_M
+    if spot is None or outline.distance(spot) > reach:
+        spot = nearest_points(chosen.polygon.boundary, target)[0]
+    if outline.distance(spot) > reach:
+        return None
+    return chosen, [spot.x, spot.y]
+
+
 def pixel_to_metres(extraction: Extraction, scale: float) -> Callable[[float, float], tuple[float, float]]:
     """Image pixels (y down) to building metres (y up), the frame the converter uses."""
     ys = [y for room in extraction.rooms or [] for ring in [_ring(room)] if ring for _, y in ring]
@@ -315,6 +343,13 @@ def _convert_floor(
             boundaries[room.space_id] = room.polygon.boundary
         return boundaries[room.space_id]
 
+    outlines: list = []
+
+    def outline():
+        if not outlines:
+            outlines.append(outer_boundary([room.polygon for room in rooms]))
+        return outlines[0]
+
     openings: list[dict] = []
     for door in extraction.doors or []:
         try:
@@ -338,9 +373,10 @@ def _convert_floor(
             continue
         point = Point(*to_m(*spot))
         ends = [id_map[i] for i in ids if i != OUTSIDE]
-        if any(room.polygon.distance(point) > MAX_DOOR_SNAP_M for room in ends):
+        if len(ends) == 2 and any(room.polygon.distance(point) > MAX_DOOR_SNAP_M for room in ends):
             found.add("door_not_on_wall", label)
             continue
+        space_ids = [OUTSIDE if flag else id_map[i].space_id for i, flag in zip(ids, outside, strict=True)]
         width = _door_width(door.width_px, scale)
         if len(ends) == 2:
             spot_m = point_on_wall(shared_wall(ends[0].polygon, ends[1].polygon), point, width)
@@ -352,11 +388,14 @@ def _convert_floor(
                 continue
             position = [(spot_m.x + second.x) / 2, (spot_m.y + second.y) / 2]
         else:
-            others = [room.polygon for room in rooms if room is not ends[0]]
-            spot_m = point_on_wall(exterior_wall(ends[0].polygon, others), point, width)
-            if spot_m is None:
-                spot_m = nearest_points(boundary(ends[0]), point)[0]
-            position = [spot_m.x, spot_m.y]
+            entrance = snap_entrance(ends[0], point, rooms, outline(), width)
+            if entrance is None:
+                found.add("entrance_dropped", label)
+                continue
+            room, position = entrance
+            if room is not ends[0]:
+                found.add("entrance_reattached", label)
+            space_ids = [room.space_id, OUTSIDE]
         if point.distance(Point(position)) > DOOR_MOVED_WARN_M:
             found.add("door_moved", label)
         kind = "entrance" if any(outside) else (door.kind if door.kind in DOOR_KINDS else "door")
@@ -364,7 +403,7 @@ def _convert_floor(
             {
                 "id": f"{floor_id}-O{len(openings) + 1:04d}",
                 "floor_id": floor_id,
-                "space_ids": [OUTSIDE if flag else id_map[i].space_id for i, flag in zip(ids, outside, strict=True)],
+                "space_ids": space_ids,
                 "kind": kind,
                 "position": [round(position[0], 3), round(position[1], 3)],
                 "width_m": width,
@@ -372,7 +411,19 @@ def _convert_floor(
                 "synthetic": False,
             }
         )
-    return spaces, openings, rooms
+    return spaces, _limit_entrances(openings, len(rooms), found), rooms
+
+
+def _limit_entrances(openings: list[dict], room_count: int, found: Collector) -> list[dict]:
+    """Drop surplus entrances (keep those that moved least) when the plan shows implausibly many."""
+    limit = max(ENTRANCE_LIMIT_MIN, room_count // ENTRANCE_LIMIT_ROOM_SHARE)
+    entrances = [o for o in openings if OUTSIDE in o["space_ids"]]
+    if len(entrances) <= limit:
+        return openings
+    drop = {id(o) for o in entrances[limit:]}
+    for opening in entrances[limit:]:
+        found.add("entrance_dropped", opening["space_ids"][0])
+    return [o for o in openings if id(o) not in drop]
 
 
 # ---------- stairs and lifts ----------

@@ -72,3 +72,58 @@ In plain words:
 - proc-factory-dev-003 has a different problem the kit metric hid: the extraction invented an entrance (outside to F0-S019, and outside to F0-S033) that does not exist in the original. Our router uses `outside` as a free shortcut through it, and 108 of 264 pairs become invalid sequences. Valid pairs are fine. A spurious entrance is worth a validation warning or a check against the real entrances.
 - The Swiss floors and the OSM floor fail because doors were not extracted (door recall 0.35, 0.26, 0.67): the extracted building has no route where the original has one. That is an extraction recall problem, not a geometry one. On osm the pairs that do route often score below 0.99 (wrong detours, probably from differing outlines or doors).
 - Takeaway: use the judge metric for Level 4 route quality. The remaining route risk is spurious or missing doors, not outline differences.
+
+### Entrance diagnosis (2026-10-24, cached extractions, no API call)
+
+Question: why did proc-factory-dev-003 get entrances the original does not have? The outer boundary is the outline of the union of all room polygons (gaps under 0.3 m closed).
+
+- Original factory-003: 4 entrances (S010, S012, S013, S016), all exactly on the outer boundary.
+- Extraction: 6 entrance markers. 4 are on the outer boundary (distance 0.00 m to it): rooms C3, C2 (west wall), B5 (top hall), c16 (corridor, east). 2 are wrong: r33 and r19 (the "Hall access" lobbies). Their markers sit 2.60 m and 2.67 m inside the outer boundary, exactly on the wall these lobbies share with the big hall (A4 resp. A1), distance 0.00 m to that hall.
+- So it is not a neighbour mix-up: both lobbies do touch the outside (4.8 m of exterior wall each), the model drew the red marker on the interior wall between lobby and hall. The old converter then snapped the marker to the nearest exterior stretch of the lobby (`point_on_wall(exterior_wall(room))`), which produced a plausible looking but invented entrance and a free `outside` shortcut (108 of 264 pairs invalid).
+- Other floors: campus-000/001, resplan-439/1465: all markers 0.00 to 0.04 m from the outer boundary, correct room. swiss-31: 4 markers, 0.09 to 0.39 m off (2 stair rooms and 2 rooms, one touches no room). swiss-203: 4 markers at 0.14 to 0.36 m from the boundary but 0.9 to 1.2 m away from the room they name (they sit in the gap next to a neighbour, door recall of that floor is 0.34 anyway). osm: markers 0.02 to 0.42 m off.
+- Original entrances can sit off the union outline too (swiss-2074: 1.27 m, wall faces a gap); that is why the snap radius is 1.5 m and the validator only warns at 0.6 m.
+
+Fix (convert.py `snap_entrance`, validate.py `outer_boundary`): marker farther than 1.5 m from the outer boundary: dropped with `entrance_dropped`; within 1.5 m: snapped to the exterior wall of the room that touches the boundary there (the named room if it does, a neighbour only if the marker is within 0.6 m of the named room, warning `entrance_reattached`); more entrances than max(8, rooms/3): extras dropped. Validator warning `entrance_not_on_outer_wall` (0.6 m). The optional `entrance_markers` count (d) was skipped: extract.py would have to read it and is outside this change.
+
+Before (row 'Judge metric' above) and after (same cached extractions, judge metric, 975 pairs):
+
+| Floor | Invalid before | Invalid after | Judge err mean before | Judge err mean after | No route before | No route after |
+|---|---|---|---|---|---|---|
+| proc-factory-dev-003:0 | 108 | 0 | 41.4% | 5.8% | 0 | 0 |
+| swiss-31:0 | 1 | 1 | 93.6% | 93.6% | 116 | 116 |
+| swiss-203:0 | 0 | 0 | 97.4% | 97.4% | 147 | 147 |
+| osm-way27326387:0 | 0 | 0 | 33.0% | 33.0% | 23 | 23 |
+| All 8 floors | 109 | 1 | 41.3% | 31.7% | 286 | 286 |
+
+### After entrance fix (2026-10-24, same cached extractions, no API call)
+
+| Floor | Rooms found/true | Recall | Precision | Area err (median) | Door recall | Route err (median) | Findings | Unreachable warned | Tokens in/out | Seconds | Cost USD |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 28/28 | 1.00 | 1.00 | 0.6% | 1.00 | 0.3% (162) | 0 | no | 1688/2228 | 10.4 | 0.026 |
+| proc-campus-dev-001:0 | 22/22 | 1.00 | 1.00 | 0.8% | 1.00 | 0.1% (126) | 0 | no | 1626/1772 | 8.7 | 0.021 |
+| proc-factory-dev-003:0 | 47/47 | 1.00 | 1.00 | 0.1% | 0.96 | 0.0% (276) | 1 | no | 2734/3864 | 17.4 | 0.044 |
+| resplan-439:0 | 8/8 | 1.00 | 1.00 | 0.6% | 1.00 | 0.2% (42) | 0 | no | 1613/875 | 5.1 | 0.012 |
+| resplan-1465:0 | 10/10 | 1.00 | 1.00 | 1.7% | 1.00 | 19.0% (54) | 1 | no | 1613/958 | 7.4 | 0.013 |
+| swiss-31:0 | 25/30 | 0.80 | 0.96 | 8.6% | 0.35 | 7.3% (19) | 4 | yes | 1643/2132 | 12.6 | 0.025 |
+| swiss-203:0 | 28/36 | 0.78 | 1.00 | 8.6% | 0.26 | 12.2% (7) | 6 | yes | 1667/2262 | 14.3 | 0.026 |
+| osm-way27326387:0 | 18/21 | 0.86 | 1.00 | 10.2% | 0.67 | 5.2% (75) | 4 | yes | 1577/1698 | 11.4 | 0.020 |
+
+- Clean (procedural, ResPlan), 5 floors, medians: recall 1.00, precision 1.00, door recall 1.00, area err 0.6%, route err 0.2%, floors with an unreachable-room finding: 0/5
+- Swiss, 2 floors, medians: recall 0.79, precision 0.98, door recall 0.31, area err 8.6%, route err 9.8%, floors with an unreachable-room finding: 2/2
+- OSM, 1 floors, medians: recall 0.86, precision 1.00, door recall 0.67, area err 10.2%, route err 5.2%, floors with an unreachable-room finding: 1/1
+- All 8 floors: median seconds 10.9, median cost 0.023 USD, total 0.186 USD (list price, not checked against an invoice).
+
+| Floor | Kit route err (median) | Judge err (median) | Judge err (mean) | Pairs >= 0.99 | Invalid sequences | No route found | Pairs |
+|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 0.3% | 0.0% | 0.0% | 100% | 0 | 0 | 156 |
+| proc-campus-dev-001:0 | 0.1% | 0.0% | 0.0% | 100% | 0 | 0 | 120 |
+| proc-factory-dev-003:0 | 0.0% | 0.0% | 5.8% | 81% | 0 | 0 | 264 |
+| resplan-439:0 | 0.2% | 0.0% | 0.0% | 100% | 0 | 0 | 30 |
+| resplan-1465:0 | 19.0% | 0.0% | 0.0% | 100% | 0 | 0 | 40 |
+| swiss-31:0 | 7.3% | 100.0% | 93.6% | 6% | 1 | 116 | 125 |
+| swiss-203:0 | 12.2% | 100.0% | 97.4% | 3% | 0 | 147 | 151 |
+| osm-way27326387:0 | 5.2% | 10.5% | 33.0% | 34% | 0 | 23 | 89 |
+| All 8 floors | 2.7% | 0.0% | 31.7% (pair-weighted) | 62% (pair-weighted) | 1 | 286 | 975 |
+
+- Targets on clean floors: room recall met, room precision met, door recall met, area error met, route error met, unreachable on at most 1 of 10 floors met
+- Swiss floors with missing rooms or doors that were also warned about: 2/2 (target 100%).

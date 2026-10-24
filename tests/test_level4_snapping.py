@@ -71,7 +71,7 @@ def test_concave_room_door_goes_to_the_wall_piece_nearest_to_the_model_point():
 
 def test_entrance_snaps_to_the_exterior_wall_not_to_a_shared_one():
     rooms = two_rooms()
-    openings, _ = convert(rooms, [ExtractedDoor(("b", "outside"), [104, 50], kind="entrance", width_px=18)])
+    openings, _ = convert(rooms, [ExtractedDoor(("b", "outside"), [104, 12], kind="entrance", width_px=18)])
     x, y = openings[0]["position"]
     assert min(abs(y), abs(y - 5.0)) < 0.01 and x > 5.0  # on the top or bottom wall of b, never on the wall to a
 
