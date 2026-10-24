@@ -103,8 +103,9 @@ button.x:hover { color: var(--text); background: transparent; }
   position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 3;
   width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); font-size: 20px; color: var(--ink);
 }
-/* Phone 2D: the floor picker sits on the right edge (the mobile layout, Phone.css, places it further). */
-.app.worker.flat .floorrail { left: auto; right: 12px; }
+/* Phone layout (also narrow windows and tablets, 2D and 3D alike): the floor picker on the right edge; Phone.css
+   places it further (landscape phones: left).  */
+.app.worker .floorrail { left: auto; right: 12px; }
 /* Laptop: ONE home for the floor rail in 2D and 3D, top right under the List button. When the List sheet opens it
    slides left with the sheet's edge (150 ms), never jumps sides. */
 .app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); top: 56px; transition: right var(--t-fast, 150ms ease-out); }

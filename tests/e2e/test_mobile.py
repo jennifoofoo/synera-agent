@@ -428,3 +428,25 @@ def test_touch_targets(open_page):
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
     tap_room(page)
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
+
+
+# Every bottom sheet: at most one drag handle, and a body that never scrolls sideways (a sideways scrollbar thumb
+# looked like a second handle on macOS Chrome, Jennifer's screenshot 24.10.).
+SHEET_HANDLES = """() => [...document.querySelectorAll('.phone-sheet')].map(sheet => {
+  const body = sheet.querySelector('.sheet-body');
+  return { handles: sheet.querySelectorAll('.sheet-handle').length, wide: body ? body.scrollWidth - body.clientWidth : 0 };
+})"""
+
+
+@audit("handle", "one drag handle per sheet, no sideways scrollbar (room card, route, walk)")
+def test_one_handle_per_sheet(open_page):
+    page = open_page()
+    tap_room(page)
+    for sheet in page.evaluate(SHEET_HANDLES):
+        assert sheet["handles"] <= 1 and sheet["wide"] <= 0, sheet
+    open_route(page)
+    for sheet in page.evaluate(SHEET_HANDLES):
+        assert sheet["handles"] <= 1 and sheet["wide"] <= 0, sheet
+    start_walk(page)
+    for sheet in page.evaluate(SHEET_HANDLES):
+        assert sheet["handles"] <= 1 and sheet["wide"] <= 0, sheet
