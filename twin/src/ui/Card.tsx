@@ -1,5 +1,5 @@
-// One card above the input, never two. Priority: the tapped room/thing (Route here / I'm here / close), then the
-// guided step (Step k of n, back/next/stop), then the last reply (2-3 lines, "more"), then the route summary.
+// One card above the input, never two. Priority: directions (From/To panel at the top, summary + Start here), the
+// tapped room/thing (Route / I'm here / close), then the guided step (Step k of n, back/next/stop), then the last reply (2-3 lines, "more"), then the route summary.
 // Owner: the Card/Position session, see ARCHITECTURE.md. Every fact comes from `state` (the API); the card only
 // shows it and sends the user's taps back as API calls or chat words ("next", "back", "stop").
 
@@ -7,10 +7,11 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import type { Route } from "../api/types";
 import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
-import { useTwin, type Selection } from "../store";
+import { HERE, useTwin, type Selection } from "../store";
 import { withoutAnswerLine } from "../voice";
 import "./Card.css";
 import { HereChip } from "./HereChip";
+import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
 
 export function Card() {
@@ -21,11 +22,11 @@ export function Card() {
   const replyShown = useTwin((s) => s.replyShown);
   const busy = useTwin((s) => s.chatBusy);
   const draft = useTwin((s) => s.draft);
-  const pickingStartFor = useTwin((s) => s.pickingStartFor);
+  const directions = useTwin((s) => s.directions);
   if (!model || draft) return null; // a Level 4 draft has its own ids; Route/I'm here would hit the API with them
 
   let card: ReactNode = null;
-  if (pickingStartFor) card = <StartPickCard model={model} destination={pickingStartFor} />;
+  if (directions) card = <DirectionsCard model={model} />;
   else if (selection) card = <SelectionCard key={selection.id} model={model} />;
   else if (guide?.active) card = <GuideCard model={model} />;
   else if (busy) card = null; // the Omnibox shows "thinking" above the input
@@ -35,8 +36,39 @@ export function Card() {
   return (
     <>
       <HereChip />
+      {directions && <DirectionsPanel model={model} />}
       {card}
     </>
+  );
+}
+
+/** Bottom card while the From/To panel is open. A room tapped meanwhile fills the field being edited (else To). */
+function DirectionsCard({ model }: { model: BuildingModel }) {
+  const selection = useTwin((s) => s.selection);
+  const select = useTwin((s) => s.select);
+  const close = useTwin((s) => s.closeDirections);
+  useEffect(() => {
+    if (!selection) return;
+    const room = roomOf(model, selection);
+    const { directions, setDirectionsFrom, setDirectionsTo } = useTwin.getState();
+    select(null);
+    if (!room || !directions) return;
+    if (directions.editing === "from") setDirectionsFrom(room);
+    else setDirectionsTo(room);
+  }, [selection, model, select]);
+  // Only a route for the current From/To (a stale one stays hidden while the new one is computed).
+  const ready = useTwin((s) => {
+    const d = s.directions;
+    const route = s.state?.route;
+    const from = d?.from === HERE ? s.state?.position?.space_id : d?.from;
+    if (!route || !from || !d?.to) return false;
+    return !route.ok || (route.start === from && route.destination === d.to); // a failed route says why
+  });
+  if (!ready) return null; // the panel at the top says what is missing
+  return (
+    <Sheet className="card-directions" label="Route" onClose={() => close()}>
+      <DirectionsSummary model={model} />
+    </Sheet>
   );
 }
 
@@ -86,13 +118,10 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const selection = useTwin((s) => s.selection)!;
   const select = useTwin((s) => s.select);
   const position = useTwin((s) => s.state?.position ?? null);
-  const routeTo = useTwin((s) => s.route);
   const ask = useTwin((s) => s.ask);
   const armHere = useTwin((s) => s.armHere);
-  const setPickingStart = useTwin((s) => s.setPickingStart);
-  const dismissReply = useTwin((s) => s.dismissReply);
+  const openDirections = useTwin((s) => s.openDirections);
   const busy = useTwin((s) => s.chatBusy);
-  const [error, setError] = useState<string | null>(null);
 
   const space = model.spaceById.get(selection.kind === "space" ? selection.id : (selection.space_id ?? ""));
   const asset = selection.kind === "asset" ? model.assetById.get(selection.id) : undefined;
@@ -111,24 +140,6 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const canBeHere = selection.kind === "space" || selection.kind === "point";
   const hereAlready = !!position && position.space_id === roomId;
 
-  const goHere = async () => {
-    if (!roomId) return;
-    setError(null);
-    if (position && position.space_id !== roomId) {
-      // Known start: the route comes straight from the routing API, no language model involved.
-      try {
-        await routeTo(position.space_id, roomId);
-        dismissReply(); // the route summary replaces an older reply
-        select(null);
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    } else if (!position) {
-      // No start yet: the next room picked (tap or Omnibox) is where the person is, see StartPickCard.
-      select(null);
-      setPickingStart(roomId);
-    }
-  };
   const imHere = () => {
     // context.here travels with this one message; the server validates it and sets the position (source "click").
     armHere(true);
@@ -149,11 +160,10 @@ function SelectionCard({ model }: { model: BuildingModel }) {
         {floor && context ? " · " : ""}
         {context}
       </div>
-      {error && <div className="card-note">{error}</div>}
       {roomId && (
         <div className="card-actions">
-          <button className="primary" disabled={busy || hereAlready} onClick={() => void goHere()} title={position ? `From ${spaceName(model, position.space_id)}` : "Then tap where you are"}>
-            Route here
+          <button className="primary" onClick={() => openDirections(roomId)}>
+            Route
           </button>
           {canBeHere && (
             <button disabled={busy || hereAlready} onClick={imHere}>
@@ -162,73 +172,6 @@ function SelectionCard({ model }: { model: BuildingModel }) {
           )}
         </div>
       )}
-    </Sheet>
-  );
-}
-
-// ---------------------------------------------------------------- start pick
-
-/** "Route here" without a known position: the next room picked is the start. It becomes the position (context.here)
- * and the route to the destination starts at once. No selection card in between; Esc or × cancels. */
-function StartPickCard({ model, destination }: { model: BuildingModel; destination: string }) {
-  const selection = useTwin((s) => s.selection);
-  const select = useTwin((s) => s.select);
-  const setPickingStart = useTwin((s) => s.setPickingStart);
-  const routeTo = useTwin((s) => s.route);
-  const ask = useTwin((s) => s.ask);
-  const dismissReply = useTwin((s) => s.dismissReply);
-  const [error, setError] = useState<string | null>(null);
-  const cancel = () => setPickingStart(null);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setPickingStart(null);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [setPickingStart]);
-
-  useEffect(() => {
-    if (!selection) return;
-    const start = roomOf(model, selection);
-    select(null);
-    if (!start) return; // not a room (e.g. a door): keep waiting
-    const here = { space_id: start, floor_id: model.spaceById.get(start)?.floor_id, point: selection.kind === "point" ? selection.point : undefined };
-    void (async () => {
-      setError(null);
-      try {
-        if (start !== destination) {
-          // Deterministic route first (instant, no language model), then the position for later questions.
-          await routeTo(start, destination);
-          dismissReply();
-        }
-        setPickingStart(null);
-        await ask("I'm here.", false, { here });
-        if (start !== destination) dismissReply(); // keep the route summary, not "Got it"
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    })();
-  }, [selection, model, destination, select, setPickingStart, routeTo, ask, dismissReply]);
-
-  // A typed sentence ("I'm in the kitchen") goes to the agent; when it sets a new position, route from there.
-  const position = useTwin((s) => s.state?.position ?? null);
-  const startPosition = useRef(position);
-  useEffect(() => {
-    if (!position || position === startPosition.current || position.space_id === startPosition.current?.space_id) return;
-    setPickingStart(null);
-    if (position.space_id !== destination) void routeTo(position.space_id, destination).then(dismissReply, (e: Error) => setError(e.message));
-  }, [position, destination, setPickingStart, routeTo, dismissReply]);
-
-  return (
-    <Sheet className="card-pick" label="Where are you?" onClose={cancel}>
-      <div className="card-head">
-        <div className="card-title">
-          <span className="here-dot" aria-hidden />
-          <strong>Tap where you are, or type it</strong>
-        </div>
-        <CloseButton onClick={cancel} label="Cancel" />
-      </div>
-      <div className="card-line">Then I route you to {spaceName(model, destination)}.</div>
-      {error && <div className="card-note">{error}</div>}
     </Sheet>
   );
 }
