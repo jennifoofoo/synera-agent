@@ -334,3 +334,98 @@ def smoothed(points: list, allowed) -> list[tuple[float, float]]:
     simple = line.simplify(SMOOTH_M, preserve_topology=False)
     chosen = simple if len(simple.coords) >= 2 and allowed.covers(simple) else line
     return [(float(x), float(y)) for x, y in chosen.coords]
+
+
+# ---------- thread the line straight through a door ----------
+
+APPROACH_M = 0.5  # the line meets a door along its wall normal from this far inside each room
+APPROACH_MIN_M = 0.2  # never closer than this (shallow rooms, assets near the door)
+APPROACH_STEP_M = 0.05  # how the approach shortens when its point or segment is not free
+WIDE_OPENING_M = 3.0  # openings at least this wide (hall passages) have no jambs to cut: no approach
+SHARED_WALL_M = 0.3  # how far apart two rooms' outlines may lie and still count as one wall at a door
+
+
+def door_approach(
+    bm: BuildingMap, opening_id: str, space_id: str, index: DrawIndex | None = None
+) -> tuple[float, float] | None:
+    """The point inside `space_id` the line passes before (after) the door, so it crosses the doorway along the
+    wall normal instead of cutting the jambs: min(APPROACH_M, half the room depth behind the door, at least
+    APPROACH_MIN_M) along the normal, shortened until the point is free and the short segment to the door keeps
+    off the assets. None for wide openings, outside, or when no such point exists (the door is then the turn)."""
+    opening = bm.openings.get(opening_id)
+    space = bm.spaces.get(space_id)
+    if opening is None or space is None or (opening.get("width_m") or 0.0) >= WIDE_OPENING_M:
+        return None
+    index = index or draw_index(bm)
+    key = ("approach", opening_id, space_id, tuple(opening["position"][:2]), tuple(map(tuple, space["polygon"])))
+    if key not in index.rooms:
+        index.rooms[key] = find_approach(bm, opening, space_id, index)
+    return index.rooms[key]
+
+
+def find_approach(bm: BuildingMap, opening: dict, space_id: str, index: DrawIndex) -> tuple[float, float] | None:
+    polygon = outline(bm.spaces[space_id]["polygon"])
+    door = np.asarray(opening["position"][:2], dtype=float)
+    if polygon.exterior.distance(Point(door)) > SHARED_WALL_M:
+        return None  # not in this room's wall (a synthetic hand-over inside a stairwell or lift): keep the turn
+    other = bm.other_side(opening, space_id)
+    other_polygon = outline(bm.spaces[other]["polygon"]) if other in bm.spaces else None
+    normal = wall_normal(polygon, other_polygon, door, opening.get("width_m") or 1.0)
+    span = span_along(polygon, door, normal)
+    if span is None:
+        return None
+    enter, leave = span
+    for tight in (False, True):  # an asset close in front of the door: try the tight margins before giving up
+        paths = room_paths(bm, space_id, index, tight)
+        distance = enter + min(APPROACH_M, (leave - enter) / 2)
+        while distance >= enter + APPROACH_MIN_M - 1e-9:
+            point = door + normal * distance
+            free = paths.free.is_empty or paths.free.covers(Point(point))
+            clear = paths.blocked is None or not paths.blocked.intersects(LineString([door, point]))
+            if free and clear:
+                return (float(point[0]), float(point[1]))
+            distance -= APPROACH_STEP_M
+    return None
+
+
+def wall_normal(polygon, other_polygon, door: np.ndarray, width: float) -> np.ndarray:
+    """Unit normal of the wall the door sits in, pointing into `polygon`: the room's outline edge nearest the door
+    (a door in a thick wall sits a little off it); at a corner, of the edges about as near, the one the room on
+    the other side lies along (its outline within SHARED_WALL_M)."""
+    ring = np.asarray(orient(polygon).exterior.coords)[:, :2]  # counter-clockwise: the room is left of every edge
+    starts, edges = ring[:-1], np.diff(ring, axis=0)
+    lengths = np.hypot(*edges.T)
+    keep = lengths > 1e-9
+    starts, edges, lengths = starts[keep], edges[keep], lengths[keep]
+    along = np.clip(np.einsum("ij,ij->i", door - starts, edges) / lengths**2, 0.0, 1.0)
+    distances = np.hypot(*(starts + edges * along[:, None] - door).T)
+    near = distances <= distances.min() + 0.05
+    chosen = int(np.argmin(distances))
+    if other_polygon is not None and near.sum() > 1:
+        around = Point(door).buffer(max(width / 2, APPROACH_M))
+        shared = other_polygon.buffer(SHARED_WALL_M).intersection(around)
+        overlap = [
+            LineString([starts[i], starts[i] + edges[i]]).intersection(shared).length if near[i] else -1.0
+            for i in range(len(edges))
+        ]
+        chosen = int(np.argmax(overlap))
+    direction = edges[chosen] / lengths[chosen]
+    return np.array([-direction[1], direction[0]])
+
+
+def span_along(polygon, door: np.ndarray, normal: np.ndarray) -> tuple[float, float] | None:
+    """(enter, leave): how far from the door the ray along `normal` enters the room and leaves it again. None if
+    it enters further than SHARED_WALL_M away (the door is not in this wall) or the room is too shallow there."""
+    reach = math.hypot(*np.subtract(polygon.bounds[2:], polygon.bounds[:2])) + 1.0
+    inside = LineString([door, door + normal * reach]).intersection(polygon)
+    spans = [
+        sorted(math.dist(door, coord[:2]) for coord in part.coords)
+        for part in getattr(inside, "geoms", [inside])
+        if part.geom_type == "LineString" and not part.is_empty
+    ]
+    if not spans:
+        return None
+    enter, leave = min(spans)[0], min(spans)[-1]
+    if enter > SHARED_WALL_M or leave - enter < 2 * APPROACH_MIN_M:
+        return None
+    return enter, leave
