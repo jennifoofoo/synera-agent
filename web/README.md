@@ -63,6 +63,18 @@ A chat reply may carry `{"reply": "...", "view": {...}}`; `app.js` passes `view`
 
 Performance (largest kit building `dev/osm-way27917482`: 5 floors, 1623 spaces, 1799 openings, 5250 things; Chrome on a MacBook): all five floors built in about 30 to 40 ms, 20 to 36 draw calls (merged geometry per floor, one instanced mesh per floor for things, doors and shafts), 60 fps (display limit) while orbiting, also exploded with all 5250 things shown (108k triangles). It only renders when something moves. The focused floor is built first, the rest one per idle slice; things are built only when first shown.
 
+## Click selection (context for the chat)
+
+Clicks pick what the next chat message is about, in 2D and 3D alike. A chip above the chat input shows it ("Selected: Office 1.04"), the × clears it, and the plan highlights it (blue room outline, blue dot, blue ring).
+
+| Click | Selects | `context` sent |
+|---|---|---|
+| a room | the room (and the room menu opens as before) | `{space_id, floor_id}` |
+| a thing (dot on the plan, box in 3D) | the thing | `{asset_id, space_id, floor_id}` |
+| a room with Shift held, or the menu entry "Select this spot" | the point, "Point in Hall 1" | `{space_id, point: [x, y], floor_id}` |
+
+Doors, lifts and stairs stay menu-only, and a click while placing a new door only picks the neighbour. Points are model metres (+y north); `floor_id` is the floor of the room, not of the camera. The selection is one-shot: it goes with the next message (typed or spoken) and is cleared once a reply arrives. If the reply has `selection_ignored`, the chat says "I couldn't use the selection: <reason>" and the chip stays so you can retry; a failed request keeps it too. Switching building clears it.
+
 ## New building from floor plans (Level 4)
 
 "+ New building" (or the New tab): drop one PNG/JPG per floor, give its floor and one length you know in metres (or tick "scale bar printed"), "Read plans". Each floor is read in the background (one vision call, 10 to 20 s), then the draft is drawn on the plan with suspicious rooms and doors in red and one findings line. Fix it on the plan (tap a room: add a door to a neighbour, set its type; tap a door: remove it) or set the scale per floor. "Save building…" shows the understanding card; only "Yes, save" saves (with "Save anyway" ticked if problems remain). The building then appears under "built from plans" in the picker and is loaded, so routes and chat work on it.

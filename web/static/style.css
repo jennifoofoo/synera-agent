@@ -329,3 +329,13 @@ ol.steps li.floor-change { font-weight: 600; }
   .view3d-floor-modes button + button { border-left: 0; border-top: 1px solid var(--line); }
   .view3d .map-controls button { width: 32px; height: 32px; }
 }
+
+/* click selection */
+.selection-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; padding: 3px 4px 3px 10px; border-radius: 999px; background: #e8f0fe; color: #1d4ed8; font-size: 12px; border: 1px solid #bfd3fb; }
+.selection-chip[hidden] { display: none; }
+.selection-chip button { all: unset; cursor: pointer; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 50%; font-size: 14px; }
+.selection-chip button:hover { background: #cfdcf9; }
+.space.selected { stroke: #2563eb; stroke-width: 3; vector-effect: non-scaling-stroke; fill-opacity: .85; }
+.asset.selected { fill: #2563eb; opacity: 1; stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.asset-hit { fill: transparent; cursor: pointer; }
+.select-point { fill: #2563eb; fill-opacity: .35; stroke: #2563eb; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
