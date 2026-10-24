@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from building_agent.level4 import extract as extract_module
 from building_agent.level4.convert import FloorInput, convert_floors_with_findings, scale_from_known_length
 from building_agent.level4.extract import DEFAULT_MODEL, ExtractError, ExtractResult, extract_floor
+from building_agent.level4.graph_score import graph_score
 from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import ExtractedDoor, ExtractedRoom, Extraction
 from building_agent.level4.validate import validate
@@ -137,6 +138,7 @@ def evaluate_floor(
     case = dataclasses.replace(case, extraction=result.extraction, scale=scale)
     case = dataclasses.replace(case, offset=best_offset(case, converted))
     measured = measure(case, converted)
+    graph = graph_score(converted, case.truth, offset=case.offset)
     codes = {finding.code for finding in [*convert_findings.items, *findings.items]}
     return {
         "floor": f"{building_id}:{level}",
@@ -154,6 +156,8 @@ def evaluate_floor(
         "judge_invalid": measured["judge_invalid"],
         "judge_no_route": measured["judge_no_route"],
         "judge_pairs": measured["judge_pairs"],
+        "graph_jaccard": graph.jaccard,
+        "graph_composite": graph.composite,
         "findings": len(convert_findings.items) + len(findings.items),
         "unreachable": "room_unreachable" in codes,
         "tokens": f"{result.input_tokens}/{result.output_tokens}",
@@ -170,14 +174,15 @@ def render(rows: list[dict], total_cost: float) -> list[str]:
     lines = [
         (
             "| Floor | Rooms found/true | Recall | Precision | Area err (median) | Door recall | Route err (median) "
-            "| Findings | Unreachable warned | Tokens in/out | Seconds | Cost USD |"
+            "| Graph Jaccard | Graph composite | Findings | Unreachable warned | Tokens in/out | Seconds | Cost USD |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
         lines.append(
             f"| {r['floor']} | {r['rooms']} | {r['recall']:.2f} | {r['precision']:.2f} | {r['area_err']:.1%} "
-            f"| {r['door_recall']:.2f} | {r['route_err']:.1%} ({r['routes']}) | {r['findings']} "
+            f"| {r['door_recall']:.2f} | {r['route_err']:.1%} ({r['routes']}) "
+            f"| {r['graph_jaccard']:.2f} | {r['graph_composite']:.2f} | {r['findings']} "
             f"| {'yes' if r['unreachable'] else 'no'} | {r['tokens']} | {r['seconds']:.1f} | {r['cost']:.3f} |"
         )
     lines.append("")
@@ -321,7 +326,7 @@ def main() -> None:
             marked_rows.append(evaluate_floor(building_id, level, result, use_markers=True))
         print(
             f"[level4] {row['floor']:28s} {source:6s} recall {row['recall']:.2f} prec {row['precision']:.2f} "
-            f"doors {row['door_recall']:.2f} area {row['area_err']:.1%} route {row['route_err']:.1%} "
+            f"doors {row['door_recall']:.2f} graph {row['graph_jaccard']:.2f}/{row['graph_composite']:.2f} area {row['area_err']:.1%} route {row['route_err']:.1%} "
             f"judge {row['judge_err']:.1%}/{row['judge_full']:.0%} inv {row['judge_invalid']} "
             f"findings {row['findings']} ${row['cost']:.3f} {row['seconds']:.1f}s"
         )

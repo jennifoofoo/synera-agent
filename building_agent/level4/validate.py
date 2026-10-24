@@ -41,6 +41,7 @@ CODES: dict[str, tuple[str, str]] = {
     "entrance_reattached": ("warning", "{n} entrance{s} {is} moved to the room that touches the outer wall there."),
     "no_entrance": ("error", "The building has no entrance to the outside."),
     "room_unreachable": ("error", "{n} room{s} {have} no way out, doors are probably missing."),
+    "low_connectivity": ("warning", "{n} room{s} {have} no door in the plan, a door is probably missing."),
     "area_implausible": ("warning", "{n} room{s} {have} an unlikely size (not 2 to 300 m2)."),
     "door_width_implausible": ("warning", "{n} door{s} {have} an unlikely width (not 0.7 to 2.5 m)."),
     "connector_missing_stop": ("error", "{n} stair{s} or lift{s} {have} no stop room on every floor they pass."),
@@ -223,6 +224,22 @@ def _check_reachability(building: dict, found: Collector) -> None:
             found.add("room_unreachable", room_label(space))
 
 
+def _check_connectivity(building: dict, found: Collector) -> None:
+    """Rooms (type room) without any door or connector that room_unreachable did not already report.
+    Only degree 0 counts: a room with a single door is normal, so it is never flagged."""
+    degree: dict[str, int] = defaultdict(int)
+    for opening in building["openings"]:
+        for end in opening["space_ids"]:
+            degree[end] += 1
+    for connector in building["vertical_connectors"]:
+        for end in connector["space_ids"]:
+            degree[end] += 1
+    reported = set(found.items.get("room_unreachable", []))
+    for space in building["spaces"]:
+        if space.get("type") == "room" and degree[space["id"]] == 0 and room_label(space) not in reported:
+            found.add("low_connectivity", room_label(space))
+
+
 def _check_floors_alone(building: dict, graph, found: Collector) -> None:
     """Without stairs or lifts every floor is checked on its own: rooms must reach an entrance (the outside), or, on a
     floor without one, the biggest group of rooms of that floor, so missing connectors are not reported as doors."""
@@ -281,7 +298,9 @@ def validate(building: dict, trusted_scale: bool = False) -> Findings:
         _check_entrances(building, polygons, found)
         _check_connectors(building, found)
         _check_scale(polygons, found, trusted_scale)
-        _check_reachability(_usable_part(building), found)
+        usable = _usable_part(building)
+        _check_reachability(usable, found)
+        _check_connectivity(usable, found)
         items = found.findings()
         floors = len(building["floors"])
         if floors > 1 and not building["vertical_connectors"]:

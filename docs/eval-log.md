@@ -446,3 +446,167 @@ Stair hall rule (`building_agent/level4/stair_doors.py`), `uv run python scripts
 - The generic rule on its own already reaches 59% (dev) because any door that connects a cluster to the rest lifts the judge pairs a bit, even a wrong one; the stair rule is the same judge result with 100% instead of 54% precision, and stair then generic is best (63% and 61%).
 - Cached real extractions (segment + markers): no gain. swiss-31:0 and swiss-203:0 judge pairs stay at 9% and 19% with the stair rule (0 suggestions on swiss-203:0, 2 wrong ones on swiss-31:0 if entrance rooms are treated as halls, which is why that was left out). In swiss-203:0 the 4 missing true doors are the landing to outside entrances, which the pairing attaches to other rooms; in swiss-31:0 they are the 4 kitchen or corridor to landing doors, the model gave no types that identify the landings. Target "clear gain on swiss-31 and swiss-203" is not reached on the real extractions; the cause is the marker pairing on imperfect rooms, not the missing door.
 - osm and the clean floors: the rule does nothing (no stair hall without a door, 0 suggestions), unchanged numbers.
+
+### Foreign drawing styles (2026-10-24, claude-sonnet-5-5, synthetic plans)
+
+Question: do extraction, segmentation and marker steps survive drawing styles other than the kit's flat colours?
+Honest limit first: these are NOT real architect plans. We drew our own floor 0 of six dev buildings from building.json
+(`scripts/render_plan_styles.py`, seeded, truth transform known) in five styles: `lines` (black wall outlines, door gaps
+with swing arcs, room numbers, stair hatch with arrow, lift box with X, entrance as thick gap), `hatched` (hatched
+walls, furniture rectangles), `dims` (lines plus dimension chains and a printed 5 m or 2 m scale bar), `scan`
+(greyscale, blur, 1.5 degree rotation, speckle, off-white paper, JPEG 70) and `lowres` (lines at 40% size). Real plans
+will be messier (text everywhere, title blocks, several drawings per sheet). Run: `scripts/level4_style_eval.py`, full
+`build_from_plan` path through `make_level4_tools`, scale = true building width as known length, truth in the image
+frame, metrics from `tests/level4_helpers.measure`. Cost: 29 extractions, $0.716 in total ($0.011 to $0.048 each, 5 to
+20 s). Cached per image hash, reruns are free. Columns: recall/precision = rooms matched at IoU 0.3 against rooms
+found, area err = median relative area error of matched rooms, judge = route pairs scoring >= 0.99 of all pairs
+(invalid sequences, no route), seg regions/markers = what `segment_rooms` and `detect_markers` find on the raw image.
+Note for `scan`: the known width is the unrotated one, so the 1.5 degree tilt adds about 1 to 2% of scale error.
+
+**lines**
+
+| building | rooms found/true | recall | precision | door recall | entrances | area err | judge full/pairs (invalid, no route) | seg regions/markers | cost | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| resplan-439 | 8/8 | 1.00 | 1.00 | 0.62 | 0/1 | 0.00 | 9/30 (0, 21) | 0/0 | $0.016 | 5.1 |
+| resplan-1465 | 10/10 | 1.00 | 1.00 | 0.50 | 0/1 | 0.00 | 2/40 (0, 38) | 0/0 | $0.017 | 10.0 |
+| proc-factory-dev-003 | 47/47 | 1.00 | 1.00 | 0.57 | 0/4 | 0.01 | 87/264 (0, 174) | 0/0 | $0.044 | 17.4 |
+| proc-campus-dev-000 | 28/28 | 1.00 | 1.00 | 0.97 | 1/2 | 0.01 | 156/156 (0, 0) | 0/0 | $0.026 | 11.0 |
+| swiss-31 | 30/30 | 0.97 | 0.97 | 0.19 | 0/4 | 0.08 | 0/154 (0, 154) | 0/0 | $0.031 | 15.6 |
+| osm-way27326387 | 21/21 | 1.00 | 1.00 | 0.93 | 2/2 | 0.01 | 96/108 (0, 6) | 0/0 | $0.031 | 13.4 |
+
+**hatched**
+
+| building | rooms found/true | recall | precision | door recall | entrances | area err | judge full/pairs (invalid, no route) | seg regions/markers | cost | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| resplan-439 | 8/8 | 1.00 | 1.00 | 0.88 | 0/1 | 0.00 | 30/30 (0, 0) | 0/0 | $0.016 | 7.6 |
+| resplan-1465 | 9/10 | 0.90 | 1.00 | 0.60 | 0/1 | 0.00 | 20/35 (0, 15) | 0/0 | $0.017 | 6.0 |
+| proc-factory-dev-003 | 47/47 | 1.00 | 1.00 | 0.61 | 0/4 | 0.05 | 57/264 (4, 202) | 0/0 | $0.048 | 20.0 |
+| proc-campus-dev-000 | 28/28 | 1.00 | 1.00 | 0.66 | 0/2 | 0.07 | 72/156 (0, 84) | 0/0 | $0.026 | 14.8 |
+| swiss-31 | 30/30 | 0.97 | 0.97 | 0.19 | 0/4 | 0.12 | 1/153 (2, 150) | 0/0 | $0.029 | 14.9 |
+| osm-way27326387 | 18/21 | 0.86 | 1.00 | 0.74 | 1/2 | 0.04 | 38/89 (0, 12) | 0/0 | $0.027 | 12.4 |
+
+**dims**
+
+| building | rooms found/true | recall | precision | door recall | entrances | area err | judge full/pairs (invalid, no route) | seg regions/markers | cost | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| resplan-439 | 8/8 | 1.00 | 1.00 | 0.75 | 0/1 | 0.00 | 20/30 (0, 10) | 0/0 | $0.018 | 4.8 |
+| resplan-1465 | 10/10 | 1.00 | 1.00 | 0.60 | 0/1 | 0.00 | 20/40 (0, 20) | 0/0 | $0.018 | 5.3 |
+| proc-factory-dev-003 | 47/47 | 1.00 | 1.00 | 0.59 | 0/4 | 0.01 | 89/264 (0, 171) | 0/0 | $0.042 | 16.4 |
+| proc-campus-dev-000 | 28/28 | 1.00 | 1.00 | 0.97 | 1/2 | 0.02 | 156/156 (0, 0) | 0/0 | $0.028 | 10.9 |
+| swiss-31 | 26/30 | 0.87 | 1.00 | 0.16 | 0/4 | 0.13 | 0/144 (5, 139) | 0/0 | $0.029 | 13.1 |
+| osm-way27326387 | 21/21 | 1.00 | 1.00 | 0.85 | 1/2 | 0.01 | 59/108 (1, 38) | 0/0 | $0.029 | 12.8 |
+
+**scan**
+
+| building | rooms found/true | recall | precision | door recall | entrances | area err | judge full/pairs (invalid, no route) | seg regions/markers | cost | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| resplan-439 | 27/8 | 0.75 | 0.22 | 0.12 | 0/1 | 0.18 | 0/28 (10, 18) | 43/0 | $0.017 | 6.7 |
+| resplan-1465 | 29/10 | 0.50 | 0.17 | 0.00 | 0/1 | 0.18 | 0/18 (0, 18) | 74/0 | $0.018 | 6.9 |
+| proc-factory-dev-003 | 84/47 | 0.30 | 0.17 | 0.00 | 0/4 | 0.40 | 0/78 (55, 23) | 76/0 | $0.039 | 17.0 |
+| proc-campus-dev-000 | 187/28 | 0.00 | 0.00 | 0.00 | 0/2 | 0.00 | 0/0 (0, 0) | 182/0 | $0.027 | 13.8 |
+| swiss-31 | 124/30 | 0.33 | 0.08 | 0.00 | 0/4 | 0.20 | 0/49 (0, 49) | 127/0 | $0.020 | 13.3 |
+| osm-way27326387 | 205/21 | 0.48 | 0.05 | 0.37 | 0/2 | 0.20 | 25/42 (9, 6) | 399/0 | $0.031 | 18.6 |
+
+**lowres**
+
+| building | rooms found/true | recall | precision | door recall | entrances | area err | judge full/pairs (invalid, no route) | seg regions/markers | cost | s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| resplan-439 | 8/8 | 1.00 | 1.00 | 0.62 | 0/1 | 0.01 | 9/30 (0, 21) | 0/0 | $0.011 | 4.8 |
+| resplan-1465 | 10/10 | 0.90 | 0.90 | 0.50 | 0/1 | 0.03 | 6/35 (0, 29) | 0/0 | $0.011 | 5.1 |
+| proc-factory-dev-003 | 20/47 | 0.43 | 1.00 | 0.06 | 0/4 | 0.02 | 2/99 (0, 97) | 0/0 | $0.017 | 9.5 |
+| proc-campus-dev-000 | not run, refused: The image is 164 x 608 px; each side must be between 200 and 8000 px. | | | | | | | | | |
+| swiss-31 | 23/30 | 0.70 | 0.91 | 0.00 | 0/4 | 0.13 | 0/116 (0, 116) | 0/0 | $0.016 | 9.1 |
+| osm-way27326387 | 17/21 | 0.81 | 1.00 | 0.30 | 0/2 | 0.13 | 6/82 (0, 64) | 0/0 | $0.016 | 8.4 |
+
+Image of `lowres` campus: refused before any API call ("The image is 164 x 608 px; each side must be between 200 and 8000 px"),
+a clear message.
+
+**Conclusion in plain words**
+
+- Clean line plans (`lines`, `dims`, `hatched`): the model reads the rooms well. Recall is 1.00 on 13 of 18 runs, the
+  rest 0.86 to 0.97 (swiss-31 tilted by about 25 degrees, osm and resplan-1465 with hatching). Doors are the weak part:
+  door recall is 0.16 to 0.97 (median about 0.6), and the number of route pairs that score >= 0.99 swings from 0 of 154
+  (swiss-31) to 156 of 156 (campus). Hatched walls cost a little (resplan-1465 0.90, osm 0.86).
+- Entrances fail almost always. The thick gap is not read as an entrance: 6 of 42 true entrances found in the three line
+  styles. The person sees "The building has no entrance to the outside" plus the question which room the entrance
+  is in (works, but every plan triggers it), and sometimes "N rooms have no way out, doors are probably missing" (up to
+  15 rooms on proc-factory). Wrong door pairs show up as "12 doors are not on a wall the two rooms share" (swiss-31).
+- The cards are honest about trouble, but they do not say "this plan looks very different from what I can read well".
+  A clean-looking campus card ("No problems found") is real here (156 of 156 pairs), so the card is not over-warning.
+- `scan` is the failure: recall 0.00 to 0.75, precision 0.00 to 0.22, 27 to 205 rooms for 8 to 28 true ones. Cause:
+  segmentation fires on a scan. The paper tone (grey 236) and its speckle are read as flat fill colour `eaeaea`, the
+  whole page becomes one giant "room" (963117 px on swiss-31), and 43 to 399 false regions replace good model polygons
+  and are added as rooms (`room_added_from_image`). The card then shows "crossed outlines repaired", "17 rooms without a
+  usable outline are left out", "5 rooms have an unlikely size", "94 rooms are smaller than ...". So the guards do NOT
+  hold for scans; the result is worse than the model alone. A real scan would likely do the same.
+- Segmentation and markers on the line styles are skipped cleanly: on all 23 line, hatched, dims and lowres images
+  `segment_rooms` finds 0 regions (note shown: `segmentation_skipped: no regions`) and `detect_markers` finds 0 markers,
+  so no false regions or false markers and the model polygons stay. Markers also found 0 on all six scans.
+- `lowres` (560 px wide for a 1400 px plan): fine on small plans (resplan 1.00 and 0.90), breaks on dense ones
+  (proc-factory recall 0.43, swiss-31 0.70, osm 0.81, only 3 doors found on proc-factory, 0 on swiss-31). Below 200 px a side the upload is refused.
+- Scale: the model never reported the printed scale bar. In all six `dims` images the bar was present and the extraction
+  had `scale_bar_px` and `scale_bar_m` empty, so `scale_from_bar` returns nothing and the person is asked for a length
+  (fine as fallback, but the bar is wasted). The prompt tells the model "usually no scale bar, use null", which is the
+  likely reason. Dimension chains cannot be read at all: the tool schema has no field for dimension text, so they
+  are ignored. Scale from a known width worked as designed (area error median 0.00 to 0.13 on clean styles).
+
+**Ranked improvements**
+
+1. Fix segmentation on photos and scans: raise the fill guard (reject a palette colour that covers more than about 40%
+   of the image, or one that is not one of the kit palette colours, or any image with JPEG noise), so a scan is skipped
+   like a line plan. Biggest single win, a scan currently gets worse than the model alone. Offline test exists
+   (`test_scan_does_not_fool_segmentation`, xfail until fixed).
+2. Entrance and door reading for line plans: a line-plan prompt variant (swing arcs are doors, gaps without arc are
+   openings, a thick gap or a door on the outer wall is an entrance) chosen when the image has no flat fills. Entrances
+   are 6 of 42 now, door recall median 0.6.
+3. Reject poor extractions with a clear message instead of a card full of repairs: for example when most rooms were
+   added from segments, when the "not on a shared wall" share is above 30%, or when no door at all was found. Say
+   "this plan looks like a scan or a drawing I read badly, please send a cleaner export".
+4. Read the printed scale bar: tell the prompt to look for a bar or dimension text in every style, and add dimension text
+   (value plus the two end points in px) to the tool schema, so scale needs no question for plans that print it.
+5. Tile dense plans: cut plans over about 40 rooms or with small text into overlapping tiles, extract each, merge.
+   Also upscale low-resolution images (below about 1000 px long side) before sending, and handle the 200 px minimum by upscaling.
+6. A deterministic wall-line detector for black-line plans (threshold, wall mask, flood fill of rooms), replacing the
+   flat-colour segmentation for this style, then the same match-to-model step. Doors from gaps in the wall mask plus swing arcs.
+7. Rotated buildings: let the model report the plan rotation, or deskew by the dominant wall angle before extraction
+   (swiss-31 at 25 degrees is the worst clean case, door recall 0.19).
+
+## Graph score
+
+Blueprint-Bench 2 style connectivity score (`building_agent/level4/graph_score.py`): rooms (type room, hall, corridor)
+plus the outside are nodes, doors are edges, built and true rooms are matched by polygon overlap (greedy IoU >= 0.3).
+Composite = 50% edge Jaccard, 20% degree similarity, 10% density similarity, 10% room count ratio, 5% door count ratio,
+divided by 0.95: the 5% orientation part is left out because the true frame is used, no rotation or reflection is
+searched. Unmatched built rooms and missing true rooms count as wrong or missed edges and as degree similarity 0. A
+built room that best matches a true stair, lift or balcony is ignored (a typing difference, not an extra room).
+Cached extractions only, no API spend. Whether Synera scores Level 4 this way is still open.
+
+Clean sources, `scripts/eval_level4.py` (model reading of the plain plan, scale from the true width):
+
+| Floor | Graph Jaccard | Graph composite | Room recall | Door recall |
+|---|---|---|---|---|
+| proc-campus-dev-000:0 | 1.00 | 1.00 | 1.00 | 1.00 |
+| proc-campus-dev-001:0 | 1.00 | 1.00 | 1.00 | 1.00 |
+| proc-factory-dev-003:0 | 0.96 | 0.97 | 1.00 | 0.96 |
+| resplan-439:0 | 1.00 | 1.00 | 1.00 | 1.00 |
+| resplan-1465:0 | 0.86 | 0.85 | 1.00 | 1.00 |
+| swiss-31:0 | 0.29 | 0.43 | 0.80 | 0.35 |
+| swiss-203:0 | 0.22 | 0.37 | 0.78 | 0.26 |
+| osm-way27326387:0 | 0.57 | 0.61 | 0.86 | 0.67 |
+
+Drawing styles, `scripts/level4_style_eval.py` (graph Jaccard / composite; `lowres` has no cached extraction, so it is
+not scored; `scan` is measured on main before the scan guard fix, segmentation still fires on the speckle):
+
+| Building | lines | hatched | dims | scan |
+|---|---|---|---|---|
+| proc-campus-dev-000 | 0.96 / 0.97 | 0.65 / 0.70 | 0.96 / 0.97 | 0.00 / 0.01 |
+| proc-factory-dev-003 | 0.56 / 0.62 | 0.56 / 0.69 | 0.58 / 0.64 | 0.00 / 0.12 |
+| resplan-439 | 0.50 / 0.58 | 0.83 / 0.88 | 0.67 / 0.72 | 0.11 / 0.14 |
+| resplan-1465 | 0.43 / 0.53 | 0.57 / 0.64 | 0.57 / 0.63 | 0.00 / 0.04 |
+| swiss-31 | 0.09 / 0.20 | 0.17 / 0.32 | 0.09 / 0.25 | 0.00 / 0.03 |
+| osm-way27326387 | 0.91 / 0.91 | 0.76 / 0.78 | 0.82 / 0.88 | 0.18 / 0.16 |
+| Mean | 0.57 / 0.64 | 0.59 / 0.67 | 0.61 / 0.68 | 0.05 / 0.08 |
+
+Weakest on edge Jaccard: by source Swiss (0.22 and 0.29 on plain plans, 0.09 to 0.17 in styles), by style `scan`
+(0.05), and without `scan` `lines` (0.57). Swiss loses edges because doors are missing in the reading (door recall
+0.2 to 0.35), proc-factory and resplan lose them in the styled plans for the same reason.
