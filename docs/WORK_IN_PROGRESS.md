@@ -16,6 +16,14 @@ Seite bauen und starten: `scripts/build_twin.sh`, dann `uv run python -m web`. H
 | `design/blueprint-minimal` | **Stil**: nüchtern, Blueprint/Industrie, nicht zu krass: Radien 4 bis 6 px statt Pillen, Haarlinien statt Schatten, Papierweiß, Graphit, **eine** Signalfarbe (Orange), flache Raumetiketten, ein Token-Block (`tokens.css`), `twin/DESIGN.md`. **Nur Stil, keine Logik** | CSS-Dateien, Farb-Konstanten der Szene |
 | `feat/twin-here-ui` | **Tipp-Pin** (Marker am genau angetippten Punkt, Punkt in der Karte), **blauen "You are here"-Punkt ziehen** (Standort korrigieren, Maus und Touch), veralteten Stub `ui/Position.tsx` bereinigen. Der Chip "You are here", die Etappenkarte (Back, Next, Stop) und die Marker **gibt es schon** | `scene/FloorMesh.tsx`, `scene/Markers.tsx`, `ui/Card.tsx`, `ui/HereChip.tsx`, `store.ts` (nur ein kleines Flag `dragLock`) |
 
+**Stand (Samstag spät): Zwischenstand gepusht, noch NICHT fertig.** Die vier Branches oben liegen auf GitHub, damit du siehst, was wir wie ändern (`git fetch`, dann z.B. `git diff origin/main...origin/fix/twin-controls -- twin/`). Die Agenten arbeiten noch daran und pushen nach. Bitte nichts davon selbst mergen.
+
+**So mergen wir, damit deine Arbeit gewinnt:**
+1. Du pushst deinen aktuellen `twin/`-Stand nach `main` (oder sagst, welcher Branch es ist).
+2. Wir bauen jeden Branch einzeln auf deinem Stand neu auf, in der Reihenfolge unten. Bei Konflikten gewinnt dein Code, unser Fix wird darauf angepasst.
+3. Vor jedem Merge: Seite bauen, Screenshots Handy und Desktop, kurz zusammen anschauen.
+4. Design (`design/blueprint-minimal`) nur nach deinem Okay, weil er am meisten in deinem CSS ändert.
+
 Zuständigkeit gegen Konflikte: Kamera und Raster = `fix/twin-controls`. Wände, Öffnungen, Geisterblock = `fix/twin-openings`. Farben, Radien, Schatten = `design/blueprint-minimal`. Antippen, Pin, Standortpunkt = `feat/twin-here-ui`. Leonies eigene Arbeit am Rest (Handy-Layout, Wake-Wort "Hey Wanda", Auto-Pace-Timer) bleibt bei ihr, siehe `docs/LEONIE_TODO.md`. **Wer `feat/twin` weiterentwickelt, bitte vorher `origin/main` holen.**
 
 ### Server und Agent
