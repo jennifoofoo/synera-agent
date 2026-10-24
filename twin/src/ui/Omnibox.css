@@ -1,0 +1,80 @@
+/* ===== Omnibox (owner: chat/search session). Uses the base tokens from styles.css only. ===== */
+.omnibox { position: relative; display: flex; flex-direction: column; gap: 6px; }
+
+.omnibox-input {
+  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 28px rgba(20, 48, 90, 0.14);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.omnibox-input:focus-within { border-color: color-mix(in srgb, var(--gold) 70%, transparent); }
+.omnibox-input.is-listening { border-color: var(--danger); }
+.omnibox-input input {
+  flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; /* 16px: no iOS zoom */
+  padding: 8px 4px; outline: none; color: var(--text);
+}
+.omnibox-input input::placeholder { color: var(--muted); }
+.omnibox-input input:focus-visible { outline: none; }
+
+.ob-icon, .ob-mic {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  border-radius: 50%; border: 0; background: transparent; color: var(--muted);
+}
+.ob-icon { width: 36px; height: 36px; min-height: 36px; }
+.ob-icon:hover { color: var(--text); }
+.ob-icon.on { color: var(--gold); }
+.ob-icon.off { color: var(--muted); opacity: 0.75; }
+.ob-mic {
+  width: 42px; height: 42px; min-height: 42px; color: var(--text);
+  background: color-mix(in srgb, var(--text) 9%, transparent); border: 1px solid var(--line);
+}
+.ob-mic:hover { background: color-mix(in srgb, var(--text) 15%, transparent); }
+.ob-mic.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: ob-pulse 1.4s ease-out infinite; }
+@keyframes ob-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent); }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+
+/* status line: thinking / listening / notice */
+.ob-status {
+  align-self: center; display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  padding: 5px 12px; border-radius: 999px; font-size: 13px; color: var(--muted);
+  background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.ob-status .x { width: 22px; min-width: 22px; min-height: 22px; font-size: 16px; }
+.ob-notice { color: var(--text); border-color: color-mix(in srgb, var(--warn) 60%, transparent); border-radius: 14px; align-self: stretch; justify-content: space-between; }
+.ob-heard { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-rec { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; animation: ob-blink 1s ease-in-out infinite alternate; }
+@keyframes ob-blink { from { opacity: 1; } to { opacity: 0.3; } }
+.ob-dots { display: inline-flex; gap: 3px; }
+.ob-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); animation: ob-dot 1.2s ease-in-out infinite; }
+.ob-dots i:nth-child(2) { animation-delay: 0.15s; }
+.ob-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ob-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+
+/* hits */
+.ob-hits, .ob-history {
+  list-style: none; margin: 0; padding: 4px; border-radius: var(--radius); background: var(--panel-solid);
+  border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(20, 48, 90, 0.14); max-height: 46vh; overflow: auto;
+}
+.ob-row {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 44px;
+  padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left;
+}
+.ob-row:hover { background: transparent; }
+.ob-row.active { background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.ob-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-sub { color: var(--muted); font-size: 12.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ob-kind { color: var(--text); opacity: 0.7; }
+.ob-ask .ob-title { color: var(--text); }
+.ob-ask svg { color: var(--gold); }
+
+/* earlier replies */
+.ob-history { padding: 6px 10px; display: flex; flex-direction: column; gap: 8px; }
+.ob-history li + li { border-top: 1px solid var(--line); padding-top: 8px; }
+.ob-q { color: var(--muted); font-size: 12.5px; }
+.ob-a { white-space: pre-wrap; font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-mic.listening, .ob-dots i, .ob-rec { animation: none; }
+}

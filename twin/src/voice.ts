@@ -1,71 +1,163 @@
-// Voice in (Web Speech API) and out (/api/speak with ElevenLabs, else the browser's own voice).
+// Voice in (Web Speech API, webkitSpeechRecognition on iOS Safari) and out (/api/speak with ElevenLabs, else
+// the browser's own voice). Owner: chat/search session; the phone helpers at the end belong to the mobile session.
 
 import { api } from "./api/client";
+import { voiceHint } from "./ui/phoneHints";
 
+type RecognitionResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
 type Recognition = {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult: ((event: { resultIndex: number; results: ArrayLike<RecognitionResult> }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
+  abort: () => void;
 };
+type RecognitionCtor = new () => Recognition;
 
-export function speechInputAvailable(): boolean {
-  const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
-  return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+function recognitionCtor(): RecognitionCtor | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-export function listenOnce(lang: string, onResult: (text: string) => void, onEnd: (error?: string) => void): () => void {
-  const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
-  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+export function speechInputAvailable(): boolean {
+  return !!recognitionCtor();
+}
+
+/** Why the mic cannot work here, in words for the person holding the phone; null when it can. */
+export function speechInputProblem(): string | null {
+  if (typeof window !== "undefined" && !window.isSecureContext) return voiceHint();
+  if (!recognitionCtor()) return voiceHint();
+  return null;
+}
+
+export interface Listener {
+  /** Stop listening and send what was heard so far. */
+  stop: () => void;
+  /** Stop listening and drop what was heard. */
+  cancel: () => void;
+}
+
+/**
+ * Push-to-talk: listen once. `onInterim` gets the live transcript, `onFinal` the finished sentence (only when
+ * something was heard), `onEnd` always runs last, with the raw recognition error code when something went wrong
+ * (word it with `voiceHint(code)`); "no-speech" and "aborted" are not errors.
+ */
+export function listen(
+  lang: string,
+  handlers: { onInterim?: (text: string) => void; onFinal: (text: string) => void; onEnd: (error?: string) => void },
+): Listener {
+  const Ctor = recognitionCtor();
   if (!Ctor) {
-    onEnd("Voice input needs Chrome or Safari.");
-    return () => {};
+    handlers.onEnd("unsupported");
+    return { stop: () => {}, cancel: () => {} };
   }
   const recognition = new Ctor();
   recognition.lang = lang;
-  recognition.interimResults = false;
+  recognition.interimResults = true;
   recognition.continuous = false;
-  let finished = false;
+  let heard = "";
+  let cancelled = false;
+  let ended = false;
+  let error: string | undefined;
   recognition.onresult = (event) => {
-    const text = Array.from(event.results)
+    heard = Array.from(event.results)
       .map((result) => result[0]?.transcript ?? "")
       .join(" ")
+      .replace(/\s+/g, " ")
       .trim();
-    if (text) onResult(text);
+    handlers.onInterim?.(heard);
   };
   recognition.onerror = (event) => {
-    finished = true;
-    onEnd(event.error === "not-allowed" ? "Microphone access was denied." : event.error === "no-speech" ? undefined : event.error);
+    if (event.error !== "no-speech" && event.error !== "aborted") error = event.error;
   };
   recognition.onend = () => {
-    if (!finished) onEnd();
-    finished = true;
+    if (ended) return;
+    ended = true;
+    if (!cancelled && heard) handlers.onFinal(heard);
+    handlers.onEnd(error);
   };
-  recognition.start();
-  return () => recognition.stop();
+  try {
+    recognition.start();
+  } catch {
+    ended = true;
+    handlers.onEnd("start-failed");
+  }
+  return {
+    stop: () => recognition.stop(),
+    cancel: () => {
+      cancelled = true;
+      recognition.abort();
+    },
+  };
 }
 
-let audio: HTMLAudioElement | null = null;
+/** @deprecated kept for older callers; use `listen`. */
+export function listenOnce(lang: string, onResult: (text: string) => void, onEnd: (error?: string) => void): () => void {
+  return listen(lang, { onFinal: onResult, onEnd }).stop;
+}
+
+// ---- voice out ----
+
+let audioUrl: string | null = null;
 
 export function stopSpeaking(): void {
-  audio?.pause();
-  audio = null;
+  const audio = sharedAudio();
+  audio.pause();
+  if (audioUrl) {
+    audio.removeAttribute("src");
+    URL.revokeObjectURL(audioUrl);
+  }
+  audioUrl = null;
   window.speechSynthesis?.cancel();
 }
 
+/** True while a reply is being spoken (server audio or browser voice). */
+export function isSpeaking(): boolean {
+  return (!!audioUrl && !sharedAudio().paused) || !!window.speechSynthesis?.speaking;
+}
+
+const ANSWER_LINE = /^\s*\**\s*Answer:/i;
+const ID_TOKEN = /\s*[([]?`?\b[A-Za-z][\w.]*(?:-[\w.]+){2,}`?[)\]]?/g;
+
+/** The reply without its final "Answer: …" line (also "**Answer:**"). For anything shown or spoken. */
+export function withoutAnswerLine(reply: string): string {
+  const lines = reply.trimEnd().split("\n");
+  const last = lines.length - 1;
+  if (last > 0 && ANSWER_LINE.test(lines[last])) lines.pop();
+  else if (last === 0 && ANSWER_LINE.test(lines[0])) return lines[0].replace(/^\s*\**\s*Answer:\**\s*/i, "");
+  return lines.join("\n").trimEnd();
+}
+
+/** What to say out loud: no final "Answer:" line, no ids, no markdown. */
+export function spokenText(reply: string): string {
+  return withoutAnswerLine(reply)
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(ID_TOKEN, (token) => (/\d/.test(token) ? "" : token))
+    .replace(/[*_`#>|]+/g, "")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/\(\s*\)/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
 /** Speak a reply: ElevenLabs through the server when configured, otherwise the browser voice. */
-export async function speak(text: string, serverVoice: boolean, lang = "en"): Promise<void> {
+export async function speak(text: string, serverVoice: boolean): Promise<void> {
   stopSpeaking();
-  const spoken = text.replace(/^Answer:.*$/m, "").trim() || text;
+  const spoken = spokenText(text);
+  if (!spoken) return;
   if (serverVoice) {
     try {
-      const blob = await api.speak(spoken, lang);
+      const blob = await api.speak(spoken, "en");
       if (blob) {
-        audio = new Audio(URL.createObjectURL(blob));
+        const audio = sharedAudio();
+        audioUrl = URL.createObjectURL(blob);
+        audio.src = audioUrl;
         await audio.play();
         return;
       }
@@ -75,8 +167,8 @@ export async function speak(text: string, serverVoice: boolean, lang = "en"): Pr
   }
   if (!window.speechSynthesis) return;
   const utterance = new SpeechSynthesisUtterance(spoken);
-  utterance.lang = lang === "de" ? "de-DE" : "en-US";
-  utterance.rate = 0.95;
+  utterance.lang = "en-US";
+  utterance.rate = 1;
   window.speechSynthesis.speak(utterance);
 }
 
