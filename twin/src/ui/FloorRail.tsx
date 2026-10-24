@@ -14,6 +14,7 @@ export function FloorRail() {
   const setViewMode = useTwin((s) => s.setViewMode);
   const profile = useTwin((s) => s.profile);
   const topInset = useTwin((s) => s.topInset);
+  const directionsOpen = useTwin((s) => s.directions !== null);
   if (!model) return null;
   const flat = viewMode === "2d";
   const routeFloors = new Set(state?.route?.ok ? state.route.floors : []);
@@ -23,7 +24,8 @@ export function FloorRail() {
       role="radiogroup"
       aria-label="Floor"
       // The phone's directions sheet covers the top of the screen: keep the rail below it (topInset = its bottom edge).
-      style={topInset > 0 && profile === "worker" ? { top: topInset + 8, maxHeight: `calc(var(--vvh, 100dvh) - ${topInset + 8}px - var(--dock-h, 90px) - 16px)` } : undefined}
+      // Phone.css places the rail from --rail-top (portrait: right edge above the dock; landscape: left edge).
+      style={directionsOpen && topInset > 0 && profile === "worker" ? ({ "--rail-top": `${topInset + 8}px` } as React.CSSProperties) : undefined}
     >
       {profile !== "worker" && (
         <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>

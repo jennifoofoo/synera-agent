@@ -48,6 +48,9 @@ function useDockHeight(worker: boolean) {
       root.style.setProperty("--dock-h", `${Math.round(box.height)}px`);
       const beside = box.left > window.innerWidth * 0.3; // landscape: dock on the right, plan uses the left
       setBottomInset(beside ? 0 : covered);
+      // Landscape: the dock covers the right column. rightInset would frame the plan left of it, but CameraRig's
+      // view offset (setViewOffset x = 0) currently moves the content right, under the dock, for a rightInset, so it
+      // is not set here until the camera owner fixes that.
     };
     const observer = new ResizeObserver(measure);
     observer.observe(dock);

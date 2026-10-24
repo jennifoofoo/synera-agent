@@ -34,6 +34,11 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
   max-height: calc(var(--vvh, 100dvh) - var(--head-y) - 56px - var(--dock-h, 90px) - 16px);
   overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
 }
+/* --rail-top (FloorRail.tsx) is the directions sheet's bottom edge + 8 px while that sheet is open */
+:root .app.worker .floorrail, :root .app.worker.directions-open .floorrail {
+  top: var(--rail-top, calc(var(--head-y) + 56px));
+  max-height: calc(var(--vvh, 100dvh) - var(--rail-top, calc(var(--head-y) + 56px)) - var(--dock-h, 90px) - 16px);
+}
 .worker .floorrail::-webkit-scrollbar { display: none; }
 .worker .rail-floor, .worker .rail-toggle { width: 44px; height: 44px; min-height: 44px; flex: none; font-size: 15px; }
 
@@ -43,6 +48,9 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
   transform: none; gap: 8px;
 }
 .keyboard-open .worker .dock { bottom: 8px; }
+/* while typing only the input (and its matches) stay: the card and the here chip come back when the keyboard closes,
+   otherwise they are pushed under the header (landscape) or leave no plan to see */
+.keyboard-open .app.worker .dock > :not(.omnibox) { display: none; }
 .worker .omnibox-input { min-height: 60px; padding: 6px 8px 6px 6px; gap: 8px; }
 .worker .omnibox-input input { font-size: 17px; padding: 10px 4px; }
 .worker .omnibox-input .mic { width: 48px; min-width: 48px; height: 48px; min-height: 48px; font-size: 20px; }
@@ -84,7 +92,12 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 /* phone on its side: input bottom right, narrower, the sheet may use more of the short screen */
 @media (orientation: landscape) and (max-height: 520px) {
   .worker .dock { left: auto; width: min(460px, 58vw); }
-  .worker .floorrail { max-height: calc(var(--vvh, 100dvh) - var(--head-y) - 56px - var(--safe-b) - 8px); }
+  /* the dock fills the right column, so the floors go to the free left edge, below the route pill */
+  :root .app.worker .floorrail, :root .app.worker.directions-open .floorrail {
+    left: calc(var(--safe-l) + 8px); right: auto;
+    top: calc(var(--rail-top, calc(var(--head-y) + 48px)) + 56px);
+    max-height: calc(var(--vvh, 100dvh) - var(--rail-top, calc(var(--head-y) + 48px)) - 56px - var(--safe-b) - 8px);
+  }
   .worker .phone-sheet { max-height: calc(var(--vvh, 100dvh) * 0.6); }
   .worker .omnibox-input { min-height: 54px; }
   .worker .hits { max-height: calc(var(--vvh, 100dvh) * 0.45); }
@@ -96,3 +109,11 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 
 /* the tapped room's name on the plan (Labels.tsx keeps it and drops labels that would sit on the room) */
 .worker .label.label-selected { font-weight: 650; }
+
+/* safe areas (viewport-fit=cover): in landscape the notch / Dynamic Island sits on the left or right edge.
+   Everything on the phone reads the --safe-* variables, so tests can simulate a notch by setting them. */
+:root .app.worker.flat .pill { left: calc(var(--safe-l) + 8px); }
+:root .app.worker .recenter { right: calc(var(--safe-r) + 14px); }
+:root .app.worker .directions {
+  padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) 10px calc(var(--safe-l) + 14px);
+}
