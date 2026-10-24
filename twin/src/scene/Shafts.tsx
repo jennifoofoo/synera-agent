@@ -29,7 +29,7 @@ export function Shafts({ model, floorY, floorTop, closed }: Props) {
         const y1 = floorTop(topFloor);
         const height = Math.max(0.5, y1 - y0);
         const isClosed = closed.has(connector.id);
-        return <Shaft key={connector.id} polygon={polygon} y={y0} height={height} colour={isClosed ? COLOURS.danger : connector.kind === "lift" ? COLOURS.accentBlue : COLOURS.accent} opacity={isClosed ? 0.3 : 0.1} />;
+        return <Shaft key={connector.id} polygon={polygon} y={y0} height={height} colour={isClosed ? COLOURS.danger : connector.kind === "lift" ? COLOURS.accentBlue : COLOURS.stairs} opacity={isClosed ? 0.3 : 0.1} />;
       })}
     </group>
   );

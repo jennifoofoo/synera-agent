@@ -5,12 +5,11 @@
 }
 
 .omnibox-input {
-  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px; border-radius: 999px;
-  background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px); box-shadow: 0 8px 28px rgba(20, 48, 90, 0.14);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 14px; border-radius: var(--radius);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float);
+  transition: border-color var(--t-fast);
 }
-.omnibox-input:focus-within { border-color: color-mix(in srgb, var(--gold) 70%, transparent); }
+.omnibox-input:focus-within { border-color: color-mix(in srgb, var(--signal) 70%, transparent); }
 .omnibox-input.is-listening { border-color: var(--ob-active); }
 .omnibox-input input {
   flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; /* 16px: no iOS zoom */
@@ -21,16 +20,16 @@
 
 .ob-icon, .ob-mic {
   flex: none; display: inline-flex; align-items: center; justify-content: center; padding: 0;
-  border-radius: 50%; border: 0; background: transparent; color: var(--muted);
+  border-radius: var(--radius-sm); border: 0; background: transparent; color: var(--muted);
 }
 .ob-icon { width: 36px; height: 36px; min-height: 36px; }
 .ob-icon:hover { color: var(--text); }
-.ob-icon.on { color: var(--gold); }
+.ob-icon.on { color: var(--signal); }
 /* spoken replies off: a filled grey disc behind the muted speaker, plainly visible but no signal colour */
 .ob-icon.off { color: var(--text); background: color-mix(in srgb, var(--text) 12%, transparent); }
 .ob-mic {
   width: 42px; height: 42px; min-height: 42px; color: var(--text);
-  background: color-mix(in srgb, var(--text) 9%, transparent); border: 1px solid var(--line);
+  background: var(--surface); border: 1px solid var(--line);
 }
 .ob-mic:hover { background: color-mix(in srgb, var(--text) 15%, transparent); }
 /* listening, as in Google Maps voice: blue filled mic with a ring pulsing outwards */
@@ -45,24 +44,24 @@
 /* status line: thinking / listening / notice */
 .ob-status {
   align-self: center; display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
-  padding: 5px 12px; border-radius: 999px; font-size: 13px; color: var(--muted);
-  background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  padding: 4px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--line);
 }
 .ob-status .x { width: 22px; min-width: 22px; min-height: 22px; font-size: 16px; }
-.ob-notice { color: var(--text); border-color: color-mix(in srgb, var(--warn) 60%, transparent); border-radius: 14px; align-self: stretch; justify-content: space-between; }
+.ob-notice { color: var(--text); border-color: var(--warn); border-radius: var(--radius); align-self: stretch; justify-content: space-between; }
 .ob-heard { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ob-rec { width: 8px; height: 8px; border-radius: 50%; background: var(--ob-active); flex: none; animation: ob-blink 1s ease-in-out infinite alternate; }
 @keyframes ob-blink { from { opacity: 1; } to { opacity: 0.3; } }
 .ob-dots { display: inline-flex; gap: 3px; }
-.ob-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); animation: ob-dot 1.2s ease-in-out infinite; }
+.ob-dots i { width: 5px; height: 5px; border-radius: 1px; background: var(--signal); animation: ob-dot 1.2s ease-in-out infinite; }
 .ob-dots i:nth-child(2) { animation-delay: 0.15s; }
 .ob-dots i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes ob-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+@keyframes ob-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 
 /* earlier replies */
 .ob-history {
-  list-style: none; margin: 0; padding: 4px; border-radius: var(--radius); background: var(--panel-solid);
-  border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(20, 48, 90, 0.14); max-height: 46vh; overflow: auto;
+  list-style: none; margin: 0; padding: 4px; border-radius: var(--radius); background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--shadow-float); max-height: 46vh; overflow: auto;
 }
 
 /* earlier replies */
@@ -89,12 +88,11 @@
 }
 .ob-fabs { display: flex; justify-content: flex-end; gap: 10px; }
 .ob-fab {
-  width: 52px; height: 52px; min-height: 52px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center;
-  justify-content: center; color: var(--text); background: var(--panel); border: 1px solid var(--line);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 6px 20px rgba(20, 48, 90, 0.16);
+  width: 48px; height: 48px; min-height: 48px; padding: 0; border-radius: var(--radius-sm); display: inline-flex; align-items: center;
+  justify-content: center; color: var(--text); background: var(--surface); border: 1px solid var(--line);
   -webkit-touch-callout: none; user-select: none;
 }
-.ob-fab:hover { background: var(--panel-solid); }
+.ob-fab:hover { background: var(--paper-2); }
 .ob-fab svg { width: 22px; height: 22px; }
 .ob-talk { position: relative; }
 /* spoken replies off: a muted-speaker badge on the Talk button */

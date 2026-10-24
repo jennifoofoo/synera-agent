@@ -1,0 +1,6 @@
+/* Point text on the room card: tabular numerals so the digits do not jump while the pin moves. */
+.card-point {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}

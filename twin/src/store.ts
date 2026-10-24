@@ -109,6 +109,9 @@ interface TwinState {
   chatBusy: boolean;
   voiceOut: boolean;
   hereArmed: boolean;
+  /** True while the "You are here" dot is dragged: camera gestures are off (set by scene/HerePin). */
+  dragLock: boolean;
+  setDragLock: (on: boolean) => void;
   campusHook: CampusHook | null;
   /** A campus route is shown: the route on screen is one leg of it (the campus card shows the legs). */
   campusRoute: boolean;
@@ -212,6 +215,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   chatBusy: false,
   voiceOut: false,
   hereArmed: false,
+  dragLock: false,
   campusHook: null,
   campusRoute: false,
   directions: null,
@@ -319,6 +323,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   armHere(hereArmed) {
     set({ hereArmed });
+  },
+  setDragLock(dragLock) {
+    set({ dragLock });
   },
   openDirections(to) {
     // "Your location" when known: here, or (campus) in another building, then routeDirections routes across.
@@ -464,7 +471,7 @@ export const useTwin = create<TwinState>((set, get) => ({
       }
       if (reply.located?.length) {
         const ids = reply.located.map((entry) => entry.asset_id);
-        get().setHighlight("found", { ids, colour: "#5eead4" });
+        get().setHighlight("found", { ids, colour: "#004fab" });
         get().flyTo(ids[0]);
       }
       return reply;

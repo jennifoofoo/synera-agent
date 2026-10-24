@@ -16,7 +16,9 @@ Seite bauen und starten: `scripts/build_twin.sh`, dann `uv run python -m web`. H
 | `design/blueprint-minimal` | **Stil**: nüchtern, Blueprint/Industrie, nicht zu krass: Radien 4 bis 6 px statt Pillen, Haarlinien statt Schatten, Papierweiß, Graphit, **eine** Signalfarbe (Orange), flache Raumetiketten, ein Token-Block (`tokens.css`), `twin/DESIGN.md`. **Nur Stil, keine Logik** | CSS-Dateien, Farb-Konstanten der Szene |
 | `feat/twin-here-ui` | **Tipp-Pin** (Marker am genau angetippten Punkt, Punkt in der Karte), **blauen "You are here"-Punkt ziehen** (Standort korrigieren, Maus und Touch), veralteten Stub `ui/Position.tsx` bereinigen. Der Chip "You are here", die Etappenkarte (Back, Next, Stop) und die Marker **gibt es schon** | `scene/FloorMesh.tsx`, `scene/Markers.tsx`, `ui/Card.tsx`, `ui/HereChip.tsx`, `store.ts` (nur ein kleines Flag `dragLock`) |
 
-**Stand (Samstag spät): Zwischenstand gepusht, noch NICHT fertig.** Die vier Branches oben liegen auf GitHub, damit du siehst, was wir wie ändern (`git fetch`, dann z.B. `git diff origin/main...origin/fix/twin-controls -- twin/`). Die Agenten arbeiten noch daran und pushen nach. Bitte nichts davon selbst mergen.
+**Update 23:30: Zwischenstand aller vier Branches ist in `main`** (Kamera/Raster, Wand-Lücken, Design Synera-Blau #004fab, Tipp-Pin; dazu List-Knopf-Fix). Die Agenten arbeiten weiter (halten und ziehen, Zeichenregeln für Türen und Passagen, Marker überdecken keine Namen) und kommen als weitere Merges. Bitte vor eigener Arbeit an `twin/` `git pull`.
+
+**Vorher:** Zwischenstand gepusht, noch NICHT fertig. Die vier Branches oben liegen auf GitHub, damit du siehst, was wir wie ändern (`git fetch`, dann z.B. `git diff origin/main...origin/fix/twin-controls -- twin/`). Die Agenten arbeiten noch daran und pushen nach. Bitte nichts davon selbst mergen.
 
 **So mergen wir, damit deine Arbeit gewinnt:**
 1. Du pushst deinen aktuellen `twin/`-Stand nach `main` (oder sagst, welcher Branch es ist).

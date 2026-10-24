@@ -91,9 +91,11 @@ function candidates(floor: FloorModel, model: BuildingModel, tier: MapTier, scal
     else if (space.name && space.type !== "outdoor" && space.type !== "corridor") rooms.push(space);
   }
   for (const opening of floor.openings) {
-    if (opening.kind === "entrance") pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: "Entrance / exit" });
+    if (opening.kind === "entrance")
+      pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
+    else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
   }
-  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3 };
+  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, step: 4 };
   pois.sort((a, b) => (a.kind === "poi" && b.kind === "poi" ? poiRank[a.poi] - poiRank[b.poi] : 0) || a.id.localeCompare(b.id));
   // Every tier: the zones (largest rooms), whatever their size on screen. Mid and near add every room whose
   // name (nearly) fits inside it at this scale. Tiers are cumulative, like a street map.
