@@ -1,4 +1,5 @@
 import math
+from collections.abc import Callable
 
 import networkx as nx
 from shapely.geometry import LineString, MultiLineString
@@ -14,9 +15,12 @@ NOT_ROOM_TYPES = {"corridor", "stair", "lift", "outdoor"}
 NOT_ROOM_ROOM_TYPES = {"corridor", "stairwell", "lift"}
 
 
-def shared_wall_midpoint(bm: BuildingMap, first: str, second: str) -> tuple[float, float]:
+def shared_wall_midpoint(bm: BuildingMap, first: str, second: str, mode: str = "longest") -> tuple[float, float]:
     """Middle of the wall `first` shares with `second`: the longest stretch of first's outline
-    within 0.35 m of second, halfway along it. Falls back to the closest points between the two."""
+    within 0.35 m of second, halfway along it. Falls back to the closest points between the two.
+
+    Other `mode`s are for scripts/rule_sensitivity.py: "combined" is halfway along all shared stretches laid end
+    to end (in the order they appear on first's outline), "centroid" the centroid of all of them."""
     first_polygon, second_polygon = space_polygon(bm, first), space_polygon(bm, second)
     if first_polygon.distance(second_polygon) > ADJACENT_DISTANCE_M:
         raise MapError(f"{bm.describe_space(first)} and {bm.describe_space(second)} do not share a wall.")
@@ -30,7 +34,20 @@ def shared_wall_midpoint(bm: BuildingMap, first: str, second: str) -> tuple[floa
     ]
     if lines:
         merged = linemerge(MultiLineString(lines))
-        wall = max(getattr(merged, "geoms", [merged]), key=lambda line: line.length)
+        parts = list(getattr(merged, "geoms", [merged]))
+        if mode == "centroid":
+            centre = MultiLineString(parts).centroid
+            return (centre.x, centre.y)
+        if mode == "combined":
+            ring = first_polygon.exterior
+            parts.sort(key=lambda line: ring.project(line.interpolate(0.5, normalized=True)))
+            half = sum(line.length for line in parts) / 2
+            for line in parts:
+                if half <= line.length:
+                    middle = line.interpolate(half)
+                    return (middle.x, middle.y)
+                half -= line.length
+        wall = max(parts, key=lambda line: line.length)
         middle = wall.interpolate(0.5, normalized=True)
         return (middle.x, middle.y)
     point_a, point_b = nearest_points(first_polygon, second_polygon)
@@ -41,12 +58,29 @@ def is_room(space: dict) -> bool:
     return space["type"] not in NOT_ROOM_TYPES and space["room_type"] not in NOT_ROOM_ROOM_TYPES
 
 
-def what_if_door(bm: BuildingMap, first: str, second: str, door_floor_id: str, floor_id: str) -> dict:
-    """Rooms on `floor_id` whose walk to the nearest entrance gets more than 1 m shorter
-    once a door joins `first` and `second` (on `door_floor_id`) in the middle of their shared wall."""
+def _gains(gain: float, inclusive: bool) -> bool:
+    return gain >= MIN_GAIN_M - 1e-9 if inclusive else gain > MIN_GAIN_M
+
+
+def what_if_door_with(
+    bm: BuildingMap,
+    first: str,
+    second: str,
+    door_floor_id: str,
+    floor_id: str,
+    *,
+    door_mode: str = "longest",
+    inclusive: bool = False,
+    counted: Callable[[dict], bool] = is_room,
+) -> dict:
+    """what_if_door with alternative readings (scripts/rule_sensitivity.py).
+
+    `door_mode` see shared_wall_midpoint, `inclusive` counts a gain of exactly 1 m, `counted` decides which
+    spaces on the floor are counted. The registered kind is this with the defaults. The tool signature of the
+    registered function is exposed to the LLM, so the readings do not live on it."""
     if bm.spaces[first]["floor_id"] != door_floor_id or bm.spaces[second]["floor_id"] != door_floor_id:
         raise MapError(f"Both spaces must be on {door_floor_id}.")
-    position = shared_wall_midpoint(bm, first, second)
+    position = shared_wall_midpoint(bm, first, second, door_mode)
     before_graph = bm.graph(step_free=False)
     after_graph = before_graph.copy()
     door = DOOR_PREFIX + "what-if"
@@ -58,15 +92,21 @@ def what_if_door(bm: BuildingMap, first: str, second: str, door_floor_id: str, f
         space_id
         for space_id, space in bm.spaces.items()
         if space["floor_id"] == floor_id
-        and is_room(space)
+        and counted(space)
         and space_id in after
-        and before.get(space_id, math.inf) - after[space_id] > MIN_GAIN_M
+        and _gains(before.get(space_id, math.inf) - after[space_id], inclusive)
     )
     return {
         "count": len(space_ids),
         "space_ids": space_ids,
         "door_position": [round(position[0], 3), round(position[1], 3)],
     }
+
+
+def what_if_door(bm: BuildingMap, first: str, second: str, door_floor_id: str, floor_id: str) -> dict:
+    """Rooms on `floor_id` whose walk to the nearest entrance gets more than 1 m shorter
+    once a door joins `first` and `second` (on `door_floor_id`) in the middle of their shared wall."""
+    return what_if_door_with(bm, first, second, door_floor_id, floor_id)
 
 
 KIND = Kind(

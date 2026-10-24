@@ -13,8 +13,29 @@ def _polygon(space: dict) -> Polygon:
     return polygon if polygon.is_valid else polygon.buffer(0)
 
 
-def room_stacked(bm: BuildingMap, start: str, direction: str) -> dict:
-    """Space on the next existing floor up/down whose outline overlaps `start` the most."""
+def _overlap(outline: Polygon, other: Polygon, metric: str) -> float:
+    shared = outline.intersection(other).area
+    if metric == "iou":
+        union = outline.union(other).area
+        return shared / union if union > 0 else 0.0
+    return shared
+
+
+def room_stacked_with(
+    bm: BuildingMap,
+    start: str,
+    direction: str,
+    *,
+    metric: str = "intersection",
+    adjacent_level_only: bool = False,
+    excluded_types: frozenset[str] = frozenset(),
+) -> dict:
+    """room_stacked with alternative readings (scripts/rule_sensitivity.py).
+
+    `metric` "iou" ranks by intersection over union instead of intersection area, `adjacent_level_only` demands
+    level +1/-1 instead of the next existing level, `excluded_types` drops candidate spaces by type.
+    The registered kind is this with the defaults. The tool signature of the registered function is exposed to
+    the LLM, so the readings do not live on it."""
     if direction not in ("above", "below"):
         raise MapError("direction must be 'above' or 'below'.")
     source = bm.data["building"].get("source")
@@ -30,14 +51,16 @@ def room_stacked(bm: BuildingMap, start: str, direction: str) -> dict:
     else:
         target_levels = [other for other in levels if other < level]
         target_level = max(target_levels, default=None)
+    if adjacent_level_only and target_level is not None and abs(target_level - level) != 1:
+        target_level = None
     if target_level is None:
         raise MapError(f"There is no floor {direction} {bm.describe_space(start)}.")
 
     outline = _polygon(space)
     overlaps = {
-        other["id"]: outline.intersection(_polygon(other)).area
+        other["id"]: _overlap(outline, _polygon(other), metric)
         for other in bm.spaces.values()
-        if bm.floors[other["floor_id"]]["level"] == target_level
+        if bm.floors[other["floor_id"]]["level"] == target_level and other["type"] not in excluded_types
     }
     best = max(overlaps, key=overlaps.get, default=None)
     if best is None or overlaps[best] <= 0:
@@ -46,8 +69,13 @@ def room_stacked(bm: BuildingMap, start: str, direction: str) -> dict:
         "space_id": best,
         "name": bm.spaces[best]["name"],
         "floor": bm.floor_name(bm.spaces[best]["floor_id"]),
-        "overlap_share": round(overlaps[best] / outline.area, 2),
+        "overlap_share": round(outline.intersection(_polygon(bm.spaces[best])).area / outline.area, 2),
     }
+
+
+def room_stacked(bm: BuildingMap, start: str, direction: str) -> dict:
+    """Space on the next existing floor up/down whose outline overlaps `start` the most."""
+    return room_stacked_with(bm, start, direction)
 
 
 KIND = Kind(
