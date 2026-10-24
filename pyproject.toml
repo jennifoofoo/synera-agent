@@ -11,7 +11,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.17.2",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -22,3 +25,7 @@ packages = ["starter_agent", "benchmark", "building_agent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["starter_agent", "benchmark", "data"]
