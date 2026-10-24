@@ -125,9 +125,6 @@ button.x:hover { color: var(--text); }
 .card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
 /* ===== Phone (owner: mobile session) ===== */
-.worker .dock { bottom: 10px; width: calc(100vw - 16px); }
-.worker .pill { top: 58px; right: 10px; }
-.worker .card-actions button, .worker .omnibox-input .mic { min-height: 44px; }
-.worker .rail-floor, .worker .rail-toggle { width: 40px; height: 40px; min-height: 40px; }
+/* Worker/phone rules live in ui/Phone.css (imported by ui/Phone.tsx and ui/PhoneSheet.tsx). */
 @media (pointer: coarse) { button { min-height: 40px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
