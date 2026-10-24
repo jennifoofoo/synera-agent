@@ -39,6 +39,7 @@ class Extraction:
     doors: list[ExtractedDoor]
     scale_bar_px: float | None = None  # printed bar length in px, if any
     scale_bar_m: float | None = None
+    plan_assets: list = field(default_factory=list)  # furniture.AssetGuess items read from the furniture glyphs
 
 
 @dataclass

@@ -22,6 +22,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -53,9 +54,6 @@ HEADING = "### Level 4 questions on built buildings"
 PROMPT_HASH = hashlib.sha256(extract_module.PROMPT.encode()).hexdigest()[:8]
 ROUTE_KINDS = ("route", "route_step_free", "tour")
 SKIPPED = {
-    "locate": "needs the furniture list",
-    "count": "needs the furniture list",
-    "errand": "needs the furniture list",
     "route_with_closure": "names a lift by element id",
     "step_free_reachable_count": "names a lift by element id",
 }
@@ -257,6 +255,8 @@ def ask(question: dict, mapper: Mapper, kinds: dict) -> tuple[str, str]:
             expected = answer["optimal_length_m"]
             ok = abs(result.length_m - expected) <= max(ROUTE_TOLERANCE * expected, ROUTE_TOLERANCE)
             return ("correct" if ok else "wrong"), f"{result.length_m:.1f} vs {expected:.1f}"
+        if kind in ("count", "locate"):
+            return ask_assets(question, mapper, hows)
         fn = kinds[kind].fn
         if kind in ("largest_room", "floor_area_total"):
             floor = mapper.floor(inputs["floor_id"])
@@ -283,12 +283,34 @@ def ask(question: dict, mapper: Mapper, kinds: dict) -> tuple[str, str]:
         result = fn(built, **args)
         if kind == "room_stacked":
             return ("correct" if accepted(built, result["space_id"], answer) else "wrong"), result["name"]
-        got = result.get("count", result.get("distance_m"))
+        got = result.get("count", result.get("distance_m", result.get("length_m")))
         return ("correct" if tolerance_ok(got, answer) else "wrong"), f"{got} vs {answer['value']}"
     except MapError as error:
         return "error", str(error)[:80]
     except (KeyError, ValueError, TypeError, ArithmeticError) as error:
         return "error", f"{type(error).__name__}: {error}"[:80]
+
+
+def ask_assets(question: dict, mapper: Mapper, hows: list[str]) -> tuple[str, str]:
+    """count: built assets of the type on that floor equal the label. locate: an asset of the asked type is listed in
+    the built room that matches the room of the label (the frames of built and true metres differ, so rooms decide)."""
+    built, answer = mapper.built, question["answer"]
+    if question["kind"] == "count":
+        wanted = answer["asset_type"]
+        if not any(a["type"] == wanted for a in built.assets.values()):
+            return "unresolved", f"no {wanted} listed"
+        level = answer["floor_level"]
+        got = sum(a["type"] == wanted and built.floors[a["floor_id"]]["level"] == level for a in built.assets.values())
+        return ("correct" if got == answer["count"] else "wrong"), f"{got} vs {answer['count']}"
+    wanted = re.sub(r"^Where is the (.*)\?$", r"\1", question["question"]).strip().replace(" ", "_")
+    holders = {a["space_id"] for a in built.assets.values() if a["type"] == wanted}
+    if not holders:
+        return "unresolved", f"no {wanted} listed"
+    target, how = mapper.space(answer["space_id"])
+    hows.append(how)
+    if target is None:
+        return "unresolved", "room not found"
+    return ("correct" if target in holders else "wrong"), f"{wanted} in {len(holders)} room(s)"
 
 
 def load_questions(directory: Path) -> list[dict]:
