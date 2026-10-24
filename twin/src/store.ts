@@ -79,6 +79,11 @@ interface TwinState {
   voiceOut: boolean;
   hereArmed: boolean;
 
+  // --- start pick (owner: card session). "Route here" without a known position: the next room the person taps
+  // or picks in the Omnibox is where they are; the card then routes to this destination space id. null = off.
+  pickingStartFor: string | null;
+  setPickingStart: (destination: string | null) => void;
+
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
   applyState: (state: BuildingState) => void;
@@ -154,6 +159,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   chatBusy: false,
   voiceOut: false,
   hereArmed: false,
+  pickingStartFor: null,
 
   async loadBuildings() {
     try {
@@ -168,7 +174,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   async openBuilding(key) {
-    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [] });
+    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], pickingStartFor: null });
     try {
       const building = await api.building(key);
       const model = buildModel(building);
@@ -250,6 +256,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   armHere(hereArmed) {
     set({ hereArmed });
+  },
+  setPickingStart(pickingStartFor) {
+    set({ pickingStartFor });
   },
 
   async route(start, destination, stepFree = false) {
