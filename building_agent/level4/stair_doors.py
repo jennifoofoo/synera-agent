@@ -18,6 +18,7 @@ from building_agent.level4.suggest import (
     WET_ROOM_TYPES,
     Suggestion,
     _candidates,
+    _exit_roots,
     _groups,
     _has_door,
     _polygon,
@@ -25,7 +26,6 @@ from building_agent.level4.suggest import (
     suggest_doors,
 )
 from building_agent.level4.validate import room_label
-from starter_agent.building_map import OUTSIDE
 
 STAIR_NAME = re.compile(r"treppe|stair|landing|aufzug|elevator|\blift\b|hall access|stair ?hall", re.IGNORECASE)
 HALL_BONUS = 2.0
@@ -37,6 +37,8 @@ MAX_DOORS_PER_HALL = 3
 LIVING_BONUS = 0.7
 REFERENCE_BONUS = 1.0
 CORRIDOR_FALLBACK = 0.0
+HALL_LINKS = 1.0
+HALL_LINK_SCORE = 0.5
 
 
 def is_stair_hall(space: dict) -> bool:
@@ -82,13 +84,7 @@ def suggest_stair_doors(building: dict, max_suggestions: int = 20) -> list[Sugge
         members: dict[str, list[str]] = defaultdict(list)
         for space_id in sorted(ids):
             members[groups.find(space_id)].append(space_id)
-        has_entrance = OUTSIDE in groups.parent and any(
-            OUTSIDE in (o.get("space_ids") or []) for o in building.get("openings") or []
-        )
-        if has_entrance:
-            reference = groups.find(OUTSIDE)
-        else:
-            reference = max(members, key=lambda root: (len(members[root]), root), default=None)
+        reference = _exit_roots(building, groups, members)
         scored = []
         for pair in _candidates(spaces).values():
             first, second = by_id[pair.first], by_id[pair.second]
@@ -106,7 +102,7 @@ def suggest_stair_doors(building: dict, max_suggestions: int = 20) -> list[Sugge
             for end in (pair.first, pair.second):
                 space = by_id[end]
                 score += _hall_bonus(space) if end in halls else _side_score(space)
-            if reference in roots:
+            if reference & set(roots):
                 score += REFERENCE_BONUS
             scored.append((tier, -score, -pair.wall, pair.first, pair.second, pair, score, hall_ends))
         scored.sort(key=lambda item: item[:5])
@@ -114,19 +110,33 @@ def suggest_stair_doors(building: dict, max_suggestions: int = 20) -> list[Sugge
         per_hall: dict[str, int] = defaultdict(int)
         chosen = []
         for _, _, _, room, hall, pair, score, hall_ends in scored:
-            roots = {groups.find(room), groups.find(hall)}
-            if len(chosen) >= max_suggestions or (roots - {reference}) & used_roots:
+            roots = {groups.find(end) for end in (room, hall) if end not in halls} or {groups.find(room)}
+            if len(chosen) >= max_suggestions or roots & used_roots:
                 continue
             if any(per_hall[end] >= MAX_DOORS_PER_HALL for end in hall_ends):
                 continue
-            used_roots |= roots - {reference}
+            used_roots |= roots
             for end in hall_ends:
                 per_hall[end] += 1
-            chosen.append((room, hall, pair, score))
+            chosen.append((room, hall, pair, score, f"{pair.wall:.1f} m of shared wall with the stair hall"))
+        if HALL_LINKS:
+            joined = _groups(building, ids, [(item[0], item[1]) for item in chosen])
+            links = sorted(
+                (pair for pair in _candidates(spaces).values() if pair.first in halls and pair.second in halls),
+                key=lambda pair: (-pair.wall, pair.first, pair.second),
+            )
+            for pair in links:
+                if len(chosen) >= max_suggestions:
+                    break
+                if pair.wall < MIN_WALL_M or _has_door(building, pair.first, pair.second):
+                    continue
+                if joined.find(pair.first) != joined.find(pair.second):
+                    joined.join(pair.first, pair.second)
+                    chosen.append((pair.first, pair.second, pair, HALL_LINK_SCORE, "two stair halls share a wall"))
     except (KeyError, TypeError, ValueError, AttributeError):
         return []
     result = []
-    for room, hall, pair, score in chosen:
+    for room, hall, pair, score, reason in chosen:
         first, second = by_id[room], by_id[hall]
         result.append(
             Suggestion(
@@ -138,7 +148,7 @@ def suggest_stair_doors(building: dict, max_suggestions: int = 20) -> list[Sugge
                 pair.position,
                 pair.wall,
                 round(score, 3),
-                f"{pair.wall:.1f} m of shared wall with the stair hall",
+                reason,
             )
         )
     return result

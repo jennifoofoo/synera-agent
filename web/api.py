@@ -82,6 +82,7 @@ class Session:
     position: dict | None = None  # where the chat thinks the person is: {space_id, floor_id, point, source}
     guide_info: dict | None = None  # the leg being guided (rooms), from the chat; state_view draws it
     route_version: int = 0  # bumped by every route the page asks for or clears; newer page routes win
+    campus: object | None = None  # web.campus_api.CampusService (shared by all sessions), or None
     original_opening_ids: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
@@ -260,8 +261,16 @@ def state_view(session: Session) -> dict:
         "route": current_route(session),
         "position": session.position,
         "guide": guide_view(session),
+        "campus": campus_state(session),
         **edit_state(bm),
     }
+
+
+def campus_state(session: Session) -> dict:
+    """Level 3: {loaded, key, name, route, closed_links}, see web/campus_api.py. Not loaded: loaded false."""
+    if session.campus is None:
+        return {"loaded": False, "key": None, "name": None, "route": None, "closed_links": []}
+    return session.campus.state()
 
 
 def guide_view(session: Session) -> dict | None:
@@ -282,6 +291,9 @@ def guide_view(session: Session) -> dict | None:
         "step_count": info["step_count"],
         "leg": {"from_space_id": info["from"], "to_space_id": info["to"], "points": points, "segments": segments},
         "target_space_id": info["target"],
+        "expected_seconds": info.get("expected_seconds", 0),  # auto-pace: the page's timer is this plus 5 s
+        "pace": info.get("pace", "off"),
+        "pace_paused": info.get("pace_paused", False),
     }
 
 

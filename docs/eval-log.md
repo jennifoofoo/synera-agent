@@ -612,3 +612,20 @@ Weakest on edge Jaccard: by source Swiss (0.22 and 0.29 on plain plans, 0.09 to 
 (0.05), and without `scan` `lines` (0.57). Swiss loses edges because doors are missing in the reading (door recall
 0.2 to 0.35), proc-factory and resplan lose them in the styled plans for the same reason.
 
+
+### Swiss stair doors under the kit 1.1.0 route model 2026-10-24 (no API)
+
+All numbers in "Swiss stair doors and SVG check" above and in the sections before it were measured under the OLD route model, where rooms of different entrances were joined through an outside node. They looked better than they are. Below is the re-measurement on the new model (door to door walking, entrances are separate exits, outside joins nothing), same drop pattern as before (`scripts/eval_suggest.py --stairs`). suggest.py and stair_doors.py now treat a room as reachable when its group touches an entrance; two groups that only meet outside stay apart.
+
+| Source | Variant | Suggestions | Real | Precision | Dropped doors restored | Judge >= 0.99 before | after |
+|---|---|---|---|---|---|---|---|
+| dev (48 floors) | generic | 230 | 124 | 54% | 56% | 46% | 58% |
+| dev | stair rule | 193 | 193 | 100% | 87% | 46% | 86% |
+| dev | stair, then generic | 242 | 195 | 81% | 87% | 46% | 86% |
+| train (361 floors) | generic | 1380 | 752 | 54% | 53% | 42% | 56% |
+| train | stair rule | 1215 | 1193 | 98% | 85% | 42% | 87% |
+| train | stair, then generic | 1441 | 1219 | 85% | 87% | 42% | 89% |
+
+- Ground floors with the drop pattern: swiss-31:0 0.38 to 1.00, swiss-203:0 0.41 to 1.00, swiss-2074:0 0.32 to 1.00 (generic alone: 0.60, 0.41, 0.47). The first version of the rule, after only the model change, reached 0.47 to 0.60 on these floors.
+- Two changes improved the measured judge without lowering precision: (1) a door between two neighbouring stair halls (landing to landing), joining parts that would otherwise stay apart (dev judge 58 to 71%); (2) a stair hall may serve up to 3 room groups, the hall no longer counts as used after its first door (dev 71 to 86%). With 87% of the dropped doors restored, what is left is mostly landing to landing doors that are not neighbours by wall length and bedrooms next to a landing.
+- Cached real extractions (segment + markers, new model): swiss-31:0 38% and swiss-203:0 100% before and after, the stair rule makes no suggestion on them (the model gives no types that identify the landings; treating entrance rooms as halls gave wrong doors). The generic rule does not change the judge there either. osm-way27326387:0 94 to 99% by the generic rule, as before.

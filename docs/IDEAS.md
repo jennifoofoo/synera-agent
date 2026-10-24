@@ -298,3 +298,40 @@ Kern (Zeitraum-Modell, austauschbare Uhr, wirksamer Stand zu einem Zeitpunkt, `w
 
 ### Risiken
 Zeitangaben sind fehleranfällig (immer das ausgewertete Datum mit Wochentag zeigen). Keine Rechteprüfung. Die Wertung am Sonntag prüft vermutlich keine Zeiträume (Synera-Frage 13), daher nur Creativity und Alltag.
+
+
+## 8. Sicherheit, Brandschutz und Evakuierung, bezogen auf den Standort (Idee von Jennifer, 24.10.2026)
+
+Status: geparkt, nicht für die Wertung. Teile gehen heute schon, ein eigener Modus fehlt.
+
+### Idee
+Wanda kennt den Standort der Person (gesagt, geklickt, am Gerät oder entlang der Route) und den **letzten bekannten**. Daraus folgt Sicherheitswissen, das ohne Rückfrage passt: "Wo ist der nächste Feuerlöscher?", "Wo ist der Defibrillator?", "Augendusche, schnell!", "Wie komme ich hier raus?" Dazu eine **Fluchtfrage**: kürzester Weg zum nächsten Ausgang, ein **zweiter, anderer** Ausgang, ohne gesperrte Bereiche, auf Wunsch stufenfrei (Rollstuhl). Proaktiv: Beim Begleiten zu einer gefährlichen Maschine ("Welding station") nennt sie nebenbei den nächsten Feuerlöscher und die Augendusche auf dem Weg, mit den Sicherheitshinweisen, die `describe_asset` schon kennt.
+
+### Was heute schon geht (belegt)
+- **Nächster Treffer vom Standort aus** (`find_nearest`, Standort aus `set_position` oder Klick): Feuerlöscher (1859 Stück in 177 von 280 Gebäuden), Duschen (391), Augenduschen (158, in 23 Gebäuden), Defibrillatoren (37, einer pro Gebäude, in 37 Gebäuden).
+- **Eingänge** gibt es in allen 280 Gebäuden (987 Eingänge). Die Weglänge zum nächsten Eingang rechnet `building_agent/entrance_distance.py` schon (für `what_if_door` und die Wirkung von Sperrungen), nur als Werkzeug für den Chat ist sie nicht freigegeben.
+- **Sperrungen** (`assume_closed`, `propose_change`) und stufenfrei sind im Routing; **Sicherheitshinweise** zu Geräten (Schweißen, Drehbank, Härteofen, Laser, Batterieladestation) stehen in `asset_knowledge.py`.
+
+### Was fehlt
+- Werkzeug `find_exit` (nächster und zweiter, unabhängiger Ausgang vom Standort, mit Weglänge und Wegbeschreibung) und eine Prompt-Zeile "Notfall": zuerst kurz antworten, keine Rückfrage, nur der Weg. Etwa eine Stunde.
+- Letzten bekannten Standort mit Alter nennen ("von deinem letzten Ort, Küche 0.28"), wenn er alt ist, einmal nachfragen. Klein.
+- **Nicht in den Daten:** Brandabschnitte, Brandschutztüren, Sammelplätze, Alarmmelder, Sprinkler, Fluchtwegschilder, Kameras, Zutrittssysteme (Ausweisleser, Schlösser), Zutrittsrechte (siehe Nr. 4). Die Antworten sind eine **Orientierungshilfe**, keine Fluchtwegplanung nach Vorschrift, und das muss im Text stehen.
+
+### Risiken
+Falsche Sicherheit ist schlimmer als keine Antwort: kein Versprechen wie "das ist der sichere Weg", immer "kürzester Weg im Plan, folge den echten Schildern". Gesperrte Bereiche kennt nur, was jemand gemeldet hat. Stufenfrei heißt nicht barrierefrei evakuierbar (Aufzüge im Brandfall sperren), das gehört in den Hinweis.
+
+## 9. Echte Räume als 3D-Scan einblenden (Matterport o. ä.) (Idee von Leonie, 24.10.2026)
+Status: geparkt.
+
+### Idee
+Neben dem Modell aus dem Grundriss zeigt die App für einen Raum den **echten Raum** als begehbaren 3D-Scan (360-Grad-Ansicht). Beim Begleiten: "So sieht es an der nächsten Abzweigung aus", oder beim Fund: "Hier steht der 3D-Drucker" mit Blick in den echten Raum.
+
+### Was es gibt
+- **Matterport:** Räume mit 360-Kamera oder iPhone mit LiDAR scannen, Ergebnis ist ein begehbarer "Digital Twin". Einbinden per iframe oder **Showcase SDK** (Kamera steuern, Markierungen "Mattertags" setzen, Position abfragen). Braucht Konto, gescannte Räume und für das SDK einen kostenpflichtigen Plan mit SDK-Key.
+- Freie Alternativen: iPhone-LiDAR-Apps (z. B. Polycam, Scaniverse) exportieren Meshes oder Gaussian Splats, die man direkt in three.js laden kann.
+
+### Was das für uns heißt
+- Unsere Daten haben **keine Scans**, nur Grundrisse. Für eine Demo müssten wir selbst einen Raum scannen (z. B. den Hackathon-Raum mit dem iPhone) und ihn einem Raum im Modell zuordnen.
+- Passt zu Level 5 "Capture on site" und zur Foto-Ortung (Idee 7): Scan zeigt, wo man steht.
+- Aufwand: iframe-Einbindung eines fertigen Matterport-Rundgangs ca. 1 h; Kopplung mit Route und Markierungen über das SDK 4 bis 6 h; eigener Scan als Splat im Twin 3 bis 5 h.
+- Haken: Kosten und Konto bei Matterport, Datenschutz bei Scans echter Räume, die Jury prüft Level 1 bis 4 auf Grundrissen, nicht auf Scans.

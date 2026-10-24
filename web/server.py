@@ -14,7 +14,20 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
   POST /api/chat     {message, voice?: true, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
                      context.here: {space_id, point?, floor_id?} or {clear: true}, "I'm here", validated, see docs/specs/position.md
+                     pace: "off" | "ask" | "say" (top level, default off), context.guide_tick: true with an empty message,
+                     context.guide_step?: int, see docs/specs/auto-pace.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
+
+Level 3, campus (web/campus_api.py; one CampusHolder shared by the page and the chat agent, see docs/specs/level3-campus.md):
+  GET  /api/campus[?key=dev/...]        loaded flag, available campus keys, buildings (id, name, floors, origin,
+                                        entrances with ids/names/positions, page_key, active), links (id, kind, from/to,
+                                        level_delta, length_m, step_free, closed), findings; ?key marks the active building
+  POST /api/campus/load  {key}          key from `available` only; findings in plain words, a missing building shows up there
+  POST /api/campus/route {start, destination, start_building?, destination_building?, step_free?}
+                                        legs per building (rooms, points, world_points) and per link, or ok:false with
+                                        an error / ambiguous + candidates
+  POST /api/campus/close {link_id, closed}   close or open a link; the route is recomputed
+  state_view.campus = {loaded, key, name, route, closed_links}; connecting buildings stays a chat action (card, clear yes)
 
 Level 4, new building from floor plans (web/level4_api.py; POSTs need a same-origin page):
   POST /api/level4/upload               raw PNG/JPG body (<= 10 MB) -> {upload_id, width, height}
@@ -39,15 +52,17 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from building_agent.pace_guide import pace_kwargs, without_tick_keys
 from building_agent.structured import located_entries
 from building_agent.voice_rules import voice_kwargs
-from starter_agent.building_map import MapError
-from web import api, level4_api, speech
+from starter_agent.building_map import BuildingMap, MapError
+from web import api, campus_api, level4_api, speech, transfer
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 from web.selection import check_here, check_selection
 
 STATIC = Path(__file__).parent / "static"
+CAMPUS_ROOT = Path(__file__).resolve().parent.parent / "campuses"  # repo root, not the working directory
 DEFAULT_PORT = 8765
 DEFAULT_HOST = "127.0.0.1"
 MAX_BODY_BYTES = 1_000_000
@@ -68,10 +83,12 @@ class App:
         data_root: Path,
         uploads_root: Path = level4_api.DEFAULT_ALLOWED_ROOT,
         buildings_root: Path = level4_api.BUILDINGS_ROOT,
+        campus_roots: tuple[Path, ...] = (CAMPUS_ROOT,),
     ) -> None:
         self.data_root = data_root
         self.buildings_root = buildings_root
         self.level4 = level4_api.PlanStudio(uploads_root, buildings_root)
+        self.campus = campus_api.CampusService(data_root, buildings_root, campus_roots, self.open_page_maps)
         self.sessions: dict[str, api.Session] = {}
         self.chats: dict[str, ChatAdapter] = {}
         self.lock = threading.RLock()
@@ -117,7 +134,7 @@ class App:
                     directory = api.resolve_building_dir(self.buildings_root, key[len(level4_api.USER_PREFIX) :])
                 else:
                     directory = api.resolve_building_dir(self.data_root, key)
-                self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory))
+                self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory), campus=self.campus)
             return self.sessions[key]
 
     def reset(self, key: str) -> api.Session:
@@ -130,7 +147,7 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4)
+                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, self.campus.synced_holder)
             return self.chats[key]
 
     def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:
@@ -164,11 +181,30 @@ class App:
             return 200, self.level4.status()
         if path == "/api/level4/preview":
             return 200, self.level4.preview()
+        if path.startswith("/api/campus"):
+            with self.lock:
+                return self.campus.get(path, self.active_directory(query))
         if path == "/api/building":
             key = (query.get("key") or [""])[0]
             with self.lock:
-                return 200, api.building_view(self.session(key))
+                session = self.session(key)
+                return 200, api.building_view(session)
         return 404, {"error": f"Unknown endpoint {path}"}
+
+    def open_page_maps(self) -> dict[Path, BuildingMap]:
+        """Every building the page has open: its folder -> the session's map (the one that holds its closures)."""
+        with self.lock:
+            return {session.directory.resolve(): session.map for session in self.sessions.values()}
+
+    def active_directory(self, query: dict) -> Path | None:
+        """The folder of the building named by ?key= (the page's active one), None if it is missing or unknown."""
+        key = (query.get("key") or [""])[0]
+        if not key:
+            return None
+        try:
+            return self.session(key).directory
+        except (MapError, OSError, ValueError, KeyError):
+            return None
 
     def upload(self, data: bytes) -> tuple[int, dict]:
         return 200, self.level4.upload(data)
@@ -196,10 +232,14 @@ class App:
     def post(self, path: str, body: dict) -> tuple[int, dict]:
         if path.startswith("/api/level4/"):
             return self.post_level4(path, body)
+        if path.startswith("/api/campus/"):
+            with self.lock:
+                return self.campus.post(path, body)
         key = body.get("building", "")
         if path == "/api/chat":
             message = str(body.get("message", "")).strip()
-            if not message:
+            ctx = body.get("context")
+            if not message and not (isinstance(ctx, dict) and ctx.get("guide_tick") is True):
                 return 400, {"error": "Empty message."}
             with self.lock:  # session and chat together, so a reset cannot pair a new map with an old chat
                 session, chat = self.session(key), self.chat(key)
@@ -211,10 +251,13 @@ class App:
             if isinstance(context, dict) and "here" in context:  # "I'm here" travels beside the click selection
                 here_raw = context["here"]
                 context = {key: value for key, value in context.items() if key != "here"} or None
+            extra_pace = pace_kwargs(body, context)  # request-level `pace` and context.guide_tick, see pace_guide
+            context = without_tick_keys(context)
             check = check_selection(context, session.map)
             here = check_here(here_raw, session.map)
             extra = {"here": here} if here.ok else {}
             extra.update(voice_kwargs(body))  # request-level spoken-reply flag, never read from the message text
+            extra.update(extra_pace)
             result = (
                 chat.ask(message, selection=check.selection, **extra) if check.selection else chat.ask(message, **extra)
             )
@@ -282,14 +325,56 @@ def make_handler(app: App) -> type:
             if args and str(args[1]).startswith(("4", "5")):
                 super().log_message(format, *args)
 
-        def send_json(self, status: int, payload: dict) -> None:
-            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+        def send_body(self, status: int, content_type: str, body: bytes, cache_control: str, revalidate: bool) -> None:
+            """One place for every body: gzip if the browser accepts it and the body is text over ~1 KB, correct
+            Content-Length and Vary, and with `revalidate` an ETag plus 304 on a matching If-None-Match."""
+            packed, gzipped = transfer.maybe_gzip(body, content_type, self.headers.get("Accept-Encoding"))
+            etag = transfer.etag_for(body, gzipped) if revalidate and status == 200 else None
+            not_modified = etag is not None and transfer.etag_matches(self.headers.get("If-None-Match"), etag)
+            self.send_response(HTTPStatus.NOT_MODIFIED if not_modified else status)
+            if not not_modified:
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(packed)))
+            if gzipped and not not_modified:
+                self.send_header("Content-Encoding", "gzip")
+            if transfer.compressible(content_type):
+                self.send_header("Vary", "Accept-Encoding")
+            if etag:
+                self.send_header("ETag", etag)
+            self.send_header("Cache-Control", cache_control)
             self.end_headers()
-            self.wfile.write(body)
+            if not not_modified and self.command != "HEAD":
+                self.wfile.write(packed)
+
+        def send_json(self, status: int, payload: dict, revalidate: bool = False) -> None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            # API answers are never cached; the big building JSON is revalidated (no-cache + ETag) instead.
+            self.send_body(
+                status,
+                "application/json; charset=utf-8",
+                body,
+                "no-cache" if revalidate else "no-store",
+                revalidate,
+            )
+
+        def serve_static(self) -> bool:
+            """A regular file below web/static (translate_path keeps the directory-traversal protection):
+            ETag, 304, gzip. Returns False for anything else (directories, missing files) so the stdlib answers."""
+            path = Path(self.translate_path(self.path))
+            if path.is_dir() and urlparse(self.path).path.endswith("/"):
+                path = next((path / name for name in ("index.html", "index.htm") if (path / name).is_file()), path)
+            if not path.is_file():
+                return False
+            try:
+                body = path.read_bytes()
+            except OSError:
+                return False
+            self.send_body(200, self.guess_type(str(path)), body, "no-cache", True)
+            return True
+
+        def do_HEAD(self) -> None:
+            if urlparse(self.path).path.startswith("/api/") or not self.serve_static():
+                super().do_HEAD()
 
         def run_speak(self, body: dict) -> None:
             try:
@@ -306,7 +391,7 @@ def make_handler(app: App) -> type:
             else:
                 self.send_json(status, payload)
 
-        def run(self, action) -> None:
+        def run(self, action, revalidate: bool = False) -> None:
             try:
                 status, payload = action()
             except MapError as error:
@@ -315,13 +400,13 @@ def make_handler(app: App) -> type:
                 status, payload = error.status, {"error": str(error)}
             except Exception as error:  # noqa: BLE001 - report it, don't kill the server
                 status, payload = 500, {"error": f"{type(error).__name__}: {error}"}
-            self.send_json(status, payload)
+            self.send_json(status, payload, revalidate and status == 200)
 
         def do_GET(self) -> None:
             url = urlparse(self.path)
             if url.path.startswith("/api/"):
-                self.run(lambda: app.get(url.path, parse_qs(url.query)))
-            else:
+                self.run(lambda: app.get(url.path, parse_qs(url.query)), revalidate=url.path == "/api/building")
+            elif not self.serve_static():
                 super().do_GET()
 
         def speak_request_allowed(self, content_types: tuple[str, ...] = ("application/json",)) -> bool:
@@ -379,9 +464,15 @@ def make_handler(app: App) -> type:
                 return
             self.run(lambda: app.post(url.path, body))
 
+        def send_header(self, keyword: str, value: str) -> None:
+            if keyword.lower() == "cache-control":
+                self.cache_control_sent = True
+            super().send_header(keyword, value)
+
         def end_headers(self) -> None:
-            if not self.path.startswith("/api/"):
-                self.send_header("Cache-Control", "no-cache")
+            if not self.path.startswith("/api/") and not getattr(self, "cache_control_sent", False):
+                self.send_header("Cache-Control", "no-cache")  # stdlib answers (404, redirects, listings)
+            self.cache_control_sent = False
             super().end_headers()
 
     return Handler

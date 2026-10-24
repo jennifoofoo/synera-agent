@@ -167,7 +167,7 @@ def _candidates(spaces: list[dict]) -> dict[frozenset, _Pair]:
 
 
 class _Groups:
-    """Union-find over spaces, `outside` and everything the openings and connectors join."""
+    """Union-find over spaces and everything the openings and connectors join. The outside joins nothing: each entrance is its own exit."""
 
     def __init__(self) -> None:
         self.parent: dict[str, str] = {}
@@ -187,7 +187,7 @@ def _groups(building: dict, ids: set[str], extra: list[tuple[str, str]]) -> _Gro
     for space_id in sorted(ids):
         groups.find(space_id)
     for opening in building.get("openings") or []:
-        ends = [end for end in opening.get("space_ids") or [] if end == OUTSIDE or end in ids]
+        ends = [end for end in opening.get("space_ids") or [] if end in ids]
         if len(ends) == 2:
             groups.join(*ends)
     for connector in building.get("vertical_connectors") or []:
@@ -203,6 +203,21 @@ def _has_door(building: dict, first: str, second: str) -> bool:
     return any(set(o.get("space_ids") or []) == {first, second} for o in building.get("openings") or [])
 
 
+def _exit_roots(building: dict, groups: _Groups, members: dict[str, list[str]]) -> set[str]:
+    """Groups that reach an entrance. Without any entrance the largest group stands in. Two groups that only meet outside stay apart."""
+    ids = {space_id for rooms in members.values() for space_id in rooms}
+    exits = {
+        groups.find(end)
+        for opening in building.get("openings") or []
+        if OUTSIDE in (opening.get("space_ids") or [])
+        for end in opening["space_ids"]
+        if end in ids
+    }
+    if exits or not members:
+        return exits
+    return {max(members, key=lambda root: (len(members[root]), root))}
+
+
 def suggest_doors(building: dict, max_suggestions: int = 20) -> list[Suggestion]:
     """Doors that would give every unreachable room a way out, best first, at most `max_suggestions`."""
     try:
@@ -210,18 +225,14 @@ def suggest_doors(building: dict, max_suggestions: int = 20) -> list[Suggestion]
         ids = {space["id"] for space in spaces}
         by_id = {space["id"]: space for space in spaces}
         candidates = _candidates(spaces)
-        has_entrance = any(OUTSIDE in (o.get("space_ids") or []) for o in building.get("openings") or [])
         chosen: list[_Pair] = []
         while len(chosen) < max_suggestions:
             groups = _groups(building, ids, [(pair.first, pair.second) for pair in chosen])
             members: dict[str, list[str]] = defaultdict(list)
             for space_id in sorted(ids):
                 members[groups.find(space_id)].append(space_id)
-            if has_entrance:
-                reference = groups.find(OUTSIDE)
-            else:
-                reference = max(members, key=lambda root: (len(members[root]), root), default=None)
-            isolated = [root for root in sorted(members, key=lambda r: members[r][0]) if root != reference]
+            reference = _exit_roots(building, groups, members)
+            isolated = [root for root in sorted(members, key=lambda r: members[r][0]) if root not in reference]
             degree: dict[str, int] = defaultdict(int)
             for opening in building.get("openings") or []:
                 for end in opening.get("space_ids") or []:
@@ -231,9 +242,14 @@ def suggest_doors(building: dict, max_suggestions: int = 20) -> list[Suggestion]
                 best = None
                 for pair in candidates.values():
                     roots = {groups.find(pair.first), groups.find(pair.second)}
-                    if roots != {root, reference} or _has_door(building, pair.first, pair.second):
+                    if (
+                        root not in roots
+                        or len(roots) != 2
+                        or not roots & reference
+                        or _has_door(building, pair.first, pair.second)
+                    ):
                         continue
-                    reached = pair.first if groups.find(pair.first) == reference else pair.second
+                    reached = pair.first if groups.find(pair.first) in reference else pair.second
                     total = pair.score + DEGREE_WEIGHT * min(degree[reached], DEGREE_CAP)
                     key = (-total, -pair.wall, pair.first, pair.second)
                     if best is None or key < best[0]:

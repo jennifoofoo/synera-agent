@@ -10,6 +10,7 @@ from building_agent.guide_tools import GuideState, building_signature, make_guid
 from building_agent.tools import make_tools
 from starter_agent.building_map import MapError
 from tests.conftest import labelled_questions, load_map
+from tests.test_walk import neighbour_pair
 
 
 def fresh_map(building_dir: str):
@@ -76,12 +77,7 @@ def test_a_long_route_is_an_overview_then_one_step_at_a_time(tmp_path):
 def test_a_short_route_is_read_out_at_once_and_repeats_in_full(tmp_path):
     bm, _ = route_question()
     tools, _ = tools_by_name(bm, tmp_path)
-    pair = next(
-        (a, b)
-        for a in bm.spaces
-        for b in bm.spaces
-        if a != b and "outside" not in (a, b) and len(routing.route(bm, a, b).space_path) == 2
-    )
+    pair = neighbour_pair(bm)
     first = json.loads(tools["give_directions"](start=pair[0], destination=pair[1]))
     assert 1 <= len(first["steps"]) <= 2
     assert json.loads(tools["repeat_steps"]())["steps"] == first["steps"]  # 'nochmal' gives the same steps again

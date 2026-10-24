@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from building_agent import routing
 from building_agent.registry import load_kinds
 from starter_agent.building_map import BuildingMap
 
@@ -229,16 +230,24 @@ def parse_question(bm: BuildingMap, text: str) -> ParsedQuestion | None:
     return parsed if isinstance(parsed, ParsedQuestion) else None
 
 
+def _room_label(bm: BuildingMap, result: dict) -> str:
+    """The room name, with its printed number added when the name does not contain it (several rooms can share a
+    name, for example twelve 'Büro', and then only the number tells them apart)."""
+    name = result["name"]
+    ref = (bm.spaces.get(result.get("space_id"), {}).get("ref") or "").strip()
+    return f"{name} ({ref})" if ref and ref.lower() not in name.lower() else name
+
+
 def _format_reply(bm: BuildingMap, parsed: ParsedQuestion, result: dict) -> str:
     kind = parsed.kind
     if kind == "largest_room":
         return (
-            f"The largest one is {result['name']} with {result['area_m2']:.2f} square metres.\n"
-            f"Answer: {result['name']}, {result['area_m2']:.2f} m²"
+            f"The largest one is {_room_label(bm, result)} with {result['area_m2']:.2f} square metres.\n"
+            f"Answer: {_room_label(bm, result)}, {result['area_m2']:.2f} m²"
         )
     if kind == "room_stacked":
         where = "above" if parsed.inputs["direction"] == "above" else "below"
-        return f"The room directly {where} is {result['name']}.\nAnswer: {result['name']}"
+        return f"The room directly {where} is {_room_label(bm, result)}.\nAnswer: {_room_label(bm, result)}"
     if kind == "floor_area_total":
         return f"Together that is {result['total_m2']:.2f} square metres.\nAnswer: {result['total_m2']:.2f}"
     if kind == "errand":
@@ -262,7 +271,7 @@ def answer_for_map(bm: BuildingMap, text: str) -> str | None:
 
 def answer_deterministic(building_directory: Path, text: str) -> str | None:
     try:
-        bm = BuildingMap.load(Path(building_directory))
+        bm = routing.load_map(Path(building_directory))  # walking lengths computed once per building and process
     except (OSError, ValueError, KeyError):
         return None
     return answer_for_map(bm, text)

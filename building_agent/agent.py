@@ -9,6 +9,7 @@ from pathlib import Path
 
 import anthropic
 
+from building_agent import routing
 from building_agent.campus_tools import CampusHolder
 from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
@@ -112,6 +113,7 @@ class Agent(StarterAgent):
         if hasattr(self.guide, "undo"):
             self.guide.undo.clear()
         self.guide.position = self.guide.walk = None  # another building: the old position means nothing
+        self.guide.pace = None  # and the auto-pace timer belongs to the old walk
         self.map = building_map
         self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building, campus=self.campus)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)
@@ -172,7 +174,7 @@ def answer(building_directory: Path, question_text: str) -> str:
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     for attempt in range(RETRIES):
         try:
-            reply = Agent(BuildingMap.load(building_directory), OUTPUT_DIRECTORY).ask(question_text)
+            reply = Agent(routing.load_map(building_directory), OUTPUT_DIRECTORY).ask(question_text)
             break
         except RETRYABLE:
             if attempt == RETRIES - 1:

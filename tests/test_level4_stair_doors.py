@@ -12,7 +12,7 @@ from building_agent.level4.stair_doors import (
     suggest_stair_doors,
     suggest_stairs_then_generic,
 )
-from building_agent.level4.suggest import apply_suggestions, describe_suggestions
+from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
 from building_agent.level4.validate import validate
 from scripts.eval_suggest import drop_stair_doors, run
 from starter_agent.building_map import OUTSIDE
@@ -109,6 +109,22 @@ def test_one_door_per_apartment_and_per_stair_hall(monkeypatch):
     assert len(suggest_stair_doors(one_apartment)) == 1
 
 
+def test_two_neighbouring_stair_halls_get_a_door(monkeypatch):
+    second = hall(3, rect(0, 10, 3, 20))
+    data = building([hall(), second], [door(1, HALL, OUTSIDE, "entrance"), door(2, SECOND, OUTSIDE, "entrance")])
+    assert pairs(suggest_stair_doors(data)) == [{HALL, SECOND}]
+    monkeypatch.setattr(stair_doors, "HALL_LINKS", 0.0)
+    assert suggest_stair_doors(data) == []
+
+
+def test_two_parts_that_only_meet_outside_are_not_connected():
+    near = space(2, rect(3, 0, 8, 10))
+    other = space(3, rect(20, 0, 25, 10))
+    data = building([hall(), near, other], [door(1, HALL, OUTSIDE, "entrance"), door(2, SECOND, OUTSIDE, "entrance")])
+    assert pairs(suggest_stair_doors(data)) == [{HALL, FIRST}]
+    assert len(suggest_doors(data)) == 1
+
+
 def test_deterministic_and_input_untouched():
     data = base(space(2, rect(3, 0, 8, 5)), space(3, rect(3, 5, 8, 10)))
     before = copy.deepcopy(data)
@@ -172,7 +188,9 @@ def test_fuzz_empty_dict():
     assert suggest_stair_doors({}) == []
 
 
-# Measured on these floors with the stair doors dropped (see docs/eval-log.md): precision 100 percent, judge pairs >= 0.99 from 9-28 percent to 100 percent.
+# Kit 1.1.0 route model (entrances are separate exits, outside joins nothing). Measured with the stair doors dropped:
+# precision 100 percent and judge pairs >= 0.99 from 0.32 to 0.41 up to 1.00 with the stair hall links. Without the
+# links the same floors reached only 0.47 to 0.60, the older 0.9 threshold came from the previous route model.
 REAL_FLOORS = [("swiss-31", 0), ("swiss-203", 0), ("swiss-2074", 0)]
 
 
@@ -188,4 +206,4 @@ def test_real_swiss_floor_with_the_stair_doors_dropped(building_id, level):
     row = run(case, converted, f"{building_id}:{level}", "swiss", suggest_stair_doors)
     assert row["suggested"] >= 2
     assert row["real"] >= 0.9 * row["suggested"]
-    assert row["judge_after"] >= max(0.9, row["judge_before"] + 0.5)
+    assert row["judge_after"] >= max(0.95, row["judge_before"] + 0.5)
