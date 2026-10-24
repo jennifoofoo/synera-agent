@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from anthropic.lib.tools import ToolError
 
-from building_agent.guide_tools import GuideState, make_guide_tools
+from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
 from building_agent.tools import make_tools
 from tests.conftest import labelled_questions, load_map
 
@@ -208,3 +208,257 @@ def test_new_actions_are_registered_and_change_the_signature():
     door = next(o for o in bm.openings.values() if "outside" not in o["space_ids"])
     door["width_m"] = 3.3
     assert building_signature(bm) != before
+
+
+# ---------- add_asset, hints and undo ----------
+
+
+def do(tools, state, reply="Ja, mach das", **kwargs):
+    """Propose in one message, confirm in the next, like a real conversation."""
+    state.begin_turn()
+    card = json.loads(tools["propose_change"](**kwargs))
+    state.begin_turn()
+    return card, json.loads(tools["confirm_change"](confirmed=True, user_reply=reply))
+
+
+def undo(tools, state):
+    state.begin_turn()
+    card = json.loads(tools["propose_change"](action="undo"))
+    state.begin_turn()
+    return card, json.loads(tools["confirm_change"](confirmed=True, user_reply="ja"))
+
+
+def factory_tools(tmp_path):
+    from tests.test_edit_ops import factory
+
+    bm = factory()
+    tools, state = tools_by_name(bm, tmp_path)
+    return bm, tools, state
+
+
+def test_cards_for_hints_and_new_assets_read_in_plain_words(tmp_path):
+    bm, tools, state = factory_tools(tmp_path)
+    state.begin_turn()
+    card = json.loads(
+        tools["propose_change"](action="add_asset", element="H-A2", asset_type="cnc mill", hint={"anchor": "NW"})
+    )
+    lines = card["effect on the whole building"]
+    assert card["I understood"].startswith("Add a new CNC mill H-A2")
+    assert any("north-west corner, 0.05 m from both walls" in line for line in lines)
+    assert any("source generated" in line for line in lines) and card["status"].startswith("nothing changed")
+    assert len(bm.assets) == 4 and "B-A00005" not in bm.assets
+    state.begin_turn()
+    card = json.loads(
+        tools["propose_change"](action="move_asset", element="B-A2", to_space="H-A2", hint={"anchor": "SE"})
+    )
+    lines = card["effect on the whole building"]
+    assert any("south-east corner" in line for line in lines)
+    state.begin_turn()
+    card = json.loads(tools["propose_change"](action="move_asset", element="B-A1", hint={"point": [8, 5]}))
+    assert any("Could not use the exact point" in line for line in card["effect on the whole building"])
+    state.begin_turn()
+    card = json.loads(tools["propose_change"](action="move_asset", element="B-A1", hint={"anchor": "E"}))
+    assert any("Could not reach the exact east wall" in line for line in card["effect on the whole building"])
+
+
+def test_bad_new_actions_are_tool_errors_that_change_nothing(tmp_path):
+    bm, tools, state = factory_tools(tmp_path)
+    before = building_signature(bm)
+    for kwargs in [
+        {"action": "add_asset", "element": "H-A2"},
+        {"action": "add_asset", "asset_type": "cnc_mil", "to_space": "H-A2"},
+        {"action": "add_asset", "asset_type": "chair"},
+        {"action": "add_asset", "asset_type": "chair", "to_space": "H-A2", "hint": {"point": [1, 1]}},
+        {"action": "move_asset", "element": "B-A1"},
+        {"action": "undo"},
+    ]:
+        state.begin_turn()
+        with pytest.raises(ToolError):
+            tools["propose_change"](**kwargs)
+    assert building_signature(bm) == before and state.pending is None
+
+
+def snapshot_of(bm):
+    return json.dumps([bm.data["assets"], bm.data["openings"], sorted(bm.closed)], sort_keys=True)
+
+
+def test_undo_a_move_restores_signature_letters_and_aliases(tmp_path):
+    from tests.test_edit_ops import assert_in_sync, names
+
+    bm, tools, state = factory_tools(tmp_path)
+    original, signature = snapshot_of(bm), building_signature(bm)
+    do(tools, state, action="move_asset", element="B-A2", to_space="H-A2", hint={"anchor": "NE"})
+    assert names(bm, "B-A2") == ["CNC mill H-A2"] and bm.assets["B-A2"]["aliases"] == ["CNC mill H-A1-B"]
+    card, result = undo(tools, state)
+    assert card["I understood"] == "Undo: move CNC mill H-A2 back to Hall H-A1."
+    assert result["applied"] and building_signature(bm) == signature and snapshot_of(bm) == original
+    assert names(bm, "B-A1", "B-A2", "B-A3") == [f"CNC mill H-A1-{c}" for c in "ABC"]
+    assert "aliases" not in bm.assets["B-A2"] and bm.last_route is None and state.session is None
+    assert_in_sync(bm)
+    assert bm.moved_assets["B-A2"]["space_id"] == "B-F0-S0" and bm.moved_assets["B-A2"]["name"] == "CNC mill H-A1-B"
+
+
+def test_undo_an_added_asset_removes_it_and_reports_it(tmp_path):
+    from tests.test_edit_ops import assert_in_sync
+
+    bm, tools, state = factory_tools(tmp_path)
+    signature = building_signature(bm)
+    do(tools, state, action="add_asset", to_space="H-A2", asset_type="chair")
+    assert "B-A00005" in bm.assets and "B-A00005" in bm.added_assets
+    card, _ = undo(tools, state)
+    assert "remove the added Chair H-A2" in card["I understood"]
+    assert "B-A00005" not in bm.assets and bm.added_assets == {} and bm.removed_assets == ["B-A00005"]
+    assert building_signature(bm) == signature
+    assert_in_sync(bm)
+    saved = json.loads((tmp_path / "building_edited.json").read_text())
+    assert len(saved["assets"]) == 4
+
+
+def test_several_undos_in_reverse_order(tmp_path):
+    bm, tools, state = factory_tools(tmp_path)
+    states = [snapshot_of(bm)]
+    do(tools, state, action="move_asset", element="B-A1", to_space="H-A3")
+    states.append(snapshot_of(bm))
+    do(tools, state, action="add_asset", to_space="H-A2", asset_type="cnc_mill", hint={"anchor": "SW"})
+    states.append(snapshot_of(bm))
+    do(tools, state, action="close", element="B-O1")
+    states.append(snapshot_of(bm))
+    do(tools, state, action="move_asset", element="B-A2", hint={"rotation_deg": 90})
+    for expected in reversed(states):
+        undo(tools, state)
+        assert snapshot_of(bm) == expected
+    state.begin_turn()
+    with pytest.raises(ToolError, match="nothing to undo"):
+        tools["propose_change"](action="undo")
+
+
+def test_undo_stack_holds_twenty_steps(tmp_path):
+    bm = fresh_map(str(min(Path("data/dev").glob("*/building.json")).parent))
+    tools, state = tools_by_name(bm, tmp_path)
+    door = next(iter(bm.openings))
+    for number in range(25):
+        do(tools, state, action="reopen" if number % 2 else "close", element=door)
+    assert len(state.undo) == 20
+    for _ in range(20):
+        undo(tools, state)
+    assert len(state.undo) == 0
+    state.begin_turn()
+    with pytest.raises(ToolError, match="nothing to undo"):
+        tools["propose_change"](action="undo")
+
+
+def test_undo_after_assume_closed_reopens(tmp_path):
+    bm, tools, state = factory_tools(tmp_path)
+    tools["assume_closed"](element="B-O2")
+    assert "B-O2" in bm.closed
+    card, _ = undo(tools, state)
+    assert "reopen" in card["I understood"] and bm.closed == set()
+
+
+def test_undo_restores_a_removed_and_widened_door(tmp_path):
+    from tests.test_edit_ops import assert_in_sync
+
+    bm, tools, state = factory_tools(tmp_path)
+    original = snapshot_of(bm)
+    do(tools, state, action="widen_door", element="B-O1", width_m=2.0)
+    do(tools, state, action="remove_door", element="B-O2")
+    assert bm.removed_openings == ["B-O2"] and bm.widened_openings == {"B-O1": 2.0}
+    undo(tools, state)
+    assert bm.removed_openings == [] and "B-O2" in bm.openings
+    undo(tools, state)
+    assert snapshot_of(bm) == original and bm.widened_openings == {}
+    assert_in_sync(bm)
+
+
+def new_action_cases(tmp_path):
+    """(tools, state, bm, kwargs) for each new action; undo needs an earlier edit."""
+    cases = []
+    for name in ("add_asset", "move_hint", "undo"):
+        bm, tools, state = factory_tools(tmp_path)
+        if name == "undo":
+            do(tools, state, action="close", element="B-O1")
+            kwargs = {"action": "undo"}
+        elif name == "add_asset":
+            kwargs = {"action": "add_asset", "to_space": "H-A2", "asset_type": "cnc_mill", "hint": {"anchor": "NW"}}
+        else:
+            kwargs = {"action": "move_asset", "element": "B-A2", "hint": {"anchor": "SW"}}
+        cases.append((tools, state, bm, kwargs))
+    return cases
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_guard_for_new_actions(index, tmp_path):
+    tools, state, bm, kwargs = new_action_cases(tmp_path)[index]
+    signature = building_signature(bm)
+    stack = len(state.undo)
+
+    state.begin_turn()
+    card = json.loads(tools["propose_change"](**kwargs))
+    assert "waiting" in card["status"]
+    with pytest.raises(ToolError):
+        tools["confirm_change"](confirmed=True, user_reply="ja")  # same message
+    assert building_signature(bm) == signature
+
+    state.begin_turn()
+    with pytest.raises(ToolError):
+        tools["confirm_change"](confirmed=True, user_reply="hmm, vielleicht")  # vague
+    assert building_signature(bm) == signature and len(state.undo) == stack
+
+    state.begin_turn()
+    tools["propose_change"](**kwargs)
+    state.begin_turn()
+    state.begin_turn()  # the card is one message too old
+    with pytest.raises(ToolError):
+        tools["confirm_change"](confirmed=True, user_reply="ja")
+    assert building_signature(bm) == signature and len(state.undo) == stack
+
+    state.begin_turn()
+    tools["propose_change"](**kwargs)
+    state.begin_turn()  # topic switch inside the answer
+    with pytest.raises(ToolError):
+        tools["confirm_change"](confirmed=True, user_reply="ja, aber lieber etwas anderes")
+    assert building_signature(bm) == signature and len(state.undo) == stack
+
+    state.begin_turn()
+    tools["propose_change"](**kwargs)
+    state.begin_turn()
+    bm.closed.add("B-O2")  # the building changes behind the card
+    with pytest.raises(ToolError, match="changed"):
+        tools["confirm_change"](confirmed=True, user_reply="ja")
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_new_actions_apply_after_a_clear_yes_and_declined_ones_do_not(index, tmp_path):
+    tools, state, bm, kwargs = new_action_cases(tmp_path)[index]
+    signature = building_signature(bm)
+    state.begin_turn()
+    tools["propose_change"](**kwargs)
+    state.begin_turn()
+    assert json.loads(tools["confirm_change"](confirmed=False, user_reply="nein"))["applied"] is False
+    assert building_signature(bm) == signature
+    state.begin_turn()
+    tools["propose_change"](**kwargs)
+    state.begin_turn()
+    assert json.loads(tools["confirm_change"](confirmed=True, user_reply="Ja"))["applied"] is True
+    assert building_signature(bm) != signature
+
+
+def test_signature_sees_names_and_rotation():
+    from tests.test_edit_ops import factory
+
+    bm = factory()
+    base = building_signature(bm)
+    bm.assets["B-A1"]["name"] = "Renamed"
+    changed_name = building_signature(bm)
+    bm.assets["B-A1"]["footprint"]["rotation_deg"] = 45
+    assert len({base, changed_name, building_signature(bm)}) == 3
+
+
+def test_directions_go_stale_after_an_undo(tmp_path):
+    _bm, tools, state = factory_tools(tmp_path)
+    do(tools, state, action="widen_door", element="B-O1", width_m=2.0)
+    state.begin_turn()
+    tools["give_directions"](start="H-A1", destination="H-A3")
+    undo(tools, state)
+    with pytest.raises(ToolError, match="No directions|changed"):
+        tools["next_steps"]()

@@ -2,6 +2,7 @@
 
 import copy
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -15,7 +16,8 @@ from building_agent.impact import analyse
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
-ACTIONS = ("close", "reopen", "add_door", "remove_door", "widen_door", "move_asset")
+ACTIONS = ("close", "reopen", "add_door", "remove_door", "widen_door", "move_asset", "add_asset", "undo")
+UNDO_DEPTH = 20
 YES = re.compile(r"\b(ja|yes|yep|jep|genau|passt|do it|go ahead|mach das|bitte ja)\b", re.IGNORECASE)
 NO = re.compile(r"\b(nein|no|nicht|stop|abbrechen|cancel|lieber|whatever|egal|aber|but|ja ja)\b", re.IGNORECASE)
 
@@ -31,6 +33,8 @@ class Pending:
     signature: tuple = ()
     width_m: float | None = None
     to_space: str | None = None
+    asset_type: str | None = None
+    hint: dict | None = None
 
 
 @dataclass
@@ -42,6 +46,7 @@ class GuideState:
     turn: int = 0
     signature: tuple = ()
     log: list[dict] = field(default_factory=list)
+    undo: deque = field(default_factory=lambda: deque(maxlen=UNDO_DEPTH))
 
     def begin_turn(self) -> None:
         """A card can only be answered in the very next message; later it is stale and dropped."""
@@ -61,7 +66,20 @@ def element_label(bm: BuildingMap, element_id: str) -> str:
 def building_signature(bm: BuildingMap) -> tuple:
     """Changes whenever closures or doors change, so stale directions and cards can be detected."""
     openings = hash(tuple(sorted((o["id"], o.get("width_m"), o["step_free"]) for o in bm.openings.values())))
-    assets = hash(tuple(sorted((a["id"], a["space_id"], tuple(a["position"])) for a in bm.assets.values())))
+    assets = hash(
+        tuple(
+            sorted(
+                (
+                    a["id"],
+                    a["space_id"],
+                    tuple(a["position"]),
+                    a["name"],
+                    (a.get("footprint") or {}).get("rotation_deg"),
+                )
+                for a in bm.assets.values()
+            )
+        )
+    )
     return (tuple(sorted(bm.closed)), len(bm.openings), openings, assets)
 
 
@@ -73,6 +91,8 @@ def apply_change(
     step_free: bool,
     width_m: float | None = None,
     to_space: str | None = None,
+    asset_type: str | None = None,
+    hint: dict | None = None,
 ) -> str:
     """Apply one edit to `bm`; returns a plain-words description. Raises MapError if it cannot be done."""
     if action == "add_door":
@@ -93,10 +113,17 @@ def apply_change(
         before = f"from {edit['old_width_m']} m " if edit["old_width_m"] is not None else ""
         return f"Widen {door} {before}to {edit['width_m']} m."
     if action == "move_asset":
-        edit = edit_ops.move_asset(bm, element, to_space or other or "")
-        return (
-            f"Move {edit['old_name']} to {bm.describe_space(edit['to_space'])}; it is then called {edit['new_name']}."
-        )
+        edit = edit_ops.move_asset(bm, element, to_space or other, hint)
+        room = bm.describe_space(edit["to_space"])
+        if edit["to_space"] == edit["from_space"]:
+            return f"Move {edit['old_name']} to another spot in {room}."
+        return f"Move {edit['old_name']} to {room}; it is then called {edit['new_name']}."
+    if action == "add_asset":
+        room = to_space or other or element
+        if not asset_type or not room:
+            raise MapError("add_asset needs asset_type and a room (to_space).")
+        edit = edit_ops.add_asset(bm, asset_type, room, hint)
+        return f"Add a new {edit['name']} to {bm.describe_space(edit['to_space'])}."
     target = bm.find_element(element)
     if (target in bm.closed) == (action == "close"):
         raise MapError(f"{element_label(bm, target)} is already {'closed' if action == 'close' else 'open'}.")
@@ -146,21 +173,87 @@ def removal_sentences(bm: BuildingMap, element: str, other: str | None) -> list[
     return analyse(bm, doors_remove=[opening["id"]]).sentences()
 
 
+def placement_sentences(placement: dict | None, rotation_before: float | None = None) -> list[str]:
+    """Plain words for where a hint put the asset, including when the exact spot could not be reached."""
+    if not placement:
+        return []
+    mode, (x, y) = placement["mode"], placement["position"]
+    spot = f"({x:g}, {y:g})"
+    out = []
+    if mode == "anchor":
+        word = edit_ops.ANCHOR_WORDS[placement["anchor"]]
+        gaps = placement["gaps"]
+        if not placement["exact"]:
+            out.append(
+                f"Could not reach the exact {word}: placed at {spot}, {placement['distance_m']:g} m away from it."
+            )
+        elif placement["anchor"] == "CENTER":
+            out.append("Placed in the centre of the room.")
+        elif len(gaps) == 2 and len(set(gaps.values())) == 1:
+            out.append(f"Placed in the {word}, {next(iter(gaps.values())):g} m from both walls.")
+        elif len(gaps) == 2:
+            sides = " and ".join(f"{gap:g} m from the {edit_ops.WALL_WORDS[key]} wall" for key, gap in gaps.items())
+            out.append(f"Placed in the {word}, {sides}.")
+        else:
+            out.append(f"Placed with its back against the {word}, {next(iter(gaps.values())):g} m from it.")
+    elif mode == "point":
+        px, py = placement["point"]
+        if placement["exact"]:
+            out.append(f"Placed at the chosen point ({px:g}, {py:g}).")
+        else:
+            out.append(
+                f"Could not use the exact point ({px:g}, {py:g}): placed at {spot}, {placement['distance_m']:g} m away."
+            )
+    elif mode == "near":
+        gap = placement.get("gap_m")
+        out.append(f"Placed next to {placement['near']}" + (f", {gap:g} m from it." if gap is not None else "."))
+    else:
+        out.append(f"Turned in place to {placement['rotation_deg']:g} degrees.")
+    out += [f"Note: {note}." for note in placement["notes"]]
+    if rotation_before is not None and rotation_before != placement["rotation_deg"] and mode != "rotate":
+        out.append(f"Rotation is {placement['rotation_deg']:g} degrees (was {rotation_before:g}).")
+    return out
+
+
 def edit_sentences(bm: BuildingMap, edit: dict) -> list[str]:
-    """Plain-words effects of a widening or a move, from the edit record of the preview."""
+    """Plain-words effects of a widening, a move or a new asset, from the edit record of the preview."""
     if edit["action"] == "widen_door":
         door = edit_ops.door_label(bm, bm.openings[edit["id"]])
         return [
             f"{door} is {edit['width_m']} m wide afterwards. Routes stay the same; only wide deliveries are affected."
         ]
-    sentences = [f"{edit['old_name']} becomes {edit['new_name']}; its id {edit['id']} stays."]
-    sentences += [
+    renamed = [
         f"{item['old']} is renamed {item['new']} because the letters change." for item in edit["renamed_siblings"]
     ]
-    sentences.append(
-        f"It now stands in {bm.describe_space(edit['to_space'])}, no longer in {bm.describe_space(edit['from_space'])}."
-    )
-    return sentences
+    if edit["action"] == "add_asset":
+        return [
+            f"New asset {edit['name']} (id {edit['id']}, source generated) is {edit['width_m']} x {edit['depth_m']} m.",
+            *renamed,
+            f"It stands in {bm.describe_space(edit['to_space'])}.",
+            *placement_sentences(edit["placement"]),
+        ]
+    room = bm.describe_space(edit["to_space"])
+    if edit["to_space"] == edit["from_space"]:
+        sentences = [f"{edit['new_name']} (id {edit['id']}) stays in {room}."]
+    else:
+        sentences = [f"{edit['old_name']} becomes {edit['new_name']}; its id {edit['id']} stays.", *renamed]
+        sentences.append(f"It now stands in {room}, no longer in {bm.describe_space(edit['from_space'])}.")
+    return sentences + placement_sentences(edit.get("placement"), edit.get("old_rotation_deg"))
+
+
+def undo_label(bm: BuildingMap, action: str, what: str, edit: dict | None) -> str:
+    """Short text for the undo card: what taking this change back means."""
+    if action == "move_asset" and edit:
+        if edit["to_space"] == edit["from_space"]:
+            return f"move {edit['new_name']} back to its old spot"
+        return f"move {edit['new_name']} back to {bm.spaces[edit['from_space']]['name']}"
+    if action == "add_asset" and edit:
+        return f"remove the added {edit['name']}"
+    if action == "close":
+        return what.replace("Close ", "reopen ", 1).rstrip(".")
+    if action == "reopen":
+        return what.replace("Reopen ", "close ", 1).rstrip(".") + " again"
+    return f"take back '{what.rstrip('.')}'"
 
 
 def check_directions(state: GuideState, bm: BuildingMap) -> None:
@@ -226,6 +319,9 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             target = bm.find_element(element)
         except MapError as error:
             raise ToolError(str(error)) from error
+        if target not in bm.closed:
+            snapshot = edit_ops.take_snapshot(bm, f"reopen {element_label(bm, target)}")
+            state.undo.append(snapshot)
         bm.closed.add(target)
         state.log.append({"turn": state.turn, "assumed_closed": target})
         return as_json({"closed": element_label(bm, target), "all_closed": sorted(bm.closed)})
@@ -233,34 +329,47 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
     @beta_tool
     def propose_change(
         action: str,
-        element: str,
+        element: str = "",
         other: str | None = None,
         step_free: bool = True,
         width_m: float | None = None,
         to_space: str | None = None,
+        asset_type: str | None = None,
+        hint: dict | None = None,
     ) -> str:
         """Prepare a change to the building and return an understanding card. Changes nothing yet.
         Show the card to the person, wait for their explicit yes in their NEXT message, then call confirm_change.
 
         Args:
             action: "close" or "reopen" (a lift, staircase, door or room), or "add_door" (between two rooms),
-                "remove_door", "widen_door" (a door) or "move_asset" (a machine or piece of furniture to another room).
+                "remove_door", "widen_door" (a door), "move_asset" (a machine or piece of furniture to another room
+                or another spot), "add_asset" (a new machine or piece of furniture) or "undo" (take back the last
+                change; needs no other argument).
             element: What to close/reopen, the first room of a new door, the door to remove/widen (id), or the asset
-                to move (id or exact name).
+                to move (id or exact name). For add_asset the room (or give to_space). Empty for undo.
             other: The second room (add_door), or for remove_door/widen_door the room on the other side when
                 element is a room instead of a door id ("outside" for an entrance).
             step_free: Whether a new door has no step (add_door only).
             width_m: New door width in metres, 0.6 to 5.0 (widen_door only).
-            to_space: Target room id, number or name (move_asset only).
+            to_space: Target room id, number or name (move_asset, add_asset). Optional for move_asset when hint
+                places the asset in the room it is already in, or at a point.
+            asset_type: Type of the new asset, such as "cnc_mill" or "printer" (add_asset only).
+            hint: Where exactly, for move_asset and add_asset. One of {"anchor": "NW"} (NW NE SW SE N S E W center;
+                a corner or a wall, back against the wall), {"near": "<room or asset>"} or {"point": [x, y]}
+                (metres, inside the room), plus optional {"rotation_deg": n}.
         """
         if action not in ACTIONS:
             raise ToolError(f"action must be one of {ACTIONS}.")
         if state.pending is not None and state.pending.turn == state.turn:
             raise ToolError("One proposal per message. Show the card you already made and wait for the answer.")
         state.pending = None
+        if action == "undo":
+            return undo_card()
+        if not element and not (action == "add_asset" and (to_space or other)):
+            raise ToolError("element is needed for this action.")
         preview = copy.deepcopy(bm)
         try:
-            what = apply_change(preview, action, element, other, step_free, width_m, to_space)
+            what = apply_change(preview, action, element, other, step_free, width_m, to_space, asset_type, hint)
         except MapError as error:
             raise ToolError(str(error)) from error
         card = {
@@ -276,11 +385,39 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 pass  # the card still works without the building-wide sentences
         if action == "remove_door":
             card["effect on the whole building"] = removal_sentences(bm, element, other)
-        elif action in ("widen_door", "move_asset"):
+        elif action in ("widen_door", "move_asset", "add_asset"):
             card["effect on the whole building"] = edit_sentences(bm, preview.last_edit)
         state.pending = Pending(
-            action, element, other, step_free, card, state.turn, building_signature(bm), width_m, to_space
+            action,
+            element,
+            other,
+            step_free,
+            card,
+            state.turn,
+            building_signature(bm),
+            width_m,
+            to_space,
+            asset_type,
+            hint,
         )
+        return as_json(card)
+
+    def undo_card() -> str:
+        if not state.undo:
+            raise ToolError("There is nothing to undo.")
+        snapshot = state.undo[-1]
+        preview = copy.deepcopy(bm)
+        edit_ops.restore_snapshot(preview, snapshot)
+        card = {
+            "I understood": f"Undo: {snapshot.label}.",
+            "effect on your last route": route_effect(bm, preview),
+            "effect on the whole building": [
+                f"This takes back the most recent change: {snapshot.label}.",
+                f"{len(state.undo) - 1} earlier change(s) could still be undone afterwards.",
+            ],
+            "status": "nothing changed yet, waiting for the person's yes",
+        }
+        state.pending = Pending("undo", "", None, True, card, state.turn, building_signature(bm))
         return as_json(card)
 
     @beta_tool
@@ -304,18 +441,33 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             raise ToolError("That reply is not a clear yes. Ask the person again, then call propose_change anew.")
         if not confirmed:
             return as_json({"applied": False, "note": "Dropped, nothing changed."})
-        try:
-            what = apply_change(
-                bm,
-                pending.action,
-                pending.element,
-                pending.other,
-                pending.step_free,
-                pending.width_m,
-                pending.to_space,
-            )
-        except MapError as error:
-            raise ToolError(str(error)) from error
+        if pending.action == "undo":
+            if not state.undo:
+                raise ToolError("There is nothing to undo.")
+            snapshot = state.undo.pop()
+            edit_ops.restore_snapshot(bm, snapshot)
+            state.session = None
+            state.signature = building_signature(bm)
+            what = f"Undone: {snapshot.label}."
+        else:
+            snapshot = edit_ops.take_snapshot(bm)
+            try:
+                what = apply_change(
+                    bm,
+                    pending.action,
+                    pending.element,
+                    pending.other,
+                    pending.step_free,
+                    pending.width_m,
+                    pending.to_space,
+                    pending.asset_type,
+                    pending.hint,
+                )
+            except MapError as error:
+                raise ToolError(str(error)) from error
+            edit = bm.last_edit if pending.action in ("move_asset", "add_asset") else None
+            snapshot.label = undo_label(bm, pending.action, what, edit)
+            state.undo.append(snapshot)
         output_directory.mkdir(parents=True, exist_ok=True)
         bm.save(output_directory / "building_edited.json")
         state.log.append({"turn": state.turn, "change": what})
