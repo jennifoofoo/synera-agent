@@ -117,7 +117,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
         {flat ? <meshBasicMaterial /> : <meshStandardMaterial roughness={0.8} metalness={0.05} />}
       </instancedMesh>
       <instancedMesh ref={outline} args={[unitBox, undefined, capacity]} frustumCulled={false} raycast={() => null}>
-        <meshBasicMaterial color={COLOURS.edge} side={THREE.BackSide} transparent opacity={0.9} />
+        <meshBasicMaterial color={COLOURS.thingEdge} side={THREE.BackSide} transparent opacity={0.6} />
       </instancedMesh>
     </group>
   );
