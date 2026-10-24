@@ -4,7 +4,7 @@
 
 import * as THREE from "three";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
-import type { Opening, Point, Space } from "../api/types";
+import type { BuildingState, Opening, Point, Space } from "../api/types";
 import { GROUP_COLOURS, spaceGroup, type SpaceGroup } from "../model/palette";
 
 const GROUP_INDEX: Record<SpaceGroup, number> = { production: 0, logistics: 1, office: 2, technical: 3, circulation: 4, outdoor: 5 };
@@ -294,7 +294,32 @@ function lerp(a: Point, b: Point, t: number): Point {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 }
 
-export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
+/** What of `state` changes the walls: doors added, removed or widened since the building was loaded. */
+export interface OpeningEdits {
+  added: BuildingState["added_doors"];
+  removed: string[];
+  widened: Record<string, number>;
+}
+
+export function openingEditsOf(state: BuildingState | null): OpeningEdits {
+  return { added: state?.added_doors ?? [], removed: state?.removed_openings ?? [], widened: state?.widened_openings ?? {} };
+}
+
+/** The floor's openings with the session's edits applied (a removed door is wall again, a widened one opens more). */
+export function effectiveOpenings(floor: FloorModel, edits?: OpeningEdits): Opening[] {
+  if (!edits) return floor.openings;
+  const removed = new Set(edits.removed);
+  const known = new Set(floor.openings.map((opening) => opening.id));
+  const kept = floor.openings
+    .filter((opening) => !removed.has(opening.id))
+    .map((opening) => (edits.widened[opening.id] ? { ...opening, width_m: edits.widened[opening.id] } : opening));
+  const added: Opening[] = edits.added
+    .filter((door) => door.floor_id === floor.id && !known.has(door.id) && !removed.has(door.id))
+    .map((door) => ({ id: door.id, floor_id: door.floor_id, space_ids: door.space_ids, kind: "door", position: door.position, width_m: 0.9, step_free: door.step_free, added: true }));
+  return [...kept, ...added];
+}
+
+export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): FloorGeometry {
   const builder = new Builder();
   const wallHeight = wallHeightFor(floor);
   const colourCache = new Map<string, THREE.Color>();
@@ -316,7 +341,7 @@ export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
   // Gaps per space: every opening cuts the walls and the outline of the spaces it joins.
   const indexById = new Map(floor.spaces.map((space, index) => [space.id, index]));
   const gapsBySpace = new Map<string, Gap[]>();
-  for (const opening of floor.openings) {
+  for (const opening of effectiveOpenings(floor, edits)) {
     const joined = opening.space_ids.filter((id) => indexById.has(id));
     const gap = openingGap(
       opening,
