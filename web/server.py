@@ -12,7 +12,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/close    {element, closed: true|false}       lift/stairs/door/room id or name
   POST /api/door     {first, second, step_free}
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
-  POST /api/chat     {message, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
+  POST /api/chat     {message, voice?: true, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
                      context.here: {space_id, point?, floor_id?} or {clear: true}, "I'm here", validated, see docs/specs/position.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 
@@ -40,6 +40,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from building_agent.structured import located_entries
+from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import MapError
 from web import api, level4_api, speech
 from web.chat import ChatAdapter, chat_available
@@ -213,6 +214,7 @@ class App:
             check = check_selection(context, session.map)
             here = check_here(here_raw, session.map)
             extra = {"here": here} if here.ok else {}
+            extra.update(voice_kwargs(body))  # request-level spoken-reply flag, never read from the message text
             result = (
                 chat.ask(message, selection=check.selection, **extra) if check.selection else chat.ask(message, **extra)
             )

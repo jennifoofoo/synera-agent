@@ -14,6 +14,7 @@ from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
+from building_agent.voice_rules import with_voice_rules, without_voice_rules
 from starter_agent.agent import SYSTEM_PROMPT as STARTER_PROMPT
 from starter_agent.agent import BuildingAgent as StarterAgent
 from starter_agent.building_map import BuildingMap
@@ -124,16 +125,19 @@ class Agent(StarterAgent):
     def swap_building(self, path) -> None:
         self.install_building(BuildingMap.load(Path(path)))
 
-    def ask(self, user_text: str) -> str:
+    def ask(self, user_text: str, voice: bool = False) -> str:
         """If the API call dies mid-turn, drop the half-written turn so the conversation stays valid."""
         self.guide.begin_turn()
         self.guide.last_user_text = user_text
         mark = len(self.messages)
+        self.system[0]["text"] = with_voice_rules(self.system[0]["text"], voice, user_text)  # this turn only
         try:
             return super().ask(user_text)
         except Exception:
             del self.messages[mark:]
             raise
+        finally:
+            self.system[0]["text"] = without_voice_rules(self.system[0]["text"])
 
 
 class Session(Agent):

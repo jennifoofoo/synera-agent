@@ -12,6 +12,7 @@ import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
 from building_agent import guide_tools, position_tools, walk
 from building_agent.registry import load_kinds
+from building_agent.voice_rules import VOICE_RULES
 from starter_agent.building_map import BuildingMap
 
 LIVE_MODEL = "claude-sonnet-5-5"
@@ -104,22 +105,26 @@ def calls_in(new_messages: list[dict]) -> list[Call]:
     return ordered
 
 
-def cache_file(building_directory: Path, user_turns: list[str], model: str) -> Path:
+def cache_file(building_directory: Path, user_turns: list[str], model: str, voice: bool = False) -> Path:
     version = (
         agent_module.CALCULATION_RULES
         + agent_module.CONVERSATION_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
         + "".join(Path(module.__file__).read_text(encoding="utf-8") for module in (position_tools, walk, guide_tools))
     )
-    raw = json.dumps([building_directory.name, user_turns, model, version])
+    raw = json.dumps([building_directory.name, user_turns, model, version] + ([VOICE_RULES] if voice else []))
     return LIVE_CACHE / f"{hashlib.sha256(raw.encode()).hexdigest()}.json"
 
 
 def run_script(
-    building_directory: Path, user_turns: list[str], model: str = LIVE_MODEL, use_cache: bool = True
+    building_directory: Path,
+    user_turns: list[str],
+    model: str = LIVE_MODEL,
+    use_cache: bool = True,
+    voice: bool = False,
 ) -> Transcript:
-    """Play the user turns in order against one fresh agent on one building."""
-    path = cache_file(building_directory, user_turns, model)
+    """Play the user turns in order against one fresh agent on one building (voice: the page's spoken-reply flag)."""
+    path = cache_file(building_directory, user_turns, model, voice)
     if use_cache and path.exists():
         saved = json.loads(path.read_text(encoding="utf-8"))
         return Transcript([Turn(t["user"], t["reply"], [Call(**c) for c in t["calls"]]) for t in saved])
@@ -130,7 +135,7 @@ def run_script(
         turns = []
         for user_text in user_turns:
             seen = len(agent.messages)
-            reply = agent.ask(user_text)
+            reply = agent.ask(user_text, voice=True) if voice else agent.ask(user_text)
             turns.append(Turn(user_text, reply, calls_in(agent.messages[seen:])))
         LIVE_USAGE.parent.mkdir(parents=True, exist_ok=True)
         with LIVE_USAGE.open("a", encoding="utf-8") as handle:
