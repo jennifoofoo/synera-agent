@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
+import { honestLine, toggleWalkWithMe, useWalkMotion } from "../walkWithMe";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import "./Walk.css";
@@ -58,7 +59,10 @@ export function Walk() {
   useEffect(() => {
     if (!walking) setList(false);
   }, [walking]);
-  const line = step !== null ? readable(walkSteps()[step] ?? "") : "";
+  const motionOn = useWalkMotion((s) => s.on);
+  const estimate = useWalkMotion((s) => s.estimate);
+  const motionNotice = useWalkMotion((s) => s.notice);
+  const line = step !== null ? honestLine(readable(walkSteps()[step] ?? "")) : "";
   const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
     const { voiceOut, handsFree, speechAvailable } = useTwin.getState();
@@ -78,10 +82,11 @@ export function Walk() {
   }, [walking]);
 
   if (step === null || !model || !route?.ok) return null;
-  const steps = walkSteps().map(readable);
+  const steps = walkSteps().map(readable).map(honestLine);
   const last = step >= steps.length - 1;
   // What is left from the current step on: the metres named in the remaining step lines, scaled to the route length.
-  const length = metresLeft(steps, step, route.length_m);
+  // Walk with me on: the module's estimate (walking metres only), shown as "about".
+  const length = estimate ? Math.round(estimate.distanceLeftM) : metresLeft(steps, step, route.length_m);
   const minutes = length !== null ? walkMinutes(length) : null;
   const end = () => {
     stopWalk();
@@ -94,7 +99,13 @@ export function Walk() {
         <div className="card-head">
           <span className="card-kicker">
             Step {step + 1} of {steps.length}
-            {length !== null && <span className="card-muted"> · {length} m left · {minutes} min</span>}
+            {length !== null && (
+              <span className="card-muted">
+                {" "}
+                · {estimate ? "about " : ""}
+                <span className="walk-left">{length}</span> m left · {minutes} min
+              </span>
+            )}
           </span>
           <HandsFreeButton />
           {/* One clear way out: ends the guide and clears the route (Esc does the same). */}
@@ -107,6 +118,18 @@ export function Walk() {
           <p aria-live="polite">{steps[step]}</p>
         </div>
         <HandsFreeStatus />
+        {/* Walk with me: counts steps on the phone and moves an estimated dot along the route (off by default). */}
+        <div className="walk-motion">
+          <label className="walk-motion-switch">
+            <input type="checkbox" role="switch" checked={motionOn} onChange={() => void toggleWalkWithMe()} aria-label="Walk with me" />
+            Walk with me
+          </label>
+          {(motionNotice || estimate?.atConnector) && (
+            <span className="walk-motion-note" role="status" aria-live="polite">
+              {motionNotice ?? "Waiting here. Tap Next once you are through."}
+            </span>
+          )}
+        </div>
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back

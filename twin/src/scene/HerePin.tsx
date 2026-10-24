@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { Html } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import type { Point } from "../api/types";
 import { samePoint } from "../model/format";
@@ -12,6 +13,7 @@ import { useTwin } from "../store";
 import { controlsRef } from "./FloorMesh";
 import { Disc, Ring } from "./Markers";
 import { markHereHintSeen } from "../ui/HereChip";
+import { useWalkMotion } from "../walkWithMe";
 import "./HerePin.css";
 import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, ScreenSized } from "./markerLayout";
 
@@ -105,7 +107,14 @@ interface Drag {
 /** The "You are here" dot. Pointer down on it, move over the floor, release: the new spot is set like "I'm here".
  * The one-time "drag to correct" hint lives in the HereChip bar, off the map. */
 export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps) {
-  const position = useTwin((s) => s.state?.position ?? null);
+  const known = useTwin((s) => s.state?.position ?? null);
+  // Walk with me: the dot shows the step estimate instead (local only, never written to state.position).
+  const estimate = useWalkMotion((s) => s.estimate);
+  const uncertaintyM = useWalkMotion((s) => s.uncertaintyM);
+  const position = useMemo(
+    () => (estimate ? { space_id: "", floor_id: estimate.floorId, point: estimate.point as Point } : known),
+    [estimate, known],
+  );
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
@@ -117,7 +126,7 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps
   visibleFloorsRef.current = visibleFloors;
   const shownFloor = position && visibleFloors.has(position.floor_id) ? position.floor_id : null;
   // A new position from the server wins over a leftover drag preview.
-  useEffect(() => setDrag(null), [position]);
+  useEffect(() => setDrag(null), [known]);
 
   useEffect(() => {
     const element = gl.domElement;
@@ -222,7 +231,17 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps
   if (!position || !shownFloor) return null;
   const point = drag?.point ?? position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0];
   return (
-    <group position={[point[0], floorY(position.floor_id), -point[1]]} name="here-dot">
+    <group position={[point[0], floorY(position.floor_id), -point[1]]} name={estimate ? "walk-estimate" : "here-dot"}>
+      {estimate && !drag && (
+        <>
+          {/* soft uncertainty ring in metres: it grows with the distance walked since the last confirmation */}
+          <Disc radius={uncertaintyM} colour={colour} opacity={0.08} through y={0.04} />
+          <Ring radius={uncertaintyM} colour={colour} width={flat ? 0.12 : 0.08} opacity={0.35} through />
+          <Html position={[0, 0, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
+            <span className="walk-estimated">estimated</span>
+          </Html>
+        </>
+      )}
       {/* the map-app blue dot: constant size on screen, white rim, a calm accuracy halo, no text */}
       <ScreenSized>
         <Disc radius={HERE_HALO_PX} colour={colour} opacity={0.16} through />
