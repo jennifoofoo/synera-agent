@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "./api/client";
-import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point } from "./api/types";
+import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point, Route } from "./api/types";
 import { buildModel, type BuildingModel } from "./model/model";
 
 export type FloorMode = "stacked" | "exploded" | "single";
@@ -64,6 +64,8 @@ export interface ChatMessage {
   text: string;
   located?: Located[];
   note?: string;
+  /** This reply drew a new route (the card then shows the one-line route summary, the text behind "Steps"). */
+  route?: boolean;
 }
 
 interface TwinState {
@@ -136,6 +138,8 @@ interface TwinState {
   // --- walking (owner: phone session): "Start" steps through state.route.steps on the client, no agent call.
   /** Index into state.route.steps while walking; null = not walking. */
   walkStep: number | null;
+  /** Bumped by "repeat" while walking: the Walk sheet speaks the current step again. */
+  walkRepeat: number;
   startWalk: () => void;
   setWalkStep: (step: number) => void;
   stopWalk: () => void;
@@ -251,6 +255,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   campusRoute: false,
   directions: null,
   walkStep: null,
+  walkRepeat: 0,
   handsFree: false,
   handsFreeStatus: "listening",
   handsFreeHeard: "",
@@ -289,7 +294,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   applyState(state) {
-    set({ state });
+    set({ state: withPendingHere(state) });
   },
 
   setProfile(profile) {
@@ -466,6 +471,19 @@ export const useTwin = create<TwinState>((set, get) => ({
   async ask(message, voice = false, opts = {}) {
     const { buildingKey, selection, hereArmed, model } = get();
     if (!buildingKey || !message.trim()) return null;
+    // Walking the steps (client side, see Walk): the usual words move the step, no agent call.
+    const walkStep = get().walkStep;
+    if (walkStep !== null) {
+      const word = message.trim().toLowerCase().replace(/[.!?]+$/, "");
+      if (/^(next|ok|okay|done|weiter|go on|continue|and now|und jetzt)$/.test(word)) return get().setWalkStep(walkStep + 1), null;
+      if (/^(back|previous|zurück)$/.test(word)) return get().setWalkStep(walkStep - 1), null;
+      if (/^(repeat|again|say again|nochmal)$/.test(word)) return set({ walkRepeat: get().walkRepeat + 1 }), null;
+      if (/^(stop|end|end route|cancel|abbrechen)$/.test(word)) {
+        get().stopWalk();
+        await get().clearRoute();
+        return null;
+      }
+    }
     if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
       get().startWalk(); // the drawn route already has its steps; no agent call
       return null;
@@ -493,14 +511,16 @@ export const useTwin = create<TwinState>((set, get) => ({
       pendingHere: null,
     }));
     try {
+      const routeBefore = routeKey(get().state?.route);
       const reply = await api.chat(buildingKey, message, hasContext ? context : undefined, voice);
+      const newRoute = !!reply.state?.route?.ok && routeKey(reply.state.route) !== routeBefore;
       const note = reply.selection_ignored
         ? `I couldn't use the selection: ${reply.selection_ignored}`
         : reply.here_ignored
           ? `I couldn't use "I'm here": ${reply.here_ignored}`
           : reply.here_note;
       set((s) => ({
-        chat: [...s.chat, { id: ++messageId, role: "agent", text: reply.reply, located: reply.located, note }],
+        chat: [...s.chat, { id: ++messageId, role: "agent", text: reply.reply, located: reply.located, note, route: newRoute }],
         chatBusy: false,
         replyShown: true,
         selection: reply.selection_ignored ? s.selection : null,
@@ -547,6 +567,11 @@ export const useTwin = create<TwinState>((set, get) => ({
 function withPendingHere(next: BuildingState): BuildingState {
   const { pendingHere, state } = useTwin.getState();
   return pendingHere && !next.position && state?.position ? { ...next, position: state.position } : next;
+}
+
+/** Identity of a drawn route (same ends and length = same route). */
+function routeKey(route: Route | null | undefined): string {
+  return route?.ok ? `${route.start}|${route.destination}|${route.length_m}` : "";
 }
 
 // --- directions (owner: card session): compute the route for the open From/To, newest request wins.
