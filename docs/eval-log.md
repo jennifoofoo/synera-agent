@@ -192,3 +192,31 @@ In plain words:
 - Fewer suggestions than isolated rooms is expected: one door frees a whole group of rooms behind it.
 - What the data said while tuning (same floors as measured, 4 weights, a plateau and not a peak, so mild optimism): the corridor/hall bonus is essential (without it precision falls from 73% to 48%). A bonus for neighbours that already have many doors (corridor proxy when the room type says nothing) raised precision from 73% to 80% (procedural 92% to 100%). More weight on wall length lowered precision (1.5 per metre: 65%), so it only breaks ties. The stair/lift penalty hardly matters (0 vs 5: 74% vs 73%), kept mild. The wet-room penalty helps ResPlan a little. Two fixes mattered more than weights: the shared wall from `convert.shared_wall` is about 0.5 m too long (buffer overshoot, trimmed by 0.4 m, so the 0.9 m rule means 0.9 m), and rooms nested inside a big OSM polygon have no shared outline, so their longest edge is used (OSM reachable 69% to 100%).
 - Limits: precision is measured against the original doors only, a wrong-but-reasonable door counts as a miss. Only 3 of the 8 cached floors have isolated rooms. Only same-floor doors are suggested, never stairs or entrances (entrances are the other agent's job).
+
+### Marker detection 2026-10-24 (claude-sonnet-5-5, prompt 9f2a64f5)
+
+| Floor | Door recall (model) | Door recall (+markers) | Pairs >= 0.99 (model) | Pairs >= 0.99 (+markers) | Invalid (model) | Invalid (+markers) | No route (model) | No route (+markers) | Pairs |
+|---|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 156 |
+| proc-campus-dev-001:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 120 |
+| proc-factory-dev-003:0 | 0.96 | 1.00 | 58% | 100% | 108 | 0 | 0 | 0 | 264 |
+| resplan-439:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 30 |
+| resplan-1465:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 40 |
+| swiss-31:0 | 0.35 | 0.35 | 6% | 5% | 1 | 14 | 116 | 105 | 125 |
+| swiss-203:0 | 0.26 | 0.32 | 3% | 5% | 0 | 4 | 147 | 137 | 151 |
+| osm-way27326387:0 | 0.67 | 0.74 | 34% | 46% | 0 | 2 | 23 | 0 | 89 |
+
+Detection alone (`building_agent/level4/markers.py`, no model), measured against the markers the kit drew (SVG positions, match within 4 px), 117 dev floors over all four sources, floor_N_plain.png:
+
+| Source | Door recall / precision | Opening recall / precision | Entrance recall / precision |
+|---|---|---|---|
+| proc (45 floors) | 1.00 / 1.00 (1239) | 1.00 / 1.00 (174) | 1.00 / 1.00 (43) |
+| resplan (10) | 1.00 / 1.00 (60) | 1.00 / 1.00 (12) | 1.00 / 1.00 (10) |
+| swiss (46) | 0.98 / 1.00 (1330) | 1.00 / 1.00 (195) | 1.00 / 1.00 (43) |
+| osm (16) | 1.00 / 1.00 (1894) | 0.92 / 1.00 (50) | 0.96 / 1.00 (135) |
+
+- Colours are exact on every image: door (139,69,19), opening (158,158,158), entrance (211,47,47). Room fills (243,239,230), (207,232,196), (244,177,131), (180,167,214), (255,242,179), (220,220,220) never clash.
+- Missed doors (23 on swiss) lie under a red entrance triangle. Missed openings (4 on osm) overlap a door dot. The floor_N.png with furniture gives identical numbers.
+- The eval table shows that markers are not the bottleneck on dense plans: the model's rooms are missing or shifted there, so a marker often finds fewer than two matching outlines or the wrong pair (swiss-31: 2 of 27 markers dropped, 5 pairs changed). Where rooms are right, markers fix kinds and positions (factory-003: invented entrances become doors or openings, 108 invalid sequences gone).
+- When the outline pair and the model pair disagree the outline pair wins (tested: model pair wins gives factory-003 108 invalid again, swiss-31 only 2 invalid instead of 14, so this trade-off is open for swiss).
+- Does not work for plans that draw doors as arcs or leaves, scans, JPEG below quality 90, or images resized after rendering (dots smaller than 4 px or blurred).

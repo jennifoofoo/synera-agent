@@ -30,6 +30,7 @@ from building_agent.level4.convert import (
     scale_from_known_length,
 )
 from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
+from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
 from building_agent.level4.validate import describe, validate
@@ -73,6 +74,7 @@ class Level4Draft:
     findings: Findings = field(default_factory=Findings)
     convert_items: list = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    marker_notes: list[str] = field(default_factory=list)
     building_id: str = field(default_factory=lambda: f"plan-{uuid.uuid4().hex[:8]}")
     name: str = "Uploaded building"
     version: int = 0
@@ -361,6 +363,11 @@ def make_level4_tools(
             draft.cache[key] = result
             draft.cost_usd += result.cost_usd
         extraction = result.extraction
+        try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
+            extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
+            draft.marker_notes = marker_warnings[:10]
+        except (OSError, ValueError):
+            pass
         try:
             if known_length_m is not None:
                 scale = scale_from_known_length(extraction, known_length_m, along)
@@ -531,8 +538,8 @@ def make_level4_tools(
         suggestions = suggest_doors(building)
         if suggestions:
             card["proposal"] = describe_suggestions(suggestions)
-        if draft.notes:
-            card["notes"] = draft.notes
+        if draft.notes or draft.marker_notes:
+            card["notes"] = draft.notes + draft.marker_notes
         draft.card_turn, draft.card_version, draft.card_blocked = state.turn, draft.version, not errors.ok
         return as_json(card)
 
