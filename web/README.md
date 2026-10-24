@@ -15,7 +15,7 @@ Then open http://127.0.0.1:8765. Options: `--data DIR` (any folder with `*/build
 - Building picker (every building under `--data`, including a new Sunday building dropped there), floor switcher.
 - Rooms from polygons with names or numbers, doors (orange ring = has a step), entrances, stairs (S) and lifts (L), things as small dots.
 - Tap a room: start here, go here, add as stop, close/reopen the room or its stair/lift, add a door to a neighbour. Tap a door: close/reopen.
-- Route tab: from/to by name, extra stops, step-free. The route is drawn per floor with A/B markers and floor-change markers (tap one to jump to the other floor). Floors on the route get a blue dot.
+- Route tab: from/to by name, extra stops, step-free. Routes use the agent's people model (`building_agent.routing`, door to door, `"model": "people"` in the JSON), so map and chat show the same rooms and length; the line runs from the start room's centre through the doors to the destination's centre. The route is drawn per floor with A/B markers and floor-change markers (tap one to jump to the other floor). Floors on the route get a blue dot.
 - Every closure or new door recomputes the current route and says what changed ("37.8 m longer, now via Lift 1" or "no route any more").
 - Find tab: rooms and things by words; hits pulse on the plan.
 - Changes tab: close/reopen every stair and lift, list of closures and new doors, reset.

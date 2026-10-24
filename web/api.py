@@ -1,36 +1,73 @@
 """JSON views of a BuildingMap for the 2D page. Pure functions, no HTTP, so tests can call them directly.
 
-Every number the page shows comes from starter_agent.building_map (same route model as the benchmark)."""
+Routes on the page come from building_agent.routing (the people model the chat agent's find_route and
+give_directions use), so map and chat show the same rooms. Every other number comes from starter_agent.building_map."""
 
 import csv
 import itertools
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import networkx as nx
 from shapely.geometry import Polygon
 
-from starter_agent.building_map import DOOR_PREFIX, OUTSIDE, BuildingMap, MapError
+from building_agent import routing
+from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
 
 COORD_DIGITS = 2
+KEPT_ROUTE_REQUESTS = 8
 
 
 class RecordingMap(BuildingMap):
-    """A BuildingMap that also remembers the arguments of its last route, so the page can redraw the chat
-    agent's route with its via stops (RouteResult does not keep them). Survives deepcopy like any attribute."""
+    """A BuildingMap that also remembers the arguments of its recent routes, so the page can redraw the chat
+    agent's route with its via stops (RouteResult does not keep them). Records kit routes (BuildingMap.route) and
+    people-model routes (building_agent.routing.route, see record_people_routes). Survives deepcopy."""
 
     last_route_request: dict | None = None
+    route_requests: list[dict] | None = None
 
     def route(self, start: str, destination: str, step_free: bool = False, via: list[str] | None = None):
         result = super().route(start, destination, step_free, via)
-        self.last_route_request = {
+        self.remember_route(start, destination, step_free, via, result)
+        return result
+
+    def remember_route(self, start: str, destination: str, step_free: bool, via, result) -> None:
+        request = {
             "start": start,
             "destination": destination,
             "step_free": step_free,
             "via": [str(stop) for stop in via or [] if stop],
             "result": result,
         }
+        self.last_route_request = request
+        # Helpers like compare_normal_length route again and put the older result back into last_route,
+        # so the request is looked up by its result, not just taken as the newest.
+        self.route_requests = [*(self.route_requests or [])[-(KEPT_ROUTE_REQUESTS - 1) :], request]
+
+    def request_for(self, result) -> dict | None:
+        return next((r for r in reversed(self.route_requests or []) if r["result"] is result), None)
+
+
+people_route = routing.route  # unwrapped: the page's own routes are never recorded as the agent's
+
+
+def record_people_routes() -> None:
+    """Wrap building_agent.routing.route so a RecordingMap remembers via stops of the agent's routes.
+    Workaround until RouteResult carries its via stops; other maps pass straight through."""
+    if getattr(routing.route, "records_route_requests", False):
+        return
+
+    def recorded_route(bm, start, destination, step_free=False, via=None):
+        result = people_route(bm, start, destination, step_free, via)
+        if isinstance(bm, RecordingMap):
+            bm.remember_route(start, destination, step_free, via, result)
         return result
+
+    recorded_route.records_route_requests = True
+    recorded_route.__doc__ = people_route.__doc__
+    routing.route = recorded_route
+
+
+record_people_routes()
 
 
 @dataclass
@@ -58,8 +95,8 @@ class Session:
         route = self.map.last_route
         if route is None or route is previous_route or self.route_version != version_before_chat:
             return False
-        recorded = getattr(self.map, "last_route_request", None)
-        via = recorded["via"] if recorded and recorded.get("result") is route else []
+        recorded = self.map.request_for(route) if isinstance(self.map, RecordingMap) else None
+        via = recorded["via"] if recorded else []
         self.route_request = {
             "start": route.start_space_id,
             "destination": route.destination_space_id,
@@ -233,6 +270,8 @@ def opening_summary(bm: BuildingMap, opening_id: str) -> dict:
 
 # ---------- routing ----------
 
+PEOPLE_MODEL = "people"  # building_agent.routing: door to door, Synera's vertical costs (what the agent tells people)
+
 
 def route_view(session: Session, start: str, destination: str, step_free: bool = False, via=None) -> dict:
     """A route the page asks for: remembered (newest wins over the chat agent's), then drawn."""
@@ -244,31 +283,47 @@ def route_view(session: Session, start: str, destination: str, step_free: bool =
 
 
 def draw_route(session: Session, start: str, destination: str, step_free: bool, via: list[str]) -> dict:
-    """Shortest route plus per-floor polylines (room anchor -> door -> room anchor) and floor changes.
+    """Shortest route in the people model (the one the agent's find_route and give_directions use), plus per-floor
+    polylines (start anchor -> doors -> end anchor) and floor changes.
     Leaves map.last_route alone: that slot belongs to the chat agent, so redrawing never looks like a new agent route."""
     bm = session.map
-    kept_route, kept_request = bm.last_route, getattr(bm, "last_route_request", None)
+    kept = (bm.last_route, getattr(bm, "last_route_request", None), list(getattr(bm, "route_requests", None) or []))
     try:
-        result = bm.route(start, destination, step_free=step_free, via=via)
+        result = people_route(bm, start, destination, step_free, via)
+        kit = kit_route(bm, start, destination, step_free, via)
     finally:
-        bm.last_route = kept_route
+        bm.last_route = kept[0]
         if isinstance(bm, RecordingMap):
-            bm.last_route_request = kept_request
+            bm.last_route_request, bm.route_requests = kept[1], kept[2]
     stops = [result.start_space_id, *[bm.resolve_space(stop) for stop in via], result.destination_space_id]
-    nodes = route_nodes(bm, stops, step_free)
-    geometry = route_geometry(bm, nodes, step_free)
+    legs = route_legs(bm, stops, step_free, result.space_path)
+    line_stops = stops if legs is not None else [stops[0], stops[-1]]
+    geometry = route_geometry(bm, line_stops, legs if legs is not None else anchor_legs(bm, result.space_path))
     return {
         "ok": True,
+        "model": PEOPLE_MODEL,
         "start": result.start_space_id,
         "destination": result.destination_space_id,
-        "via": [bm.resolve_space(stop) for stop in via],
+        "via": stops[1:-1],
         "step_free": step_free,
         "length_m": result.length_m,
         "space_path": result.space_path,
+        "kit": kit,
+        "differs_from_kit": kit is not None and kit["space_path"] != result.space_path,
         "steps": compact_steps(result.steps),
         **geometry,
         "floors": list(dict.fromkeys(segment["floor_id"] for segment in geometry["segments"])),
     }
+
+
+def kit_route(bm: BuildingMap, start: str, destination: str, step_free: bool, via: list[str]) -> dict | None:
+    """The same trip in the kit model (README section 3), which the labelled numbers use. None if it finds no route.
+    The caller restores last_route; BuildingMap.route is called unbound so a RecordingMap does not record it."""
+    try:
+        result = BuildingMap.route(bm, start, destination, step_free=step_free, via=via)
+    except MapError:
+        return None
+    return {"space_path": result.space_path, "length_m": result.length_m}
 
 
 def current_route(session: Session) -> dict | None:
@@ -299,82 +354,108 @@ def compact_steps(steps: list[str]) -> list[str]:
     return compact
 
 
-def route_nodes(bm: BuildingMap, stops: list[str], step_free: bool) -> list[str]:
-    """Same Dijkstra as BuildingMap.route, but keeping the door nodes so the line can pass through doors."""
-    graph = bm.graph(step_free)
-    nodes: list[str] = []
-    for leg_start, leg_end in itertools.pairwise(stops):
-        _, leg_nodes = nx.single_source_dijkstra(graph, leg_start, leg_end, weight="weight")
-        nodes += leg_nodes if not nodes else leg_nodes[1:]
-    return nodes
+def route_legs(bm: BuildingMap, stops: list[str], step_free: bool, space_path: list[str]) -> list[list[tuple]] | None:
+    """The door and connector nodes of each leg, from the same graph and search as routing.route (which only
+    returns spaces). None if they do not give the route's space_path; the line then runs through room anchors."""
+    rg = routing.routing_graph(bm, step_free)
+    try:
+        if len(stops) == 2:
+            found = routing.shortest_leg(bm, rg, stops[0], stops[1])
+            legs = None if found is None else [found[1]]
+        else:
+            legs = routing.tour_legs(bm, rg, stops, step_free)[1]
+    except MapError:
+        return None
+    if legs is None:
+        return None
+    spaces: list[str] = []
+    for (leg_start, leg_end), nodes in zip(itertools.pairwise(stops), legs, strict=True):
+        leg = routing.leg_spaces(leg_start, leg_end, nodes)
+        spaces += leg if not spaces else leg[1:]
+    return legs if spaces == space_path else None
 
 
-def route_geometry(bm: BuildingMap, nodes: list[str], step_free: bool) -> dict:
-    """Split the node path into drawable segments per floor, plus markers where the route changes floor."""
-    graph = bm.graph(step_free)
+def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:
+    """Fallback, one leg: a stop at every room anchor, and a connector crossing wherever the floor changes."""
+    nodes: list[tuple] = []
+    for previous, space_id in itertools.pairwise(space_path):
+        if space_id == OUTSIDE or previous == OUTSIDE:
+            continue
+        if bm.spaces[previous]["floor_id"] != bm.spaces[space_id]["floor_id"]:
+            connector = next(
+                (c for c in bm.connectors.values() if previous in c["space_ids"] and space_id in c["space_ids"]), None
+            )
+            if connector is not None:
+                nodes += [("c", connector["id"], previous), ("c", connector["id"], space_id)]
+                continue
+        nodes.append(("a", None, space_id))
+    return [nodes]
+
+
+def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -> dict:
+    """Drawable segments per floor plus markers where the route changes floor.
+
+    The people model walks door to door: the line starts at the start room's anchor, runs through every door
+    (and connector stop, which sits at its room's anchor), touches the anchor of each via stop, and ends at the
+    destination's anchor. Walking outside between two entrances is its own dashed segment."""
+    path: list[tuple] = [("a", None, stops[0])]
+    for stop, nodes in zip(stops[1:], legs, strict=True):
+        path += [*nodes, ("a", None, stop)]
     segments: list[dict] = []
     floor_changes: list[dict] = []
     current: dict | None = None
 
-    def point_of(node: str) -> tuple[str, list[float]] | None:
-        if node.startswith(DOOR_PREFIX):
-            opening = bm.openings[node[len(DOOR_PREFIX) :]]
+    def point_of(node: tuple) -> tuple[str, list[float]] | None:
+        kind, element, space_id = node
+        if kind == "o":
+            opening = bm.openings[element]
             return opening["floor_id"], rounded(opening["position"])
-        if node in bm.spaces:
-            return bm.spaces[node]["floor_id"], rounded(bm.anchor(node))
-        return None  # outside
+        if space_id == OUTSIDE or space_id not in bm.spaces:
+            return None
+        return bm.spaces[space_id]["floor_id"], rounded(bm.anchor(space_id))
 
-    def add_point(node: str, kind: str = "walk") -> None:
+    def add_point(node: tuple, kind: str = "walk") -> None:
         nonlocal current
         located = point_of(node)
         if located is None:
             return
         floor_id, point = located
+        if current is not None and current["floor_id"] == floor_id and current["points"][-1] == point:
+            return
         if current is None or current["floor_id"] != floor_id or current["kind"] != kind:
-            current = {"floor_id": floor_id, "kind": kind, "points": []}
+            joined = [current["points"][-1]] if current is not None and current["floor_id"] == floor_id else []
+            current = {"floor_id": floor_id, "kind": kind, "points": joined}
             segments.append(current)
         current["points"].append(point)
 
-    add_point(nodes[0])
-    for previous, node in itertools.pairwise(nodes):
-        edge = min(graph[previous][node].values(), key=lambda candidate: candidate["weight"])
-        element = edge["via"]
-        if element in bm.connectors:
-            connector = bm.connectors[element]
-            from_floor, to_floor = bm.spaces[previous]["floor_id"], bm.spaces[node]["floor_id"]
+    add_point(path[0])
+    for previous, node in itertools.pairwise(path):
+        crossing = previous[0] == node[0] and previous[0] in "oc" and previous[1] == node[1] and previous[2] != node[2]
+        if crossing and node[0] == "c":
+            connector = bm.connectors[node[1]]
+            from_floor, to_floor = bm.spaces[previous[2]]["floor_id"], bm.spaces[node[2]]["floor_id"]
             last = floor_changes[-1] if floor_changes else None
-            if last and last["connector_id"] == element and last["to_floor"] == from_floor:
+            if last and last["connector_id"] == node[1] and last["to_floor"] == from_floor:
                 # Riding on past a floor: one change F0 -> F4, no stub drawn on the floors in between.
                 if current is not None and len(current["points"]) == 1:
                     segments.remove(current)
-                last.update(to_floor=to_floor, to_point=rounded(bm.anchor(node)))
-                current = None
-                add_point(node)
-                continue
-            floor_changes.append(
-                {
-                    "connector_id": element,
-                    "kind": connector["kind"],
-                    "name": connector["name"],
-                    "from_floor": from_floor,
-                    "to_floor": to_floor,
-                    "from_point": rounded(bm.anchor(previous)),
-                    "to_point": rounded(bm.anchor(node)),
-                }
-            )
+                last.update(to_floor=to_floor, to_point=rounded(bm.anchor(node[2])))
+            else:
+                floor_changes.append(
+                    {
+                        "connector_id": node[1],
+                        "kind": connector["kind"],
+                        "name": connector["name"],
+                        "from_floor": from_floor,
+                        "to_floor": to_floor,
+                        "from_point": rounded(bm.anchor(previous[2])),
+                        "to_point": rounded(bm.anchor(node[2])),
+                    }
+                )
             current = None
             add_point(node)
-        elif node == OUTSIDE or previous == OUTSIDE:
-            # Leaving through one entrance and coming back in through another: draw that part dashed.
-            if node == OUTSIDE:
-                continue
-            if current is not None:
-                last_point = current["points"][-1]
-                current = None
-                add_point(node, "outside")
-                current["points"].insert(0, last_point)
-                current = None
-            add_point(node)
+        elif not crossing and previous[2] == OUTSIDE and node[2] == OUTSIDE:
+            add_point(node, "outside")  # from one entrance to another, outside the building
         else:
             add_point(node)
     for change in floor_changes:

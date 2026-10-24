@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from shapely.geometry import Polygon
 
+from building_agent import routing
 from web.server import App, make_handler
 
 DATA = Path("data")
@@ -70,8 +71,8 @@ def test_step_free_route_across_floors_then_lift_closure_reroutes(app, key):
     _, payload = app.post("/api/route", {"building": key, "start": start, "destination": end, "step_free": True})
     route = payload["route"]
     assert route["ok"], route
-    expected = app.session(key).map.route(start, end, step_free=True).length_m
-    assert route["length_m"] == expected
+    expected = routing.route(app.session(key).map, start, end, step_free=True).length_m
+    assert route["length_m"] == expected and route["model"] == "people"
     assert route["space_path"][0] == start and route["space_path"][-1] == end
     assert route["floor_changes"], "a route between floors must change floor"
     assert all(change["kind"] == "lift" for change in route["floor_changes"])
@@ -187,7 +188,7 @@ def test_agent_route_is_drawn_with_its_via_stops(app, key, monkeypatch):
     via = next(
         s["id"] for s in bm.spaces.values() if s["floor_id"] == bm.spaces[start]["floor_id"] and s["id"] != start
     )
-    fake_chat(app, key, monkeypatch, lambda m: m.route(start, end, False, [via]))
+    fake_chat(app, key, monkeypatch, lambda m: routing.route(m, start, end, False, [via]))
     _, reply = app.post("/api/chat", {"building": key, "message": "take me there via the other room"})
     route = reply["state"]["route"]
     assert route["ok"] and route["via"] == [via] and via in route["space_path"]
@@ -197,7 +198,7 @@ def test_page_route_asked_during_chat_wins_over_the_agent_route(app, key, monkey
     start, end = rooms_on_lift_floors(app, key)
 
     def agent_then_page(m):
-        m.route(start, end, False, None)  # the agent routes first ...
+        routing.route(m, start, end, False, None)  # the agent routes first ...
         app.post("/api/route", {"building": key, "start": end, "destination": start})  # ... the page asks later
 
     fake_chat(app, key, monkeypatch, agent_then_page)
