@@ -56,11 +56,31 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const chosen = far ? [...lifts.slice(0, 4), ...rooms.slice(0, 6)] : [...connectors.slice(0, 12), ...rooms];
     return cullOverlaps(chosen, LABEL_PX * scale * (flat ? 0.9 : 1.1));
   }, [floor, model, limit, scale, flat]);
+  // 2D: stairs, lifts, toilets and entrances as small round icons like a street map's points of interest.
+  const pois = useMemo(() => {
+    if (!flat) return [];
+    const shownNames = new Set(labelled.map((space) => space.id));
+    const items: { id: string; point: [number, number]; glyph: string; title: string }[] = [];
+    for (const space of floor.spaces) {
+      const connector = model.connectorBySpace.get(space.id);
+      if (connector && !shownNames.has(space.id)) items.push({ id: space.id, point: space.anchor, glyph: connector.kind === "lift" ? "⇅" : "⟋", title: space.name });
+      else if (space.room_type === "toilet" && Math.sqrt(space.area_m2) >= 24 * scale) items.push({ id: space.id, point: space.anchor, glyph: "WC", title: space.name });
+    }
+    for (const opening of floor.openings) {
+      if (opening.kind === "entrance") items.push({ id: opening.id, point: opening.position, glyph: "⎆", title: "Entrance" });
+    }
+    return cullOverlaps(items.map((item) => ({ ...item, anchor: item.point })), 26 * scale);
+  }, [flat, floor, model, labelled, scale]);
   return (
     <group position-y={y + 0.5}>
       {labelled.map((space) => (
         <Html key={space.id} position={[space.anchor[0], 0, -space.anchor[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-          <div className={`label ${model.connectorBySpace.has(space.id) ? "label-connector" : ""}`}>{space.name}</div>
+          <div className={`label ${flat ? "label-plan" : ""} ${model.connectorBySpace.has(space.id) ? "label-connector" : ""}`}>{space.name}</div>
+        </Html>
+      ))}
+      {pois.map((poi) => (
+        <Html key={`poi-${poi.id}`} position={[poi.point[0], 0, -poi.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+          <div className="poi" title={poi.title}>{poi.glyph}</div>
         </Html>
       ))}
     </group>

@@ -5,7 +5,9 @@
 import * as THREE from "three";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 import type { Opening, Point, Space } from "../api/types";
-import { GROUP_COLOURS, spaceGroup } from "../model/palette";
+import { GROUP_COLOURS, spaceGroup, type SpaceGroup } from "../model/palette";
+
+const GROUP_INDEX: Record<SpaceGroup, number> = { production: 0, logistics: 1, office: 2, technical: 3, circulation: 4, outdoor: 5 };
 import type { FloorModel } from "../model/model";
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -59,6 +61,8 @@ class Builder {
   colours: number[] = [];
   wallNormals: number[] = [];
   walls: number[] = []; // 1 for wall vertices (flattened in the 2D plan), 0 for slabs
+  groups: number[] = []; // room group index per vertex (plan colours in 2D)
+  currentGroup = 2;
   spaceIndices: number[] = [];
   indices: number[] = [];
   lines: number[] = [];
@@ -71,6 +75,7 @@ class Builder {
     this.colours.push(c.r, c.g, c.b);
     this.wallNormals.push(wn[0], wn[1]);
     this.walls.push(wall);
+    this.groups.push(this.currentGroup);
     this.spaceIndices.push(sid);
     return this.positions.length / 3 - 1;
   }
@@ -149,6 +154,7 @@ class Builder {
     solid.setAttribute("color", new THREE.Float32BufferAttribute(this.colours, 3));
     solid.setAttribute("wallNormal", new THREE.Float32BufferAttribute(this.wallNormals, 2));
     solid.setAttribute("wall", new THREE.Float32BufferAttribute(this.walls, 1));
+    solid.setAttribute("roomGroup", new THREE.Float32BufferAttribute(this.groups, 1));
     solid.setAttribute("spaceIndex", new THREE.Float32BufferAttribute(this.spaceIndices, 1));
     solid.setIndex(this.indices);
     solid.computeBoundingSphere();
@@ -228,6 +234,7 @@ export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
     if (polygon.length < 3) return;
     const group = spaceGroup(space.type, space.room_type);
     const palette = GROUP_COLOURS[group];
+    builder.currentGroup = GROUP_INDEX[group];
     builder.slab(polygon, 0, colourFor(palette.slab), sid);
     const isOutdoor = space.type === "outdoor";
     const height = isOutdoor ? Math.min(wallHeight, 0.5) : wallHeight;
@@ -302,9 +309,26 @@ export function withCutaway<T extends THREE.Material>(
         `#include <common>
         attribute vec2 wallNormal;
         attribute float wall;
+        attribute float roomGroup;
         uniform vec2 uCamDir;
         uniform float uCut;
         uniform float uFlat;`,
+      )
+      .replace(
+        "#include <color_vertex>",
+        `#include <color_vertex>
+        #ifdef USE_COLOR
+        {
+          // 2D plan: map colours like a street map. Corridors white, rooms near-white, stairs/lifts and outdoor
+          // a little greyer, walls grey.
+          vec3 plan = vec3(0.975, 0.97, 0.955);
+          if (roomGroup > 3.5 && roomGroup < 4.5) plan = vec3(1.0);
+          if (roomGroup > 2.5 && roomGroup < 3.5) plan = vec3(0.93, 0.93, 0.915);
+          if (roomGroup > 4.5) plan = vec3(0.925, 0.925, 0.905);
+          if (wall > 0.5) plan = vec3(0.72, 0.72, 0.70);
+          vColor.rgb = mix(vColor.rgb, plan, uFlat);
+        }
+        #endif`,
       )
       .replace(
         "#include <begin_vertex>",

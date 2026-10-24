@@ -17,8 +17,13 @@ interface Props {
 /** Shared uniforms for the dollhouse cutaway: direction from the building centre to the camera, and on/off. */
 export const cutawayUniforms = { uCamDir: { value: new THREE.Vector2(0, 1) }, uCut: { value: 1 }, uFlat: { value: 0 } };
 
+/** The one CameraControls instance (set by CameraRig), for gestures handled on meshes (double tap zoom). */
+export const controlsRef: { current: import("camera-controls").default | null } = { current: null };
+
 export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
   const select = useTwin((s) => s.select);
+  const flat = useTwin((s) => s.viewMode === "2d");
+  const reducedMotion = useTwin((s) => s.reducedMotion);
   const built = useMemo(() => {
     const started = performance.now();
     const geometry = buildFloorGeometry(floor);
@@ -48,6 +53,20 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
     return { solid, edges, ghostSolid, ghostEdges };
   }, []);
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
+  useEffect(() => {
+    materials.edges.color.set(flat ? "#a8a8a3" : COLOURS.edge);
+    materials.edges.opacity = flat ? 1 : 0.85;
+    materials.solid.roughness = flat ? 1 : 0.92;
+  }, [flat, materials]);
+
+  const onDoubleClick = (event: ThreeEvent<MouseEvent>) => {
+    if (!flat || ghost) return;
+    event.stopPropagation();
+    const c = controlsRef.current;
+    if (!c) return;
+    void c.moveTo(event.point.x, event.point.y, event.point.z, !reducedMotion);
+    void c.zoom(c.camera.zoom, !reducedMotion); // doubles the zoom
+  };
 
   const group = useRef<THREE.Group>(null);
   useFrame(() => {
@@ -81,6 +100,7 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
         geometry={built.solid}
         material={ghost ? materials.ghostSolid : materials.solid}
         onClick={ghost ? undefined : onClick}
+        onDoubleClick={ghost ? undefined : onDoubleClick}
         renderOrder={ghost ? 10 : 0}
         layers-mask={ghost ? 2 : 1}
         userData={{ floorId: floor.id, ghost }}

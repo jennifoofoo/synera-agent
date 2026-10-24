@@ -59,6 +59,8 @@ interface TwinState {
   bottomInset: number;
   /** A Level 4 draft (new building from floor plans) is shown instead of the building; set by ui/newBuildingStore. */
   draft: boolean;
+  /** 2D: the plan was panned away from the floor (shows the recenter button). Set by the scene. */
+  offCentre: boolean;
   floorMode: FloorMode;
   focusedFloorId: string | null;
   thingsMode: ThingsMode;
@@ -134,6 +136,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   viewMode: autoProfile() === "worker" ? "2d" : "3d",
   bottomInset: 0,
   draft: false,
+  offCentre: false,
   floorMode: "stacked",
   focusedFloorId: null,
   thingsMode: "near",

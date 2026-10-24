@@ -90,6 +90,27 @@ button.x:hover { color: var(--text); }
   border: 1px solid rgba(20, 48, 90, 0.45); border-radius: 4px; padding: 1px 5px; white-space: nowrap;
 }
 .label-connector { background: rgba(43, 181, 160, 0.22); border-color: rgba(43, 181, 160, 0.6); }
+/* 2D map: dark grey text with a white halo, no box */
+.label.label-plan {
+  background: transparent; border: 0; padding: 0; color: #3c4043; font-size: 12px; font-weight: 500;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 2px #fff;
+}
+.poi {
+  width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid #c4c7c5; color: #5f6368;
+  font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.recenter {
+  position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 3;
+  width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; font-size: 20px; color: #3c4043;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+}
+/* 2D: the floor picker is a small white pill at the right edge, like a map app */
+.app.flat .floorrail { left: auto; right: 12px; background: #fff; border-radius: 10px; padding: 3px; gap: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
+.app.flat .rail-floor, .app.flat .rail-toggle { background: #fff; border: 0; backdrop-filter: none; border-radius: 8px; }
+.app.flat .rail-toggle { margin: 0; }
+.app.flat .rail-floor.active { background: #e8f0fe; color: #1a5fd0; }
+.app.flat .rail-floor .dot { background: #4285f4; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 8px;
   border-radius: 999px; white-space: nowrap; background: var(--navy); border: 1px solid var(--navy); color: #fff;

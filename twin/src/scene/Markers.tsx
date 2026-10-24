@@ -23,6 +23,7 @@ interface Props {
   selection: Selection | null;
   reducedMotion: boolean;
   worker: boolean;
+  flat?: boolean;
 }
 
 interface Disruption {
@@ -105,7 +106,8 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
   );
 }
 
-export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker }: Props) {
+export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
+  const hereColour = flat ? COLOURS.mapBlue : COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
@@ -127,13 +129,17 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
       {position && shown(position.floor_id) && (
         <group position={at(position.floor_id, position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0])}>
           <Pulse reducedMotion={reducedMotion} speed={0.8} amount={0.25}>
-            <Ring radius={1.4} colour={COLOURS.here} width={0.14} opacity={0.7} through />
+            <Disc radius={flat ? 3 : 1.4} colour={hereColour} opacity={flat ? 0.18 : 0.2} through />
           </Pulse>
-          <Disc radius={0.9} colour={COLOURS.here} opacity={0.35} through />
-          <mesh position-y={0.35}>
-            <sphereGeometry args={[0.32, 16, 16]} />
-            <meshBasicMaterial color={COLOURS.here} />
-          </mesh>
+          {!flat && <Ring radius={1.4} colour={hereColour} width={0.14} opacity={0.7} through />}
+          <Disc radius={flat ? 0.75 : 0.9} colour="#ffffff" opacity={1} through y={0.08} />
+          <Disc radius={flat ? 0.55 : 0.6} colour={hereColour} opacity={1} through y={0.1} />
+          {!flat && (
+            <mesh position-y={0.35}>
+              <sphereGeometry args={[0.32, 16, 16]} />
+              <meshBasicMaterial color={hereColour} />
+            </mesh>
+          )}
           <group position-y={2.2}>{chip("You are here", "here")}</group>
         </group>
       )}

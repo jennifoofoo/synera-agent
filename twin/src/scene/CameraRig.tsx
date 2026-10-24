@@ -5,7 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
 import type { BuildingModel } from "../model/model";
 import { useTwin } from "../store";
-import { cutawayUniforms } from "./FloorMesh";
+import { controlsRef, cutawayUniforms } from "./FloorMesh";
 
 interface Props {
   model: BuildingModel;
@@ -173,9 +173,28 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.nonce, floorMode, camera]);
 
-  // Cutaway: outer walls facing the camera are lowered.
+  useEffect(() => {
+    controlsRef.current = controls.current;
+    return () => {
+      controlsRef.current = null;
+    };
+  });
+
+  // Cutaway: outer walls facing the camera are lowered. In 2D, note when the view was panned away from the floor.
   const direction = new THREE.Vector2();
+  const target = new THREE.Vector3();
   useFrame(() => {
+    const c = controls.current;
+    if (c && flat && focusedFloorId) {
+      const floor = model.floorById.get(focusedFloorId);
+      if (floor) {
+        c.getTarget(target);
+        const dx = Math.abs(target.x - floor.bounds.cx);
+        const dz = Math.abs(-target.z - floor.bounds.cy);
+        const away = dx > floor.bounds.size * 0.35 || dz > floor.bounds.size * 0.35;
+        if (away !== useTwin.getState().offCentre) useTwin.setState({ offCentre: away });
+      }
+    } else if (useTwin.getState().offCentre) useTwin.setState({ offCentre: false });
     direction.set(camera.position.x - bounds.cx, camera.position.z + bounds.cy).normalize();
     cutawayUniforms.uCamDir.value.copy(direction);
     cutawayUniforms.uCut.value = cutaway && !flat ? 1 : 0;

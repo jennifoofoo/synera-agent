@@ -18,6 +18,10 @@ export const COLOURS = {
   ghost: "#7f9fc6",
   ground: "#dfe7f0",
   background: "#edf2f8",
+  plan: "#f3f1ec", // 2D map background
+  mapBlue: "#4285f4",
+  mapBlueDark: "#1a5fd0",
+  mapRed: "#ea4335",
   accent: "#5eead4",
   gold: "#e3b45a",
   accentBlue: "#60a5fa",

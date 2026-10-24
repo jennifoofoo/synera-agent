@@ -16,6 +16,7 @@ interface Props {
   floorY: (floorId: string) => number;
   onlyFloor: string | null;
   reducedMotion: boolean;
+  flat?: boolean;
 }
 
 function toPoints(segments: RouteSegment[], floorY: (id: string) => number, onlyFloor: string | null): THREE.Vector3[] {
@@ -30,7 +31,7 @@ function toPoints(segments: RouteSegment[], floorY: (id: string) => number, only
 
 /** The route as a glowing line through the floors (vertical runs at stairs and lifts), drawn in, then a pulse
  * travels along it. With reduced motion the line is simply there. */
-export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, reducedMotion }: Props) {
+export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, reducedMotion, flat = false }: Props) {
   void model;
   const points = useMemo(() => (route?.ok && route.segments ? toPoints(route.segments, floorY, onlyFloor) : []), [route, floorY, onlyFloor]);
   const guidePoints = useMemo(() => (guideSegments ? toPoints(guideSegments, floorY, onlyFloor) : []), [guideSegments, floorY, onlyFloor]);
@@ -73,15 +74,17 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
 
   if (points.length < 2) return null;
   const guided = guidePoints.length > 1;
+  const lineColour = flat ? COLOURS.mapBlue : COLOURS.route;
+  const casingColour = flat ? COLOURS.mapBlueDark : COLOURS.routeGlow;
   return (
     <group>
       <Line
         ref={glow}
         points={points}
-        color={COLOURS.routeGlow}
-        lineWidth={guided ? 5 : 9}
+        color={casingColour}
+        lineWidth={flat ? (guided ? 7 : 9) : guided ? 5 : 9}
         transparent
-        opacity={guided ? 0.18 : 0.28}
+        opacity={flat ? (guided ? 0.5 : 1) : guided ? 0.18 : 0.28}
         dashed
         dashSize={total}
         gapSize={total}
@@ -91,8 +94,8 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       <Line
         ref={line}
         points={points}
-        color={COLOURS.route}
-        lineWidth={guided ? 2 : 3.5}
+        color={lineColour}
+        lineWidth={flat ? (guided ? 4 : 6) : guided ? 2 : 3.5}
         transparent
         opacity={guided ? 0.55 : 1}
         dashed
@@ -101,19 +104,37 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         depthTest={false}
         renderOrder={21}
       />
-      {guided && <Line points={guidePoints} color={COLOURS.route} lineWidth={5} depthTest={false} renderOrder={22} />}
+      {guided && <Line points={guidePoints} color={lineColour} lineWidth={flat ? 7 : 5} depthTest={false} renderOrder={22} />}
       <mesh ref={pulse} renderOrder={23}>
         <sphereGeometry args={[0.35, 12, 12]} />
-        <meshBasicMaterial color={COLOURS.routeGlow} depthTest={false} transparent opacity={0.95} />
+        <meshBasicMaterial color={flat ? "#ffffff" : COLOURS.routeGlow} depthTest={false} transparent opacity={0.95} />
       </mesh>
       <mesh position={points[0]} renderOrder={23}>
         <sphereGeometry args={[0.45, 14, 14]} />
-        <meshBasicMaterial color={COLOURS.route} depthTest={false} />
+        <meshBasicMaterial color={lineColour} depthTest={false} />
       </mesh>
-      <mesh position={points[points.length - 1]} renderOrder={23}>
-        <coneGeometry args={[0.55, 1.1, 4]} />
-        <meshBasicMaterial color={COLOURS.route} depthTest={false} />
-      </mesh>
+      {flat ? (
+        <group position={points[points.length - 1]} renderOrder={23}>
+          {/* a red pin: ball on a short stem */}
+          <mesh position-y={1.6}>
+            <sphereGeometry args={[0.7, 16, 16]} />
+            <meshBasicMaterial color={COLOURS.mapRed} depthTest={false} />
+          </mesh>
+          <mesh position-y={0.8}>
+            <coneGeometry args={[0.35, 1.4, 12]} />
+            <meshBasicMaterial color={COLOURS.mapRed} depthTest={false} />
+          </mesh>
+          <mesh position-y={1.6}>
+            <sphereGeometry args={[0.25, 10, 10]} />
+            <meshBasicMaterial color="#ffffff" depthTest={false} />
+          </mesh>
+        </group>
+      ) : (
+        <mesh position={points[points.length - 1]} renderOrder={23}>
+          <coneGeometry args={[0.55, 1.1, 4]} />
+          <meshBasicMaterial color={lineColour} depthTest={false} />
+        </mesh>
+      )}
     </group>
   );
 }

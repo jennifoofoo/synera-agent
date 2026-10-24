@@ -60,7 +60,7 @@ function Building({ model }: { model: BuildingModel }) {
         );
       })}
       {floorMode !== "single" && !flat && <Shafts model={model} floorY={floorY} floorTop={floorTop} closed={closed} />}
-      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={floorMode === "single" || flat ? focused : null} reducedMotion={reducedMotion} />
+      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={floorMode === "single" || flat ? focused : null} reducedMotion={reducedMotion} flat={flat} />
       <Markers
         model={model}
         state={state}
@@ -71,6 +71,7 @@ function Building({ model }: { model: BuildingModel }) {
         selection={selection}
         reducedMotion={reducedMotion}
         worker={worker}
+        flat={flat}
       />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
       {!worker && !flat && (
@@ -139,8 +140,8 @@ export function Scene() {
       ) : (
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
-      <color attach="background" args={[COLOURS.background]} />
-      <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />
+      <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
+      {!flat && <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />}
       <hemisphereLight args={["#ffffff", "#9fb4cc", 1.0]} />
       <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
       <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />
@@ -152,8 +153,9 @@ export function Scene() {
       />
       <mesh rotation-x={-Math.PI / 2} position={[centre[0], groundY, centre[2]]} renderOrder={-1}>
         <planeGeometry args={[size * 12, size * 12]} />
-        <meshBasicMaterial color={COLOURS.ground} />
+        <meshBasicMaterial color={flat ? COLOURS.plan : COLOURS.ground} />
       </mesh>
+      {!flat && (
       <Grid
         position={[centre[0], groundY + 0.02, centre[2]]}
         args={[size * 6, size * 6]}
@@ -168,6 +170,7 @@ export function Scene() {
         infiniteGrid
         followCamera={false}
       />
+      )}
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && !flat && (
