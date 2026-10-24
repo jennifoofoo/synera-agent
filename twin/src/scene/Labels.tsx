@@ -38,7 +38,7 @@ export function Labels({ floor, model, y, limit }: Props) {
   return (
     <group position-y={y + 0.5}>
       {labelled.map((space) => (
-        <Html key={space.id} position={[space.anchor[0], 0, -space.anchor[1]]} center zIndexRange={[2, 0]} style={{ pointerEvents: "none" }}>
+        <Html key={space.id} position={[space.anchor[0], 0, -space.anchor[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
           <div className={`label ${model.connectorBySpace.has(space.id) ? "label-connector" : ""}`}>{space.name}</div>
         </Html>
       ))}

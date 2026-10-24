@@ -24,7 +24,7 @@ Nothing else by default. Popovers only on click, never hover. No tabs, panels, b
 | `src/ui/Omnibox.tsx` | ask-or-search input, hits, voice in, spoken replies | **chat/search session** |
 | `src/ui/Card.tsx` | selection card (Route here / I'm here / Close) and reply card | **card session** |
 | `src/ui/Position.tsx` (stub) | "You are here" chip with clear, guide "Step k of n" + Next, arrival text | **position session** |
-| `src/ui/Worker/Mobile.tsx` (stub) | phone: audio unlock, wake lock, bottom-sheet card, mobile audit fixes | **phone session** |
+| `src/ui/Phone.tsx` (stub) | phone glue: header buttons, audio unlock, wake lock, bottom-sheet card, mobile audit fixes; rules in `MOBILE.md` | **phone session** |
 | `src/voice.ts` | Web Speech in, `/api/speak` out (fallback browser voice), audio unlock, wake lock | chat/search session (mobile session may add unlock/wake lock) |
 | `src/styles.css` | base styles at the top (scene session); each component owns its marked block (`===== Omnibox`, `===== Card`, `===== Phone`). Prefer a component-local `X.css` imported by the component if the block grows. | per block |
 
@@ -45,17 +45,18 @@ session with the exact field/action you need (name, type, when it changes) inste
 State: `buildings, buildingKey, building, model, state (BuildingState from the API: closed, added_doors,
 route, position, guide, asset edits), loading, error, chatAvailable, speechAvailable`.
 
-UI: `profile ("planner" | "worker", by width < 1100 px; worker = no AO, bigger targets), floorMode
+UI: `profile ("planner" | "worker", by width < 1100 px or a coarse-pointer phone; worker = no AO, bigger targets),
+viewMode ("2d" | "3d", phones start in 2D), bottomInset (px of UI covering the bottom; the camera frames above it), floorMode
 ("stacked" | "exploded" | "single"), focusedFloorId, thingsMode, cutaway, ao, reducedMotion, selection
 (kind space|asset|point|connector, id, floor_id, space_id?, point?), popover (screen position of the last
 click), highlights {name: {ids, colour}}, camera (request with nonce), replyShown, chat[], chatBusy, voiceOut,
 hereArmed`.
 
-Actions: `loadBuildings, openBuilding(key), applyState(state), setFloorMode, focusFloor, setThingsMode,
+Actions: `loadBuildings, openBuilding(key), applyState(state), setViewMode, setBottomInset(px), setFloorMode, focusFloor, setThingsMode,
 toggleCutaway, select(selection | null, screen?), closePopover, setHighlight(name, highlight | null),
 requestCamera({kind: home|object|floor|point, ids?, floorId?, point?, radius?}), flyTo(id) (sets the floor and
 frames the object), dismissReply, setVoiceOut, armHere(on), route(start, destination, stepFree?), clearRoute,
-setClosed(element, closed), addDoor(first, second), reset, ask(message, voice?) -> ChatReply | null`.
+setClosed(element, closed), addDoor(first, second), reset, ask(message, voice?, opts?: {here}) -> ChatReply | null`.
 
 `ask` sends the selection as `context` (space_id/asset_id/point/floor_id), adds `context.here` when
 `hereArmed`, sends top-level `voice: true` when the message came from speech, stores the reply in `chat`,

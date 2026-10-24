@@ -8,6 +8,7 @@ import { buildModel, type BuildingModel } from "./model/model";
 export type FloorMode = "stacked" | "exploded" | "single";
 export type Profile = "planner" | "worker";
 export type ThingsMode = "near" | "all" | "off";
+export type ViewMode = "2d" | "3d";
 
 export interface Selection {
   kind: "space" | "asset" | "point" | "opening" | "connector";
@@ -52,6 +53,10 @@ interface TwinState {
 
   profile: Profile;
   profileForced: boolean;
+  /** 2D = orthographic plan of the focused floor, 3D = the twin. Phones start in 2D. */
+  viewMode: ViewMode;
+  /** Height in px of UI covering the bottom of the viewport (dock / sheet); the camera frames above it. */
+  bottomInset: number;
   floorMode: FloorMode;
   focusedFloorId: string | null;
   thingsMode: ThingsMode;
@@ -74,6 +79,8 @@ interface TwinState {
   openBuilding: (key: string) => Promise<void>;
   applyState: (state: BuildingState) => void;
   setProfile: (profile: Profile | null) => void;
+  setViewMode: (mode: ViewMode) => void;
+  setBottomInset: (px: number) => void;
   setFloorMode: (mode: FloorMode) => void;
   focusFloor: (floorId: string | null) => void;
   setThingsMode: (mode: ThingsMode) => void;
@@ -92,7 +99,8 @@ interface TwinState {
   setClosed: (element: string, closed: boolean) => Promise<void>;
   addDoor: (first: string, second: string) => Promise<void>;
   reset: () => Promise<void>;
-  ask: (message: string, voice?: boolean) => Promise<ChatReply | null>;
+  /** opts.here overrides the hereArmed/selection logic, e.g. { here: { clear: true } } from the "You are here" chip. */
+  ask: (message: string, voice?: boolean, opts?: { here?: ChatContext["here"] }) => Promise<ChatReply | null>;
 }
 
 let messageId = 0;
@@ -104,7 +112,8 @@ const prefersReducedMotion =
 function autoProfile(): Profile {
   if (typeof window === "undefined") return "planner";
   const narrow = window.innerWidth < 1100;
-  return narrow ? "worker" : "planner";
+  const phone = window.matchMedia?.("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 600;
+  return narrow || phone ? "worker" : "planner";
 }
 
 export const useTwin = create<TwinState>((set, get) => ({
@@ -120,6 +129,8 @@ export const useTwin = create<TwinState>((set, get) => ({
 
   profile: autoProfile(),
   profileForced: false,
+  viewMode: autoProfile() === "worker" ? "2d" : "3d",
+  bottomInset: 0,
   floorMode: "stacked",
   focusedFloorId: null,
   thingsMode: "near",
@@ -177,6 +188,12 @@ export const useTwin = create<TwinState>((set, get) => ({
   setProfile(profile) {
     if (profile === null) set({ profile: autoProfile(), profileForced: false, ao: autoProfile() === "planner" });
     else set({ profile, profileForced: true, ao: profile === "planner" });
+  },
+  setViewMode(viewMode) {
+    set({ viewMode });
+  },
+  setBottomInset(bottomInset) {
+    if (bottomInset !== get().bottomInset) set({ bottomInset });
   },
   setFloorMode(floorMode) {
     set({ floorMode });
@@ -258,17 +275,18 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ building, model: buildModel(building), state: building.state, selection: null, popover: null, highlights: {} });
   },
 
-  async ask(message, voice = false) {
+  async ask(message, voice = false, opts = {}) {
     const { buildingKey, selection, hereArmed, model } = get();
     if (!buildingKey || !message.trim()) return null;
     const context: ChatContext = {};
+    if (opts.here) context.here = opts.here;
     if (selection) {
       if (selection.kind === "space") context.space_id = selection.id;
       if (selection.kind === "asset") (context.asset_id = selection.id), (context.space_id = selection.space_id);
       if (selection.kind === "point") (context.space_id = selection.space_id), (context.point = selection.point);
       context.floor_id = selection.floor_id;
     }
-    if (hereArmed && selection && (selection.kind === "space" || selection.kind === "point")) {
+    if (!opts.here && hereArmed && selection && (selection.kind === "space" || selection.kind === "point")) {
       context.here = { space_id: selection.kind === "space" ? selection.id : selection.space_id!, point: selection.point, floor_id: selection.floor_id };
     }
     const hasContext = Object.keys(context).length > 0;
@@ -327,8 +345,10 @@ export const useTwin = create<TwinState>((set, get) => ({
 }));
 
 if (typeof window !== "undefined") {
-  window.addEventListener("resize", () => {
+  const refreshProfile = () => {
     const { profileForced } = useTwin.getState();
     if (!profileForced) useTwin.setState({ profile: autoProfile(), ao: autoProfile() === "planner" });
-  });
+  };
+  window.addEventListener("resize", refreshProfile);
+  window.addEventListener("orientationchange", refreshProfile);
 }

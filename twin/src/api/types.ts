@@ -102,7 +102,7 @@ export interface Route {
 export interface Position {
   space_id: string;
   floor_id: string;
-  point: Point;
+  point: Point | null; // null when the position was set by room (source "said" or a click without a point)
   source: string;
 }
 

@@ -32,9 +32,23 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const reducedMotion = useTwin((s) => s.reducedMotion);
   const cutaway = useTwin((s) => s.cutaway);
   const floorMode = useTwin((s) => s.floorMode);
+  const profile = useTwin((s) => s.profile);
+  const bottomInset = useTwin((s) => s.bottomInset);
   const { bounds } = model;
   const size = bounds.size;
   const camera = useThree((s) => s.camera);
+  const viewport = useThree((s) => s.size);
+
+  // UI covering the bottom (dock, sheet): render the top part of a taller virtual frame so the framed object
+  // sits in the visible area above it.
+  useEffect(() => {
+    const w = viewport.width;
+    const h = viewport.height;
+    const inset = Math.min(bottomInset, h * 0.6);
+    if (inset > 0) camera.setViewOffset(w, h + inset, 0, inset, w, h);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+  }, [camera, viewport.width, viewport.height, bottomInset]);
 
   // Limits follow the building.
   useEffect(() => {
@@ -61,7 +75,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const box = new THREE.Box3();
     if (request.kind === "home") {
       box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
-      void c.rotateTo(HOME_AZIMUTH, HOME_POLAR, animate);
+      void c.rotateTo(HOME_AZIMUTH, profile === "worker" ? Math.PI / 5 : HOME_POLAR, animate);
       fitBox(c, box, animate, 0.95);
       return;
     }

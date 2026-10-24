@@ -130,7 +130,7 @@ export function Scene() {
       style={{ touchAction: "none" }}
     >
       <color attach="background" args={[COLOURS.background]} />
-      <fog attach="fog" args={[COLOURS.background, size * 3, size * 9]} />
+      <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />
       <hemisphereLight args={["#e8f0fa", "#0b1e3a", 1.1]} />
       <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
       <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />

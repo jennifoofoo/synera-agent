@@ -109,7 +109,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
   const chip = (text: string, kind: string) => (
-    <Html center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
+    <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
       <div className={`chip chip-${kind}`}>{text}</div>
     </Html>
   );
@@ -124,7 +124,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
     <group>
       {/* You are here */}
       {position && shown(position.floor_id) && (
-        <group position={at(position.floor_id, position.point)}>
+        <group position={at(position.floor_id, position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0])}>
           <Pulse reducedMotion={reducedMotion} speed={0.8} amount={0.25}>
             <Ring radius={1.4} colour={COLOURS.here} width={0.14} opacity={0.7} through />
           </Pulse>

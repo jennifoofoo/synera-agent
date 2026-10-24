@@ -7,7 +7,7 @@ import { FloorRail } from "./ui/FloorRail";
 import { Omnibox } from "./ui/Omnibox";
 import { Position } from "./ui/Position";
 import { TopBar } from "./ui/TopBar";
-import { Mobile } from "./ui/Worker/Mobile";
+import { Phone } from "./ui/Phone";
 
 /** One screen: the building, one input, one card. Everything else only when needed. */
 export function App() {
@@ -25,8 +25,8 @@ export function App() {
       <TopBar />
       <FloorRail />
       <ChangesPill />
+      <Phone />
       <Position />
-      <Mobile />
       <div className="dock">
         <Card />
         <Omnibox />
