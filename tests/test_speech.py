@@ -1,6 +1,7 @@
 """Offline tests for web/speech.py and POST /api/speak. No real ElevenLabs call, no key needed."""
 
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -8,8 +9,10 @@ from pathlib import Path
 
 import pytest
 
+from web import speech
 from web.server import App, make_handler
-from web.speech import SpeechError, spoken_version, synthesize
+from web.speech import SpeechError, synthesize
+from web.speech import spoken_version as tagged_version
 
 SECRET = "sk_test_secret_value_123"
 ID = "proc-campus-dev-000-F0-S012"
@@ -23,6 +26,13 @@ def env(monkeypatch):
 
 # ---------- spoken_version ----------
 
+TAG = re.compile(r' ?<break time="[0-9.]+s" /> ?')
+
+
+def spoken_version(reply, **kwargs):
+    """The spoken text without pause tags (the old tests check wording, pauses have their own tests)."""
+    return TAG.sub(" ", tagged_version(reply, **kwargs))
+
 
 def test_markdown_and_answer_line_are_removed():
     reply = "## Result\n**The lift** is `closed`.\n- Use the stairs.\nAnswer: 42"
@@ -32,7 +42,7 @@ def test_markdown_and_answer_line_are_removed():
 def test_only_three_steps_then_german_tail():
     reply = "Route found:\n1. Go left.\n2. Take the lift.\n3. Turn right.\n4. Walk on.\n5. Arrive."
     spoken = spoken_version(reply)
-    assert "Go left." in spoken and "Turn right." in spoken
+    assert "go left." in spoken and "turn right." in spoken
     assert "Walk on" not in spoken
     assert spoken.endswith("and 2 more steps, see the screen.")
     assert spoken_version(reply, lang="de").endswith("und 2 weitere Schritte, siehe Bildschirm.")
@@ -58,7 +68,7 @@ def test_dates_and_refs_are_kept_but_dataset_ids_go():
 
 def test_markdown_links_tables_rules_and_bold_steps():
     reply = "See [the plan](http://x.y/z).\n---\n| a | b |\n|---|---|\n**1.** Go left.\n**2.** Go on."
-    assert spoken_version(reply) == "See the plan. Go left. Go on."
+    assert spoken_version(reply) == "See the plan. Step one, go left. Step two, go on."
 
 
 def test_abbreviations_do_not_end_sentences():
@@ -86,7 +96,7 @@ def test_confirmation_card_keeps_core_and_question():
         "Your last route would change by 40 metres. Nothing changed yet. Should I do that?"
     )
     spoken = spoken_version(reply)
-    assert spoken == "I understood: close the east lift on floor 1. Should I do that?"
+    assert spoken == "I understood: close the east lift on floor one. Should I do that?"
 
 
 def test_german_card():
@@ -117,8 +127,10 @@ def test_english_card_markers_and_abbreviations():
 
 
 def test_room_refs_are_spelled_and_measurements_are_not():
-    assert spoken_version("Lab 0.12 is 63.4 m away") == "Lab zero point one two is 63.4 metres away"
-    assert spoken_version("Lab 0.12 is 63.4 m away", lang="de") == "Lab null Punkt eins zwei is 63.4 Meter away"
+    assert spoken_version("Lab 0.12 is 63.4 m away") == "Lab zero point one two is sixty three point four metres away"
+    assert spoken_version("Lab 0.12 is 63.4 m away", lang="de") == (
+        "Lab null Punkt eins zwei is dreiundsechzig Komma vier Meter away"
+    )
     assert spoken_version("Office 2.30 and Office 2.31.") == (
         "Office two point three zero and Office two point three one."
     )
@@ -127,11 +139,144 @@ def test_room_refs_are_spelled_and_measurements_are_not():
     )
     assert spoken_version("Raum 0.12 und 0.13", lang="de") == "Raum null Punkt eins zwei und null Punkt eins drei"
     assert spoken_version("The corridor is 12.5 metres long on floor 2.") == (
-        "The corridor is 12.5 metres long on floor 2."
+        "The corridor is twelve point five metres long on floor two."
     )
     assert spoken_version("Meeting room 0.12 has 24.5 m2.") == (
-        "Meeting room zero point one two has 24.5 square metres."
+        "Meeting room zero point one two has twenty four point five square metres."
     )
+
+
+# ---------- pacing: pauses, numbers, lists ----------
+
+BREAK = re.compile(r'<break time="([0-9.]+)s" />')
+ROUTE = "Route to Kitchen 0.28, about 36 m.\n1. Leave the office.\n2. Turn left.\n3. Go on."
+
+
+def test_pauses_after_headline_and_between_steps():
+    spoken = tagged_version(ROUTE)
+    assert spoken == (
+        "Route to Kitchen zero point two eight, about 36 metres. "
+        '<break time="0.8s" /> Step one, leave the office. <break time="0.8s" /> Step two, turn left. <break time="0.8s" /> Step three, go on.'
+    )
+    assert [float(x) for x in BREAK.findall(spoken)] == [speech.PAUSE_HEADLINE, speech.PAUSE_ITEM, speech.PAUSE_ITEM]
+
+
+def test_longer_pause_before_closing_question():
+    spoken = tagged_version("I understood: close lift B. Nothing changed yet. Should I do that?")
+    assert spoken == 'I understood: close lift B. <break time="1.2s" /> Should I do that?'
+    assert speech.PAUSE_QUESTION > speech.PAUSE_ITEM
+
+
+def test_no_pause_inside_a_short_sentence_or_at_the_edges():
+    assert tagged_version("The lift is closed.") == "The lift is closed."
+    for reply in (ROUTE, "Go left, then right, then straight on. Done?", "A. B. C. D?"):
+        spoken = tagged_version(reply)
+        assert not spoken.startswith("<") and not spoken.endswith(">")
+        assert "<break" not in spoken.split("<break")[0]
+        assert not re.search(r"/>\s*<break", spoken)
+
+
+def test_forged_tags_in_the_reply_are_stripped():
+    reply = 'Go left <break time="9s" /> now. <speak>Hi</speak> <phoneme alias="x">y</phoneme> done'
+    spoken = tagged_version(reply)
+    assert "9s" not in spoken and "<speak" not in spoken and "phoneme" not in spoken
+    assert all(float(x) in (0.8, 1.2) for x in BREAK.findall(spoken))
+    assert "<" not in BREAK.sub("", spoken) and ">" not in BREAK.sub("", spoken)
+    assert tagged_version('<break time="2s" />') == ""
+
+
+def test_tags_do_not_count_towards_max_chars():
+    reply = "Route to the lab.\n" + "\n".join(f"{i}. Walk {i}." for i in range(1, 4))
+    full = "Route to the lab. Step one, walk 1. Step two, walk 2. Step three, walk 3."
+    two = "Route to the lab. Step one, walk 1. Step two, walk 2."
+    spoken = tagged_version(reply, max_chars=len(full))
+    assert BREAK.sub(" ", spoken).count("walk") == 3 and len(spoken) > len(full) + 10
+    assert "walk 3" not in tagged_version(reply, max_chars=len(two))
+    assert "walk 2" in tagged_version(reply, max_chars=len(two))
+
+
+def test_more_steps_remark_follows_the_last_shown_step():
+    steps = "\n".join(f"{i}. Step {i}." for i in range(1, 6))
+    spoken = tagged_version(f"Route found.\n{steps}")
+    assert spoken.endswith("Step three, step 3. and 2 more steps, see the screen.")
+    assert "Step 4" not in spoken
+
+
+def test_route_steps_are_steps_and_lists_are_ordinals():
+    steps = "Route to the lab.\n1. Go left.\n2. Take the lift."
+    assert spoken_version(steps) == "Route to the lab. Step one, go left. Step two, take the lift."
+    assert spoken_version("Route zum Labor.\n1. Links.\n2. Zum Aufzug.", lang="de") == (
+        "Route zum Labor. Schritt eins, links. Schritt zwei, zum Aufzug."
+    )
+    # "Step N:" lines are steps too, and the written number is replaced by our own counting.
+    assert spoken_version("Route:\nStep 1: Go left.\nStep 2: Go on.") == "Route: Step one, go left. Step two, go on."
+    assert spoken_version("Weg:\nSchritt 1: Links.\nSchritt 2: Weiter.", lang="de") == (
+        "Weg: Schritt eins, links. Schritt zwei, weiter."
+    )
+    assert spoken_version("Route:\n1. Go on.") == "Route: Go on."  # one step needs no numbering
+    welding = "Welding station H-A1 in zone H-A1 Welding station H-A4 in zone H-A4"
+    assert spoken_version(welding).startswith("First, welding") and "Step" not in spoken_version(welding)
+    assert spoken_version("Two:\n- Press 1\n- Press 2", lang="de").count("Erstens") == 1
+    assert "Schritt" not in spoken_version("Two:\n- Press 1\n- Press 2", lang="de")
+
+
+def test_room_numbers_and_codes_english():
+    assert spoken_version("Office corridor 0.16 is next to Kitchen 0.28.") == (
+        "Office corridor zero point one six is next to Kitchen zero point two eight."
+    )
+    assert spoken_version("Room 1.30 is free.") == "Room one point three zero is free."
+    assert spoken_version("Zone H-A1 is on F1.") == "Zone H A one is on floor one."
+    assert spoken_version("Ref N3806 on floor 2.") == "Ref N three eight zero six on floor two."
+    assert spoken_version("It is 36.48 metres, about 36 m.") == (
+        "It is thirty six point four eight metres, about 36 metres."
+    )
+    assert spoken_version("That is 1.5 m wide.") == "That is one point five metres wide."
+
+
+def test_room_numbers_and_codes_german():
+    assert spoken_version("Flur 0.16 neben Küche 0.28.", lang="de") == (
+        "Flur null Punkt eins sechs neben Küche null Punkt zwei acht."
+    )
+    assert spoken_version("Zone H-A1 auf Etage F-1, 36.48 m.", lang="de") == (
+        "Zone H A eins auf Etage minus eins, sechsunddreißig Komma vier acht Meter."
+    )
+    assert spoken_version("Das sind 21.5 m und 101.2 m.", lang="de") == (
+        "Das sind einundzwanzig Komma fünf Meter und einhunderteins Komma zwei Meter."
+    )
+
+
+def test_run_on_list_becomes_separate_items():
+    reply = "Welding station H-A1 in Production zone H-A1 Welding station H-A4 in Production zone H-A4"
+    assert tagged_version(reply) == (
+        "First, welding station H A one in Production zone H A one. "
+        '<break time="0.8s" /> Second, welding station H A four in Production zone H A four.'
+    )
+    german = tagged_version("Schweißstation H-A1 in Zone H-A1 Schweißstation H-A4 in Zone H-A4", lang="de")
+    assert german.startswith("Erstens, schweißstation H A eins in Zone H A eins.") and "Zweitens," in german
+
+
+def test_lead_in_and_bullet_lists():
+    spoken = tagged_version("Found two: Welding station H-A1 in Production zone H-A1 Welding station H-A4 in zone H-A4")
+    assert spoken.startswith('Found two: <break time="0.8s" /> First, welding station H A one')
+    bullets = tagged_version("Two matches:\n- Press 1 in hall A\n- Press 2 in hall B")
+    assert bullets == (
+        'Two matches: <break time="0.8s" /> First, press 1 in hall A. <break time="0.8s" /> Second, press 2 in hall B.'
+    )
+    assert tagged_version("Note:\n- Only one bullet here") == "Note: Only one bullet here"
+
+
+def test_second_pass_keeps_text_and_never_doubles_tags():
+    for reply in (
+        ROUTE,
+        "I understood: close lift B. Should I do that?",
+        "Welding station H-A1 in zone H-A1 Welding station H-A4 in zone H-A4",
+    ):
+        once = tagged_version(reply)
+        twice = tagged_version(once)
+        assert BREAK.sub(" ", twice).split() == BREAK.sub(" ", once).split()
+        assert not re.search(r"/>\s*<break", twice)
+        assert not twice.startswith("<") and not twice.endswith(">")
+    assert tagged_version(ROUTE) == tagged_version(ROUTE)
 
 
 def test_cap_at_sentence_boundary():
@@ -170,7 +315,11 @@ def test_synthesize_success(env):
     assert synthesize("Hallo", "voice1234567890", http=fake_http(seen=seen)) == b"MP3DATA"
     assert seen["url"].endswith("/v1/text-to-speech/voice1234567890?output_format=mp3_44100_128")
     assert seen["headers"]["xi-api-key"] == SECRET
-    assert seen["data"] == {"text": "Hallo", "model_id": "eleven_flash_v2_5"}
+    assert seen["data"] == {
+        "text": "Hallo",
+        "model_id": "eleven_flash_v2_5",
+        "voice_settings": {"speed": 0.85, "stability": 0.5, "similarity_boost": 0.75},
+    }
     assert seen["timeout"] == 5
 
 
@@ -214,6 +363,28 @@ def test_synthesize_missing_key_or_voice(monkeypatch):
     monkeypatch.setenv("ELEVENLABS_API_KEY", SECRET)
     with pytest.raises(SpeechError):
         synthesize("Hallo", "", http=fake_http())
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [(None, 0.85), ("0.9", 0.9), ("0.2", 0.7), ("5", 1.2), ("abc", 0.85), ("", 0.85), ("nan", 0.85), ("inf", 0.85)],
+)
+def test_speed_from_env_is_clamped(env, monkeypatch, value, expected):
+    if value is None:
+        monkeypatch.delenv("ELEVENLABS_SPEED", raising=False)
+    else:
+        monkeypatch.setenv("ELEVENLABS_SPEED", value)
+    seen: dict = {}
+    synthesize("Hallo", "voice1234567890", http=fake_http(seen=seen))
+    assert seen["data"]["voice_settings"]["speed"] == expected
+    assert 0 <= seen["data"]["voice_settings"]["stability"] <= 1
+
+
+def test_pause_tags_reach_the_request_body(env):
+    seen: dict = {}
+    text = tagged_version(ROUTE)
+    synthesize(text, "voice1234567890", http=fake_http(seen=seen))
+    assert seen["data"]["text"] == text and "<break" in seen["data"]["text"]
 
 
 # ---------- endpoint ----------
