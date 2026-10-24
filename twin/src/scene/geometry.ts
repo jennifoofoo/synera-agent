@@ -178,6 +178,7 @@ type Gap = [Point, Point];
 
 const PERP_TOL = 0.35; // a gap cuts an edge that runs within this distance of it
 const SHARED_TOL = 0.35; // two polygon edges count as one shared boundary within this distance
+const CORNER_TIE = 0.05; // edges this much farther than the nearest one still count as meeting it (a corner)
 const DOOR_REACH = 0.8; // a door or entrance belongs to the polygon edge within this distance of its position
 
 function pointOnEdge(a: Point, b: Point, s: number): Point {
@@ -218,42 +219,45 @@ function sharedBoundaries(first: Point[], second: Point[]): Gap[] {
 }
 
 /**
- * The gap an opening cuts into the walls, as a segment in model metres (null: nothing to cut).
- * - kind "opening" between two spaces: width_m centred on `position` projected onto the shared boundary of the two
- *   polygons, clamped to that boundary (an opening wider than the boundary opens all of it).
- * - doors, entrances and everything else: width_m centred on `position` along the polygon edge nearest to it.
+ * The gaps an opening cuts into the walls, as segments in model metres (empty: nothing to cut).
+ * - between two spaces: width_m centred on `position` projected onto the shared boundary of the two polygons,
+ *   clamped to that boundary (an opening of kind "opening" wider than the boundary opens all of it).
+ * - entrances, and doors with no shared boundary near them: width_m centred on `position` along the polygon edge nearest to it; at a
+ *   polygon corner (two edges equally near) both edges open.
  */
-function openingGap(opening: Opening, polygons: Point[][]): Gap | null {
-  if (!polygons.length) return null;
+function openingGaps(opening: Opening, polygons: Point[][]): Gap[] {
+  if (!polygons.length) return [];
   const width = opening.width_m && opening.width_m > 0 ? opening.width_m : 0.9;
-  if (opening.kind === "opening" && polygons.length >= 2) {
-    let best: { gap: Gap; distance: number } | null = null;
+  if (polygons.length >= 2) {
+    // Between two spaces the gap lies on their shared boundary, whatever else is near the position.
+    let best: { segment: Gap; s: number; length: number; distance: number } | null = null;
     for (const segment of sharedBoundaries(polygons[0], polygons[1])) {
-      const { s, distance, length } = nearestOnEdge(segment[0], segment[1], opening.position);
-      if (!best || distance < best.distance) {
-        const half = width / 2;
-        const from = width >= length - 0.01 ? 0 : Math.max(0, s - half);
-        const to = width >= length - 0.01 ? length : Math.min(length, s + half);
-        best = { gap: [pointOnEdge(segment[0], segment[1], from), pointOnEdge(segment[0], segment[1], to)], distance };
-      }
+      const hit = nearestOnEdge(segment[0], segment[1], opening.position);
+      if (!best || hit.distance < best.distance) best = { segment, ...hit };
     }
-    if (best) return best.gap;
+    if (best && (opening.kind === "opening" || best.distance <= DOOR_REACH)) {
+      const { segment, s, length } = best;
+      const half = opening.kind === "opening" ? width / 2 : Math.max(0.3, width / 2);
+      const whole = opening.kind === "opening" && width >= length - 0.01;
+      return [[pointOnEdge(segment[0], segment[1], whole ? 0 : Math.max(0, s - half)), pointOnEdge(segment[0], segment[1], whole ? length : Math.min(length, s + half))]];
+    }
   }
-  let nearest: { a: Point; b: Point; s: number; distance: number; length: number } | null = null;
+  const near: { a: Point; b: Point; s: number; distance: number; length: number }[] = [];
   for (const polygon of polygons) {
     for (let i = 0; i < polygon.length; i++) {
       const a = polygon[i];
       const b = polygon[(i + 1) % polygon.length];
       const hit = nearestOnEdge(a, b, opening.position);
-      if (hit.length >= 0.05 && (!nearest || hit.distance < nearest.distance)) nearest = { a, b, ...hit };
+      if (hit.length >= 0.05) near.push({ a, b, ...hit });
     }
   }
-  if (!nearest || nearest.distance > DOOR_REACH) return null;
+  if (!near.length) return [];
+  const closest = Math.min(...near.map((edge) => edge.distance));
+  if (closest > DOOR_REACH) return [];
   const half = Math.max(0.3, width / 2);
-  return [
-    pointOnEdge(nearest.a, nearest.b, Math.max(0, nearest.s - half)),
-    pointOnEdge(nearest.a, nearest.b, Math.min(nearest.length, nearest.s + half)),
-  ];
+  return near
+    .filter((edge) => edge.distance <= closest + CORNER_TIE)
+    .map((edge): Gap => [pointOnEdge(edge.a, edge.b, Math.max(0, edge.s - half)), pointOnEdge(edge.a, edge.b, Math.min(edge.length, edge.s + half))]);
 }
 
 /** The pieces of [0, 1] (parameter along edge a-b) that stay after cutting the gaps that lie along the edge. */
@@ -343,14 +347,13 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
   const gapsBySpace = new Map<string, Gap[]>();
   for (const opening of effectiveOpenings(floor, edits)) {
     const joined = opening.space_ids.filter((id) => indexById.has(id));
-    const gap = openingGap(
+    const gaps = openingGaps(
       opening,
       joined.map((id) => polygons[indexById.get(id)!]),
     );
-    if (!gap) continue;
     for (const spaceId of joined) {
       const list = gapsBySpace.get(spaceId) ?? [];
-      list.push(gap);
+      list.push(...gaps);
       gapsBySpace.set(spaceId, list);
     }
   }
