@@ -1,30 +1,30 @@
 /* ===== Card (owner: card/position session). Uses the base tokens from styles.css. */
 .card {
-  position: relative; padding: 12px 14px; border-radius: 14px; background: var(--panel-solid);
-  border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(20, 48, 90, 0.14);
-  transition: transform 0.18s ease;
-  animation: card-in 0.18s ease-out;
+  position: relative; padding: 12px 14px; border-radius: var(--radius); background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--shadow-float);
+  animation: card-in 150ms ease-out;
 }
-@keyframes card-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes card-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .card-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .card-title strong { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-line, .card-muted { color: var(--muted); font-size: 13px; }
 .card-line { margin-top: 2px; }
 .card-kicker { font-weight: 600; font-size: 13px; }
-.card-note { color: #a86b12; font-size: 12.5px; margin-top: 6px; }
+.card-note { color: var(--warn); font-size: 12.5px; margin-top: 6px; }
 .card-actions { display: flex; gap: 8px; margin-top: 10px; }
 .card-actions button { flex: 1; }
-.card button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.card button.primary:hover { filter: brightness(1.06); }
+.card button.primary { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); font-weight: 600; }
+.card button.primary:hover { background: var(--signal); filter: brightness(0.94); }
 .card button.quiet { flex: 0 0 auto; border-color: transparent; background: transparent; color: var(--muted); }
+.card button.quiet:hover { background: transparent; color: var(--text); }
 .card button.link {
   border: 0; background: transparent; padding: 0; min-height: 0; color: var(--accent); font-size: 13px;
 }
 
-/* selection: the one place with gold */
-.card-selection { border-color: rgba(201, 150, 46, 0.55); box-shadow: inset 3px 0 0 var(--gold), 0 10px 30px rgba(20, 48, 90, 0.14); }
-.sel-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px rgba(201, 150, 46, 0.22); }
+/* selection: the signal colour */
+.card-selection { border-color: var(--signal); box-shadow: var(--shadow-float); }
+.sel-dot { flex: none; width: 8px; height: 8px; border-radius: 1px; background: var(--signal); }
 
 /* reply: 3 lines, then "more" */
 .card-reply-body { display: flex; align-items: flex-start; gap: 8px; }
@@ -36,28 +36,29 @@
 
 /* guide: step dots, only the current one stands out */
 .steps { display: flex; gap: 4px; }
-.steps i { width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
+.steps i { width: 6px; height: 6px; border-radius: 1px; background: var(--hairline-strong); opacity: 0.5; }
 .steps i.done { background: var(--muted); }
-.steps i.now { background: var(--accent); width: 14px; border-radius: 3px; }
+.steps i.now { background: var(--signal); opacity: 1; width: 14px; }
 
 /* route facts */
 .route-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
 .route-facts { display: inline-flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 13px; }
+.route-facts { font-variant-numeric: tabular-nums; }
 .route-facts b { color: var(--text); }
-.route-facts .ok { color: #1f8f6a; }
-.route-facts .warn { color: #a86b12; }
+.route-facts .ok { color: var(--ok); }
+.route-facts .warn { color: var(--warn); }
 .route-links { display: inline-flex; gap: 14px; }
 .card button.link.quiet-link { color: var(--muted); }
-.route-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.route-dot { flex: none; width: 8px; height: 8px; border-radius: 1px; background: var(--signal); }
 
 /* You are here chip */
 .here-chip {
   align-self: flex-start; display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 2px;
-  border-radius: 999px; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px); font-size: 13px;
+  border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); font-size: 13px;
 }
-.here-chip .here-name { border: 0; background: transparent; min-height: 28px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); border-radius: 999px; }
+.here-chip .here-name { border: 0; background: transparent; min-height: 28px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); border-radius: var(--radius-sm); }
 .here-chip .here-name b { color: var(--text); font-weight: 600; }
-.here-dot { width: 9px; height: 9px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+.here-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--info); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--info); }
 
 /* phone: PhoneSheet (Phone.css) is the surface; here only sizes, and the 3-line clamp kept inside the sheet */
 .phone-sheet .card { animation: none; }
