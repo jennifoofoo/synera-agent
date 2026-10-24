@@ -118,18 +118,6 @@ export function Walk() {
           <p aria-live="polite">{steps[step]}</p>
         </div>
         <HandsFreeStatus />
-        {/* Walk with me: counts steps on the phone and moves an estimated dot along the route (off by default). */}
-        <div className="walk-motion">
-          <label className="walk-motion-switch">
-            <input type="checkbox" role="switch" checked={motionOn} onChange={() => void toggleWalkWithMe()} aria-label="Walk with me" />
-            Walk with me
-          </label>
-          {(motionNotice || estimate?.atConnector) && (
-            <span className="walk-motion-note" role="status" aria-live="polite">
-              {motionNotice ?? "Waiting here. Tap Next once you are through."}
-            </span>
-          )}
-        </div>
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back
@@ -138,10 +126,23 @@ export function Walk() {
             {last ? "Done" : "Next"}
           </button>
         </div>
-        {steps.length > 1 && (
-          <button className="link walk-toggle" onClick={() => setList(!list)} aria-expanded={list}>
-            {list ? "Hide steps" : `All ${steps.length} steps`}
-          </button>
+        {/* One quiet row under the buttons: the Walk with me switch (counts steps, moves an estimated dot along the
+            route; off by default) and the list toggle. */}
+        <div className="walk-foot">
+          <label className="walk-motion-switch">
+            <input type="checkbox" role="switch" checked={motionOn} onChange={() => void toggleWalkWithMe()} aria-label="Walk with me" />
+            Walk with me
+          </label>
+          {steps.length > 1 && (
+            <button className="link walk-toggle" onClick={() => setList(!list)} aria-expanded={list}>
+              {list ? "Hide steps" : `All ${steps.length} steps`}
+            </button>
+          )}
+        </div>
+        {(motionNotice || estimate?.atConnector) && (
+          <p className="walk-motion-note" role="status" aria-live="polite">
+            {estimate?.atConnector ? "Waiting here. Tap Next once you are through." : motionNotice}
+          </p>
         )}
         {list && (
           <ol className="walk-list">
