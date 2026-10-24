@@ -28,7 +28,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from starter_agent.building_map import BuildingMap, MapError
+from starter_agent.building_map import MapError
 from web import api, speech
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
@@ -93,7 +93,7 @@ class App:
         with self.lock:
             if key not in self.sessions:
                 directory = api.resolve_building_dir(self.data_root, key)
-                self.sessions[key] = api.Session(key, directory, BuildingMap.load(directory))
+                self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory))
             return self.sessions[key]
 
     def reset(self, key: str) -> api.Session:
@@ -132,12 +132,16 @@ class App:
             message = str(body.get("message", "")).strip()
             if not message:
                 return 400, {"error": "Empty message."}
-            session = self.session(key)
-            previous_route = session.map.last_route
+            with self.lock:  # session and chat together, so a reset cannot pair a new map with an old chat
+                session, chat = self.session(key), self.chat(key)
+                previous_route, version = session.map.last_route, session.route_version
             # Not under the lock: an API call takes seconds and must not freeze the map.
-            result = self.chat(key).ask(message)
+            result = chat.ask(message)
             with self.lock:
-                session.adopt_agent_route(previous_route)
+                current = self.session(key)
+                if current is not session:  # the building was reset while the agent was thinking
+                    return 200, {**result, "stale": True, "state": api.state_view(current)}
+                session.adopt_agent_route(previous_route, version)
                 return 200, {**result, "state": api.state_view(session)}
         with self.lock:
             session = self.session(key)

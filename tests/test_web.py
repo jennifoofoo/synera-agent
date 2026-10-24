@@ -164,3 +164,66 @@ def test_http_round_trip(app, key):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---------- chat and page at the same time (fake agent, no API) ----------
+
+
+def fake_chat(app: App, key: str, monkeypatch, during_ask) -> None:
+    """Chat on with a fake agent: ask() runs `during_ask(map)` the way the real agent would use the shared map."""
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+
+    def ask(adapter, text: str) -> dict:
+        during_ask(adapter.map)
+        return {"reply": "done", "backend": "fake"}
+
+    monkeypatch.setattr("web.chat.ChatAdapter.ask", ask)
+
+
+def test_agent_route_is_drawn_with_its_via_stops(app, key, monkeypatch):
+    start, end = rooms_on_lift_floors(app, key)
+    bm = app.session(key).map
+    via = next(
+        s["id"] for s in bm.spaces.values() if s["floor_id"] == bm.spaces[start]["floor_id"] and s["id"] != start
+    )
+    fake_chat(app, key, monkeypatch, lambda m: m.route(start, end, False, [via]))
+    _, reply = app.post("/api/chat", {"building": key, "message": "take me there via the other room"})
+    route = reply["state"]["route"]
+    assert route["ok"] and route["via"] == [via] and via in route["space_path"]
+
+
+def test_page_route_asked_during_chat_wins_over_the_agent_route(app, key, monkeypatch):
+    start, end = rooms_on_lift_floors(app, key)
+
+    def agent_then_page(m):
+        m.route(start, end, False, None)  # the agent routes first ...
+        app.post("/api/route", {"building": key, "start": end, "destination": start})  # ... the page asks later
+
+    fake_chat(app, key, monkeypatch, agent_then_page)
+    _, reply = app.post("/api/chat", {"building": key, "message": "route me"})
+    assert (reply["state"]["route"]["start"], reply["state"]["route"]["destination"]) == (end, start)
+
+
+def test_page_routing_leaves_the_agent_route_slot_alone(app, key):
+    start, end = rooms_on_lift_floors(app, key)
+    bm = app.session(key).map
+    agent_route = bm.route(start, end)
+    app.post("/api/route", {"building": key, "start": end, "destination": start})
+    app.get("/api/building", {"key": [key]})  # redraws the page route
+    assert bm.last_route is agent_route
+
+
+def test_reset_during_chat_returns_the_fresh_building(app, key, monkeypatch):
+    start, end = rooms_on_lift_floors(app, key)
+
+    def agent_closes_then_page_resets(m):
+        lift = next(c["id"] for c in m.connectors.values() if c["kind"] == "lift")
+        m.set_closed(lift, True)
+        m.route(start, end, False, None)
+        app.post("/api/reset", {"building": key})
+
+    fake_chat(app, key, monkeypatch, agent_closes_then_page_resets)
+    _, reply = app.post("/api/chat", {"building": key, "message": "close the lift"})
+    assert reply["stale"] is True
+    assert reply["state"] == {"closed": [], "added_doors": [], "route": None}
