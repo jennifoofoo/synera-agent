@@ -112,3 +112,11 @@ Status: 3a und 3b **gesetzt** (Leonie, 24.10.2026), 3c geparkt. Gedanke: 3D nich
 - Ein Schichtablauf ("Teil holen, Prüflabor, Montage, Lager") wird als Linien gezeichnet, mit Metern pro Schicht.
 - Der Agent probiert Varianten ("Werkzeugregal nach Halle 2") und zeigt die bessere: "minus 340 m pro Schicht".
 - Daten: `errand`-Logik, nächster Raum mit Asset, Was-wäre-wenn. Fehlt: echte Abläufe und Häufigkeiten (Annahmen vom Nutzer erfragen).
+
+### 3d. Störungs-Modus für den Instandhalter, geparkt
+- Persona aus dem README: Servicetechniker, Hände voll, Handy in der Tasche, will Sprache.
+- Per Sprache: "Presse 2 steht still." Der Agent findet die Maschine, die 3D-Ansicht fliegt hin, die Maschine blinkt rot.
+- Eine Rückfrage: "Brauchst du Werkzeug?" Wenn ja, nächstes passendes Werkzeug oder Ersatzteil suchen und die Route darüber legen (erst holen, dann zur Maschine, wie `errand`).
+- An der Maschine die Zugangsseite markieren (die Seite, die nicht an Wand oder Nachbarmaschine steht, aus `footprint` und Nachbarn).
+- Wegbeschreibung per Sprache in kurzen Schritten mit Landmarken.
+- Unterschied zur normalen Route: Der Agent denkt den Auftrag mit (holen, wo anpacken), nicht nur den Weg. Näher an "üblich" als 3a und 3b.
