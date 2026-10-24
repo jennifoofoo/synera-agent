@@ -250,3 +250,34 @@ Status: geparkt (Leonie, 24.10.2026). Gedanke für die Story: 6G soll Gebäude s
 - Ablauf: "Presse 2 steht." Der Agent kennt die Positionen der eingecheckten Techniker, rechnet echte Laufwege (nicht Luftlinie, über Treppen und Aufzüge) und schlägt den nächsten vor: "Max ist 40 m entfernt, Lena 120 m über die Treppe." Auf Ja bekommt Max die Route, optional mit Werkzeug-Abholung (3d Störungs-Modus).
 - Daten: Routing, `errand`-Logik, Maschinenpositionen vorhanden. Fehlt: Qualifikation der Techniker (im Gespräch angeben oder simulieren).
 - Passt zu Syneras Präsentation (Mehrnutzer-Karte auf der Schlussfolie).
+
+## 6. Geplante Wartungen anmelden (Idee von Jennifer, 24.10.2026)
+Status: geparkt. Baut auf der Spec `docs/specs/live-updates.md` auf (Sperrungen mit Zeitraum, Dokumente, Sprache) und auf Idee 3b (Ereignisprotokoll).
+
+### Idee
+Wartungen sind keine Überraschung, sondern vorab bekannt. Man **meldet sie an** (per Sprache, Text, Formular in der Seite oder Dokument) und das Gebäude "weiß" es: Wann wird was gewartet, wer macht es, was ist dadurch gesperrt, wie komme ich trotzdem hin?
+- "Die Abkantpresse H-A3-B wird am 4. November von 8 bis 12 Uhr gewartet, Techniker Müller." Der Agent legt einen Wartungstermin an: Gerät, Zeitraum, Person, Dauer, Wirkung (die Maschine ist gesperrt, der Gang davor ist bis 10 Uhr blockiert, ein Umweg wird nötig).
+- Wiederkehrende Wartungen: "Alle Aufzüge jeden ersten Montag im Monat, 7 bis 9 Uhr." Der Eintrag wiederholt sich selbst.
+- Erinnerung und Warnung: "Morgen ab 8 Uhr ist Aufzug 1 in Wartung. Deine Route für morgen führt über ihn, hier ist der Umweg." Der Techniker bekommt seinen Weg zum Gerät (mit Landmarken und Abbiegehinweisen) und sagt "angekommen" (Beginn), "fertig" (Ende, hebt die Sperrung auf).
+- Konflikte erkennen: "Am 4. November sind schon der Aufzug 2 und der Hauptgang gesperrt. Mit dieser Wartung ist Halle B nicht mehr erreichbar." Der Agent zeigt es als Warnung, bevor der Termin bestätigt wird.
+- Überblick: Wartungskalender pro Gebäude, "Was ist diese Woche in Wartung?", "Was steht beim Gerät X an?", "Wann war die letzte Wartung der Presse?" (Verlauf aus dem Ereignisprotokoll).
+
+### Was daraus ohne Neubau folgt
+- Alles aus `live-updates.md` (Zeitraum, automatisches Anwenden und Aufheben, Routen für einen Zeitpunkt, Warnung vor kommenden Sperrungen, Dokumente und Kalenderdateien einlesen) deckt die Sperrungsseite ab. Dazu kommt nur noch die **Wartungsseite**: Gerät, verantwortliche Person, Art (Inspektion, Reparatur, Reinigung), Wiederholung, Status (geplant, läuft, erledigt) und Notizen.
+- Wartungstypen als `kind: maintenance` im Datenmodell `ScheduledChange` (schon vorgesehen), erweitert um `asset_id`, `assignee`, `task`, `repeat`.
+- Techniker-Weg: `give_directions` zum Gerät mit Rolle "Techniker" (Hände voll, Landmarken, Dreierschritte, Sprache), das gibt es.
+- Verlauf: die Ereignisse "Wartung begonnen" und "fertig" mit Zeit gehören ins Ereignisprotokoll (Idee 3b).
+
+### Was die Daten nicht hergeben
+Es gibt keine Wartungsdaten, Intervalle, Techniker oder Termine (geprüft). Alles wird von Menschen oder Dokumenten gemeldet. Wir erfinden nichts: kein "die Presse ist wartungsfällig" ohne gemeldete Wartung. Ein Standard-Intervall nach Geräteart (zum Beispiel "Aufzug monatlich") wäre nur ein Vorschlag mit Quelle "Beispielregel".
+
+### Aufbau und Aufwand
+- Abhängig von Schritt 1 der Live-Updates-Spec (4 bis 5 Stunden). Dazu für Wartungen: Felder, Wiederholung, Konflikterkennung ("Was ist dann nicht mehr erreichbar?", Wiederverwendung von `impact.analyse` mit Zeitpunkt), Techniker-Weg, Status "läuft" und "erledigt" per Sprache: etwa 3 bis 4 Stunden.
+- Oberfläche (Leonie): Wartungskalender (Wochenansicht), Formular "Wartung anmelden", Gerät auf dem Plan markiert, Banner "Wartung beginnt in 20 Min".
+- Mit Dokumenten (Wartungsplan als CSV, Kalenderdatei oder Aushang): gehört zu Schritt 2 der Live-Updates-Spec.
+
+### Risiken und Haken
+- Zeitangaben und Zeitzonen (siehe Live-Updates-Spec): Karte zeigt immer das ausgewertete Datum mit Wochentag.
+- Wer darf Wartungen anmelden und aufheben? Ohne Rechteprüfung (Idee 4) darf es jeder, der den Agenten fragt. Hinweis in der Karte.
+- Sicherheit: Wartungsmeldungen nicht als Freigabe für gefährliche Arbeiten darstellen ("Sperrung für Planung", kein Sicherheitsfreigabe-System).
+- Einordnung: Gehört zu "Make things move" und zu "A building that never stops changing" in der Synera-Präsentation. Für die Jury eine glaubwürdige Alltagsgeschichte, aber keine Rubrik der Kernwertung. Beim Gate zusammen mit Live-Updates entscheiden, nicht einzeln.

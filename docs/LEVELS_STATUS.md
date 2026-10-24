@@ -60,3 +60,9 @@ Abgleich mit dem, was wir können (ehrlich):
 | "Use what is possible today": Voice in/out, Rückfragen, zeigt, was es verstanden hat, Directions people can follow | fertig, außer "Live updates from a scan" und "AR on the phone" (optional, nicht geplant) |
 | Schlussfolie: isometrische 3D-Etagen über dem 2D-Plan, Spielkarte (Mario), Among-Us-Karte (mehrere Spieler), Kartenroute | Hinweis auf Darstellung: 3D und Mehrnutzer wirken wichtig. 3D steht im Idea Fridge, Mehrnutzer nicht geplant. |
 | Baseline-Folie: "Scale: several floors and buildings, linked by stairs and lifts" | Campus-Links haben `level_delta`, Treppen und Aufzüge zwischen Gebäuden sind damit abbildbar. |
+
+## Weitere Spezifikationen und Ideen (nicht gebaut)
+- Live-Updates mit Zeiträumen, Dokumenten und Sprache: `docs/specs/live-updates.md` (Entwurf).
+- Eingangsprüfung für alle Plan-Fälle in Level 4: `docs/specs/plan-input-coverage.md` (Entwurf).
+- Accessibility-Modus: `docs/specs/accessibility-mode.md` (Entwurf).
+- Idea Fridge: Accessibility, 3D mit Walkthrough, Funde aus der Synera-Präsentation, Zutrittsrechte, Roadmap-Geschichte, geplante Wartungen (`docs/IDEAS.md`).
