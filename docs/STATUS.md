@@ -10,8 +10,8 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | Kind (Testfragen) | Wer | Status | Branch |
 |---|---|---|---|
 | errand (20) | Jennifer | gemergt | feat/q-errand |
-| floor_area_total (33) | Jennifer | in Arbeit | feat/q-floor_area_total |
-| straight_line_3d (15) | Jennifer | in Arbeit | feat/q-straight_line_3d |
+| floor_area_total (33) | Jennifer | gemergt | feat/q-floor_area_total |
+| straight_line_3d (15) | Jennifer | gemergt | feat/q-straight_line_3d |
 | shared_walls_count (26) | Leonie | in Arbeit | feat/q-shared_walls_count |
 | largest_room (21) | Leonie | in Arbeit | feat/q-largest_room |
 | wide_delivery_count (18) | Leonie | in Arbeit | feat/q-wide_delivery_count |
