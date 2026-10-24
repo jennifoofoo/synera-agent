@@ -1,7 +1,7 @@
 /* ===== Planner list (owner: planner session). Laptop only; quiet: flat paper, colour only for problems. */
 .planner-toggle {
   position: absolute; right: 14px; top: 14px; z-index: 3; min-height: 30px; padding: 4px 12px;
-  border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--text);
+  border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--muted); border-color: transparent;
 }
 /* the changes pill sits left of the List button */
 .app.planner .pill { right: 76px; }
