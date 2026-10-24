@@ -268,3 +268,17 @@ def test_parser_is_fast():
         parse_question(bm, q["question"])
         slowest = max(slowest, time.perf_counter() - start)
     assert slowest < 0.05
+
+
+def test_answer_deterministic_reuses_the_walking_lengths_per_building():
+    from building_agent import routing
+
+    building = min(Path("data/dev").glob("proc-factory-dev-*"))
+    question = next(
+        json.loads(line)["question"]
+        for line in (building / "questions.jsonl").read_text(encoding="utf-8").splitlines()
+        if json.loads(line)["kind"] == "errand"
+    )
+    first = answer_deterministic(building, question)
+    assert building in routing._WALKS  # computed once and kept for the next question on this building
+    assert answer_deterministic(building, question) == first
