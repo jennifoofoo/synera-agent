@@ -5,6 +5,9 @@ import react from "@vitejs/plugin-react";
 // The server checks Origin/Host on /api/speak and /api/level4/*, so the proxy presents itself as the same origin.
 const API = process.env.TWIN_API ?? "http://127.0.0.1:8765";
 
+// A phone demo over a Cloudflare quick tunnel (scripts/tunnel-twin.sh) arrives with a *.trycloudflare.com host.
+const allowedHosts = [".trycloudflare.com"];
+
 const proxy = {
   "/api": {
     target: API,
@@ -17,7 +20,7 @@ const proxy = {
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5180, host: true, proxy },
-  preview: { port: 5181, host: true, proxy },
+  server: { port: 5180, host: true, proxy, allowedHosts },
+  preview: { port: 5181, host: true, proxy, allowedHosts },
   build: { outDir: "dist", sourcemap: false, chunkSizeWarningLimit: 1500 },
 });
