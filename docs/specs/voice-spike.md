@@ -139,3 +139,25 @@ Dateiliste: `web/speech.py`, `web/static/voice.js`, `tests/test_speech.py`, Änd
 - https://elevenlabs.io/docs/api-reference/text-to-speech/stream
 - https://elevenlabs.io/docs/overview/models
 - https://elevenlabs.io/pricing/api
+
+## API (Vertrag für `web/static/voice.js`)
+
+Backend steht (`web/speech.py`, `web/server.py`). Modell `eleven_flash_v2_5`, `language_code` wird nicht gesendet (Sprache wird aus dem Text erkannt).
+
+`GET /api/status` enthält `speech_available` (true, wenn Key und Voice-ID in der Umgebung stehen; die Werte werden nie ausgegeben).
+
+`POST /api/speak`, JSON `{ "text": "<voller Agent-Text>", "voice_id": "<optional>" }`. Der Server kürzt selbst (`spoken_version`), die Seite schickt den ungekürzten Text.
+
+| Status | Inhalt | Was die Seite tut |
+|---|---|---|
+| 200 | `audio/mpeg` (Bytes) | `new Audio(URL.createObjectURL(blob)).play()` |
+| 400 | JSON `{error}` (nichts zu sagen) | nichts abspielen |
+| 502 | JSON `{error, fallback}` (Quota, 401, Timeout nach 5 s, ElevenLabs-Fehler) | `speechSynthesis` mit dem Text, sonst stumm; Text steht immer da |
+| 503 | JSON `{error}` (kein Key oder keine Voice-ID) | wie 502; besser: `speech_available` aus `/api/status` beim Laden lesen und gleich die Browser-Stimme nutzen |
+
+Push-to-talk:
+1. Klick auf Sprechen: `SpeechRecognition` starten (`lang` de-DE/en-US), Transkript anzeigen.
+2. Ende der Erkennung: Text per `/api/chat` senden, Antwort als Text anzeigen.
+3. Danach `POST /api/speak` mit der Antwort, Audio abspielen. Mikro ist während der Wiedergabe aus.
+4. Nach `ended` die Erkennung nur neu starten, wenn die Antwort eine Rückfrage oder Verständniskarte war.
+5. Stopp oder erneuter Klick auf Sprechen: `audio.pause()` und `recognition.abort()`.

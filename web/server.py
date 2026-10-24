@@ -13,6 +13,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/door     {first, second, step_free}
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
   POST /api/chat     {message}
+  POST /api/speak    {text, voice_id?}                   audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 """
 
 import argparse
@@ -25,7 +26,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from starter_agent.building_map import BuildingMap, MapError
-from web import api
+from web import api, speech
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 
@@ -33,6 +34,10 @@ STATIC = Path(__file__).parent / "static"
 DEFAULT_PORT = 8765
 DEFAULT_HOST = "127.0.0.1"
 MAX_BODY_BYTES = 1_000_000
+
+
+def speech_available() -> bool:
+    return bool(os.environ.get("ELEVENLABS_API_KEY") and os.environ.get("ELEVENLABS_VOICE_ID"))
 
 
 class App:
@@ -43,6 +48,20 @@ class App:
         self.sessions: dict[str, api.Session] = {}
         self.chats: dict[str, ChatAdapter] = {}
         self.lock = threading.RLock()
+        self.synthesize = speech.synthesize  # replaced in tests
+
+    def speak(self, body: dict) -> tuple[int, bytes | dict]:
+        """Shorten the text for speaking and return MP3 bytes, or (status, error payload)."""
+        voice_id = str(body.get("voice_id") or os.environ.get("ELEVENLABS_VOICE_ID", ""))
+        if not (os.environ.get("ELEVENLABS_API_KEY") and voice_id):
+            return 503, {"error": "Speech is not configured (ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID)."}
+        text = speech.spoken_version(str(body.get("text", "")))
+        if not text:
+            return 400, {"error": "Nothing to say."}
+        try:
+            return 200, self.synthesize(text, voice_id)
+        except speech.SpeechError as error:
+            return 502, {"error": str(error), "fallback": "browser_voice_or_text"}
 
     def session(self, key: str) -> api.Session:
         with self.lock:
@@ -68,7 +87,11 @@ class App:
 
     def get(self, path: str, query: dict) -> tuple[int, dict]:
         if path == "/api/status":
-            return 200, {"chat_available": chat_available(), "chat_backend": chat_backend_name()}
+            return 200, {
+                "chat_available": chat_available(),
+                "chat_backend": chat_backend_name(),
+                "speech_available": speech_available(),
+            }
         if path == "/api/buildings":
             return 200, {"buildings": api.list_buildings(self.data_root)}
         if path == "/api/building":
@@ -137,6 +160,21 @@ def make_handler(app: App) -> type:
             self.end_headers()
             self.wfile.write(body)
 
+        def run_speak(self, body: dict) -> None:
+            try:
+                status, payload = app.speak(body)
+            except Exception as error:  # noqa: BLE001 - report it, don't kill the server
+                status, payload = 500, {"error": f"{type(error).__name__}: {error}"}
+            if isinstance(payload, bytes):
+                self.send_response(status)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(payload)
+            else:
+                self.send_json(status, payload)
+
         def run(self, action) -> None:
             try:
                 status, payload = action()
@@ -163,6 +201,9 @@ def make_handler(app: App) -> type:
                 body = json.loads(self.rfile.read(length) or b"{}")
             except json.JSONDecodeError:
                 self.send_json(400, {"error": "Body is not JSON."})
+                return
+            if url.path == "/api/speak":
+                self.run_speak(body)
                 return
             self.run(lambda: app.post(url.path, body))
 
