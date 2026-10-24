@@ -15,6 +15,7 @@ from building_agent.find_space import find_space
 from building_agent.find_tools import make_find_tools
 from building_agent.guide_tools import GuideState, make_guide_tools
 from building_agent.impact import make_impact_tools
+from building_agent.judge_route import judge_route
 from building_agent.registry import Kind, load_kinds
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -125,6 +126,25 @@ def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None
             raise ToolError(str(error)) from error
         return as_json(asdict(result))
 
+    @beta_tool
+    def find_forklift_route(start: str, destination: str, via: list[str] | None = None) -> str:
+        """Route for a FORKLIFT or pallet truck: only forklift aisles and openings 3 m or wider, never stairs,
+        and production bays only as a start or destination, never passed through. Use this instead of
+        find_route when the person drives a forklift or moves pallets by truck.
+
+        Args:
+            start: Space id, asset id, or exact room number/name of where the forklift is.
+            destination: Space id, asset id, or exact room number/name of where it must go.
+            via: Optional list of places to visit in order between start and destination.
+        """
+        try:
+            result = judge_route(bm, start, destination, forklift=True, via=via)
+        except MapError as error:
+            raise ToolError(str(error)) from error
+        if not result["ok"]:
+            raise ToolError(f"No forklift route: {result['reason']}")
+        return as_json(result)
+
     kinds = [kind_tool(bm, kind) for kind in load_kinds().values()]
     starter = [
         tool
@@ -135,6 +155,7 @@ def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None
     return [
         *starter,
         find_route,
+        find_forklift_route,
         find_space_tool,
         *make_find_tools(bm),
         *make_impact_tools(bm),

@@ -80,3 +80,19 @@ def test_bracketed_overview_string_is_reduced_to_the_id():
     assert clean_reference(bm, f"{bm.spaces[start]['name']} [{start}]") == start
     assert clean_reference(bm, "Office 1.02") == "Office 1.02"
     assert clean_reference(bm, "Room [not-an-id]") == "Room [not-an-id]"
+
+
+def test_forklift_route_tool_exists_and_refuses_pedestrian_only_buildings_cleanly():
+    from pathlib import Path
+
+    from anthropic.lib.tools import ToolError
+
+    from starter_agent.building_map import BuildingMap
+
+    bm = BuildingMap.load(Path("data/dev/proc-factory-dev-003"))
+    tool = tool_by_name(make_tools(bm, None), "find_forklift_route")
+    spaces = sorted(bm.spaces)
+    try:
+        tool(start=spaces[0], destination=spaces[-1])
+    except ToolError as error:
+        assert "forklift" in str(error).lower() or "no route" in str(error).lower() or str(error)

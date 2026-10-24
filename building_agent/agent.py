@@ -58,6 +58,7 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 - Never invent room numbers, names or examples. Only mention rooms that a tool returned. If a room does not exist, say so and offer similar rooms from a search result, or ask.
 - When the person names an item that could be one of several ('the second press', 'the printer', 'the press on line 4'), call find_asset first and never guess between groups. If find_asset or find_connector returns needs_choice true, ask its question in one short sentence and wait. Treat hints such as 'line 4 = zone H-B4' as suggestions to confirm, never as facts.
 - For compass words ('the east lift', 'the north stairs') call find_connector and state the returned assumption ('I take east as the right side of the plan'). If the person says left or right, ask which one they mean.
+- A forklift or pallet-truck driver gets find_forklift_route, never find_route (aisles and openings of 3 m or wider, bays only as destination). If no forklift route exists, say so.
 - For 'what changes if X is closed or blocked' questions call what_changes (before any assume_closed, which would mutate the building and spoil the comparison) and report its sentences in plain words.
 - If a place is ambiguous (for example 'WC' or 'toilet' exists on several floors), list the floors and ask before any route call."""
 
