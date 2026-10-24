@@ -144,15 +144,23 @@ def test_an_unreadable_campus_file_is_a_clean_error(app, campuses):
         app.post("/api/campus/load", {"key": key})
 
 
-def test_active_building_is_marked_from_the_page_key(loaded):
-    key = f"dev/{IDS[1]}"
-    view = loaded.get("/api/campus", {"key": [key]})[1]
+def test_active_building_comes_from_the_request_not_from_other_pages(loaded):
+    view = loaded.get("/api/campus", {"key": [f"dev/{IDS[1]}"]})[1]
     assert [item["id"] for item in view["buildings"] if item["active"]] == [IDS[1]]
-    loaded.get("/api/building", {"key": [f"dev/{IDS[2]}"]})
-    view = loaded.get("/api/campus", {})[1]
-    assert [item["id"] for item in view["buildings"] if item["active"]] == [IDS[2]]
-    view = loaded.get("/api/campus", {"key": ["dev/nope"]})[1]  # an unknown key changes nothing
-    assert [item["id"] for item in view["buildings"] if item["active"]] == [IDS[2]]
+    loaded.get("/api/building", {"key": [f"dev/{IDS[2]}"]})  # another page opens a building: no effect
+    view = loaded.get("/api/campus", {"key": [f"dev/{IDS[1]}"]})[1]
+    assert [item["id"] for item in view["buildings"] if item["active"]] == [IDS[1]]
+    for query in ({}, {"key": ["dev/nope"]}):  # no key or an unknown key: nothing is active
+        view = loaded.get("/api/campus", query)[1]
+        assert not any(item["active"] for item in view["buildings"])
+
+
+def test_default_campus_root_is_the_repo_not_the_working_directory(tmp_path, monkeypatch):
+    repo = Path(__file__).resolve().parent.parent
+    data = DATA.resolve()
+    monkeypatch.chdir(tmp_path)
+    app = App(data, buildings_root=tmp_path / "b")
+    assert app.campus.roots[1] == repo / "campuses" and app.campus.roots[1].is_absolute()
 
 
 # ---------- routing ----------
@@ -386,3 +394,93 @@ def test_http_round_trip(app):
     finally:
         server.shutdown()
         server.server_close()
+
+
+# ---------- closures made inside a building count in campus routes ----------
+
+OFFICE, SEMINAR = "Office 0.02", "Seminar room 4.02"
+
+
+def close_all_connectors(app: App, building_id: str) -> list[str]:
+    key = f"dev/{building_id}"
+    ids = [item["id"] for item in app.get("/api/building", {"key": [key]})[1]["connectors"]]
+    for element in ids:
+        app.post("/api/close", {"building": key, "element": element, "closed": True})
+    return ids
+
+
+def page_route_ok(app: App, building_id: str, start: str, destination: str) -> bool:
+    answer = app.post("/api/route", {"building": f"dev/{building_id}", "start": start, "destination": destination})[1]
+    return answer["route"]["ok"]
+
+
+def tools_of(app: App, monkeypatch, building_id: str) -> dict:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-never-used")
+    return {tool.name: tool for tool in app.chat(f"dev/{building_id}").ensure_session().tools}
+
+
+def campus_route_ok(app: App, start: str, destination: str) -> bool:
+    return app.post("/api/campus/route", {"start": start, "destination": destination})[1]["ok"]
+
+
+def test_closed_lifts_on_the_page_stop_the_campus_route_and_the_chat_tool(loaded, monkeypatch):
+    tools = tools_of(loaded, monkeypatch, IDS[0])
+    assert campus_route_ok(loaded, OFFICE, SEMINAR) and page_route_ok(loaded, IDS[0], OFFICE, SEMINAR)
+    assert json.loads(tools["campus_route"](start=OFFICE, destination=SEMINAR))["length_m"] > 0
+
+    close_all_connectors(loaded, IDS[0])
+    assert page_route_ok(loaded, IDS[0], OFFICE, SEMINAR) is False
+    answer = loaded.post("/api/campus/route", {"start": OFFICE, "destination": SEMINAR})[1]
+    assert answer["ok"] is False and answer["error"]  # page and campus endpoint agree
+    with pytest.raises(ToolError):  # ... and so does the chat tool
+        tools["campus_route"](start=OFFICE, destination=SEMINAR)
+    assert loaded.campus.state()["route"]["ok"] is False
+
+
+def test_reopening_restores_the_campus_route(loaded):
+    before = loaded.post("/api/campus/route", {"start": OFFICE, "destination": SEMINAR})[1]
+    ids = close_all_connectors(loaded, IDS[0])
+    assert campus_route_ok(loaded, OFFICE, SEMINAR) is False
+    for element in ids:
+        loaded.post("/api/close", {"building": f"dev/{IDS[0]}", "element": element, "closed": False})
+    after = loaded.post("/api/campus/route", {"start": OFFICE, "destination": SEMINAR})[1]
+    assert after["ok"] is True and after["length_m"] == before["length_m"]
+
+
+def test_a_closure_made_by_the_chat_agent_counts_in_the_campus_route(loaded, monkeypatch):
+    tools_of(loaded, monkeypatch, IDS[0])
+    session = loaded.session(f"dev/{IDS[0]}")
+    for connector in list(session.map.connectors):  # what the agent's confirm_change does: it closes on the page map
+        session.map.set_closed(connector, True)
+    assert campus_route_ok(loaded, OFFICE, SEMINAR) is False
+    assert loaded.campus.state()["closed_links"] == []  # link closures are separate and keep working
+
+
+def test_closures_in_two_buildings_and_link_closures_all_count(loaded):
+    first, last = first_room(loaded, IDS[0]), first_room(loaded, IDS[2])
+    whole = loaded.post("/api/campus/route", {"start": first, "destination": last})[1]
+    assert whole["ok"] is True
+    entrance_a = whole["legs"][0]["exit_entrance"]
+    entrance_c = whole["legs"][-1]["entry_entrance"]
+    for building_id, entrance in ((IDS[0], entrance_a), (IDS[2], entrance_c)):
+        key = f"dev/{building_id}"
+        loaded.post("/api/close", {"building": key, "element": entrance, "closed": True})
+        assert campus_route_ok(loaded, first, last) is False
+        loaded.post("/api/close", {"building": key, "element": entrance, "closed": False})
+        assert campus_route_ok(loaded, first, last) is True
+    loaded.post("/api/close", {"building": f"dev/{IDS[0]}", "element": entrance_a, "closed": True})
+    loaded.post("/api/close", {"building": f"dev/{IDS[2]}", "element": entrance_c, "closed": True})
+    loaded.post("/api/close", {"building": f"dev/{IDS[0]}", "element": entrance_a, "closed": False})
+    assert campus_route_ok(loaded, first, last) is False  # still closed in the other building
+    loaded.post("/api/close", {"building": f"dev/{IDS[2]}", "element": entrance_c, "closed": False})
+    loaded.post("/api/campus/close", {"link_id": "L1", "closed": True})  # links still work next to door closures
+    assert campus_route_ok(loaded, first, last) is False
+    loaded.post("/api/campus/close", {"link_id": "L1", "closed": False})
+    assert campus_route_ok(loaded, first, last) is True
+
+
+def test_a_page_reset_drops_the_closures_for_the_campus_too(loaded):
+    close_all_connectors(loaded, IDS[0])
+    assert campus_route_ok(loaded, OFFICE, SEMINAR) is False
+    loaded.post("/api/reset", {"building": f"dev/{IDS[0]}"})
+    assert campus_route_ok(loaded, OFFICE, SEMINAR) is True

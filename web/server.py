@@ -52,13 +52,14 @@ from urllib.parse import parse_qs, urlparse
 
 from building_agent.structured import located_entries
 from building_agent.voice_rules import voice_kwargs
-from starter_agent.building_map import MapError
+from starter_agent.building_map import BuildingMap, MapError
 from web import api, campus_api, level4_api, speech, transfer
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 from web.selection import check_here, check_selection
 
 STATIC = Path(__file__).parent / "static"
+CAMPUS_ROOT = Path(__file__).resolve().parent.parent / "campuses"  # repo root, not the working directory
 DEFAULT_PORT = 8765
 DEFAULT_HOST = "127.0.0.1"
 MAX_BODY_BYTES = 1_000_000
@@ -79,12 +80,12 @@ class App:
         data_root: Path,
         uploads_root: Path = level4_api.DEFAULT_ALLOWED_ROOT,
         buildings_root: Path = level4_api.BUILDINGS_ROOT,
-        campus_roots: tuple[Path, ...] = (Path("campuses"),),
+        campus_roots: tuple[Path, ...] = (CAMPUS_ROOT,),
     ) -> None:
         self.data_root = data_root
         self.buildings_root = buildings_root
         self.level4 = level4_api.PlanStudio(uploads_root, buildings_root)
-        self.campus = campus_api.CampusService(data_root, buildings_root, campus_roots)
+        self.campus = campus_api.CampusService(data_root, buildings_root, campus_roots, self.open_page_maps)
         self.sessions: dict[str, api.Session] = {}
         self.chats: dict[str, ChatAdapter] = {}
         self.lock = threading.RLock()
@@ -143,7 +144,7 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, lambda: self.campus.holder)
+                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, self.campus.synced_holder)
             return self.chats[key]
 
     def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:
@@ -184,9 +185,13 @@ class App:
             key = (query.get("key") or [""])[0]
             with self.lock:
                 session = self.session(key)
-                self.campus.active_dir = session.directory  # which building of the campus the page shows
                 return 200, api.building_view(session)
         return 404, {"error": f"Unknown endpoint {path}"}
+
+    def open_page_maps(self) -> dict[Path, BuildingMap]:
+        """Every building the page has open: its folder -> the session's map (the one that holds its closures)."""
+        with self.lock:
+            return {session.directory.resolve(): session.map for session in self.sessions.values()}
 
     def active_directory(self, query: dict) -> Path | None:
         """The folder of the building named by ?key= (the page's active one), None if it is missing or unknown."""

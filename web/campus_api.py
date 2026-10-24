@@ -5,6 +5,7 @@ on the page shows up in the agent's campus_route and the other way round. Pure P
 dispatches here. Nothing from the browser is ever used as a path or a type: campus keys come from a list built
 here, ids are checked against the loaded campus, bad input is a clean 400 (MapError), never a crash."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 from building_agent import campus as campus_module
@@ -57,7 +58,13 @@ def point_pair(point) -> list[float]:
 
 
 class CampusService:
-    def __init__(self, data_root: Path, buildings_root: Path, extra_roots: tuple[Path, ...] = ()) -> None:
+    def __init__(
+        self,
+        data_root: Path,
+        buildings_root: Path,
+        extra_roots: tuple[Path, ...] = (),
+        page_maps: Callable[[], dict[Path, BuildingMap]] | None = None,
+    ) -> None:
         self.data_root = Path(data_root)
         self.buildings_root = Path(buildings_root)
         self.roots = [self.data_root, *extra_roots]
@@ -65,7 +72,30 @@ class CampusService:
         self.key: str | None = None
         self.findings: list = []
         self.route_request: dict | None = None
-        self.active_dir: Path | None = None  # the building the page shows (a Session directory)
+        self.page_maps = page_maps or dict  # resolved building folder -> the page session's map (its closures)
+        self.active_dir: Path | None = None  # only set for the duration of one GET /api/campus?key=...
+
+    # ---------- one set of closures for page and chat ----------
+
+    def sync_maps(self) -> None:
+        """Campus routing must see the closures (and added doors) of the page. For every campus building that the
+        page has open, the campus uses the page session's own map object, so a closure made on the page or by the
+        chat is seen by the endpoints and by the chat's campus tools alike. Buildings the page has not opened keep
+        their own map (nothing can be closed in them from the page). Called before every campus read."""
+        if self.holder is None:
+            return
+        open_maps = self.page_maps()
+        for item in self.holder.campus.buildings:
+            if item.path is None or not Path(item.path).exists():
+                continue
+            shared = open_maps.get(Path(item.path).resolve())
+            if shared is not None and self.holder.maps.get(item.building_id) is not shared:
+                self.holder.maps[item.building_id] = shared
+
+    def synced_holder(self) -> CampusHolder | None:
+        """The holder the chat agent gets (campus_source of the chat adapter), with the page's maps in place."""
+        self.sync_maps()
+        return self.holder
 
     # ---------- which campuses can be loaded ----------
 
@@ -183,6 +213,7 @@ class CampusService:
         }
 
     def view(self) -> dict:
+        self.sync_maps()
         available = [{"key": key, "name": item["name"]} for key, item in self.known().items()]
         if self.holder is None:
             return {"loaded": False, "available": available, "buildings": [], "links": [], "findings": []}
@@ -202,6 +233,7 @@ class CampusService:
         """The `campus` field of state_view: loaded flag, the page's route (recomputed against closures), closed links."""
         if self.holder is None:
             return idle_state()
+        self.sync_maps()
         route = None
         if self.route_request is not None:
             outcome = self.compute_route(self.route_request)
@@ -263,6 +295,7 @@ class CampusService:
     def require(self) -> CampusHolder:
         if self.holder is None:
             raise MapError("No campus is loaded. Load one with POST /api/campus/load first.")
+        self.sync_maps()
         return self.holder
 
     def route(self, body: dict) -> dict:
@@ -404,7 +437,7 @@ class CampusService:
 
     def get(self, path: str, active_dir: Path | None) -> tuple[int, dict]:
         if path == "/api/campus":
-            self.active_dir = active_dir if active_dir is not None else self.active_dir
+            self.active_dir = active_dir  # per request: the page that asks says which building it shows
             return 200, self.view()
         return 404, {"error": f"Unknown endpoint {path}"}
 

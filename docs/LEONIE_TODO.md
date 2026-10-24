@@ -29,7 +29,7 @@ Schalter "Auto-Pace" (Default aus), Timer nach jedem gesprochenen Schritt (erwar
 
 ## 5. Level 3 in der Seite (Gebäudewahl, Route über Gebäude)
 Die Endpunkte stehen auf `feat/web-campus-gzip` (Spec mit allen Feldern: `docs/specs/level3-campus.md`, Abschnitt "Page API").
-- `GET /api/campus`: `available` (ladbare Campusse), Gebäude (Etagen, Eingänge, `page_key` zum Laden mit `/api/building`, `active` für das Gebäude auf dem Plan, Welt-Positionen) und Links (Art, Länge, `closed`). Mit `?key=<Gebäudeschlüssel>` markiert der Server das aktive Gebäude.
+- `GET /api/campus`: `available` (ladbare Campusse), Gebäude (Etagen, Eingänge, `page_key` zum Laden mit `/api/building`, `active` für das Gebäude auf dem Plan, Welt-Positionen) und Links (Art, Länge, `closed`). Nur mit `?key=<Gebäudeschlüssel>` markiert der Server das aktive Gebäude (ohne `key` ist keines aktiv, schick ihn bei jedem Aufruf mit). Sperrungen von Türen und Aufzügen auf der Seite zählen auch in Campus-Routen.
 - `POST /api/campus/load {key}`: `example` lädt drei Dev-Gebäude zum Üben. Befunde in `findings` und `summary` anzeigen (fehlende Gebäude sind Befunde, kein Fehler).
 - `POST /api/campus/route {start, destination, start_building?, destination_building?, step_free?}`: `legs` pro Gebäude (Räume, `points`, `world_points`) und pro Link. Bei `ambiguous: true` die `candidates` als Auswahl zeigen und mit Gebäude erneut anfragen. Kein Weg kommt als Satz in `error`.
 - `POST /api/campus/close {link_id, closed}`: Link sperren oder öffnen, Antwort enthält die neu gerechnete Route. Der Chat sieht dieselbe Sperrung.
