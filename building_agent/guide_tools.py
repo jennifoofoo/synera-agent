@@ -9,13 +9,13 @@ import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
-from building_agent import routing
+from building_agent import edit_ops, routing
 from building_agent.directions import DirectionsSession
 from building_agent.impact import analyse
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
-ACTIONS = ("close", "reopen", "add_door")
+ACTIONS = ("close", "reopen", "add_door", "remove_door", "widen_door", "move_asset")
 YES = re.compile(r"\b(ja|yes|yep|jep|genau|passt|do it|go ahead|mach das|bitte ja)\b", re.IGNORECASE)
 NO = re.compile(r"\b(nein|no|nicht|stop|abbrechen|cancel|lieber|whatever|egal|aber|but|ja ja)\b", re.IGNORECASE)
 
@@ -29,6 +29,8 @@ class Pending:
     card: dict
     turn: int
     signature: tuple = ()
+    width_m: float | None = None
+    to_space: str | None = None
 
 
 @dataclass
@@ -58,10 +60,20 @@ def element_label(bm: BuildingMap, element_id: str) -> str:
 
 def building_signature(bm: BuildingMap) -> tuple:
     """Changes whenever closures or doors change, so stale directions and cards can be detected."""
-    return (tuple(sorted(bm.closed)), len(bm.openings))
+    openings = hash(tuple(sorted((o["id"], o.get("width_m"), o["step_free"]) for o in bm.openings.values())))
+    assets = hash(tuple(sorted((a["id"], a["space_id"], tuple(a["position"])) for a in bm.assets.values())))
+    return (tuple(sorted(bm.closed)), len(bm.openings), openings, assets)
 
 
-def apply_change(bm: BuildingMap, action: str, element: str, other: str | None, step_free: bool) -> str:
+def apply_change(
+    bm: BuildingMap,
+    action: str,
+    element: str,
+    other: str | None,
+    step_free: bool,
+    width_m: float | None = None,
+    to_space: str | None = None,
+) -> str:
     """Apply one edit to `bm`; returns a plain-words description. Raises MapError if it cannot be done."""
     if action == "add_door":
         if not other:
@@ -69,9 +81,22 @@ def apply_change(bm: BuildingMap, action: str, element: str, other: str | None, 
         pair = {bm.resolve_space(element), bm.resolve_space(other)}
         if any(set(opening["space_ids"]) == pair for opening in bm.openings.values()):
             raise MapError("These two rooms already have a door between them.")
-        opening = bm.add_door(element, other, step_free)
+        opening = edit_ops.add_door_safe(bm, element, other, step_free)
         first, second = (bm.describe_space(space_id) for space_id in opening["space_ids"])
         return f"New {'step-free ' if step_free else ''}door between {first} and {second}."
+    if action == "remove_door":
+        edit = edit_ops.remove_door(bm, element, other)
+        return f"Remove {edit_ops.door_label(bm, edit['opening'])} for good."
+    if action == "widen_door":
+        edit = edit_ops.widen_door(bm, element, other, width_m)
+        door = edit_ops.door_label(bm, bm.openings[edit["id"]])
+        before = f"from {edit['old_width_m']} m " if edit["old_width_m"] is not None else ""
+        return f"Widen {door} {before}to {edit['width_m']} m."
+    if action == "move_asset":
+        edit = edit_ops.move_asset(bm, element, to_space or other or "")
+        return (
+            f"Move {edit['old_name']} to {bm.describe_space(edit['to_space'])}; it is then called {edit['new_name']}."
+        )
     target = bm.find_element(element)
     if (target in bm.closed) == (action == "close"):
         raise MapError(f"{element_label(bm, target)} is already {'closed' if action == 'close' else 'open'}.")
@@ -112,6 +137,30 @@ def compare_normal_length(bm: BuildingMap, route) -> float | None:
         normal = None
     bm.last_route = last
     return normal
+
+
+def removal_sentences(bm: BuildingMap, element: str, other: str | None) -> list[str]:
+    opening = edit_ops.resolve_opening(bm, element, other)
+    if opening["id"] in bm.closed:
+        return ["The door is closed already, so routes do not change when it is removed."]
+    return analyse(bm, doors_remove=[opening["id"]]).sentences()
+
+
+def edit_sentences(bm: BuildingMap, edit: dict) -> list[str]:
+    """Plain-words effects of a widening or a move, from the edit record of the preview."""
+    if edit["action"] == "widen_door":
+        door = edit_ops.door_label(bm, bm.openings[edit["id"]])
+        return [
+            f"{door} is {edit['width_m']} m wide afterwards. Routes stay the same; only wide deliveries are affected."
+        ]
+    sentences = [f"{edit['old_name']} becomes {edit['new_name']}; its id {edit['id']} stays."]
+    sentences += [
+        f"{item['old']} is renamed {item['new']} because the letters change." for item in edit["renamed_siblings"]
+    ]
+    sentences.append(
+        f"It now stands in {bm.describe_space(edit['to_space'])}, no longer in {bm.describe_space(edit['from_space'])}."
+    )
+    return sentences
 
 
 def check_directions(state: GuideState, bm: BuildingMap) -> None:
@@ -182,15 +231,27 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         return as_json({"closed": element_label(bm, target), "all_closed": sorted(bm.closed)})
 
     @beta_tool
-    def propose_change(action: str, element: str, other: str | None = None, step_free: bool = True) -> str:
+    def propose_change(
+        action: str,
+        element: str,
+        other: str | None = None,
+        step_free: bool = True,
+        width_m: float | None = None,
+        to_space: str | None = None,
+    ) -> str:
         """Prepare a change to the building and return an understanding card. Changes nothing yet.
         Show the card to the person, wait for their explicit yes in their NEXT message, then call confirm_change.
 
         Args:
-            action: "close" or "reopen" (a lift, staircase, door or room), or "add_door" (between two rooms).
-            element: What to close/reopen, or the first room of a new door (id, number or name).
-            other: The second room, only for add_door.
+            action: "close" or "reopen" (a lift, staircase, door or room), or "add_door" (between two rooms),
+                "remove_door", "widen_door" (a door) or "move_asset" (a machine or piece of furniture to another room).
+            element: What to close/reopen, the first room of a new door, the door to remove/widen (id), or the asset
+                to move (id or exact name).
+            other: The second room (add_door), or for remove_door/widen_door the room on the other side when
+                element is a room instead of a door id ("outside" for an entrance).
             step_free: Whether a new door has no step (add_door only).
+            width_m: New door width in metres, 0.6 to 5.0 (widen_door only).
+            to_space: Target room id, number or name (move_asset only).
         """
         if action not in ACTIONS:
             raise ToolError(f"action must be one of {ACTIONS}.")
@@ -199,7 +260,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         state.pending = None
         preview = copy.deepcopy(bm)
         try:
-            what = apply_change(preview, action, element, other, step_free)
+            what = apply_change(preview, action, element, other, step_free, width_m, to_space)
         except MapError as error:
             raise ToolError(str(error)) from error
         card = {
@@ -213,7 +274,13 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 card["effect on the whole building"] = analyse(bm, **{effect_key: [element]}).sentences()
             except (MapError, KeyError, ValueError, nx.NetworkXException):
                 pass  # the card still works without the building-wide sentences
-        state.pending = Pending(action, element, other, step_free, card, state.turn, building_signature(bm))
+        if action == "remove_door":
+            card["effect on the whole building"] = removal_sentences(bm, element, other)
+        elif action in ("widen_door", "move_asset"):
+            card["effect on the whole building"] = edit_sentences(bm, preview.last_edit)
+        state.pending = Pending(
+            action, element, other, step_free, card, state.turn, building_signature(bm), width_m, to_space
+        )
         return as_json(card)
 
     @beta_tool
@@ -238,12 +305,19 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         if not confirmed:
             return as_json({"applied": False, "note": "Dropped, nothing changed."})
         try:
-            what = apply_change(bm, pending.action, pending.element, pending.other, pending.step_free)
+            what = apply_change(
+                bm,
+                pending.action,
+                pending.element,
+                pending.other,
+                pending.step_free,
+                pending.width_m,
+                pending.to_space,
+            )
         except MapError as error:
             raise ToolError(str(error)) from error
-        if pending.action == "add_door":
-            output_directory.mkdir(parents=True, exist_ok=True)
-            bm.save(output_directory / "building_edited.json")
+        output_directory.mkdir(parents=True, exist_ok=True)
+        bm.save(output_directory / "building_edited.json")
         state.log.append({"turn": state.turn, "change": what})
         return as_json(
             {
