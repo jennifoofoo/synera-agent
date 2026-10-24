@@ -12,11 +12,11 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | errand (20) | Jennifer | gemergt | feat/q-errand |
 | floor_area_total (33) | Jennifer | gemergt | feat/q-floor_area_total |
 | straight_line_3d (15) | Jennifer | gemergt | feat/q-straight_line_3d |
-| shared_walls_count (26) | Leonie | in Arbeit | feat/q-shared_walls_count |
+| shared_walls_count (26) | Leonie | gemergt | feat/q-shared_walls_count |
 | largest_room (21) | Leonie | gemergt | feat/q-largest_room |
-| wide_delivery_count (18) | Leonie | in Arbeit | feat/q-wide_delivery_count |
-| room_stacked (9) | Leonie | in Arbeit | feat/q-room_stacked |
-| what_if_door (3) | Leonie | in Arbeit | feat/q-what_if_door |
+| wide_delivery_count (18) | Leonie | gemergt | feat/q-wide_delivery_count |
+| room_stacked (9) | Leonie | gemergt | feat/q-room_stacked |
+| what_if_door (3) | Leonie | gemergt | feat/q-what_if_door |
 | step_free_reachable_count (0 im Test) | | offen | |
 
 | Aufgabe | Wer | Status | Branch |
