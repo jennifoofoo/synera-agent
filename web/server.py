@@ -53,7 +53,7 @@ from urllib.parse import parse_qs, urlparse
 from building_agent.structured import located_entries
 from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import MapError
-from web import api, campus_api, level4_api, speech
+from web import api, campus_api, level4_api, speech, transfer
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 from web.selection import check_here, check_selection
@@ -313,14 +313,56 @@ def make_handler(app: App) -> type:
             if args and str(args[1]).startswith(("4", "5")):
                 super().log_message(format, *args)
 
-        def send_json(self, status: int, payload: dict) -> None:
-            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+        def send_body(self, status: int, content_type: str, body: bytes, cache_control: str, revalidate: bool) -> None:
+            """One place for every body: gzip if the browser accepts it and the body is text over ~1 KB, correct
+            Content-Length and Vary, and with `revalidate` an ETag plus 304 on a matching If-None-Match."""
+            packed, gzipped = transfer.maybe_gzip(body, content_type, self.headers.get("Accept-Encoding"))
+            etag = transfer.etag_for(body, gzipped) if revalidate and status == 200 else None
+            not_modified = etag is not None and transfer.etag_matches(self.headers.get("If-None-Match"), etag)
+            self.send_response(HTTPStatus.NOT_MODIFIED if not_modified else status)
+            if not not_modified:
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(packed)))
+            if gzipped and not not_modified:
+                self.send_header("Content-Encoding", "gzip")
+            if transfer.compressible(content_type):
+                self.send_header("Vary", "Accept-Encoding")
+            if etag:
+                self.send_header("ETag", etag)
+            self.send_header("Cache-Control", cache_control)
             self.end_headers()
-            self.wfile.write(body)
+            if not not_modified and self.command != "HEAD":
+                self.wfile.write(packed)
+
+        def send_json(self, status: int, payload: dict, revalidate: bool = False) -> None:
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            # API answers are never cached; the big building JSON is revalidated (no-cache + ETag) instead.
+            self.send_body(
+                status,
+                "application/json; charset=utf-8",
+                body,
+                "no-cache" if revalidate else "no-store",
+                revalidate,
+            )
+
+        def serve_static(self) -> bool:
+            """A regular file below web/static (translate_path keeps the directory-traversal protection):
+            ETag, 304, gzip. Returns False for anything else (directories, missing files) so the stdlib answers."""
+            path = Path(self.translate_path(self.path))
+            if path.is_dir() and urlparse(self.path).path.endswith("/"):
+                path = next((path / name for name in ("index.html", "index.htm") if (path / name).is_file()), path)
+            if not path.is_file():
+                return False
+            try:
+                body = path.read_bytes()
+            except OSError:
+                return False
+            self.send_body(200, self.guess_type(str(path)), body, "no-cache", True)
+            return True
+
+        def do_HEAD(self) -> None:
+            if urlparse(self.path).path.startswith("/api/") or not self.serve_static():
+                super().do_HEAD()
 
         def run_speak(self, body: dict) -> None:
             try:
@@ -337,7 +379,7 @@ def make_handler(app: App) -> type:
             else:
                 self.send_json(status, payload)
 
-        def run(self, action) -> None:
+        def run(self, action, revalidate: bool = False) -> None:
             try:
                 status, payload = action()
             except MapError as error:
@@ -346,13 +388,13 @@ def make_handler(app: App) -> type:
                 status, payload = error.status, {"error": str(error)}
             except Exception as error:  # noqa: BLE001 - report it, don't kill the server
                 status, payload = 500, {"error": f"{type(error).__name__}: {error}"}
-            self.send_json(status, payload)
+            self.send_json(status, payload, revalidate and status == 200)
 
         def do_GET(self) -> None:
             url = urlparse(self.path)
             if url.path.startswith("/api/"):
-                self.run(lambda: app.get(url.path, parse_qs(url.query)))
-            else:
+                self.run(lambda: app.get(url.path, parse_qs(url.query)), revalidate=url.path == "/api/building")
+            elif not self.serve_static():
                 super().do_GET()
 
         def speak_request_allowed(self, content_types: tuple[str, ...] = ("application/json",)) -> bool:
@@ -410,9 +452,15 @@ def make_handler(app: App) -> type:
                 return
             self.run(lambda: app.post(url.path, body))
 
+        def send_header(self, keyword: str, value: str) -> None:
+            if keyword.lower() == "cache-control":
+                self.cache_control_sent = True
+            super().send_header(keyword, value)
+
         def end_headers(self) -> None:
-            if not self.path.startswith("/api/"):
-                self.send_header("Cache-Control", "no-cache")
+            if not self.path.startswith("/api/") and not getattr(self, "cache_control_sent", False):
+                self.send_header("Cache-Control", "no-cache")  # stdlib answers (404, redirects, listings)
+            self.cache_control_sent = False
             super().end_headers()
 
     return Handler
