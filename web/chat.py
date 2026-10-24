@@ -12,6 +12,7 @@ import os
 import threading
 from pathlib import Path
 
+from building_agent import pace_guide
 from starter_agent.building_map import BuildingMap
 
 BACKEND = "auto"
@@ -50,18 +51,36 @@ class ChatAdapter:
         self.saved_paths: list[Path] = []  # buildings the agent saved during the current turn (Level 4 save_building)
         self.lock = threading.Lock()
 
-    def ask(self, text: str, selection=None, here=None, voice: bool = False) -> dict:
+    def ask(
+        self,
+        text: str,
+        selection=None,
+        here=None,
+        voice: bool = False,
+        pace: str = "off",
+        tick: bool = False,
+        tick_step: int | None = None,
+    ) -> dict:
         """selection: a validated web.selection.Selection, valid for this one turn only.
         here: a validated web.selection.HereCheck ("I'm here" click or clear), applied before the turn.
-        voice: request-level spoken-reply flag."""
+        voice: request-level spoken-reply flag.
+        pace: 'off' | 'ask' | 'say', the page's auto-pace switch. tick: context.guide_tick was a real true (the
+        message is empty then); tick_step: the step its timer was started for. See building_agent/pace_guide.py."""
         if not chat_available():
+            if tick and not text.strip():  # a timer tick has nothing to say without a key
+                return {"reply": "", "backend": None, "tick_ignored": True}
             return {"reply": NO_KEY_MESSAGE, "backend": None, "error": "no_api_key"}
         backend = backend_name()
         try:
             with self.lock:  # one conversation per building: never two turns at once
                 self.saved_paths = []
                 if backend == "building_agent":
-                    result = {"reply": self.ask_building_agent(text, selection, here, voice), "backend": backend}
+                    reply = self.ask_building_agent(text, selection, here, voice, pace, tick, tick_step)
+                    result = {"reply": reply, "backend": backend}
+                    if tick and not reply:
+                        result["tick_ignored"] = True  # no guide, forged, stale or a repeat: nothing to say
+                elif tick and not text.strip():
+                    result = {"reply": "", "backend": backend, "tick_ignored": True}
                 else:
                     result = {"reply": self.ask_starter(text), "backend": backend}
                 if self.saved_paths:
@@ -70,8 +89,12 @@ class ChatAdapter:
         except Exception as error:  # noqa: BLE001 - the page must keep working whatever the API does
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
-    def ask_building_agent(self, text: str, selection=None, here=None, voice: bool = False) -> str:
+    def ask_building_agent(
+        self, text: str, selection=None, here=None, voice: bool = False, pace="off", tick=False, tick_step=None
+    ) -> str:
         self.ensure_session()
+        if tick and not text.strip():  # a tick is only a tick without words; it never reaches the model as text
+            return pace_guide.run_turn(self.session, "", pace, True, tick_step, voice)
         if self.level4 is not None:
             self.level4.begin_turn()
             note = self.level4.chat_context()
@@ -81,7 +104,12 @@ class ChatAdapter:
             self.apply_here(here)
         self.session.guide.selection = selection
         try:
-            return self.session.ask(text, **({"voice": True} if voice else {}))
+            if pace == "off":
+                switched = pace_guide.pace_of(self.session.guide)
+                if switched is not None:  # the page switched pace off: state_view must say so
+                    switched.mode = "off"
+                return self.session.ask(text, **({"voice": True} if voice else {}))
+            return pace_guide.run_turn(self.session, text, pace, False, None, voice)
         finally:
             self.session.guide.selection = None  # one-shot: never leaks into the next message
 
@@ -103,10 +131,10 @@ class ChatAdapter:
             self.add_level4_tools()
         elif campus is not getattr(self.session, "campus", None):
             guide = self.session.guide
-            position, walk = guide.position, guide.walk
+            position, walk, pace = guide.position, guide.walk, pace_guide.pace_of(guide)
             self.session.campus = campus
             self.session.install_building(self.map)
-            guide.position, guide.walk = position, walk
+            guide.position, guide.walk, guide.pace = position, walk, pace
             self.add_level4_tools()
         if campus is not None:
             campus.bm = self.map  # next_steps compares against the map the tools were built with
@@ -131,7 +159,10 @@ class ChatAdapter:
         from building_agent import walk as walking
 
         walk = getattr(self.session.guide, "walk", None) if self.session is not None else None
-        return walking.guide_info(walk)
+        info = walking.guide_info(walk)
+        if info is not None:  # additive: what the page needs to start its pace timer
+            info.update(pace_guide.view(self.session.map, self.session.guide))
+        return info
 
     def position_view(self) -> dict | None:
         """What state_view shows: {space_id, floor_id, point, source} or None."""

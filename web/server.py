@@ -14,6 +14,8 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
   POST /api/chat     {message, voice?: true, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
                      context.here: {space_id, point?, floor_id?} or {clear: true}, "I'm here", validated, see docs/specs/position.md
+                     pace: "off" | "ask" | "say" (top level, default off), context.guide_tick: true with an empty message,
+                     context.guide_step?: int, see docs/specs/auto-pace.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 
 Level 3, campus (web/campus_api.py; one CampusHolder shared by the page and the chat agent, see docs/specs/level3-campus.md):
@@ -50,6 +52,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from building_agent.pace_guide import pace_kwargs, without_tick_keys
 from building_agent.structured import located_entries
 from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import BuildingMap, MapError
@@ -235,7 +238,8 @@ class App:
         key = body.get("building", "")
         if path == "/api/chat":
             message = str(body.get("message", "")).strip()
-            if not message:
+            ctx = body.get("context")
+            if not message and not (isinstance(ctx, dict) and ctx.get("guide_tick") is True):
                 return 400, {"error": "Empty message."}
             with self.lock:  # session and chat together, so a reset cannot pair a new map with an old chat
                 session, chat = self.session(key), self.chat(key)
@@ -247,10 +251,13 @@ class App:
             if isinstance(context, dict) and "here" in context:  # "I'm here" travels beside the click selection
                 here_raw = context["here"]
                 context = {key: value for key, value in context.items() if key != "here"} or None
+            extra_pace = pace_kwargs(body, context)  # request-level `pace` and context.guide_tick, see pace_guide
+            context = without_tick_keys(context)
             check = check_selection(context, session.map)
             here = check_here(here_raw, session.map)
             extra = {"here": here} if here.ok else {}
             extra.update(voice_kwargs(body))  # request-level spoken-reply flag, never read from the message text
+            extra.update(extra_pace)
             result = (
                 chat.ask(message, selection=check.selection, **extra) if check.selection else chat.ask(message, **extra)
             )
