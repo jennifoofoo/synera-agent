@@ -11,12 +11,12 @@ import anthropic
 
 from building_agent import routing
 from building_agent.campus_tools import CampusHolder
-from building_agent.exit_tools import EMERGENCY_RULES
+from building_agent.exit_tools import EMERGENCY_RULES, is_emergency
 from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
-from building_agent.voice_rules import with_voice_rules, without_voice_rules
+from building_agent.voice_rules import with_voice_rules
 from starter_agent.agent import SYSTEM_PROMPT as STARTER_PROMPT
 from starter_agent.agent import BuildingAgent as StarterAgent
 from starter_agent.building_map import BuildingMap
@@ -122,9 +122,9 @@ class Agent(StarterAgent):
             STARTER_PROMPT.format(overview=overview)
             + CALCULATION_RULES
             + CONVERSATION_RULES
-            + EMERGENCY_RULES
             + (CAMPUS_RULES if self.campus else "")
         )
+        self.emergency = False  # the emergency rules stay for the turn after one (the "which room?" reply)
 
     def swap_building(self, path) -> None:
         self.install_building(BuildingMap.load(Path(path)))
@@ -134,14 +134,18 @@ class Agent(StarterAgent):
         self.guide.begin_turn()
         self.guide.last_user_text = user_text
         mark = len(self.messages)
-        self.system[0]["text"] = with_voice_rules(self.system[0]["text"], voice, user_text)  # this turn only
+        base = self.system[0]["text"]
+        urgent = is_emergency(user_text)
+        prompt = base + EMERGENCY_RULES if urgent or self.emergency else base  # this turn only
+        self.emergency = urgent
+        self.system[0]["text"] = with_voice_rules(prompt, voice, user_text)  # this turn only
         try:
             return super().ask(user_text)
         except Exception:
             del self.messages[mark:]
             raise
         finally:
-            self.system[0]["text"] = without_voice_rules(self.system[0]["text"])
+            self.system[0]["text"] = base
 
 
 class Session(Agent):

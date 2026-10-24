@@ -39,6 +39,20 @@ def is_german(text: str) -> bool:
     return any(ch in str(text).lower() for ch in "äöüß") or sum(word in GERMAN_WORDS for word in words) >= 2
 
 
+EMERGENCY_WORDS = re.compile(
+    r"\b(fire|smoke|burn\w*|alarm|evacuat\w*|emergency|escape|way out|get out|injur\w*|hurt|bleed\w*|chemical\w*|"
+    r"spill\w*|extinguisher|defibrillator|defib|aed|eye ?wash\w*|first aid|"
+    r"notfall|feuer|brennt|brand|rauch|raus|evakuier\w*|verletz\w*|chemikalie\w*|feuerlöscher|augendusche)\b",
+    re.IGNORECASE,
+)
+
+
+def is_emergency(text: str) -> bool:
+    """True when a message sounds like an emergency; only then do the emergency rules join the prompt (they ask for
+    an answer without any question, which otherwise leaks into ordinary turns)."""
+    return bool(EMERGENCY_WORDS.search(str(text)))
+
+
 EMERGENCY_RULES = """
 
 Emergency (words like fire, alarm, evacuate, emergency, Notfall, Feuer, brennt, raus, Verletzte, Chemikalie):
