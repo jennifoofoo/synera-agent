@@ -12,11 +12,11 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | errand (20) | Jennifer | gemergt | feat/q-errand |
 | floor_area_total (33) | Jennifer | offen | |
 | straight_line_3d (15) | Jennifer | offen | |
-| shared_walls_count (26) | Leonie | offen | |
-| largest_room (21) | Leonie | offen | |
-| wide_delivery_count (18) | Leonie | offen | |
-| room_stacked (9) | Leonie | offen | |
-| what_if_door (3) | Leonie | offen | |
+| shared_walls_count (26) | Leonie | in Arbeit | feat/q-shared_walls_count |
+| largest_room (21) | Leonie | in Arbeit | feat/q-largest_room |
+| wide_delivery_count (18) | Leonie | in Arbeit | feat/q-wide_delivery_count |
+| room_stacked (9) | Leonie | in Arbeit | feat/q-room_stacked |
+| what_if_door (3) | Leonie | in Arbeit | feat/q-what_if_door |
 | step_free_reachable_count (0 im Test) | | offen | |
 
 | Aufgabe | Wer | Status | Branch |
@@ -25,7 +25,7 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | tools.py (aus Registry), find_space, agent.py, Baseline-Lauf | Jennifer | offen | |
 | Test "Text zu Parametern" | Jennifer | offen | |
 | Interaction: 6 Skripte, Verständniskarte, Landmarken (directions.py) | Jennifer | offen | |
-| 2D-Web-Seite (Chat + Etagenplan mit Route) | Leonie | offen | |
+| 2D-Web-Seite (Chat + Etagenplan mit Route) | Leonie | in Arbeit | feat/web-2d |
 | Abgabe-Tooling: make_submission, BENCHMARK.md, Format-Adapter | Leonie | offen | |
 | Abgabeformat klären (PDF answers.json vs README-CSV) | | offen | |
 | Demo-Video + Tech-Erklärung | beide | offen | |
