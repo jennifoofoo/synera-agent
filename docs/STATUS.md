@@ -26,9 +26,9 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | Leitplanken, tools.py, find_space, agent.py, Cache, Session, Härtung, Sweep, Format | Jennifer | gemergt | |
 | Interaction: Landmarken, 3er-Schritte, Verständniskarte, 6 Skripte plus Gegner-Varianten (live) | Jennifer | gemergt | |
 | Test "Text zu Parametern" (Haiku, alle gelabelten und 145 Testfragen) | Jennifer | gemergt | |
-| A. Warm-up: `structured.py` (Route als Knotenliste, Länge, Raum-ID), Live-Auswertung der 6 Warm-up-Typen, Kosten festhalten (Tools allein: 369 von 369 in Dev) | Jennifer | offen | |
+| A. Warm-up: `structured.py`, `scripts/eval_warmup.py`, `assume_closed` (Live Dev: 18 von 18 gemischt, Sperrungen 26 von 29, Tools allein 369 von 369) | Jennifer | gemergt | feat/warmup |
 | C. Voice-Spike (Ergebnis `docs/specs/voice-spike.md`: Browser-STT plus ElevenLabs-TTS, ca. 1,8 h) | Jennifer | gemergt | spike/voice |
-| D. Level-4-Spike (Plan-Bild nach `building.json` mit Claude-Vision, Qualität gegen Original messen) | Jennifer | offen | |
+| D. Level-4-Spike (Ergebnis `docs/specs/level4-spike.md`: geführter Ablauf, Maßstab vom Nutzer, ca. 8 bis 10 h für Einzeletage) | Jennifer | fertig, Branch spike/level4 | spike/level4 |
 | Testlauf auf `data/test` (3 pro Typ), `docs/eval-log.md`, Tool-Schleife 20 auf 8 Runden | Jennifer | offen | |
 | 2D-Web-Seite (Chat, Etagenplan, Route, Sperren, Türen) | Leonie | gemergt (Chat mit Session, siehe Blocker) | feat/web-2d |
 | B. Abgabe: `run_benchmark <building_dir> <questions.json> <answers.json>`, `BENCHMARK.md`, `make_submission`, Format-Adapter (nutzt `structured.py`), Test-CSV, Tag `known-good` | Leonie | in Arbeit (`building_agent/submission.py`: alle Frageformate, CSV + answers.json, Prüfung wie Jury; structured.py fehlt noch) | main |
