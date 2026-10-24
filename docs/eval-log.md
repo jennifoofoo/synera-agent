@@ -72,3 +72,31 @@ In plain words:
 - proc-factory-dev-003 has a different problem the kit metric hid: the extraction invented an entrance (outside to F0-S019, and outside to F0-S033) that does not exist in the original. Our router uses `outside` as a free shortcut through it, and 108 of 264 pairs become invalid sequences. Valid pairs are fine. A spurious entrance is worth a validation warning or a check against the real entrances.
 - The Swiss floors and the OSM floor fail because doors were not extracted (door recall 0.35, 0.26, 0.67): the extracted building has no route where the original has one. That is an extraction recall problem, not a geometry one. On osm the pairs that do route often score below 0.99 (wrong detours, probably from differing outlines or doors).
 - Takeaway: use the judge metric for Level 4 route quality. The remaining route risk is spurious or missing doors, not outline differences.
+
+### Marker detection 2026-10-24 (claude-sonnet-5-5, prompt 9f2a64f5)
+
+| Floor | Door recall (model) | Door recall (+markers) | Pairs >= 0.99 (model) | Pairs >= 0.99 (+markers) | Invalid (model) | Invalid (+markers) | No route (model) | No route (+markers) | Pairs |
+|---|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 156 |
+| proc-campus-dev-001:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 120 |
+| proc-factory-dev-003:0 | 0.96 | 1.00 | 58% | 100% | 108 | 0 | 0 | 0 | 264 |
+| resplan-439:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 30 |
+| resplan-1465:0 | 1.00 | 1.00 | 100% | 100% | 0 | 0 | 0 | 0 | 40 |
+| swiss-31:0 | 0.35 | 0.35 | 6% | 5% | 1 | 14 | 116 | 105 | 125 |
+| swiss-203:0 | 0.26 | 0.32 | 3% | 5% | 0 | 4 | 147 | 137 | 151 |
+| osm-way27326387:0 | 0.67 | 0.74 | 34% | 46% | 0 | 2 | 23 | 0 | 89 |
+
+Detection alone (`building_agent/level4/markers.py`, no model), measured against the markers the kit drew (SVG positions, match within 4 px), 117 dev floors over all four sources, floor_N_plain.png:
+
+| Source | Door recall / precision | Opening recall / precision | Entrance recall / precision |
+|---|---|---|---|
+| proc (45 floors) | 1.00 / 1.00 (1239) | 1.00 / 1.00 (174) | 1.00 / 1.00 (43) |
+| resplan (10) | 1.00 / 1.00 (60) | 1.00 / 1.00 (12) | 1.00 / 1.00 (10) |
+| swiss (46) | 0.98 / 1.00 (1330) | 1.00 / 1.00 (195) | 1.00 / 1.00 (43) |
+| osm (16) | 1.00 / 1.00 (1894) | 0.92 / 1.00 (50) | 0.96 / 1.00 (135) |
+
+- Colours are exact on every image: door (139,69,19), opening (158,158,158), entrance (211,47,47). Room fills (243,239,230), (207,232,196), (244,177,131), (180,167,214), (255,242,179), (220,220,220) never clash.
+- Missed doors (23 on swiss) lie under a red entrance triangle. Missed openings (4 on osm) overlap a door dot. The floor_N.png with furniture gives identical numbers.
+- The eval table shows that markers are not the bottleneck on dense plans: the model's rooms are missing or shifted there, so a marker often finds fewer than two matching outlines or the wrong pair (swiss-31: 2 of 27 markers dropped, 5 pairs changed). Where rooms are right, markers fix kinds and positions (factory-003: invented entrances become doors or openings, 108 invalid sequences gone).
+- When the outline pair and the model pair disagree the outline pair wins (tested: model pair wins gives factory-003 108 invalid again, swiss-31 only 2 invalid instead of 14, so this trade-off is open for swiss).
+- Does not work for plans that draw doors as arcs or leaves, scans, JPEG below quality 90, or images resized after rendering (dots smaller than 4 px or blurred).
