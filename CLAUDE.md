@@ -49,6 +49,10 @@ Replies must end with exactly one `Answer:` line (the scorer reads only that).
 - At the end of a session: update `docs/STATUS.md`, push, note open points.
 - Only one person uploads submissions, agree in chat first.
 
+## Before anything reaches main
+- `scripts/check.sh` does not run the live tests, so it cannot see a changed conversation behaviour. For any change that touches the prompt, the tools, `walk.py`, position, voice or the chat layer, run the live suite as well before merging to `main`: `uv run --env-file .env pytest -m live -q` (cached, about 2 minutes, one to two dollars). It must be fully green, and a red live test is fixed or, if the design changed on purpose, the test is updated with a docstring that says why. Never weaken an assertion about safety (no change without a card and a clear yes in the next message).
+- Also measure `uv run python scripts/eval_warmup.py data/train data/dev --routes` and the dev benchmark (`benchmark.evaluate data/dev --per-kind 3`) after changes to routing or the question kinds.
+
 ## Rules
 - No hard-coding to test buildings, the Sunday building is new.
 - Never upload a worse submission over a better one.
