@@ -34,9 +34,8 @@ export function Omnibox() {
   const select = useTwin((s) => s.select);
   const focusFloor = useTwin((s) => s.focusFloor);
   const requestCamera = useTwin((s) => s.requestCamera);
-  // "Route here" without a known position: the Card asks "Where are you?" here; picking a room selects it and
-  // the Card turns that into the position and the route.
-  const pickingFor = useTwin((s) => s.pickingStartFor);
+  // The old "Where are you?" start-pick mode was replaced by the Directions panel (From/To fields).
+  const pickingFor = null as string | null;
 
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);

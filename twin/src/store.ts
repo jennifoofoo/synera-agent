@@ -18,6 +18,18 @@ export interface Selection {
   space_id?: string;
 }
 
+/** A directions end: a space id, or "here" = the current position (state.position). */
+export type Place = string;
+export const HERE: Place = "here";
+
+export interface Directions {
+  from: Place | null;
+  to: Place | null;
+  stepFree: boolean;
+  /** The field a plan tap or the next typed pick fills; null = none (taps are ignored). */
+  editing: "from" | "to" | null;
+}
+
 export interface Highlight {
   ids: string[];
   colour: string;
@@ -97,10 +109,18 @@ interface TwinState {
   /** A campus route is shown: the route on screen is one leg of it (the campus card shows the legs). */
   campusRoute: boolean;
 
-  // --- start pick (owner: card session). "Route here" without a known position: the next room the person taps
-  // or picks in the Omnibox is where they are; the card then routes to this destination space id. null = off.
-  pickingStartFor: string | null;
-  setPickingStart: (destination: string | null) => void;
+  // --- directions (owner: card session). Google-Maps-like From/To panel: "Route" on the card opens it with To set;
+  // From is "here" (state.position) when known. As soon as both ends are set the route is computed (/api/route).
+  // While it is open, a room tapped in the plan fills the field being edited (never a selection card).
+  directions: Directions | null;
+  openDirections: (to: string) => void;
+  setDirectionsFrom: (place: Place | null) => void;
+  setDirectionsTo: (place: Place | null) => void;
+  swapDirections: () => void;
+  setDirectionsStepFree: (on: boolean) => void;
+  editDirections: (field: "from" | "to" | null) => void;
+  /** keepRoute: leave the drawn route (e.g. "Start" guidance); default clears it. */
+  closeDirections: (keepRoute?: boolean) => void;
 
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
@@ -179,9 +199,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   chatBusy: false,
   voiceOut: false,
   hereArmed: false,
-  pickingStartFor: null,
   campusHook: null,
   campusRoute: false,
+  directions: null,
 
   async loadBuildings() {
     try {
@@ -196,7 +216,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   async openBuilding(key) {
-    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], pickingStartFor: null });
+    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null });
     try {
       const building = await api.building(key);
       const model = buildModel(building);
@@ -283,8 +303,44 @@ export const useTwin = create<TwinState>((set, get) => ({
   armHere(hereArmed) {
     set({ hereArmed });
   },
-  setPickingStart(pickingStartFor) {
-    set({ pickingStartFor });
+  openDirections(to) {
+    const from = get().state?.position ? HERE : null;
+    set({ directions: { from, to, stepFree: false, editing: from ? null : "from" }, selection: null, popover: null });
+    void routeDirections();
+  },
+  setDirectionsFrom(from) {
+    const d = get().directions;
+    if (!d) return;
+    set({ directions: { ...d, from, editing: from ? (d.to ? null : "to") : "from" } });
+    void routeDirections();
+  },
+  setDirectionsTo(to) {
+    const d = get().directions;
+    if (!d) return;
+    set({ directions: { ...d, to, editing: to ? (d.from ? null : "from") : "to" } });
+    void routeDirections();
+  },
+  swapDirections() {
+    const d = get().directions;
+    if (!d) return;
+    set({ directions: { ...d, from: d.to, to: d.from } });
+    void routeDirections();
+  },
+  setDirectionsStepFree(stepFree) {
+    const d = get().directions;
+    if (!d) return;
+    set({ directions: { ...d, stepFree } });
+    void routeDirections();
+  },
+  editDirections(editing) {
+    const d = get().directions;
+    if (d) set({ directions: { ...d, editing } });
+  },
+  closeDirections(keepRoute = false) {
+    if (!get().directions) return;
+    set({ directions: null });
+    directionsRun++;
+    if (!keepRoute && get().state?.route) void get().clearRoute();
   },
 
   async route(start, destination, stepFree = false) {
@@ -385,6 +441,25 @@ export const useTwin = create<TwinState>((set, get) => ({
     }
   },
 }));
+
+// --- directions (owner: card session): compute the route for the open From/To, newest request wins.
+let directionsRun = 0;
+async function routeDirections(): Promise<void> {
+  const { directions, buildingKey, state } = useTwin.getState();
+  if (!directions || !buildingKey) return;
+  const resolve = (place: Place | null) => (place === HERE ? (state?.position?.space_id ?? null) : place);
+  const start = resolve(directions.from);
+  const destination = resolve(directions.to);
+  const run = ++directionsRun;
+  if (!start || !destination || start === destination) {
+    if (state?.route) useTwin.setState({ state: (await api.clearRoute(buildingKey)).state });
+    return;
+  }
+  const result = await api.route(buildingKey, start, destination, directions.stepFree);
+  if (run !== directionsRun || !useTwin.getState().directions) return; // a newer pick or a close won
+  useTwin.setState({ state: result.state, replyShown: false });
+  if (result.route.ok && result.route.floors?.length) useTwin.setState({ focusedFloorId: result.route.floors[0] });
+}
 
 if (typeof window !== "undefined") {
   const refreshProfile = () => {
