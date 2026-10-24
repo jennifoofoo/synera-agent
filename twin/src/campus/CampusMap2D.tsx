@@ -47,6 +47,16 @@ export function CampusMap2D() {
     return () => observer.disconnect();
   }, []);
 
+  // The dock (card + input) covers the bottom; frame the site above it.
+  const [dockH, setDockH] = useState(90);
+  useEffect(() => {
+    const dock = document.querySelector<HTMLElement>(".dock");
+    if (!dock) return;
+    const observer = new ResizeObserver(() => setDockH(Math.round(window.innerHeight - dock.getBoundingClientRect().top)));
+    observer.observe(dock);
+    return () => observer.disconnect();
+  }, []);
+
   const legs = steps(route);
   const line = useMemo(() => (route?.ok && route.legs ? routeLine(view, route.legs) : []), [view, route]);
   const routeBuildings = new Set(route?.ok ? route.buildings : []);
@@ -58,15 +68,15 @@ export function CampusMap2D() {
   const fit = useMemo<ViewBox>(() => {
     const b = boundsOf(campusPoints(view, details));
     const top = 64;
-    const bottom = Math.max(bottomInset, 90) + 16;
-    const usableW = Math.max(size.w - 48, 120);
+    const bottom = Math.max(bottomInset, dockH, 90) + 16;
+    const usableW = Math.max(size.w - Math.min(170, size.w * 0.36), 120); // room for the names beside the outlines
     const usableH = Math.max(size.h - top - bottom, 120);
     const k = Math.min(usableW / Math.max(b.maxX - b.minX, 10), usableH / Math.max(b.maxY - b.minY, 10));
     // centre of the usable area in metres: shift so the map sits between the bars
     const cy = (b.minY + b.maxY) / 2 - (bottom - top) / 2 / k;
     return { cx: (b.minX + b.maxX) / 2, cy, k };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view.key, loadedCount, size.w, size.h, bottomInset]);
+  }, [view.key, loadedCount, size.w, size.h, bottomInset, dockH]);
   useEffect(() => setVb(null), [fit]);
   const current = vb ?? fit;
 

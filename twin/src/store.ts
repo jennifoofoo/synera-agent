@@ -54,6 +54,8 @@ export interface CampusHook {
   back: () => boolean;
   /** Label for that step, or null when the campus has nothing to go back to. */
   backLabel: () => string | null;
+  /** Name of the building of "You are here" when it is another campus building than the one on screen, else null. */
+  hereName: () => string | null;
 }
 
 export interface ChatMessage {

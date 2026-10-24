@@ -21,8 +21,8 @@ export function CampusSite() {
     void loadList();
   }, [loadList]);
   useEffect(() => {
-    document.body.classList.toggle("campus-site", site);
-    document.body.classList.toggle("campus-on", mode !== "off");
+    document.body.classList.toggle("campus-site-open", site);
+    document.body.classList.toggle("campus-open", mode !== "off");
   }, [site, mode]);
 
   if (!site) return null;

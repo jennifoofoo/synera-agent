@@ -2,6 +2,7 @@
 // or the tapped link (length, step-free, close / reopen), or a campus message. Never next to another card: the
 // selection, a guide step or a reply win.
 
+import { useEffect, useRef } from "react";
 import type { CampusLink } from "../api/campus";
 import { PhoneSheet } from "../ui/PhoneSheet";
 import { useTwin } from "../store";
@@ -49,6 +50,11 @@ function LegsCard() {
   const destination = last?.kind === "building" ? (last.rooms[last.rooms.length - 1]?.name ?? last.building_name) : "";
   const now = step ?? 0;
   const stepFree = route.step_free;
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const chip = list.current?.querySelector<HTMLElement>(".campus-step.now");
+    if (chip && list.current) list.current.scrollTo({ left: chip.offsetLeft - 14, behavior: "smooth" }); // phones: one sideways row
+  }, [now]);
   return (
     <Frame label={`Route to ${destination}`} onClose={clearRoute} className="card-route campus-legs">
       <div className="card-head">
@@ -65,7 +71,7 @@ function LegsCard() {
         <span>{(route.buildings ?? []).length} buildings</span>
         {stepFree && <span className="ok">step-free</span>}
       </div>
-      <ol className="campus-steps" aria-label="Legs">
+      <ol className="campus-steps" aria-label="Legs" ref={list}>
         {legs.map((leg, index) => (
           <li key={index}>
             <button className={`campus-step ${index === now ? "now" : ""} ${index < now ? "done" : ""} leg-${leg.kind}`} onClick={() => void goStep(index)} aria-current={index === now ? "step" : undefined}>
