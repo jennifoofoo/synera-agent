@@ -9,6 +9,7 @@ One-line switch: BACKEND below.
 """
 
 import os
+import threading
 from pathlib import Path
 
 from starter_agent.building_map import BuildingMap
@@ -44,20 +45,17 @@ class ChatAdapter:
         self.map = building_map
         self.starter = None
         self.session = None
+        self.lock = threading.Lock()
 
     def ask(self, text: str) -> dict:
         if not chat_available():
             return {"reply": NO_KEY_MESSAGE, "backend": None, "error": "no_api_key"}
         backend = backend_name()
         try:
-            if backend == "building_agent":
-                try:
+            with self.lock:  # one conversation per building: never two turns at once
+                if backend == "building_agent":
                     return {"reply": self.ask_building_agent(text), "backend": backend}
-                except Exception:
-                    if BACKEND != "auto":
-                        raise
-                    backend = "starter"
-            return {"reply": self.ask_starter(text), "backend": backend}
+                return {"reply": self.ask_starter(text), "backend": backend}
         except Exception as error:  # noqa: BLE001 - the page must keep working whatever the API does
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
@@ -65,7 +63,7 @@ class ChatAdapter:
         from building_agent.agent import Session
 
         if self.session is None:
-            self.session = Session(self.map)
+            self.session = Session(self.map, OUTPUT_DIRECTORY / self.building_dir.name)
         return self.session.ask(text)
 
     def ask_starter(self, text: str) -> str:

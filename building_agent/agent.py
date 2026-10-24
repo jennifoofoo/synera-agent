@@ -64,8 +64,14 @@ class Agent(StarterAgent):
         self.system[0]["text"] = STARTER_PROMPT.format(overview=overview) + CALCULATION_RULES + CONVERSATION_RULES
 
     def ask(self, user_text: str) -> str:
+        """If the API call dies mid-turn, drop the half-written turn so the conversation stays valid."""
         self.guide.begin_turn()
-        return super().ask(user_text)
+        mark = len(self.messages)
+        try:
+            return super().ask(user_text)
+        except Exception:
+            del self.messages[mark:]
+            raise
 
 
 class Session(Agent):

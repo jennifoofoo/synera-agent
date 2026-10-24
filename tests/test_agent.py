@@ -56,3 +56,21 @@ def test_session_works_on_the_given_map_and_keeps_the_conversation():
     session.guide.begin_turn()
     session.guide.begin_turn()
     assert session.guide.turn == 2  # state lives on the session, not per question
+
+
+def test_failed_turn_leaves_the_conversation_valid(monkeypatch):
+    import starter_agent.agent as starter
+
+    building_dir, _ = labelled_questions("errand")[0]
+    agent = Agent(load_map(building_dir), Path("agent_output") / "test", client=object())
+
+    def dying_ask(self, text):
+        self.messages.append({"role": "user", "content": text})
+        raise RuntimeError("API died")
+
+    monkeypatch.setattr(starter.BuildingAgent, "ask", dying_ask)
+    try:
+        agent.ask("hello")
+    except RuntimeError:
+        pass
+    assert agent.messages == []

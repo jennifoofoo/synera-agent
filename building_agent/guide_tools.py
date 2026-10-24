@@ -25,6 +25,7 @@ class Pending:
     step_free: bool
     card: dict
     turn: int
+    signature: tuple = ()
 
 
 @dataclass
@@ -34,6 +35,7 @@ class GuideState:
     session: DirectionsSession | None = None
     pending: Pending | None = None
     turn: int = 0
+    signature: tuple = ()
     log: list[dict] = field(default_factory=list)
 
     def begin_turn(self) -> None:
@@ -49,6 +51,11 @@ def element_label(bm: BuildingMap, element_id: str) -> str:
     if element_id in bm.spaces:
         return bm.describe_space(element_id)
     return element_id
+
+
+def building_signature(bm: BuildingMap) -> tuple:
+    """Changes whenever closures or doors change, so stale directions and cards can be detected."""
+    return (tuple(sorted(bm.closed)), len(bm.openings))
 
 
 def apply_change(bm: BuildingMap, action: str, element: str, other: str | None, step_free: bool) -> str:
@@ -75,16 +82,22 @@ def route_effect(before: BuildingMap, after: BuildingMap) -> dict | None:
     if last is None:
         return None
     ends = (last.start_space_id, last.destination_space_id, last.step_free)
-    effect = {
-        "route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}",
-        "length_before_m": copy.deepcopy(before).route(*ends).length_m,
-    }
-    try:
-        effect["length_after_m"] = after.route(*ends).length_m
-    except MapError:
-        effect["length_after_m"] = None
-        effect["note"] = "No route any more after this change."
+    effect = {"route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}"}
+    for label, building in (("length_before_m", copy.deepcopy(before)), ("length_after_m", after)):
+        try:
+            effect[label] = building.route(*ends).length_m
+        except MapError:
+            effect[label] = None
+            effect.setdefault("note", "There is no route " + ("now." if label == "length_before_m" else "after this change."))
     return effect
+
+
+def check_directions(state: GuideState, bm: BuildingMap) -> None:
+    if state.session is None:
+        raise ToolError("No directions yet. Call give_directions first.")
+    if state.signature != building_signature(bm):
+        state.session = None
+        raise ToolError("The building changed since these directions (a closure or door). Call give_directions again.")
 
 
 def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState) -> list:
@@ -102,6 +115,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         try:
             route = bm.route(start, destination, step_free, via)
             state.session = DirectionsSession.from_route(bm, route)
+            state.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
         return as_json({"length_m": route.length_m, "step_free": route.step_free, "steps": state.session.next(),
@@ -110,16 +124,14 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
     @beta_tool
     def next_steps() -> str:
         """The next (at most 3) steps of the current directions, when the person says 'weiter' or 'next'."""
-        if state.session is None:
-            raise ToolError("No directions yet. Call give_directions first.")
+        check_directions(state, bm)
         steps = state.session.next()
         return as_json({"steps": steps, "steps_remaining": state.session.remaining(), "done": not steps})
 
     @beta_tool
     def repeat_steps() -> str:
         """The steps handed out last, again, when the person says 'nochmal' or 'repeat'."""
-        if state.session is None:
-            raise ToolError("No directions yet. Call give_directions first.")
+        check_directions(state, bm)
         return as_json({"steps": state.session.repeat(), "steps_remaining": state.session.remaining()})
 
     @beta_tool
@@ -145,7 +157,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             raise ToolError(str(error)) from error
         card = {"I understood": what, "effect on your last route": route_effect(bm, preview),
                 "status": "nothing changed yet, waiting for the person's yes"}
-        state.pending = Pending(action, element, other, step_free, card, state.turn)
+        state.pending = Pending(action, element, other, step_free, card, state.turn, building_signature(bm))
         return as_json(card)
 
     @beta_tool
@@ -163,6 +175,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         if state.turn == pending.turn:
             raise ToolError("Ask the person first: show the card and wait for their answer in a new message.")
         state.pending = None
+        if pending.signature != building_signature(bm):
+            raise ToolError("The building changed since this card was made. Call propose_change again.")
         if confirmed and (not YES.search(user_reply) or NO.search(user_reply)):
             raise ToolError("That reply is not a clear yes. Ask the person again, then call propose_change anew.")
         if not confirmed:

@@ -134,3 +134,18 @@ def test_noop_changes_are_refused_and_card_uses_names_not_ids(tmp_path):
         tools["propose_change"](action="reopen", element=bm.resolve_space(end))  # not closed
     card = json.loads(tools["propose_change"](action="close", element=bm.resolve_space(end)))
     assert bm.spaces[bm.resolve_space(end)]["name"] in card["I understood"]
+
+
+def test_directions_and_cards_go_stale_when_the_building_changes(tmp_path):
+    bm, (start, end) = route_question()
+    tools, state = tools_by_name(bm, tmp_path)
+    state.begin_turn()
+    tools["give_directions"](start=start, destination=end)
+    bm.set_closed(bm.resolve_space(end), True)  # e.g. the user closes something on the page
+    with pytest.raises(ToolError, match="changed"):
+        tools["next_steps"]()
+    tools["propose_change"](action="reopen", element=bm.resolve_space(end))
+    bm.set_closed(bm.resolve_space(end), False)  # page edit between card and answer
+    state.begin_turn()
+    with pytest.raises(ToolError, match="changed"):
+        tools["confirm_change"](confirmed=True, user_reply="ja")
