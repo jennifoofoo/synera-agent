@@ -1,6 +1,6 @@
 # Spec: Interaction-Skripte als Live-Tests
 
-Status: ENTWURF (wartet auf Bestätigung von Jennifer).
+Status: bestätigt (Jennifer, 2026-10-24).
 
 ## Ziel
 Die 25 Interaction-Punkte kommen aus einem Skript-Gespräch mit schwierigen Nutzern. Wir bauen dieselben Szenarien als Tests, die ein echtes Gespräch mit dem Agenten führen und prüfen, ob er sich richtig verhält. Das schützt vor Rückschritten, wenn wir Prompt oder Tools ändern.

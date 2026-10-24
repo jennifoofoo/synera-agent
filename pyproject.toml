@@ -25,6 +25,8 @@ packages = ["starter_agent", "benchmark", "building_agent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not live'"
+markers = ["live: talks to the Claude API (needs .env, costs money); run with -m live"]
 
 [tool.ruff]
 line-length = 120
