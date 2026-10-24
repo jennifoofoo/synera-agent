@@ -202,6 +202,16 @@ def test_entrance_joins_room_and_outside_on_the_wall():
     assert entrance["position"][0] == pytest.approx(0.0, abs=0.01)
 
 
+CLEAN_FLOORS = [item for item in SAMPLE_FLOORS if item[0].startswith(("proc-", "resplan-"))]
+
+
+@pytest.mark.parametrize(("building_id", "level"), CLEAN_FLOORS)
+def test_median_route_error_at_3_px_noise_stays_under_3_percent_on_clean_floors(building_id, level):
+    case = floor_case(building_id, level, noise_px=3, seed=5)
+    converted, _ = convert_case(case)
+    assert measure(case, converted)["route_err_median"] < 0.03
+
+
 def test_door_is_projected_onto_the_shared_wall():
     extraction = simple_extraction()
     extraction.doors[0].position_px = [106, 50]  # 0.3 m beside the wall
@@ -331,7 +341,7 @@ def test_door_with_missing_room_far_from_wall_or_same_room_is_dropped():
     extraction.doors += [
         ExtractedDoor(("a", "zzz"), [100, 50]),
         ExtractedDoor(("a", "c"), [100, 50]),  # rooms do not touch
-        ExtractedDoor(("a", "b"), [60, 50]),  # far from the wall
+        ExtractedDoor(("a", "b"), [20, 50]),  # 4 m from the wall
         ExtractedDoor(("a", "a"), [50, 50]),
         ExtractedDoor(("outside", "outside"), [0, 0]),
         ExtractedDoor(("a", "b"), [float("nan"), 3]),

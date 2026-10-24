@@ -32,6 +32,7 @@ CODES: dict[str, tuple[str, str]] = {
     "door_same_room": ("error", "{n} door{s} {have} the same room on both sides."),
     "door_not_on_wall": ("error", "{n} door{s} {is} not on a wall the two rooms share."),
     "door_bad_position": ("warning", "{n} door{s} without a usable position {is} left out."),
+    "door_moved": ("warning", "{n} door{s} {is} more than 0.5 m from the wall in the plan and moved onto it."),
     "no_entrance": ("error", "The building has no entrance to the outside."),
     "room_unreachable": ("error", "{n} room{s} {have} no way out, doors are probably missing."),
     "area_implausible": ("warning", "{n} room{s} {have} an unlikely size (not 2 to 300 m2)."),
