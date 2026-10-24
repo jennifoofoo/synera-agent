@@ -142,7 +142,7 @@ def prepare_image(image_path: str | Path, allowed_root: str | Path = DEFAULT_ALL
             image = probe.copy()
     except ExtractError:
         raise
-    except Exception:
+    except Exception:  # noqa: BLE001
         raise ExtractError("The image could not be read; it may be damaged.") from None
 
     longer = max(width, height)
@@ -335,7 +335,7 @@ def extract_floor(
     if client is None:
         try:
             client = anthropic.Anthropic(max_retries=0, timeout=180.0)
-        except Exception:
+        except Exception:  # noqa: BLE001
             raise ExtractError("The Claude API client could not be created; is the API key set?") from None
     width, height = prepared.original_size
     prompt = PROMPT.format(width=prepared.sent_size[0], height=prepared.sent_size[1], tool=EXTRACTION_TOOL["name"])
@@ -371,7 +371,7 @@ def extract_floor(
             )
         except ExtractError:
             raise
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             if isinstance(error, anthropic.APIError) and _is_transient(error) and attempt < max_retries:
                 last_problem = f"API error ({type(error).__name__})"
                 warnings.append(f"Retried after a temporary API error ({type(error).__name__}).")
