@@ -38,9 +38,10 @@ export function FloorRail() {
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
           onClick={() => setFloorMode(floorMode === "exploded" ? "single" : "exploded")}
           title={floorMode === "exploded" ? "Show only this floor" : "Show all floors"}
+          aria-label="All floors"
           aria-pressed={floorMode === "exploded"}
         >
-          ⇕
+          <AllFloorsIcon />
         </button>
       )}
       {model.floors.length > 1 && [...model.floors].reverse().map((floor) => {
@@ -67,8 +68,8 @@ export function FloorRail() {
         );
       })}
       {profile !== "worker" && (
-        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view: the whole building" aria-label="Home view">
-          ⌂
+        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Reset view: the whole building" aria-label="Reset view">
+          <ResetViewIcon />
         </button>
       )}
       {profile !== "worker" && (
@@ -77,5 +78,27 @@ export function FloorRail() {
         </button>
       )}
     </div>
+  );
+}
+
+const railIcon = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+
+/** Three stacked floor plates (Tabler "stack-2" style): show all floors apart. */
+export function AllFloorsIcon() {
+  return (
+    <svg {...railIcon}>
+      <path d="M12 4 4 8l8 4 8-4z" />
+      <path d="m4 12 8 4 8-4" />
+      <path d="m4 16 8 4 8-4" />
+    </svg>
+  );
+}
+
+/** Four frame corners (Tabler "maximize" style): back to the view of the whole building. */
+export function ResetViewIcon() {
+  return (
+    <svg {...railIcon}>
+      <path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v2M16 20h2a2 2 0 0 0 2-2v-2" />
+    </svg>
   );
 }
