@@ -17,8 +17,8 @@ Techniker mit vollen Händen fragen, ohne einen Knopf zu drücken, und der Agent
 - Das Sprech-Modul setzt vor der Schlussfrage eine Pause von 1,2 s (Arbeit des Sprech-Agenten, `web/speech.py`).
 
 ## Teil B: Aktivierungswort (Seite, Leonie)
-- Name (Konstante, ein Wort ändern): **Marco**. Aktivierung "Hey Marco". Antwort beim reinen Aufruf: kurzer Ton und gesprochen "Polo!". Danach ist die nächste Äußerung die Frage.
-- Web Speech API dauerhaft (`continuous`, `interimResults`). Erkennungstext wird auf das Wort geprüft: Satz beginnt mit "hey marco" (auch "hi marco", "okay marco", Schreibvarianten "marko", "marcos" per kleiner Ähnlichkeitsliste). Rest des Satzes wird als Frage gesendet. Nur das Wort: Ton plus "Polo!", dann die nächste Äußerung.
+- Name (Konstante, ein Wort ändern): **Wanda** (die Stimme ist weiblich). Aktivierung "Hey Wanda". Antwort beim reinen Aufruf: kurzer Ton und gesprochen "I'm here.". Danach ist die nächste Äußerung die Frage.
+- Web Speech API dauerhaft (`continuous`, `interimResults`). Erkennungstext wird auf das Wort geprüft: Satz beginnt mit "hey wanda" (auch "hi wanda", "okay wanda", Schreibvarianten "wonda", "wander" per kleiner Ähnlichkeitsliste). Rest des Satzes wird als Frage gesendet. Nur das Wort: Ton plus "I'm here.", dann die nächste Äußerung.
 - Barge-in: wird das Wort während der Sprachausgabe erkannt, stoppt die Ausgabe sofort.
 - Neustart: Chrome beendet die Dauererkennung nach Stille, die Seite startet sie sauber neu, ohne doppelte Instanzen.
 - Schalter "Hands-free" (Default aus, Push-to-talk bleibt), sichtbares Mikrofon-Symbol und "mute"-Knopf. Zustand nie versteckt: man sieht, wann zugehört wird.
@@ -34,8 +34,8 @@ Teil A (offline und live):
 4. Benchmark-Modus: nie Rückfragen, auch mit Flag.
 5. Antworten im Sprachmodus enthalten kein Markdown und keine IDs (Check auf Zeichen und Muster).
 Teil B (manuell, Handtest in `docs/HANDTEST.md` Abschnitt G):
-6. "Hey Marco, where is the coffee machine?" löst eine Frage aus. Ohne das Wort passiert nichts.
-7. "Hey Marco" allein: Ton und "Polo!", dann Frage.
+6. "Hey Wanda, where is the coffee machine?" löst eine Frage aus. Ohne das Wort passiert nichts.
+7. "Hey Wanda" allein: Ton und "I'm here.", dann Frage.
 8. Aktivierungswort während der Ausgabe stoppt sie.
 9. Nach 2 Minuten Stille hört die Seite weiter zu (Neustart).
 10. Schalter aus: kein Dauer-Mikrofon.
