@@ -40,6 +40,8 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | Seite: Auswahl per Klick (Chip, `context` an /api/chat), Seite zeigt Asset-Änderungen (`added_assets` usw.) in 2D und 3D | Leonie | gemergt | feat/web-selection, feat/web-asset-edits |
 | Mobile Version der Seite (Spec `docs/specs/mobile-first.md`, Audit-Liste folgt von Jennifer) | Leonie | in Arbeit | feat/web-mobile |
 | Standort-Punkt, Chip, "I'm here", Kamera folgt (Phase 2 von `docs/specs/position.md`) und Aktivierungswort "Hey Wanda" (Teil B von `docs/specs/voice-handsfree.md`), Auto-Pace-Timer (`docs/specs/auto-pace.md`) | Leonie | zugesagt, nach Merge der Server-Branches | feat/web-position |
+| Position Phase 1 (Zustand, set/get_position, nearest, Klick-Kontext serverseitig, Duplikatregeln) und Phase 3 (Begleiten) | Jennifer | Test grün (Phase 1 und 3), wartet auf Review und Merge | feat/position |
+| Position Phase 2 (Seite): blauer Punkt "You are here" in Plan und 3D, Chip mit Löschen (`context.here = {clear: true}`), Knopf "I'm here" (`context.here = {space_id, point?, floor_id?}`), Kamera folgt `state.position`. Vertrag und Server fertig auf Branch, siehe `docs/specs/position.md` Abschnitt "Vertrag für die Seite" | Leonie | offen | feat/position-page |
 | Fragen an Synera vor Ort: Format, Locate/Route, Level 3 mehrere Gebäude, Freeze, Zeitlimit | wer vor Ort ist | offen | |
 | G. Routen-Modell: Raumfolge mit Tür-zu-Tür-Distanz und Synera-Kosten (Spike: 92,4 % auf 99,6 % volle Punkte), Kit-Modell für errand und what_if_door behalten, siehe `docs/specs/route-metric-spike.md` | Jennifer | gemergt-bereit | feat/route-model |
 | E. Demo-Video, Technik-Text, Pitch (3 Minuten plus 1 Minute Fragen) | beide | offen | |

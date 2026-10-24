@@ -10,11 +10,13 @@ from pathlib import Path
 
 import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
+from building_agent import guide_tools, position_tools, walk
 from building_agent.registry import load_kinds
 from starter_agent.building_map import BuildingMap
 
 LIVE_MODEL = "claude-sonnet-5-5"
 LIVE_CACHE = Path("agent_output") / "live_cache"
+LIVE_USAGE = Path("agent_output") / "live_usage.jsonl"  # one line of token counts per uncached script, for spend
 
 
 @dataclass
@@ -55,6 +57,21 @@ class Transcript:
         return [turn.reply for turn in self.turns]
 
 
+def effective_start(bm: BuildingMap, transcript: Transcript, turn: int, call: Call) -> str | None:
+    """Space id a route starts from: its start argument, else the position set before it (start left out)."""
+    if call.args.get("start"):
+        try:
+            return bm.resolve_space(call.args["start"])
+        except Exception:  # noqa: BLE001 - an unresolvable start is a test finding, not a crash here
+            return None
+    found = None
+    for index, earlier in transcript.calls("set_position"):
+        body = json.loads(earlier.result) if earlier.result and not earlier.is_error else {}
+        if index <= turn and body.get("position") and not body.get("needs_choice"):
+            found = body["position"]["space_id"]
+    return found
+
+
 def block_field(block, name: str):
     return block.get(name) if isinstance(block, dict) else getattr(block, name, None)
 
@@ -92,6 +109,7 @@ def cache_file(building_directory: Path, user_turns: list[str], model: str) -> P
         agent_module.CALCULATION_RULES
         + agent_module.CONVERSATION_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
+        + "".join(Path(module.__file__).read_text(encoding="utf-8") for module in (position_tools, walk, guide_tools))
     )
     raw = json.dumps([building_directory.name, user_turns, model, version])
     return LIVE_CACHE / f"{hashlib.sha256(raw.encode()).hexdigest()}.json"
@@ -114,6 +132,9 @@ def run_script(
             seen = len(agent.messages)
             reply = agent.ask(user_text)
             turns.append(Turn(user_text, reply, calls_in(agent.messages[seen:])))
+        LIVE_USAGE.parent.mkdir(parents=True, exist_ok=True)
+        with LIVE_USAGE.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"turns": user_turns[:1], **agent.usage}) + "\n")
     finally:
         starter_module.MODEL = previous_model
     LIVE_CACHE.mkdir(parents=True, exist_ok=True)

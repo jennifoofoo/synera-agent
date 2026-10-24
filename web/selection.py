@@ -91,3 +91,47 @@ def check_selection(raw, bm: BuildingMap) -> SelectionCheck:
 
 def validate_selection(raw, bm: BuildingMap) -> Selection | None:
     return check_selection(raw, bm).selection
+
+
+@dataclass(frozen=True)
+class HereCheck:
+    """The page's "I'm here" click, checked: a room is required, the point is optional, {"clear": true} forgets."""
+
+    space_id: str | None = None
+    floor_id: str | None = None
+    point: tuple[float, float] | None = None
+    clear: bool = False
+    reason: str = ""
+    note: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.clear or self.space_id is not None
+
+
+def check_here(raw, bm: BuildingMap) -> HereCheck:
+    """Validate context['here'] = {space_id, point?, floor_id?}. Never raises; an unknown id drops the whole thing.
+
+    Same rules as the selection: the room must exist, numbers must be finite, the floor must match the room. A
+    point outside the room is dropped on its own, with a note. Never read from message text."""
+    if raw is None:
+        return HereCheck()
+    if not isinstance(raw, dict):
+        return HereCheck(reason="here must be an object")
+    if raw.get("clear") is True:
+        return HereCheck(clear=True)
+    try:
+        space_id, floor_id = text_id(raw, "space_id"), text_id(raw, "floor_id")
+        point = read_point(raw["point"]) if raw.get("point") is not None else None
+    except ValueError as error:
+        return HereCheck(reason=str(error))
+    if space_id is None:
+        return HereCheck(reason="here needs a space_id")
+    if space_id not in bm.spaces:
+        return HereCheck(reason="unknown space")
+    if floor_id is not None and floor_id != bm.spaces[space_id]["floor_id"]:
+        return HereCheck(reason="floor does not match the space")
+    note = ""
+    if point is not None and not Polygon(bm.spaces[space_id]["polygon"]).buffer(1e-6).contains(Point(point)):
+        point, note = None, "The point is outside the room and was dropped."
+    return HereCheck(space_id, bm.spaces[space_id]["floor_id"], point, note=note)

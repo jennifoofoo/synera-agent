@@ -13,6 +13,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/door     {first, second, step_free}
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
   POST /api/chat     {message, context?: {space_id, asset_id, point, floor_id}}   click selection, validated
+                     context.here: {space_id, point?, floor_id?} or {clear: true}, "I'm here", validated, see docs/specs/position.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 
 Level 4, new building from floor plans (web/level4_api.py; POSTs need a same-origin page):
@@ -43,7 +44,7 @@ from starter_agent.building_map import MapError
 from web import api, level4_api, speech
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
-from web.selection import check_selection
+from web.selection import check_here, check_selection
 
 STATIC = Path(__file__).parent / "static"
 DEFAULT_PORT = 8765
@@ -204,10 +205,25 @@ class App:
                 previous_route, version = session.map.last_route, session.route_version
             session.map.located_asset_ids = []  # so `located` below only holds what this turn found
             # Not under the lock: an API call takes seconds and must not freeze the map.
-            check = check_selection(body.get("context"), session.map)
-            result = chat.ask(message, selection=check.selection) if check.selection else chat.ask(message)
-            if body.get("context") is not None and not check.selection:
+            context = body.get("context")
+            here_raw = None
+            if isinstance(context, dict) and "here" in context:  # "I'm here" travels beside the click selection
+                here_raw = context["here"]
+                context = {key: value for key, value in context.items() if key != "here"} or None
+            check = check_selection(context, session.map)
+            here = check_here(here_raw, session.map)
+            extra = {"here": here} if here.ok else {}
+            result = (
+                chat.ask(message, selection=check.selection, **extra) if check.selection else chat.ask(message, **extra)
+            )
+            if context is not None and not check.selection:
                 result = {**result, "selection_ignored": check.reason}
+            if here_raw is not None and not here.ok:
+                result = {**result, "here_ignored": here.reason}
+            elif here.note:
+                result = {**result, "here_note": here.note}
+            session.position = chat.position_view()
+            session.guide_info = chat.guide_info()
             saved_path = result.pop("saved_path", None)
             with self.lock:
                 current = self.session(key)

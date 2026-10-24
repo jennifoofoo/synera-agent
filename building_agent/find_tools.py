@@ -364,7 +364,7 @@ def find_connector(bm: BuildingMap, kind: str, direction: str | None = None, flo
     }
 
 
-def make_find_tools(bm: BuildingMap) -> list:
+def make_find_tools(bm: BuildingMap, annotate=None) -> list:
     @beta_tool
     def find_asset_tool(query: str, floor_level: int | None = None) -> str:
         """Find equipment or furniture by type or name when the person's words may fit several items,
@@ -378,7 +378,10 @@ def make_find_tools(bm: BuildingMap) -> list:
             floor_level: Floor of the item (0 = ground floor, -1 = basement). Omit if unknown.
         """
         try:
-            return as_json(find_asset(bm, query, floor_level))
+            result = find_asset(bm, query, floor_level)
+            if annotate:
+                annotate(result["groups"])  # route length from the person's position, when one is set
+            return as_json(result)
         except MapError as error:
             raise ToolError(str(error)) from error
 

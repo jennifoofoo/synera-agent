@@ -49,8 +49,9 @@ class ChatAdapter:
         self.saved_paths: list[Path] = []  # buildings the agent saved during the current turn (Level 4 save_building)
         self.lock = threading.Lock()
 
-    def ask(self, text: str, selection=None) -> dict:
-        """selection: a validated web.selection.Selection, valid for this one turn only."""
+    def ask(self, text: str, selection=None, here=None) -> dict:
+        """selection: a validated web.selection.Selection, valid for this one turn only.
+        here: a validated web.selection.HereCheck ("I'm here" click or clear), applied before the turn."""
         if not chat_available():
             return {"reply": NO_KEY_MESSAGE, "backend": None, "error": "no_api_key"}
         backend = backend_name()
@@ -58,7 +59,7 @@ class ChatAdapter:
             with self.lock:  # one conversation per building: never two turns at once
                 self.saved_paths = []
                 if backend == "building_agent":
-                    result = {"reply": self.ask_building_agent(text, selection), "backend": backend}
+                    result = {"reply": self.ask_building_agent(text, selection, here), "backend": backend}
                 else:
                     result = {"reply": self.ask_starter(text), "backend": backend}
                 if self.saved_paths:
@@ -67,7 +68,7 @@ class ChatAdapter:
         except Exception as error:  # noqa: BLE001 - the page must keep working whatever the API does
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
-    def ask_building_agent(self, text: str, selection=None) -> str:
+    def ask_building_agent(self, text: str, selection=None, here=None) -> str:
         from building_agent.agent import Session
 
         if self.session is None:
@@ -80,11 +81,39 @@ class ChatAdapter:
             note = self.level4.chat_context()
             if note:
                 text = f"{note}\n{text}"
+        if here is not None and here.ok:
+            self.apply_here(here)
         self.session.guide.selection = selection
         try:
             return self.session.ask(text)
         finally:
             self.session.guide.selection = None  # one-shot: never leaks into the next message
+
+    def apply_here(self, here) -> None:
+        """The page's validated click sets the position (source click); the next message is the next turn."""
+        from building_agent import walk as walking
+        from building_agent.position import make_position
+
+        guide, bm = self.session.guide, self.session.map
+        guide.session = None
+        if here.clear:
+            guide.position = guide.walk = None
+            return
+        guide.position = make_position(bm, here.space_id, here.point, "click", guide.turn + 1)
+        walking.follow(bm, guide, here.space_id)  # with a walk: what is left is recomputed from this room
+        guide.position = make_position(bm, here.space_id, here.point, "click", guide.turn + 1)
+
+    def guide_info(self) -> dict | None:
+        """The current leg while guiding (rooms only; the page side draws it), else None."""
+        from building_agent import walk as walking
+
+        walk = getattr(self.session.guide, "walk", None) if self.session is not None else None
+        return walking.guide_info(walk)
+
+    def position_view(self) -> dict | None:
+        """What state_view shows: {space_id, floor_id, point, source} or None."""
+        position = getattr(self.session.guide, "position", None) if self.session is not None else None
+        return position.view() if position is not None else None
 
     def watch_saves(self, session) -> None:
         """Note every building the agent saves, so the page can open it (the agent's own tools call swap_building)."""

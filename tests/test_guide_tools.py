@@ -4,8 +4,11 @@ from pathlib import Path
 import pytest
 from anthropic.lib.tools import ToolError
 
+from building_agent import routing
+from building_agent import walk as walking
 from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
 from building_agent.tools import make_tools
+from starter_agent.building_map import MapError
 from tests.conftest import labelled_questions, load_map
 
 
@@ -29,20 +32,54 @@ def tools_by_name(bm, tmp_path):
     return tools, state
 
 
-def test_directions_come_in_chunks_of_three_with_next_and_repeat(tmp_path):
-    bm, (start, end) = route_question()
+def long_route(bm):
+    """Two rooms whose route has at least 3 steps (an overview). Fails if the building has none."""
+    rooms = [space_id for space_id, space in bm.spaces.items() if space["type"] == "room"]
+    for start in rooms[:15]:
+        for end in rooms[-15:]:
+            if start == end:
+                continue
+            try:
+                route = routing.route(bm, start, end)
+            except MapError:
+                continue
+            if len(walking.build_walk(bm, route).steps) >= walking.MIN_STEPS_FOR_OVERVIEW:
+                return start, end
+    pytest.fail("no route of 3 or more steps in this building")
+
+
+def test_a_long_route_is_an_overview_then_one_step_at_a_time(tmp_path):
+    bm, _ = route_question()
+    start, end = long_route(bm)
     tools, _ = tools_by_name(bm, tmp_path)
     first = json.loads(tools["give_directions"](start=start, destination=end))
-    assert len(first["steps"]) <= 3
-    assert json.loads(tools["repeat_steps"]())["steps"] == first["steps"]
-    seen = list(first["steps"])
-    while True:
-        more = json.loads(tools["next_steps"]())
-        if more["done"]:
-            break
-        assert len(more["steps"]) <= 3
-        seen += more["steps"]
-    assert len(seen) == len(first["steps"]) + first["steps_remaining"]
+    assert "steps" not in first
+    assert first["mode"] == "overview" and 2 <= len(first["landmarks"]) <= 4 and first["offer"]
+    guided = json.loads(tools["walk"](said="yes"))
+    assert guided["step_number"] == 1
+    assert json.loads(tools["repeat_steps"]())["step"] == guided["step"]
+    seen = [guided["step"]]
+    while not guided["arrived"]:
+        guided = json.loads(tools["next_steps"]())
+        seen.append(guided["step"])
+        assert 1 <= guided["step_number"] <= first["steps_total"]
+    assert len(seen) == first["steps_total"]
+
+
+def test_a_short_route_is_read_out_at_once_and_repeats_in_full(tmp_path):
+    bm, _ = route_question()
+    tools, _ = tools_by_name(bm, tmp_path)
+    pair = next(
+        (a, b)
+        for a in bm.spaces
+        for b in bm.spaces
+        if a != b and "outside" not in (a, b) and len(routing.route(bm, a, b).space_path) == 2
+    )
+    first = json.loads(tools["give_directions"](start=pair[0], destination=pair[1]))
+    assert 1 <= len(first["steps"]) <= 2
+    assert json.loads(tools["repeat_steps"]())["steps"] == first["steps"]  # 'nochmal' gives the same steps again
+    assert json.loads(tools["walk"](said="repeat"))["steps"] == first["steps"]
+    assert json.loads(tools["next_steps"]())["done"] is True
 
 
 def test_next_steps_without_directions_is_a_tool_error(tmp_path):
@@ -142,8 +179,11 @@ def test_directions_and_cards_go_stale_when_the_building_changes(tmp_path):
     state.begin_turn()
     tools["give_directions"](start=start, destination=end)
     bm.set_closed(bm.resolve_space(end), True)  # e.g. the user closes something on the page
-    with pytest.raises(ToolError, match="changed"):
-        tools["next_steps"]()
+    if state.walk.mode == "plain":  # all steps were read out: they are simply out of date
+        with pytest.raises(ToolError, match="changed"):
+            tools["next_steps"]()
+    else:  # a walk folds the change in: the destination is closed, so there is no route any more
+        assert json.loads(tools["next_steps"]())["no_route"] is True
     tools["propose_change"](action="reopen", element=bm.resolve_space(end))
     bm.set_closed(bm.resolve_space(end), False)  # page edit between card and answer
     state.begin_turn()
@@ -460,8 +500,9 @@ def test_directions_go_stale_after_an_undo(tmp_path):
     state.begin_turn()
     tools["give_directions"](start="H-A1", destination="H-A3")
     undo(tools, state)
-    with pytest.raises(ToolError, match="No directions|changed"):
-        tools["next_steps"]()
+    # the undone widening does not change the route: the walk stays and says nothing about a new route
+    result = json.loads(tools["next_steps"]())
+    assert result["mode"] == "overview" and "no_route" not in result and "rerouted" not in result
 
 
 def test_undo_is_refused_when_the_building_changed_in_another_way(tmp_path):

@@ -8,7 +8,7 @@ import pytest
 
 from building_agent import routing as route_model
 from starter_agent.building_map import BuildingMap, MapError
-from tests.live.harness import Transcript, dev_building, run_script
+from tests.live.harness import Transcript, dev_building, effective_start, run_script
 from tests.live.test_script_1_3 import (
     ROUTING,
     assert_no_invented_places,
@@ -117,7 +117,7 @@ def test_typos_and_mixed_language_route_to_real_rooms_or_ask(pick):
     assert set(re.findall(r"\d\.\d{2}", reply)) <= known_room_numbers(bm)
     if pick == "room":
         assert routed and resolve(bm, routed[-1].args["destination"]) == room["id"]
-        assert resolve(bm, routed[-1].args["start"]) == start["id"]
+        assert effective_start(bm, transcript, 0, routed[-1]) == start["id"]
     else:
         coffee_spaces = {a["space_id"] for a in bm.assets.values() if a["type"] == "coffee_machine"}
         assert all(resolve(bm, call.args["destination"]) in coffee_spaces for call in routed)
@@ -161,7 +161,7 @@ def test_change_of_mind_after_next_restarts_from_same_start_in_chunks_of_three()
     fresh = [call for index, call in transcript.calls("give_directions") if index == 2 and not call.is_error]
     assert fresh, "no new give_directions after the change of mind"
     for call in fresh:
-        assert resolve(bm, call.args["start"]) == bm.resolve_space(start), "start changed"
+        assert effective_start(bm, transcript, 2, call) == bm.resolve_space(start), "start changed"
     assert resolve(bm, fresh[-1].args["destination"]) == bm.resolve_space(other)
     assert not re.search(
         r"\b(where are you|where do you start|wo bist du|wo starten)\b", transcript.turns[2].reply, re.IGNORECASE
@@ -179,8 +179,13 @@ def test_ambiguous_toilet_asks_before_routing():
     start = unique_name_space(bm, "office")
     transcript = run_script(path, [f"I'm in {start['name']}. Where is the toilet?"])
     first = transcript.turns[0]
-    assert not [call for call in first.calls if call.name in ROUTING], "routed before clarifying which toilet"
-    assert "?" in first.reply
+    # The position is known (spec rule 2): the nearest toilet by route length, found before any routing, or a question.
+    names = [call.name for call in first.calls]
+    routed = [index for index, name in enumerate(names) if name in ROUTING]
+    if routed:
+        assert "find_nearest" in names[: routed[0]], "routed to a toilet that find_nearest did not pick"
+    else:
+        assert "?" in first.reply
     assert_no_invented_places(bm, transcript)
 
 
