@@ -41,8 +41,8 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 - Sprache: `twin/src/handsFree.ts`, `voice.ts`, `store.ts`, `ui/HandsFree.tsx`, `ui/Omnibox.tsx`, neu `wake.ts`
 - Sperrungen sichtbar: `scene/Labels.tsx`, `scene/Markers.tsx`, `scene/poiIcons.*`, `ui/Card.tsx`, `ui/Card.css`, `ui/Directions.tsx`, `ui/KeyHelp.tsx`, `audit.ts`, `DESIGN.md`, neu `model/closures.ts`, `ui/AvoidsClosed.tsx`
 - Route gerade durch Türen (Server): `web/api.py`, `web/route_draw.py`
-Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`), neue Dateien `ui/Round.tsx`, `ui/Notes.tsx`, `ui/Report.tsx`, und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
-Server-Teile aus `docs/PLAN_SUNDAY.md` (Prüfrunde, Was-wäre-wenn, Notizen-API) sind auf Jennifers Wunsch pausiert, bis die Fixes drin sind.
+Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
+**Bis zum Freeze werden keine neuen Funktionen gebaut, nur Fehler behoben und aufgeräumt** (Entscheidung Jennifer).
 
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
