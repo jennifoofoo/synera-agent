@@ -16,7 +16,7 @@
 }
 /* Room labels: a thin paper-white halo so a route line behind them stays readable. */
 .label.label-halo {
-  --halo: var(--panel-solid, #fff);
+  --halo: var(--paper, var(--panel-solid, #fff));
   text-shadow:
     1px 0 0 var(--halo), -1px 0 0 var(--halo), 0 1px 0 var(--halo), 0 -1px 0 var(--halo),
     1px 1px 0 var(--halo), -1px -1px 0 var(--halo), 1px -1px 0 var(--halo), -1px 1px 0 var(--halo),
