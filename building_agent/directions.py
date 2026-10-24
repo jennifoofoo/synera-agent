@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from shapely.geometry import Polygon
 
+from building_agent.geometry import repaired
 from starter_agent.building_map import ADJACENT_DISTANCE_M, OUTSIDE, BuildingMap, RouteResult
 
 MAX_STEPS = 3
@@ -33,11 +34,11 @@ def _candidates(bm: BuildingMap, space_id: str) -> list[tuple[tuple, Landmark]]:
             continue
         label = asset["type"].replace("_", " ")
         found.append(((count, 1, asset["id"]), Landmark("asset", asset["id"], label)))
-    polygon = Polygon(space["polygon"])
+    polygon = repaired(Polygon(space["polygon"]))
     for other in bm.spaces.values():
         if other["id"] == space_id or other["floor_id"] != floor_id or other["room_type"] in PLAIN_ROOM_TYPES:
             continue
-        if polygon.distance(Polygon(other["polygon"])) <= ADJACENT_DISTANCE_M:
+        if polygon.distance(repaired(Polygon(other["polygon"]))) <= ADJACENT_DISTANCE_M:
             key = (room_count[other["room_type"]], 0, other["id"])
             found.append((key, Landmark("space", other["id"], other["name"])))
     return found

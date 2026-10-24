@@ -55,7 +55,7 @@ def kind_tool(bm: BuildingMap, kind: Kind):
             return as_json(kind.fn(bm, *args, **kwargs))
         except MapError as error:
             raise ToolError(str(error)) from error
-        except (KeyError, ValueError, nx.NodeNotFound) as error:
+        except (KeyError, ValueError, AttributeError, TypeError, nx.NodeNotFound) as error:
             raise ToolError(f"Invalid argument: {error}. Use space ids from find_space and floor ids from the overview.") from error
 
     run.__signature__ = signature.replace(parameters=parameters)

@@ -103,6 +103,8 @@ def answer(building_directory: Path, question_text: str) -> str:
             if attempt == RETRIES - 1:
                 raise
             time.sleep(2**attempt)
+        except (anthropic.APIError, FileNotFoundError, KeyError) as error:
+            return f"Sorry, I could not answer this ({type(error).__name__}). Please try again."
     if "Answer:" in reply:
         CACHE_DIRECTORY.mkdir(parents=True, exist_ok=True)
         cache_file.write_text(reply, encoding="utf-8")

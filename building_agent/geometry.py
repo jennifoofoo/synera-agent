@@ -1,15 +1,25 @@
 """Shared geometry helpers on building.json spaces. Keep it small: add a helper only when two kinds need it.
 
-Polygons are used exactly as given (no repair yet). If invalid OSM polygons turn out to break a kind,
-fix it here once for everyone."""
+Valid polygons are used exactly as given (all 280 kit buildings are valid today). A self-intersecting one is
+repaired here once for everyone, so the Sunday building cannot crash a kind."""
 
-from shapely.geometry import Polygon
+from shapely.geometry import MultiPolygon, Polygon
 
 from starter_agent.building_map import BuildingMap, MapError
 
 
+def repaired(polygon: Polygon) -> Polygon:
+    """Same polygon if valid; otherwise the largest part of buffer(0)."""
+    if polygon.is_valid:
+        return polygon
+    fixed = polygon.buffer(0)
+    if isinstance(fixed, MultiPolygon):
+        fixed = max(fixed.geoms, key=lambda part: part.area)
+    return fixed
+
+
 def space_polygon(bm: BuildingMap, space_id: str) -> Polygon:
-    return Polygon(bm.spaces[space_id]["polygon"])
+    return repaired(Polygon(bm.spaces[space_id]["polygon"]))
 
 
 def space_area(bm: BuildingMap, space_id: str) -> float:
