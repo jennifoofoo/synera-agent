@@ -8,6 +8,7 @@
 .card-walk .walk-icon { flex: none; color: var(--walk-blue); }
 .card-walk button.primary { background: var(--walk-blue); border-color: var(--walk-blue); color: #fff; }
 .card-walk .walk-toggle { display: block; margin: 8px auto 0; }
+.worker .card.card-walk button.link.walk-toggle { min-height: 44px; min-width: 64px; margin-top: 2px; }
 .walk-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .walk-list button {
   display: flex; gap: 10px; align-items: baseline; width: 100%; min-height: 44px; padding: 10px 4px;
