@@ -12,14 +12,17 @@ export function FloorRail() {
   const state = useTwin((s) => s.state);
   const viewMode = useTwin((s) => s.viewMode);
   const setViewMode = useTwin((s) => s.setViewMode);
+  const profile = useTwin((s) => s.profile);
   if (!model) return null;
   const flat = viewMode === "2d";
   const routeFloors = new Set(state?.route?.ok ? state.route.floors : []);
   return (
     <div className="floorrail" role="radiogroup" aria-label="Floor">
-      <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
-        {flat ? "3D" : "2D"}
-      </button>
+      {profile !== "worker" && (
+        <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
+          {flat ? "3D" : "2D"}
+        </button>
+      )}
       {!flat && model.floors.length > 1 && (
         <button
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}

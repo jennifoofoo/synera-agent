@@ -46,7 +46,7 @@ State: `buildings, buildingKey, building, model, state (BuildingState from the A
 route, position, guide, asset edits), loading, error, chatAvailable, speechAvailable`.
 
 UI: `profile ("planner" | "worker", by width < 1100 px or a coarse-pointer phone; worker = no AO, bigger targets),
-viewMode ("2d" | "3d", phones start in 2D), bottomInset (px of UI covering the bottom; the camera frames above it),
+viewMode ("2d" | "3d"; worker is 2D only, setViewMode("3d") is ignored there), bottomInset (px of UI covering the bottom; the camera frames above it),
 draft (a Level 4 draft is shown instead of the building; ui/newBuildingStore sets it), floorMode
 ("stacked" | "exploded" | "single"), focusedFloorId, thingsMode, cutaway, ao, reducedMotion, selection
 (kind space|asset|point|connector, id, floor_id, space_id?, point?), popover (screen position of the last

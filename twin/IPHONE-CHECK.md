@@ -9,6 +9,6 @@ Run `scripts/tunnel.sh`, then open the https link in **Safari** on the iPhone. T
 5. Tap once anywhere, then ask something with the mic. Safari asks for the microphone once and the reply is spoken. Also try with the mute switch on and note whether audio still plays.
 6. Block the mic (ᴀA › Website Settings › Microphone › Deny) and tap the mic: the hint names exactly that path.
 7. Start a guided route ("guide me to …") and leave the phone untouched past the auto-lock time: the screen stays on. Switch to another app and back: it still stays on.
-8. Tap 3D and back to 2D: one tap each way, and the plan keeps the same floor.
+8. There is no 3D toggle in the floor pill on the phone (2D only); the plan keeps its floor after rotating the phone.
 9. Turn the phone sideways: the input moves to the bottom right, the floor buttons stay reachable, and nothing overlaps. Turn it back.
 10. Every button hits on the first try with your thumb, and nothing needs a long press or hover to explain itself. The phone does not get warm after 2 minutes idle.

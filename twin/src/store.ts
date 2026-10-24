@@ -53,7 +53,8 @@ interface TwinState {
 
   profile: Profile;
   profileForced: boolean;
-  /** 2D = orthographic plan of the focused floor, 3D = the twin. Phones start in 2D. */
+  /** 2D = orthographic plan of the focused floor, 3D = the twin. Phones (worker) are 2D only: setViewMode("3d")
+   * is ignored there and the 3D/postprocessing code paths are never reached. */
   viewMode: ViewMode;
   /** Height in px of UI covering the bottom of the viewport (dock / sheet); the camera frames above it. */
   bottomInset: number;
@@ -192,10 +193,11 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   setProfile(profile) {
-    if (profile === null) set({ profile: autoProfile(), profileForced: false, ao: autoProfile() === "planner" });
-    else set({ profile, profileForced: true, ao: profile === "planner" });
+    const next = profile ?? autoProfile();
+    set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" ? { viewMode: "2d" as const } : {}) });
   },
   setViewMode(viewMode) {
+    if (viewMode === "3d" && get().profile === "worker") return; // phones are 2D only
     set({ viewMode });
   },
   setBottomInset(bottomInset) {
@@ -353,7 +355,10 @@ export const useTwin = create<TwinState>((set, get) => ({
 if (typeof window !== "undefined") {
   const refreshProfile = () => {
     const { profileForced } = useTwin.getState();
-    if (!profileForced) useTwin.setState({ profile: autoProfile(), ao: autoProfile() === "planner" });
+    if (!profileForced) {
+      const next = autoProfile();
+      useTwin.setState({ profile: next, ao: next === "planner", ...(next === "worker" ? { viewMode: "2d" } : {}) });
+    }
   };
   window.addEventListener("resize", refreshProfile);
   window.addEventListener("orientationchange", refreshProfile);

@@ -4,7 +4,8 @@ Sources: `docs/mobile-audit.md`, `docs/specs/mobile-first.md`, Leonie's design d
 
 ## Screen
 - Only the building, a slim header (back, name, search). No lists, tabs, panels, no minimap.
-- Starts in the 2D top-down view of the current floor; 3D is one tap away.
+- 2D only: the top-down plan of the current floor. There is no 3D on the phone (Leonie's decision); the 3D and
+  post-processing code paths are never reached and the postprocessing chunk is not loaded.
 - At the bottom, in thumb reach: one "Ask or search…" input with a big mic.
 - Route, next step and finds only when needed, as a bottom sheet (never over the plan). Cards only on tap, 2 to 3 lines.
 - Touch targets at least 44 px. Inputs at least 16 px font (otherwise iOS zooms). `touch-action: manipulation`.
@@ -21,7 +22,7 @@ Sources: `docs/mobile-audit.md`, `docs/specs/mobile-first.md`, Leonie's design d
 - Show only the current leg, small "Step 2 of 5" (`state.guide`).
 
 ## Performance
-- Light rendering on the phone: no ambient occlusion, no post effects, load 3D on demand, things only nearby.
+- Light rendering on the phone: 2D plan only, no ambient occlusion, no post effects, only machines and equipment drawn.
 
 ## Look
 - Bluish, clean, a little gold as accent, colour only for information, respect `prefers-reduced-motion`.
