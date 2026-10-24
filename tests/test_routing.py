@@ -1,5 +1,6 @@
-"""The door-to-door route model (building_agent/routing.py) against the geodesic measure from the route spike."""
+"""The route model (building_agent/routing.py) against the labelled answers, and against the kit's BuildingMap."""
 
+import csv
 import json
 import random
 import statistics
@@ -11,7 +12,6 @@ from pathlib import Path
 import pytest
 
 from building_agent import routing
-from spikes.route.geodesic import model_for
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
 from tests.conftest import LABELLED_SPLITS, load_map
 
@@ -21,11 +21,11 @@ ROUTE_KINDS = ("route", "route_step_free", "route_with_closure", "tour")
 BIGGEST = "data/dev/osm-way27917482"
 SEED = 7
 MAX_CLOSURES = 4
-MAX_PER_BUILDING = 12  # keeps the slow geodesic reference graphs of single buildings out of the test time
-PER_SOURCE = 80  # cases per source, at least 300 reachable ones in total
-# The whole dev+train population (1457 reachable cases) gives 99.4 percent; a sparse sample of osm/swiss-heavy
-# cases scatters around 98.8 to 99.4, so the test guards at 98 percent.
-MIN_SHARE_FULL_MARKS = 0.98
+MAX_PER_BUILDING = 12
+PER_SOURCE = 160  # cases per source, at least 300 reachable ones in total (about half are unreachable)
+LENGTH_TOLERANCE = 0.001  # tour labels add rounded legs, so lengths agree to 0.1 percent, plain routes exactly
+KIT_PAIRS = 300
+KIT_BUILDINGS = 20
 
 
 @cache
@@ -50,12 +50,17 @@ def load_cases() -> dict[str, list[dict]]:
                 source = question["building_id"].split("-")[0]
                 common = {"building": question["building_id"], "kind": kind}
                 if kind == "tour":
-                    legs = [
-                        (leg["from_space_id"], leg["to_space_id"], leg.get("reachable") is not False)
-                        for leg in answer["legs"]
-                    ]
-                    for start, end, reachable in legs:
-                        pools[source].append({**common, "start": start, "end": end, "reachable": reachable})
+                    for leg in answer.get("legs", []):  # no legs when a stop is unreachable (test_routing_tours)
+                        pools[source].append(
+                            {
+                                **common,
+                                "start": leg["from_space_id"],
+                                "end": leg["to_space_id"],
+                                "reachable": leg.get("reachable") is not False,
+                                "length": leg.get("optimal_length_m"),
+                                "space_path": leg.get("space_path"),
+                            }
+                        )
                     continue
                 pools[source].append(
                     {
@@ -65,13 +70,14 @@ def load_cases() -> dict[str, list[dict]]:
                         "step_free": kind == "route_step_free",
                         "closed": answer.get("closed_element_id"),
                         "reachable": answer.get("reachable") is not False,
+                        "length": answer.get("optimal_length_m"),
+                        "space_path": answer.get("space_path"),
                     }
                 )
     rng = random.Random(SEED)
     for cases in pools.values():
         rng.shuffle(cases)
-    # The geodesic reference graph is slow to build (once per building, step-free flag and closure), so the
-    # sample stays on a few buildings per source and caps closure cases.
+    # The sample stays on a few buildings per source and caps closure cases.
     picked = {}
     for source in SOURCES:
         buildings = sorted({c["building"] for c in pools[source]})
@@ -111,26 +117,6 @@ def run_route(case: dict):
         bm.closed = closed_before
 
 
-def score(case: dict, result) -> float:
-    bm = load_map(building_dir(case["building"]))
-    closed_before = set(bm.closed)
-    if case.get("closed"):
-        bm.closed.add(case["closed"])
-    try:
-        step_free = case.get("step_free", False)
-        model = model_for(bm, step_free=step_free, closed=bm.closed)
-        # The spike builds the per-space visibility graphs once per model; share them across variants.
-        model.geoms = bm.__dict__.setdefault("_shared_geoms", {})
-        best = model.best_route(case["start"], case["end"])
-        ours = model.measure(result.space_path)
-    finally:
-        bm.closed = closed_before
-    if ours is None:
-        return 0.0
-    assert best is not None
-    return 1.0 if ours <= 1e-9 else min(1.0, best[1] / ours)
-
-
 def joined(bm: BuildingMap, first: str, second: str, step_free: bool) -> bool:
     for opening in bm.openings.values():
         if set(opening["space_ids"]) == {first, second} and not (step_free and not opening["step_free"]):
@@ -143,30 +129,31 @@ def joined(bm: BuildingMap, first: str, second: str, step_free: bool) -> bool:
     return False
 
 
-def test_agreement_with_geodesic_measure():
+def test_agreement_with_the_labels():
     reachable = [case for case in cases() if case["reachable"]]
     assert len(reachable) >= 300
-    scores = []
+    ratios = []
     for case in reachable:
         bm, result = run_route(case)
         step_free = case.get("step_free", False)
-        assert result.space_path[0] == case["start"] and result.space_path[-1] == case["end"]
+        assert result.space_path == case["space_path"], case
+        assert abs(result.length_m - case["length"]) <= max(0.02, LENGTH_TOLERANCE * case["length"]), case
         for first, second in zip(result.space_path, result.space_path[1:], strict=False):
             assert joined(bm, first, second, step_free), (case, first, second)
-        scores.append(score(case, result))
-    share = sum(value >= 0.99 for value in scores) / len(scores)
+        ratios.append(result.length_m / case["length"] if case["length"] else 1.0)
     print(
-        f"agreement n={len(scores)} share>=0.99={share:.4f} median={statistics.median(scores):.3f} worst={min(scores):.3f}"
+        f"agreement n={len(ratios)} median={statistics.median(ratios):.5f} worst={max(ratios, key=lambda r: abs(r - 1)):.5f}"
     )
-    assert share >= MIN_SHARE_FULL_MARKS
 
 
 def test_unreachable_raises_map_error():
     unreachable = [case for case in cases() if not case["reachable"]]
     assert unreachable
     for case in unreachable:
-        with pytest.raises(MapError):
+        bm = load_map(building_dir(case["building"]))
+        with pytest.raises(MapError, match="No .*route"):
             run_route(case)
+        assert bm.last_route is None  # a failed route never leaves a stale route to be reported as the answer
 
 
 @cache
@@ -191,7 +178,7 @@ def test_closure_makes_target_unreachable():
 def test_via_keeps_order():
     checked = 0
     for split in LABELLED_SPLITS:
-        for path in sorted((DATA / split).glob("swiss-*/questions_basic.jsonl"))[:3]:
+        for path in sorted((DATA / split).glob("swiss-*/questions_basic.jsonl"))[:10]:
             for line in path.read_text(encoding="utf-8").splitlines():
                 question = json.loads(line)
                 if question["kind"] != "tour" or len(question["answer"].get("stops", [])) < 3:
@@ -223,19 +210,46 @@ def test_step_free_never_uses_a_step():
     assert checked >= 20
 
 
-def test_outside_entrances_cost_nothing():
+def test_no_route_leaves_and_reenters():
     bm = load_map(building_dir("swiss-3355"))
     entrances = [o for o in bm.openings.values() if OUTSIDE in o["space_ids"]]
-    inside = [bm.other_side(o, OUTSIDE) for o in entrances]
     assert len(entrances) >= 2
     graph = routing.routing_graph(bm, False).graph
+    assert OUTSIDE not in graph
     for entrance in entrances:
-        node = ("o", entrance["id"], OUTSIDE)
-        assert graph.degree(node) >= 1
-        for neighbour in graph[node]:
-            if neighbour[2] == OUTSIDE:
-                assert graph[node][neighbour]["weight"] == 0.0
-    assert inside
+        node = f"door:{entrance['id']}"
+        inside = bm.other_side(entrance, OUTSIDE)
+        if node in graph:
+            assert {space for _, _, space in graph.edges(node, data="space")} == {inside}
+
+
+def test_same_length_as_the_kit_model():
+    """One model: the same pair of rooms never gets two lengths in one building."""
+    with (DATA / "manifest.csv").open(encoding="utf-8", newline="") as handle:
+        paths = sorted(row["path"] for row in csv.DictReader(handle))
+    rng = random.Random(SEED)
+    buildings = rng.sample(paths, KIT_BUILDINGS)
+    per_building = KIT_PAIRS // KIT_BUILDINGS
+    compared = reachable = 0
+    for relative in buildings:
+        bm = load_map(str(DATA / relative))
+        ids = sorted(bm.spaces)
+        for _ in range(per_building):
+            start, end = rng.sample(ids, 2)
+            step_free = rng.random() < 0.3
+            try:
+                kit = bm.route(start, end, step_free)
+            except MapError:
+                with pytest.raises(MapError):
+                    routing.route(bm, start, end, step_free)
+                compared += 1
+                continue
+            ours = routing.route(bm, start, end, step_free)
+            assert ours.length_m == kit.length_m and ours.space_path == kit.space_path, (start, end)
+            assert ours.steps == kit.steps
+            compared += 1
+            reachable += 1
+    assert compared == KIT_PAIRS and reachable >= KIT_PAIRS // 2
 
 
 def test_same_room_route_is_trivial_in_both_models():
@@ -284,3 +298,14 @@ def test_cache_notices_changed_opening_flags():
     opening = next(iter(bm.openings.values()))
     opening["step_free"] = not opening["step_free"]
     assert routing.routing_graph(bm, False) is not first
+
+
+def test_load_map_shares_the_walks_between_maps():
+    first = routing.load_map(Path(small_map()))
+    start, end = "swiss-3355-F0-S023", "swiss-3355-F2-S004"
+    expected = routing.route(first, start, end).length_m
+    second = routing.load_map(Path(small_map()))
+    assert second is not first and second.walks and second.walks.keys() == first.walks.keys()
+    assert routing.route(second, start, end).length_m == expected
+    second.closed.add(next(iter(second.openings)))  # edits of one map never leak into the other
+    assert not first.closed

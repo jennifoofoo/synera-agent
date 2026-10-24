@@ -382,23 +382,8 @@ def compact_steps(steps: list[str]) -> list[str]:
 
 def route_legs(bm: BuildingMap, stops: list[str], step_free: bool, space_path: list[str]) -> list[list[tuple]] | None:
     """The door and connector nodes of each leg, from the same graph and search as routing.route (which only
-    returns spaces). None if they do not give the route's space_path; the line then runs through room anchors."""
-    rg = routing.routing_graph(bm, step_free)
-    try:
-        if len(stops) == 2:
-            found = routing.shortest_leg(bm, rg, stops[0], stops[1])
-            legs = None if found is None else [found[1]]
-        else:
-            legs = routing.tour_legs(bm, rg, stops, step_free)[1]
-    except MapError:
-        return None
-    if legs is None:
-        return None
-    spaces: list[str] = []
-    for (leg_start, leg_end), nodes in zip(itertools.pairwise(stops), legs, strict=True):
-        leg = routing.leg_spaces(leg_start, leg_end, nodes)
-        spaces += leg if not spaces else leg[1:]
-    return legs if spaces == space_path else None
+    returns spaces). None if there is none; the line then runs through room anchors."""
+    return routing.leg_portals(bm, step_free, stops)
 
 
 def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:

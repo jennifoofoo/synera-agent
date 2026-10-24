@@ -147,8 +147,9 @@ def test_unreachable_page_route_explains_why():
     assert api.current_route(session)["ok"] is False
 
 
-def test_page_marks_a_route_where_the_kit_model_differs():
-    """The spike's worst proc case: the kit model picks another room sequence than the people model."""
+def test_page_route_never_differs_from_the_kit_model():
+    """One model: the people route and the kit route are the same trip, so the page never flags a difference."""
+    checked = 0
     for building_dir in sorted(str(p.parent) for p in (DATA / "dev").glob("proc-*/building.json")):
         session = session_for(building_dir)
         bm = session.map
@@ -158,9 +159,8 @@ def test_page_marks_a_route_where_the_kit_model_differs():
                 page = api.route_view(session, start, end)
             except MapError:
                 continue
-            if page["differs_from_kit"]:
-                assert page["kit"]["space_path"] != page["space_path"]
-                assert page["space_path"] == routing.route(bm, start, end).space_path
-                assert page["model"] == api.PEOPLE_MODEL
-                return
-    pytest.fail("no dev proc route where kit and people model differ")
+            assert page["differs_from_kit"] is False
+            assert page["kit"]["space_path"] == page["space_path"] == routing.route(bm, start, end).space_path
+            assert page["model"] == api.PEOPLE_MODEL
+            checked += 1
+    assert checked > 20

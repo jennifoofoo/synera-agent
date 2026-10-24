@@ -4,8 +4,10 @@ from pathlib import Path
 import pytest
 from anthropic.lib.tools import ToolError
 
+from building_agent import routing
 from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
 from building_agent.tools import make_tools
+from starter_agent.building_map import MapError
 from tests.conftest import labelled_questions, load_map
 
 
@@ -19,8 +21,15 @@ def fresh_map(building_dir: str):
 def route_question():
     building_dir, question = labelled_questions("errand")[0]
     bm = fresh_map(building_dir)
-    stops = [bm.resolve_space(question["inputs"]["start"]), next(iter(bm.assets.values()))["space_id"]]
-    return bm, stops
+    start = bm.resolve_space(question["inputs"]["start"])
+    # The kit model has no way round the outside: take the first asset room that can be reached from the start.
+    for asset in bm.assets.values():
+        try:
+            if asset["space_id"] != start and routing.route(bm, start, asset["space_id"]).length_m > 0:
+                return bm, [start, asset["space_id"]]
+        except MapError:
+            continue
+    raise AssertionError("no reachable asset room")
 
 
 def tools_by_name(bm, tmp_path):

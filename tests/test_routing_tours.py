@@ -1,6 +1,5 @@
-"""Tours (via stops) in building_agent/routing.py: joint planning over all stops, scored like Synera does."""
+"""Tours (via stops) in building_agent/routing.py: legs in order, like the labelled tours, scored like Synera does."""
 
-import hashlib
 import itertools
 import json
 import random
@@ -18,11 +17,9 @@ from starter_agent.building_map import BuildingMap, MapError
 from tests.conftest import LABELLED_SPLITS, load_map
 
 DATA = Path("data")
-GOLDEN = Path(__file__).parent / "fixtures" / "routing_plain_golden.json"
-PLAIN_KINDS = ("route", "route_step_free", "route_with_closure")
-PLAIN_SAMPLE = 300
-TOUR_SAMPLE = 150  # of the 240 labelled tours; keeps the geodesic judge inside the time budget
+TOUR_SAMPLE = 150  # of the 240 labelled tours
 SEED = 11
+LENGTH_TOLERANCE = 0.001  # labels add rounded legs
 BIGGEST = "data/dev/osm-way27917482"
 
 
@@ -37,11 +34,6 @@ def questions(kind: str) -> tuple[tuple[str, dict], ...]:
     return tuple(found)
 
 
-def plain_questions() -> list[tuple[str, dict]]:
-    pool = [item for kind in PLAIN_KINDS for item in questions(kind)]
-    return sorted(random.Random(SEED).sample(pool, PLAIN_SAMPLE), key=lambda item: item[1]["id"])
-
-
 def plan(directory: str, start: str, end: str, via=None, step_free=False, closed=()):
     """Route on the shared map with extra closures applied; closures are restored afterwards."""
     bm = load_map(directory)
@@ -51,31 +43,6 @@ def plan(directory: str, start: str, end: str, via=None, step_free=False, closed
         return bm, routing.route(bm, start, end, step_free, via)
     finally:
         bm.closed = before
-
-
-def route_digest(item: tuple[str, dict]):
-    directory, question = item
-    answer = question["answer"]
-    closed = [answer["closed_element_id"]] if answer.get("closed_element_id") else []
-    try:
-        _, result = plan(
-            directory,
-            answer["from_space_id"],
-            answer["to_space_id"],
-            step_free=question["kind"] == "route_step_free",
-            closed=closed,
-        )
-    except MapError:
-        return "unreachable"
-    return [result.length_m, hashlib.md5("|".join(result.space_path).encode()).hexdigest()]
-
-
-def test_plain_routes_unchanged():
-    golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
-    items = plain_questions()
-    assert len(items) == PLAIN_SAMPLE
-    changed = [item[1]["id"] for item in items if route_digest(item) != golden[item[1]["id"]]]
-    assert not changed, changed
 
 
 def tour_buildings() -> list[tuple[str, list[dict]]]:
@@ -95,30 +62,51 @@ def tour_buildings() -> list[tuple[str, list[dict]]]:
 
 
 def test_labelled_tours_score_like_synera():
-    scores, invalid = [], 0
+    scores, invalid, unreachable = [], 0, 0
     for directory, tours in tour_buildings():
         judge_map = BuildingMap.load(Path(directory))
         for question in tours:
             stops = question["answer"]["stops"]
             try:
-                bm, _ = plan(directory, stops[0], stops[-1], via=stops[1:-1])
+                bm, result = plan(directory, stops[0], stops[-1], via=stops[1:-1])
                 entry = route_entry(bm)
+                if question["answer"].get("reachable") is not False:
+                    legs = []
+                    for leg in question["answer"]["legs"]:
+                        legs += leg["space_path"] if not legs else leg["space_path"][1:]
+                    assert result.space_path == legs, question["id"]
+                    label = question["answer"]["optimal_length_m"]
+                    assert abs(result.length_m - label) <= max(0.02, LENGTH_TOLERANCE * label), question["id"]
             except MapError:
                 entry = None
+                unreachable += 1
             judged = score_route(judge_map, entry, question)
             invalid += not judged.valid
             scores.append(judged.score)
     full = sum(value >= 0.99 for value in scores) / len(scores)
     print(
-        f"tours n={len(scores)} valid={1 - invalid / len(scores):.4f} share>=0.99={full:.4f} "
-        f"mean={statistics.mean(scores):.4f} median={statistics.median(scores):.3f} worst={min(scores):.3f} "
-        "(leg by leg before: share 0.983 and mean 0.9958 on all 240, worst 0.374)"
+        f"tours n={len(scores)} unreachable={unreachable} valid={1 - invalid / len(scores):.4f} "
+        f"share>=0.99={full:.4f} mean={statistics.mean(scores):.4f} worst={min(scores):.3f}"
     )
     assert len(scores) >= TOUR_SAMPLE
-    assert 1 - invalid / len(scores) >= 0.99
-    assert full >= 0.97
-    assert statistics.median(scores) == 1.0
-    assert min(scores) >= 0.9
+    assert unreachable > 0  # the sample holds tours with an unreachable stop; they must say so, not crash
+    assert invalid == 0
+    assert full == 1.0
+
+
+def test_unreachable_tours_raise_no_route():
+    checked = 0
+    for directory, question in questions("tour"):
+        answer = question["answer"]
+        if answer.get("reachable") is not False:
+            continue
+        stops = answer["stops"]
+        bm = load_map(directory)
+        with pytest.raises(MapError, match="No .*route"):
+            routing.route(bm, stops[0], stops[-1], via=stops[1:-1])
+        assert bm.last_route is None
+        checked += 1
+    assert checked >= 5
 
 
 def rect(x0, y0, x1, y1):
@@ -162,25 +150,13 @@ def synthetic_tour_map() -> BuildingMap:
     )
 
 
-def leg_by_leg(bm: BuildingMap, stops: list[str]) -> list[str]:
-    """The previous planner: every leg on its own, zero cost inside the stop spaces."""
-    rg = routing.routing_graph(bm, False)
-    spaces: list[str] = []
-    for first, second in itertools.pairwise(stops):
-        found = routing.shortest_leg(bm, rg, first, second)
-        assert found is not None
-        leg = routing.leg_spaces(first, second, found[1])
-        spaces += leg if not spaces else leg[1:]
-    return spaces
-
-
-def test_joint_plan_beats_leg_by_leg():
+def test_tour_is_the_sum_of_its_legs():
     bm = synthetic_tour_map()
-    assert leg_by_leg(bm, ["A", "M", "B"]) == ["A", "M", "B"]
+    first, second = routing.route(bm, "A", "M"), routing.route(bm, "M", "B")
     result = routing.route(bm, "A", "B", via=["M"])
-    assert result.space_path == ["A", "Y", "M", "B"]
-    assert result.length_m == pytest.approx(28.43 + 2.24, abs=0.05)
-    assert routing.route(bm, "A", "B").length_m == result.length_m  # M lies on the best plain route anyway
+    assert result.space_path == ["A", "M", "B"]
+    assert result.length_m == pytest.approx(first.length_m + second.length_m, abs=0.01)
+    assert routing.route(bm, "A", "B").length_m < result.length_m  # via Y is shorter, but the tour must stop at M
 
 
 def test_step_free_tour_avoids_the_step():
@@ -188,7 +164,7 @@ def test_step_free_tour_avoids_the_step():
     result = routing.route(bm, "A", "B", step_free=True, via=["M"])
     assert result.space_path == ["A", "M", "B"]
     assert result.step_free
-    assert result.length_m == pytest.approx(35.01, abs=0.05)
+    assert result.length_m == pytest.approx(45.32, abs=0.05)
 
 
 def test_tour_can_revisit_a_space():
@@ -228,7 +204,7 @@ def test_closure_that_cuts_a_leg_raises():
 def test_tour_steps_cover_every_space_change():
     bm = synthetic_tour_map()
     result = routing.route(bm, "A", "B", via=["M"])
-    assert result.steps[0].startswith("Start in") and result.steps[-1].startswith("You have arrived")
+    assert result.steps[0].startswith("Start in") and "You have arrived at" in result.steps[-1]
     assert len(result.steps) == len(result.space_path) + 1
 
 

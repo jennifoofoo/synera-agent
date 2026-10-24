@@ -1,8 +1,9 @@
 """Level 3, routes across buildings: one Dijkstra over (building, entrance) nodes on top of routing.py.
 
-Inside a building the legs are routing.py's door-to-door model. The outside is never a free shortcut: legs of a
-campus route are computed on a view of each map with the space `outside` closed, so a leg cannot leave the building
-and re-enter somewhere else for free. Buildings are only joined by links (cost length_m) between two entrances.
+Inside a building the legs are routing.py's model (the kit's door-to-door model, which has no outside node). The
+outside is never a free shortcut: legs of a campus route are computed on a view of each map with the space `outside`
+closed, so a leg cannot leave the building and re-enter somewhere else. Buildings are only joined by links (cost
+length_m) between two entrances.
 A route inside one building is delegated to routing.route unchanged."""
 
 import copy
