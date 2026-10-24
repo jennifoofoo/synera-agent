@@ -5,6 +5,7 @@ keyed by script turns, model and prompt/tool version, so reruns without changes 
 
 import hashlib
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -65,6 +66,9 @@ def effective_start(bm: BuildingMap, transcript: Transcript, turn: int, call: Ca
             return bm.resolve_space(call.args["start"])
         except Exception:  # noqa: BLE001 - an unresolvable start is a test finding, not a crash here
             return None
+    reported = re.search(r"\[([^\[\]]+)\]", json.loads(call.result).get("start_assumed", "")) if call.result else None
+    if reported and reported.group(1) in bm.spaces:  # the tool says which room it started from
+        return reported.group(1)
     found = None
     for index, earlier in transcript.calls("set_position"):
         body = json.loads(earlier.result) if earlier.result and not earlier.is_error else {}

@@ -79,8 +79,21 @@ def lift_case():
     return building, lifts[0]
 
 
-def step_lists(transcript, names=("give_directions", "next_steps", "repeat_steps")):
-    return [(i, c.name, json.loads(c.result)["steps"]) for n in names for i, c in transcript.calls(n) if not c.is_error]
+def steps_of(result: dict) -> list[str]:
+    """The steps one reply may carry: a short route's steps, or the single current step of a guided walk."""
+    return result.get("steps") or ([result["step"]] if "step" in result else [])
+
+
+def step_lists(transcript, names=("give_directions", "next_steps", "repeat_steps", "walk")):
+    """(turn, tool, steps handed out) for every successful call; an overview carries landmarks, not steps."""
+    found = []
+    for name in names:
+        for index, call in transcript.calls(name):
+            if not call.is_error:
+                result = json.loads(call.result)
+                assert len(result.get("landmarks", [])) <= 4, "an overview names at most 4 landmarks"
+                found.append((index, call.name, steps_of(result)))
+    return found
 
 
 @pytest.mark.live
@@ -102,23 +115,44 @@ def test_script_4_wheelchair_gets_step_free_route_and_honest_reply():
 
 @pytest.mark.live
 def test_script_5_hands_full_gets_chunks_of_three_next_and_again():
+    """Hands full (script 5): short replies, never more than 3 steps at once, 'next' advances, 'again' repeats.
+
+    Changed with the walk design: a long route now starts with an overview and one offer, and guiding then hands
+    out ONE step per reply (so 'chunks of three' is now 'at most three'). So the script says yes to the offer
+    first; the requirement (next advances to a new step, again repeats the same step without advancing) is kept."""
     building, start, destination = long_route_case()
     transcript = run_script(
         building,
-        [f"I'm carrying boxes, keep it short. How do I get from {start} to {destination}?", "next", "again"],
+        [
+            f"I'm carrying boxes, keep it short. How do I get from {start} to {destination}?",
+            "yes please",
+            "next",
+            "again",
+        ],
     )
     assert transcript.turns[0].called("give_directions"), "give_directions not used in turn 1"
     assert all(len(steps) <= 3 for _, _, steps in step_lists(transcript))
-    first = json.loads(transcript.turns[0].called("give_directions")[0].result)["steps"]
-    assert 0 < len(first) <= 3
-    following = transcript.turns[1].called("next_steps")
-    assert following, "next_steps not called after 'next'"
-    second = json.loads(following[0].result)["steps"]
-    assert second and not set(second) & set(first), "next_steps repeated or returned nothing"
-    repeated = transcript.turns[2].called("repeat_steps")
-    assert repeated, "repeat_steps not called after 'again'"
-    assert json.loads(repeated[0].result)["steps"] == second
-    assert not transcript.turns[2].called("next_steps")
+    overview = json.loads(transcript.turns[0].called("give_directions")[0].result)
+    assert overview.get("mode") in ("overview", "guided") or overview.get("steps"), "no overview, step or steps"
+
+    def guided_steps(turn):
+        return [
+            json.loads(c.result)
+            for c in transcript.turns[turn].calls
+            if c.name in ("give_directions", "walk", "next_steps", "repeat_steps")
+            and not c.is_error
+            and "step_number" in json.loads(c.result)
+        ]
+
+    first, second, again = guided_steps(1), guided_steps(2), guided_steps(3)
+    assert first and first[-1]["step_number"] == 1, "'yes' did not give the first step"
+    assert second and second[-1]["step_number"] == 2 and second[-1]["step"] != first[-1]["step"], (
+        "'next' did not advance"
+    )
+    assert again and again[-1]["step_number"] == 2 and again[-1]["step"] == second[-1]["step"], (
+        "'again' moved or changed"
+    )
+    assert not transcript.turns[3].called("next_steps")
 
 
 @pytest.mark.live
