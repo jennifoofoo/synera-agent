@@ -13,6 +13,7 @@ from anthropic.lib.tools import ToolError
 from building_agent import edit_ops, routing
 from building_agent.directions import DirectionsSession
 from building_agent.impact import analyse
+from building_agent.position import NO_POSITION, Position, Trail, remember_route
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
@@ -47,6 +48,8 @@ class GuideState:
     signature: tuple = ()
     log: list[dict] = field(default_factory=list)
     undo: deque = field(default_factory=lambda: deque(maxlen=UNDO_DEPTH))
+    position: Position | None = None  # where the person stands; only the server sets it, one per conversation
+    trail: Trail | None = None  # the route handed out last, with its room sequence
 
     def begin_turn(self) -> None:
         """A card can only be answered in the very next message; later it is stale and dropped."""
@@ -266,23 +269,30 @@ def check_directions(state: GuideState, bm: BuildingMap) -> None:
 
 def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState) -> list:
     @beta_tool
-    def give_directions(start: str, destination: str, step_free: bool = False, via: list[str] | None = None) -> str:
+    def give_directions(
+        destination: str, start: str | None = None, step_free: bool = False, via: list[str] | None = None
+    ) -> str:
         """Directions for a person on foot, with landmarks, handed out in chunks of at most 3 steps.
         Read out only the steps returned; the person asks for the rest with next_steps.
 
         Args:
-            start: Space id, asset id, or exact room number/name of where the person is.
             destination: Space id, asset id, or exact room number/name of where they want to go.
+            start: Space id, asset id, or exact room number/name of where the person is. Leave it out to start at
+                the person's position (see set_position) and say so (start_assumed).
             step_free: True to avoid stairs and steps (wheelchair, pram, trolley, crutches).
             via: Optional places to visit in order before the destination.
         """
+        if start is None and state.position is None:
+            raise ToolError(NO_POSITION)
         try:
-            route = routing.route(bm, start, destination, step_free, via)
+            route = routing.route(bm, state.position.space_id if start is None else start, destination, step_free, via)
             state.session = DirectionsSession.from_route(bm, route)
             state.signature = building_signature(bm)
+            remember_route(state, route, [bm.resolve_space(stop) for stop in via or []])
         except MapError as error:
             raise ToolError(str(error)) from error
         result = {
+            **({"start_assumed": bm.describe_space(route.start_space_id)} if start is None else {}),
             "length_m": route.length_m,
             "step_free": route.step_free,
             "steps": state.session.next(),

@@ -18,6 +18,8 @@ from building_agent.guide_tools import GuideState, make_guide_tools
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
+from building_agent.position import NO_POSITION, remember_route
+from building_agent.position_tools import distance_annotator, make_position_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
 from building_agent.task_tools import make_task_tools
@@ -104,6 +106,8 @@ def make_tools(
     on_saved=None,
     campus: CampusHolder | None = None,
 ) -> list:
+    guide = guide or GuideState()
+
     @beta_tool
     def find_space_tool(name: str, floor_level: int | None = None) -> str:
         """Resolve a room id, number or name to its space id. Use this before the calculation tools,
@@ -121,20 +125,27 @@ def make_tools(
     find_space_tool.name = "find_space"
 
     @beta_tool
-    def find_route(start: str, destination: str, step_free: bool = False, via: list[str] | None = None) -> str:
+    def find_route(
+        destination: str, start: str | None = None, step_free: bool = False, via: list[str] | None = None
+    ) -> str:
         """Shortest walking route between two places, with step-by-step directions and length in metres.
 
         Args:
-            start: Space id, asset id, or exact room number/name of where the person is.
             destination: Space id, asset id, or exact room number/name of where they want to go.
+            start: Space id, asset id, or exact room number/name of where the person is. Leave it out to start at
+                the person's position (see set_position) and say so (start_assumed).
             step_free: True to avoid stairs and steps (wheelchair, trolley, pram).
             via: Optional list of places to visit in order between start and destination (multi-stop tour).
         """
+        if start is None and guide.position is None:
+            raise ToolError(NO_POSITION)
         try:
-            result = routing.route(bm, start, destination, step_free, via)
+            result = routing.route(bm, guide.position.space_id if start is None else start, destination, step_free, via)
+            remember_route(guide, result, [bm.resolve_space(stop) for stop in via or []])
         except MapError as error:
             raise ToolError(str(error)) from error
-        return as_json(asdict(result))
+        assumed = {"start_assumed": bm.describe_space(result.start_space_id)} if start is None else {}
+        return as_json({**asdict(result), **assumed})
 
     @beta_tool
     def find_forklift_route(start: str, destination: str, via: list[str] | None = None) -> str:
@@ -156,12 +167,12 @@ def make_tools(
         return as_json(result)
 
     kinds = [kind_tool(bm, kind) for kind in load_kinds().values()]
+    annotate = distance_annotator(bm, guide)
     starter = [
         tool
         for tool in make_starter_tools(bm, output_directory)
         if tool.name not in REPLACED_BY_GUIDE | REPLACED_STARTER_TOOLS
     ]
-    guide = guide or GuideState()
     guide_tools = make_guide_tools(bm, output_directory, guide)
     level4_tools = make_level4_tools(BMHolder(bm), output_directory, guide, on_saved)
     return [
@@ -169,8 +180,9 @@ def make_tools(
         find_route,
         find_forklift_route,
         find_space_tool,
-        *make_find_tools(bm),
-        *make_task_tools(bm),
+        *make_find_tools(bm, annotate),
+        *make_position_tools(bm, guide),
+        *make_task_tools(bm, annotate),
         *make_impact_tools(bm),
         *guide_tools,
         *make_selection_tools(bm, guide),

@@ -135,6 +135,30 @@ def _leg(graph, rg, start, end, start_node, end_node):
     return length, path[1:-1]
 
 
+def distances_from(bm: BuildingMap, rg: RoutingGraph, start: str, targets: list[str]) -> dict[str, float]:
+    """Route length from one space to each reachable target space in one pass (same rule as shortest_leg)."""
+    if start in bm.closed:
+        return {}
+    source = (START, start)
+    with _LEG_LOCK:
+        graph = rg.graph
+        try:
+            for node in rg.members.get(start, []):
+                graph.add_edge(source, node, weight=0.0)
+            reached = nx.single_source_dijkstra_path_length(graph, source, weight="weight") if source in graph else {}
+        finally:
+            graph.remove_nodes_from([source])
+    found: dict[str, float] = {}
+    for target in targets:
+        if target == start:
+            found[target] = 0.0
+        elif target not in bm.closed:
+            lengths = [reached[node] for node in rg.members.get(target, []) if node in reached]
+            if lengths:
+                found[target] = min(lengths)
+    return found
+
+
 def leg_spaces(start: str, end: str, nodes: list[tuple]) -> list[str]:
     """Ordered spaces of one leg; consecutive nodes of the same space count once."""
     spaces = [start]

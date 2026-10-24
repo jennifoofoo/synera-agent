@@ -79,6 +79,7 @@ class Session:
     directory: Path
     map: BuildingMap
     route_request: dict | None = None
+    position: dict | None = None  # where the chat thinks the person is: {space_id, floor_id, point, source}
     route_version: int = 0  # bumped by every route the page asks for or clears; newer page routes win
     original_opening_ids: set[str] = field(default_factory=set)
 
@@ -256,6 +257,7 @@ def state_view(session: Session) -> dict:
         "closed": sorted(bm.closed),
         "added_doors": [opening_summary(bm, opening_id) for opening_id in session.added_door_ids],
         "route": current_route(session),
+        "position": session.position,
         **edit_state(bm),
     }
 

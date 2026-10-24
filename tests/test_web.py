@@ -63,7 +63,7 @@ def test_building_view_has_everything_the_page_draws(app, key):
     assert all(len(s["polygon"]) >= 3 and len(s["anchor"]) == 2 for s in view["spaces"])
     assert len(view["openings"]) == len(bm.openings)
     assert {c["id"] for c in view["connectors"]} == set(bm.connectors)
-    assert view["state"] == {"closed": [], "added_doors": [], "route": None}
+    assert view["state"] == {"closed": [], "added_doors": [], "route": None, "position": None}
 
 
 def test_step_free_route_across_floors_then_lift_closure_reroutes(app, key):
@@ -126,7 +126,7 @@ def test_added_door_is_drawn_and_used_then_reset_clears_everything(app, key):
     assert any(o["id"] == door["id"] and o["added"] for o in view["openings"])
 
     _, reset = app.post("/api/reset", {"building": key})
-    assert reset["state"] == {"closed": [], "added_doors": [], "route": None}
+    assert reset["state"] == {"closed": [], "added_doors": [], "route": None, "position": None}
     assert all(not o["added"] for o in reset["openings"])
 
 
@@ -227,7 +227,7 @@ def test_reset_during_chat_returns_the_fresh_building(app, key, monkeypatch):
     fake_chat(app, key, monkeypatch, agent_closes_then_page_resets)
     _, reply = app.post("/api/chat", {"building": key, "message": "close the lift"})
     assert reply["stale"] is True
-    assert reply["state"] == {"closed": [], "added_doors": [], "route": None}
+    assert reply["state"] == {"closed": [], "added_doors": [], "route": None, "position": None}
 
 
 # ---------- click selection through /api/chat ----------

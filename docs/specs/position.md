@@ -1,6 +1,6 @@
 # Spec: Standort ("You are here") und Duplikate
 
-Status: ENTWURF, wartet auf Bestätigung von Jennifer. Seitenteile (Phase 2) gehören Leonie und werden erst nach ihrer Zusage gebaut.
+Status: bestätigt (Jennifer und Leonie). Seitenteile (Phase 2) gehören Leonie. Erweiterung Phase 3 (Zwei Modi) bestätigt von Jennifer, siehe unten.
 
 ## Ziel
 Der Agent weiß, wo die Person steht, und nutzt das als Start für Wege, für "nearest ..." und um gleiche Namen oder Geräte aufzulösen. Er nennt seine Annahme immer laut, damit ein falscher Standort mit einem Wort korrigiert ist. Passt zur Persona "first day at work, hands full".
@@ -36,6 +36,13 @@ Der Standort verändert nie das Gebäude. Alle Änderungen laufen weiter über K
 - `state_view` liefert `position: {space_id, floor_id, point, source} | null`.
 - Plan und 3D zeigen einen blauen Punkt "You are here". Die Kamera der 3D-Ansicht folgt über die bestehende Steuer-API, wenn sich die Position ändert.
 - Chip "You are here: Kitchen 1.30" mit Löschen-Knopf. "I'm here"-Knopf neben der Klick-Auswahl. Kontext `{here: ...}` wie `picked` im nächsten Chat-Aufruf.
+
+## Vertrag für die Seite (Stand Phase 1, gebaut)
+- `POST /api/chat` Körper `{message, context?}`. `context` bleibt die flache Auswahl (`space_id`, `asset_id`, `point`, `floor_id`). Daneben darf `context.here` stehen: `{space_id, floor_id?, point?}` (Klick "I'm here") oder `{clear: true}` (Löschen-Knopf des Chips). `here` allein ist keine Auswahl.
+- Der Server prüft `here` wie die Auswahl: Raum muss existieren, `floor_id` muss zum Raum passen, Punkt endlich, ein Punkt außerhalb des Raums wird verworfen (`here_note` in der Antwort), alles andere verwirft `here` ganz (`here_ignored` mit Grund). Nie aus Nachrichtentext. Ein gültiges `here` setzt die Position mit `source: "click"` vor der Nachricht und gilt danach weiter (kein Einmal-Kontext), bis sie ersetzt oder gelöscht wird.
+- `state_view` (in jeder Antwort unter `state`) hat immer den Schlüssel `position`: `{space_id, floor_id, point: [x, y] | null, source: "said" | "click" | "device" | "route"}` oder `null`. Er steht nach jedem Chat-Aufruf aktuell im Chat-Ergebnis. Gebäudewechsel und `/api/reset` setzen ihn auf `null`.
+- Die Position hat nur einen Raum und Etage für Routen. `point` ist für den blauen Punkt gedacht (bei `said` ist er `null`, dann Raummitte zeichnen).
+- Vorschlag für Phase 2: Kamera und Punkt folgen `state.position`, Chip nutzt `{here: {clear: true}}` zum Löschen.
 
 ## Akzeptanzkriterien und Testfälle
 1. Satz setzt Position, Folgefrage ohne Start nutzt sie (Live-Skript).
