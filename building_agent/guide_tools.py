@@ -10,6 +10,7 @@ from anthropic.lib.tools import ToolError
 
 from building_agent import routing
 from building_agent.directions import DirectionsSession
+from building_agent.impact import analyse
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
@@ -205,6 +206,9 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             "effect on your last route": route_effect(bm, preview),
             "status": "nothing changed yet, waiting for the person's yes",
         }
+        if action in ("close", "reopen"):
+            effect_key = "closed_add" if action == "close" else "closed_remove"
+            card["effect on the whole building"] = analyse(bm, **{effect_key: [element]}).sentences()
         state.pending = Pending(action, element, other, step_free, card, state.turn, building_signature(bm))
         return as_json(card)
 

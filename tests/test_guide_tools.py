@@ -187,3 +187,13 @@ def test_agent_tools_include_assume_closed():
 
 def tmp_dir():
     return Path("agent_output") / "test"
+
+
+def test_close_card_describes_the_effect_on_the_whole_building(tmp_path):
+    bm, _ = route_question()
+    tools, state = tools_by_name(bm, tmp_path)
+    state.begin_turn()
+    connector = next(iter(bm.connectors))
+    card = json.loads(tools["propose_change"](action="close", element=connector))
+    assert card["effect on the whole building"], "the card needs plain sentences about the building"
+    assert bm.closed == set()  # still only a proposal
