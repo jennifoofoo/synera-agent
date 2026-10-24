@@ -13,6 +13,7 @@ from building_agent.guide_tools import GuideState
 from building_agent.level4 import tools as level4_tools
 from building_agent.level4.extract import ExtractResult
 from building_agent.level4.schema import Extraction
+from building_agent.level4.segment import SCAN_NOTE, SegmentResult
 from building_agent.level4.tools import BMHolder, make_level4_tools
 from starter_agent.building_map import BuildingMap
 from tests.level4_helpers import floor_case, load_building
@@ -255,7 +256,7 @@ def test_errors_block_saving_unless_explicitly_accepted(tmp_path, monkeypatch):
     rig = Rig(tmp_path, monkeypatch, case=floor_case(BUILDING, LEVEL, drop_doors=1.0))
     rig.build()
     rig.turn()
-    card = rig.call("preview_draft")
+    card = rig.call("preview_draft", user_reply="build it anyway")
     assert card["can be saved"] is False and "saving blocked" in card
     rig.turn()
     with pytest.raises(ToolError, match="block saving"):
@@ -357,3 +358,158 @@ def test_accept_suggestions_proposes_then_adds_doors_and_invalidates_the_card(ri
         rig.call("fix_draft", action="accept_suggestions")
         rig.call("fix_draft", action="accept_suggestions")
     assert "proposal" not in rig.call("preview_draft")
+
+
+# ---------- poor readings ----------
+
+
+def test_good_reading_has_no_quality_warning(rig):
+    summary = rig.build()
+    assert "poor_reading" not in summary and "problems" in summary
+    assert "poor reading" not in rig.show_card()
+
+
+def test_no_doors_at_all_asks_for_a_clearer_image(tmp_path, monkeypatch):
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.doors = []
+    rig = Rig(tmp_path, monkeypatch, case)
+    summary = rig.build()
+    assert "no doors were found at all" in summary["poor_reading"]
+    assert "clearer image" in summary["poor_reading"] and "build it anyway" in summary["poor_reading"]
+    assert "problems" not in summary
+    assert rig.holder.bm is rig.first_map and not rig.saved
+
+
+def test_low_resolution_image_asks_for_a_clearer_image(tmp_path, monkeypatch):
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.width_px, case.extraction.height_px = 300, 200
+    rig = Rig(tmp_path, monkeypatch, case)
+    assert "300 x 200 pixels" in rig.build()["poor_reading"]
+
+
+def test_most_rooms_from_segments_is_a_poor_reading(tmp_path, monkeypatch):
+    rig = Rig(tmp_path, monkeypatch)
+    rooms = len(rig.case.extraction.rooms)
+    monkeypatch.setattr(level4_tools, "segment_rooms", lambda path: SegmentResult(100, 100, []))
+    monkeypatch.setattr(
+        level4_tools,
+        "match_to_extraction",
+        lambda extraction, segment: (extraction, ["room_added_from_image: segX (beige, 10 px)"] * rooms),
+    )
+    assert f"most rooms ({rooms} of {rooms})" in rig.build()["poor_reading"]
+
+
+def test_few_rooms_from_segments_is_fine(tmp_path, monkeypatch):
+    rig = Rig(tmp_path, monkeypatch)
+    monkeypatch.setattr(level4_tools, "segment_rooms", lambda path: SegmentResult(100, 100, []))
+    monkeypatch.setattr(
+        level4_tools,
+        "match_to_extraction",
+        lambda extraction, segment: (extraction, ["room_added_from_image: segX (beige, 10 px)"]),
+    )
+    assert "poor_reading" not in rig.build()
+
+
+def poor_rig(tmp_path, monkeypatch) -> Rig:
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.doors = []
+    rig = Rig(tmp_path, monkeypatch, case)
+    rig.build()
+    return rig
+
+
+def anyway_card(rig: Rig) -> dict:
+    """The person says 'build it anyway' in a new message, the card is shown, the next message is the answer."""
+    rig.turn()
+    card = rig.call("preview_draft", user_reply="build it anyway")
+    rig.turn()
+    return card
+
+
+def test_card_of_a_poor_reading_waits_for_build_it_anyway(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    with pytest.raises(ToolError, match="clearer image"):  # same turn as the build
+        rig.call("preview_draft", user_reply="build it anyway")
+    rig.turn()
+    with pytest.raises(ToolError, match="clearer image"):  # new message, but not the person's wish
+        rig.call("preview_draft")
+    with pytest.raises(ToolError, match="clearer image"):
+        rig.call("preview_draft", user_reply="ok")
+    card = rig.call("preview_draft", user_reply="trotzdem bauen")
+    assert "poor reading" in card and not card["can be saved"] and "saving blocked" in card
+
+
+def test_build_it_anyway_still_needs_card_and_clear_yes(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    with pytest.raises(ToolError, match="No card was shown"):
+        rig.call("save_building", confirmed=True, user_reply="build it anyway", accept_problems=True)
+    anyway_card(rig)
+    with pytest.raises(ToolError, match="block saving"):
+        rig.call("save_building", confirmed=True, user_reply="ja", accept_problems=False)
+    assert not rig.saved
+
+
+@pytest.mark.parametrize("reply", ["build it anyway", "trotzdem", "ja, trotzdem bauen", "yes, anyway"])
+def test_build_it_anyway_is_not_a_save_statement(tmp_path, monkeypatch, reply):
+    rig = poor_rig(tmp_path, monkeypatch)
+    anyway_card(rig)
+    with pytest.raises(ToolError, match="save it anyway"):
+        rig.call("save_building", confirmed=True, user_reply=reply, accept_problems=True)
+    assert not rig.saved and rig.holder.bm is rig.first_map
+
+
+@pytest.mark.parametrize("reply", ["yes, save it anyway", "ja, trotzdem speichern", "trotzdem speichern bitte"])
+def test_save_it_anyway_saves_a_poor_reading(tmp_path, monkeypatch, reply):
+    rig = poor_rig(tmp_path, monkeypatch)
+    anyway_card(rig)
+    result = rig.call("save_building", confirmed=True, user_reply=reply, accept_problems=True)
+    assert result["saved"] and "Poor reading accepted" in result["accepted_problems"]
+
+
+def test_poor_reading_clears_once_a_door_exists(tmp_path, monkeypatch):
+    (tmp_path / "ref").mkdir()
+    good = Rig(tmp_path / "ref", monkeypatch)
+    good.build()
+    labels = {space["id"]: level4_tools._label(space) for space in good.draft.building["spaces"]}
+    first, second = (labels[room] for room in good.pairs()[0])
+    rig = poor_rig(tmp_path, monkeypatch)
+    rig.call("fix_draft", action="add_door", ref=first, other_ref=second)
+    rig.turn()
+    assert "poor reading" not in rig.call("preview_draft")
+
+
+def test_poor_reading_of_an_old_floor_does_not_show_for_a_good_new_floor(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    good = floor_case(BUILDING, LEVEL).extraction
+    monkeypatch.setattr(
+        level4_tools,
+        "extract_floor",
+        lambda path, client=None, allowed_root=None, **kw: ExtractResult(good, 1, 1, 1.0, 0.0),
+    )
+    (rig.uploads / "plan2.png").write_bytes(PNG)
+    assert "poor_reading" not in rig.build(image_path="plan2.png", level=1)
+    rig.turn()
+    with pytest.raises(ToolError, match="floor 0"):  # the old floor still gates the card
+        rig.call("preview_draft")
+
+
+def test_scan_fallback_shows_the_note_and_distrusts_few_doors(tmp_path, monkeypatch):
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.doors = case.extraction.doors[:1]
+    rig = Rig(tmp_path, monkeypatch, case)
+    monkeypatch.setattr(level4_tools, "segment_rooms", lambda path: SegmentResult(100, 100, [], reject_note=SCAN_NOTE))
+    summary = rig.build()
+    assert "scan or photo" in summary["poor_reading"]
+    assert all(room.fill is None for room in rig.draft.floors[LEVEL].extraction.rooms)  # model rooms, no fill tags
+    assert rig.draft.floors[LEVEL].scan_fallback and SCAN_NOTE in rig.draft.marker_notes
+    rig.turn()
+    card = rig.call("preview_draft", user_reply="build it anyway")
+    assert SCAN_NOTE in card["notes"] and "poor reading" in card
+
+
+def test_scan_fallback_with_enough_doors_is_not_poor(tmp_path, monkeypatch):
+    rig = Rig(tmp_path, monkeypatch)
+    monkeypatch.setattr(level4_tools, "segment_rooms", lambda path: SegmentResult(100, 100, [], reject_note=SCAN_NOTE))
+    assert "poor_reading" not in rig.build()
+    rig.turn()
+    assert SCAN_NOTE in rig.call("preview_draft")["notes"]

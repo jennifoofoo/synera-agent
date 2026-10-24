@@ -447,6 +447,7 @@ Stair hall rule (`building_agent/level4/stair_doors.py`), `uv run python scripts
 - Cached real extractions (segment + markers): no gain. swiss-31:0 and swiss-203:0 judge pairs stay at 9% and 19% with the stair rule (0 suggestions on swiss-203:0, 2 wrong ones on swiss-31:0 if entrance rooms are treated as halls, which is why that was left out). In swiss-203:0 the 4 missing true doors are the landing to outside entrances, which the pairing attaches to other rooms; in swiss-31:0 they are the 4 kitchen or corridor to landing doors, the model gave no types that identify the landings. Target "clear gain on swiss-31 and swiss-203" is not reached on the real extractions; the cause is the marker pairing on imperfect rooms, not the missing door.
 - osm and the clean floors: the rule does nothing (no stair hall without a door, 0 suggestions), unchanged numbers.
 
+
 ### Foreign drawing styles (2026-10-24, claude-sonnet-5-5, synthetic plans)
 
 Question: do extraction, segmentation and marker steps survive drawing styles other than the kit's flat colours?
@@ -610,3 +611,4 @@ not scored; `scan` is measured on main before the scan guard fix, segmentation s
 Weakest on edge Jaccard: by source Swiss (0.22 and 0.29 on plain plans, 0.09 to 0.17 in styles), by style `scan`
 (0.05), and without `scan` `lines` (0.57). Swiss loses edges because doors are missing in the reading (door recall
 0.2 to 0.35), proc-factory and resplan lose them in the styled plans for the same reason.
+

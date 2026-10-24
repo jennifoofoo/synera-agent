@@ -204,11 +204,21 @@ def test_success_message_and_draft_reset_after_save(rig_clean):
     assert len({p.parent.name for p in rig.buildings.rglob("building.json")}) == 2
 
 
-@pytest.mark.parametrize("reply", ["trotzdem speichern", "save it anyway", "Nevertheless, save", "speichern, anyway"])
+def poor_card(rig) -> dict:
+    """These floors have no doors, a poor reading: the card needs 'build it anyway' first."""
+    rig.turn()
+    card = rig.call("preview_draft", user_reply="build it anyway")
+    rig.turn()
+    return card
+
+
+@pytest.mark.parametrize(
+    "reply", ["trotzdem speichern", "save it anyway", "Nevertheless, save it anyway", "speichern, anyway"]
+)
 def test_accept_path_needs_no_yes_word(tmp_path, monkeypatch, reply):
     rig = Rig(tmp_path, monkeypatch, case=floor_case(BUILDING, LEVEL, drop_doors=1.0))
     rig.build()
-    assert "save it anyway" in rig.show_card()["saving blocked"]
+    assert "save it anyway" in poor_card(rig)["saving blocked"]
     result = rig.call("save_building", confirmed=True, user_reply=reply, accept_problems=True)
     assert result["saved"] is True and result["accepted_problems"]
 
@@ -217,7 +227,7 @@ def test_accept_path_needs_no_yes_word(tmp_path, monkeypatch, reply):
 def test_accept_path_still_refuses_negations_and_plain_yes(tmp_path, monkeypatch, reply):
     rig = Rig(tmp_path, monkeypatch, case=floor_case(BUILDING, LEVEL, drop_doors=1.0))
     rig.build()
-    rig.show_card()
+    poor_card(rig)
     with pytest.raises(ToolError):
         rig.call("save_building", confirmed=True, user_reply=reply, accept_problems=True)
     assert not rig.saved

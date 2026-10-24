@@ -88,10 +88,19 @@ def test_line_styles_do_not_fool_segmentation_or_markers(renders, style):
     assert len(detect_markers(made.path)) == 0
 
 
-@pytest.mark.xfail(reason="known gap: grey scan paper is read as flat fill, so segmentation fires on a scan")
 def test_scan_does_not_fool_segmentation(renders):
     segment = segment_rooms(renders["scan"].path)
     assert not segment.usable or len(segment.regions) <= 2
+
+
+def test_scan_is_rejected_with_a_plain_note_and_keeps_model_rooms(renders):
+    made = renders["scan"]
+    segment = segment_rooms(made.path)
+    assert not segment.usable and segment.regions == [] and segment.reject_note
+    extraction = perfect_extraction(made)
+    merged, notes = match_to_extraction(extraction, segment)
+    assert merged.rooms == extraction.rooms
+    assert notes == [segment.reject_note] and "scan" in notes[0]
 
 
 def test_scan_has_no_markers(renders):

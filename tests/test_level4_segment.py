@@ -8,7 +8,13 @@ from PIL import Image, ImageDraw
 from shapely.geometry import Polygon
 
 from building_agent.level4.schema import ExtractedDoor, ExtractedRoom, Extraction
-from building_agent.level4.segment import match_to_extraction, segment_rooms
+from building_agent.level4.segment import (
+    NOISE_NOTE,
+    SCAN_NOTE,
+    check_region_count,
+    match_to_extraction,
+    segment_rooms,
+)
 from tests.level4_helpers import DATA_DEV
 from tests.level4_segment_eval import measure_segment
 from tests.level4_segment_truth import image_path, truth_in_image
@@ -111,7 +117,7 @@ def test_non_plan_image_is_skipped(tmp_path):
     result = segment_rooms(path)
     extraction = Extraction(120, 120, [ExtractedRoom("r1", [[0, 0], [50, 0], [50, 50]])], [])
     same, warnings = match_to_extraction(extraction, result)
-    assert same is extraction and warnings[0].startswith("segmentation_skipped")
+    assert same is extraction and warnings == [SCAN_NOTE]
 
 
 def segmented(tmp_path):
@@ -232,3 +238,67 @@ def test_build_from_plan_survives_unreadable_image(tmp_path, monkeypatch):
     rig = Rig(tmp_path, monkeypatch)  # the uploaded file is not a real png
     rig.build()
     assert rig.draft.building["spaces"]
+
+
+# ---------- scan guard ----------
+
+
+def test_paper_tone_page_is_rejected(tmp_path):
+    """A grey sheet with a few dark lines: the paper tone must not become one giant room."""
+    image = Image.new("RGB", (300, 200), (236, 236, 236))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([20, 20, 280, 180], outline=(60, 60, 60), width=2)
+    draw.line([150, 20, 150, 180], fill=(60, 60, 60), width=2)
+    path = tmp_path / "paper.png"
+    image.save(path)
+    result = segment_rooms(path)
+    assert not result.usable and result.regions == [] and result.reject_note == SCAN_NOTE
+
+
+def test_one_palette_colour_over_the_whole_image_is_rejected(tmp_path):
+    path = tmp_path / "flat.png"
+    Image.new("RGB", (200, 200), (243, 239, 230)).save(path)
+    assert segment_rooms(path).reject_note == SCAN_NOTE
+
+
+def test_kit_style_plan_is_not_rejected(tmp_path):
+    result = segment_rooms(
+        plan(tmp_path, [([10, 10, 140, 190], (243, 239, 230)), ([150, 10, 290, 190], (220, 220, 220))])
+    )
+    assert result.usable and not result.reject_note and len(result.regions) == 2
+
+
+def test_implausible_region_count_is_rejected(tmp_path):
+    result = segment_rooms(plan(tmp_path, [([10 + 20 * i, 10, 25 + 20 * i, 190], (243, 239, 230)) for i in range(14)]))
+    assert len(result.regions) == 14
+    model = Extraction(300, 200, [ExtractedRoom("r1", [[0, 0], [50, 0], [50, 50]])] * 3, [])
+    assert check_region_count(result, 3).reject_note  # 14 regions > max(12, 3 * 3)
+    assert not check_region_count(result, 6).reject_note  # 14 <= 3 * 6
+    assert not check_region_count(result, 0).reject_note  # the model found nothing: the regions are all we have
+    same, warnings = match_to_extraction(model, check_region_count(result, 3))
+    assert same is model and warnings == [NOISE_NOTE]
+
+
+def bands(tmp_path, rows: list[tuple[int, tuple[int, int, int]]]):
+    """A 100 x 100 image of white with full-width colour bands of the given heights (no ink)."""
+    image = Image.new("RGB", (100, 100), "white")
+    draw = ImageDraw.Draw(image)
+    top = 0
+    for height, colour in rows:
+        draw.rectangle([0, top, 99, top + height - 1], fill=colour)
+        top += height
+    path = tmp_path / "bands.png"
+    image.save(path)
+    return path
+
+
+@pytest.mark.parametrize(("rows", "rejected"), [(10, False), (11, True)])
+def test_off_palette_threshold_is_ten_percent(tmp_path, rows, rejected):
+    result = segment_rooms(bands(tmp_path, [(rows, (230, 230, 230))]))  # 10 rows = exactly 10% of the pixels
+    assert bool(result.reject_note) is rejected
+
+
+@pytest.mark.parametrize(("rows", "rejected"), [(75, False), (76, True)])
+def test_single_palette_colour_threshold_is_seventy_five_percent(tmp_path, rows, rejected):
+    result = segment_rooms(bands(tmp_path, [(rows, (243, 239, 230))]))
+    assert bool(result.reject_note) is rejected
