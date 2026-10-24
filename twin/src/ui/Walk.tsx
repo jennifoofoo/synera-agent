@@ -60,11 +60,23 @@ export function Walk() {
     if (!walking) setList(false);
   }, [walking]);
   const line = step !== null ? readable(walkSteps()[step] ?? "") : "";
+  const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
     const { voiceOut, speechAvailable } = useTwin.getState();
     if (line && voiceOut) void speak(line, speechAvailable);
-  }, [line]);
+  }, [line, repeat]);
   useEffect(() => () => stopSpeaking(), []);
+  // Esc ends the route (guide and line in one go), unless the key belongs to a text field.
+  useEffect(() => {
+    if (!walking) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      useTwin.getState().stopWalk();
+      void useTwin.getState().clearRoute();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walking]);
 
   if (step === null || !model || !route?.ok) return null;
   const steps = walkSteps().map(readable);
@@ -89,8 +101,9 @@ export function Walk() {
             Step {step + 1} of {steps.length}
             {length !== null && <span className="card-muted"> · {length} m left · {minutes} min</span>}
           </span>
-          <button className="x" onClick={end} aria-label="End directions">
-            ×
+          {/* One clear way out: ends the guide and clears the route (Esc does the same). */}
+          <button className="walk-end" onClick={end} title="End the route (Esc)">
+            End route
           </button>
         </div>
         <div className="walk-now">
@@ -128,6 +141,6 @@ export function Walk() {
 }
 
 /** The server's step lines name rooms as "Office 0.46 [building-F0-S046]"; the id in brackets is not for people. */
-function readable(line: string): string {
+export function readable(line: string): string {
   return line.replace(/\s*\[[^\]]*\]/g, "");
 }

@@ -1,5 +1,6 @@
-// One card above the input, never two. Priority: directions (From/To panel at the top, summary + Start here), the
-// tapped room/thing (Route / I'm here / close), then the guided step (Step k of n, back/next/stop), then the last reply (2-3 lines, "more"), then the route summary.
+// One card above the input, never two. Priority: directions (From/To panel at the top, summary + Guide me), the
+// tapped room/thing (Route / I'm here / close), then the guided step (Step k of n, back/next/stop), then the last reply
+// (2-3 lines, "more"; a reply that drew a route is the one-line route card), then the route card.
 // Owner: the Card/Position session, see ARCHITECTURE.md. Every fact comes from `state` (the API); the card only
 // shows it and sends the user's taps back as API calls or chat words ("next", "back", "stop").
 
@@ -14,6 +15,7 @@ import "./Card.css";
 import { HereChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
+import { readable } from "./Walk";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -191,6 +193,8 @@ function GuideCard({ model }: { model: BuildingModel }) {
   const chat = useTwin((s) => s.chat);
   const ask = useTwin((s) => s.ask);
   const busy = useTwin((s) => s.chatBusy);
+  const end = useEndRoute();
+  useEscape(end);
   const last = [...chat].reverse().find((message) => message.role === "agent");
   const step = guide.step_index + 1;
   const to = spaceName(model, guide.leg.to_space_id);
@@ -216,8 +220,8 @@ function GuideCard({ model }: { model: BuildingModel }) {
         <button className="primary" disabled={busy} onClick={() => void ask("next")}>
           {step === guide.step_count ? "I'm there" : "Next"}
         </button>
-        <button className="quiet" disabled={busy} onClick={() => void ask("stop")}>
-          Stop
+        <button className="quiet" disabled={busy} onClick={end} title="End the route (Esc)">
+          End route
         </button>
       </div>
     </Sheet>
@@ -232,6 +236,8 @@ function ReplyCard({ model }: { model: BuildingModel }) {
   const route = useTwin((s) => s.state?.route ?? null);
   const last = chat[chat.length - 1];
   if (!last) return null;
+  // A reply that drew the route is the route card: one line and "Guide me", the reply text behind "Steps".
+  if (last.route && route?.ok) return <RouteCard model={model} route={route} details={withoutAnswerLine(last.text)} note={last.note} />;
   return (
     <Sheet className="card-reply" label="Reply" onClose={dismissReply}>
       <div className="card-reply-body">
@@ -262,7 +268,7 @@ function Clamped({ text }: { text: string }) {
         {text}
       </div>
       {long && (
-        <button className="link" onClick={() => setOpen(!open)}>
+        <button className="link" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? "less" : "more"}
         </button>
       )}
@@ -279,62 +285,113 @@ function routeFacts(model: BuildingModel, route: Route) {
   return {
     length: route.length_m !== undefined ? `${Math.round(route.length_m)} m` : "",
     floors: route.floors?.length ?? 1,
+    steps: route.steps?.length ?? 0,
     stepFree,
     destination: spaceName(model, route.destination),
   };
 }
 
-function RouteLine({ model, route }: { model: BuildingModel; route: Route }) {
+/** One action ends the route: the agent's guide (if one runs) and the drawn route. */
+export function useEndRoute() {
   const clearRoute = useTwin((s) => s.clearRoute);
   const ask = useTwin((s) => s.ask);
+  const guiding = useTwin((s) => !!s.state?.guide?.active);
+  return () => {
+    // The guide's reply carries the server state, so the route is cleared after it (else the reply redraws it).
+    void (async () => {
+      if (guiding) await ask("stop");
+      await clearRoute();
+    })();
+  };
+}
+
+/** Esc runs the action, unless the key belongs to a text field. */
+export function useEscape(action: () => void) {
+  const ref = useRef(action);
+  ref.current = action;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      ref.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
+/** The route in one line under a reply about something else: facts, "Guide me", "End route". */
+function RouteLine({ model, route }: { model: BuildingModel; route: Route }) {
+  const ask = useTwin((s) => s.ask);
+  const end = useEndRoute();
   const facts = routeFacts(model, route);
   return (
     <div className="route-line">
       <span className="route-facts">
         {facts.length && <b>{facts.length}</b>}
-        <span>
-          {facts.floors} {facts.floors === 1 ? "floor" : "floors"}
-        </span>
+        {facts.floors > 1 && <span>{facts.floors} floors</span>}
         <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
       </span>
       <span className="route-links">
         <button className="link" onClick={() => void ask("guide me")}>
           Guide me
         </button>
-        <button className="link quiet-link" onClick={() => void clearRoute()}>
-          Clear
+        <button className="link quiet-link" onClick={end}>
+          End route
         </button>
       </span>
     </div>
   );
 }
 
-function RouteCard({ model, route }: { model: BuildingModel; route: Route }) {
-  const clearRoute = useTwin((s) => s.clearRoute);
+/** The route card: "30 m to X · 4 steps · step-free", then "Guide me" and "End route". The step text (the reply
+ * that drew the route, else the route's own steps) only behind "Steps"; guiding speaks it step by step. */
+function RouteCard({ model, route, details, note }: { model: BuildingModel; route: Route; details?: string; note?: string }) {
   const ask = useTwin((s) => s.ask);
   const busy = useTwin((s) => s.chatBusy);
+  const end = useEndRoute();
+  const [open, setOpen] = useState(false);
+  useEscape(end);
   const facts = routeFacts(model, route);
+  const steps = (route.steps ?? []).map(readable);
   return (
-    <Sheet className="card-route" label={`Route to ${facts.destination}`} onClose={() => void clearRoute()}>
-      <div className="card-head">
-        <div className="card-title">
-          <span className="route-dot" aria-hidden />
-          <strong>To {facts.destination}</strong>
-        </div>
-        <CloseButton onClick={() => void clearRoute()} label="Clear route" />
-      </div>
-      <div className="card-line route-facts">
-        {facts.length && <b>{facts.length}</b>}
-        <span>
-          {facts.floors} {facts.floors === 1 ? "floor" : "floors"}
+    <Sheet className="card-route" label={`Route to ${facts.destination}`} onClose={end}>
+      <div className="route-summary" data-testid="route-summary">
+        <span className="route-dot" aria-hidden />
+        <span className="route-sentence">
+          {facts.length && <b>{facts.length}</b>} to <strong>{facts.destination}</strong>
+          <span className="card-muted">
+            {facts.steps > 0 && ` · ${facts.steps} ${facts.steps === 1 ? "step" : "steps"}`}
+            {facts.floors > 1 && ` · ${facts.floors} floors`}
+            {" · "}
+          </span>
+          <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
         </span>
-        <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
       </div>
+      {note && <div className="card-note">{note}</div>}
       <div className="card-actions">
         <button className="primary" disabled={busy} onClick={() => void ask("guide me")}>
           Guide me
         </button>
+        <button onClick={end} title="End the route (Esc)">
+          End route
+        </button>
       </div>
+      {(details || steps.length > 0) && (
+        <button className="link route-steps-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? "Hide steps" : "Steps"}
+        </button>
+      )}
+      {open &&
+        (details ? (
+          <div className="card-text open route-details">{details}</div>
+        ) : (
+          <ol className="route-steps">
+            {steps.map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ol>
+        ))}
     </Sheet>
   );
 }
