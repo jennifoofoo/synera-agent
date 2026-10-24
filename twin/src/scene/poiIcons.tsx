@@ -97,13 +97,17 @@ const GLYPHS: Record<PoiKind, JSX.Element> = {
   ),
 };
 
-export function PoiBadge({ kind, title }: { kind: PoiKind; title: string }) {
+/** `closed`: the same glyph with a danger-red edge and a diagonal bar (prohibition style), for a closed lift or stairs. */
+export function PoiBadge({ kind, title, closed = false }: { kind: PoiKind; title: string; closed?: boolean }) {
   return (
-    <div className={`poi-badge poi-${kind}`} title={title} role="img" aria-label={title}>
+    <div className={`poi-badge poi-${kind} ${closed ? "poi-closed" : ""}`} title={title} role="img" aria-label={title} data-closed={closed || undefined}>
       {GLYPHS[kind]}
     </div>
   );
 }
+
+/** Width (px) of the "Closed" tag beside a closed glyph (12 px semibold, see .closed-tag). */
+export const CLOSED_TAG_PX = 46;
 
 /** Height of the floor-change badge and the found-item name (px); widths come from floorBadgeWidth / the text. */
 export const FLOOR_BADGE_H_PX = 22;

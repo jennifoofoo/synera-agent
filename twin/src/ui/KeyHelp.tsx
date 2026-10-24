@@ -64,6 +64,10 @@ export function KeyHelp() {
             <span>{row.label}</span>
           </li>
         ))}
+        <li data-legend="closed">
+          <PoiBadge kind="lift" title="Closed" closed />
+          <span>Closed (routes go around it; a closed door gets a red bar)</span>
+        </li>
         <li>
           <span className="keyhelp-icon">
             <AllFloorsIcon />

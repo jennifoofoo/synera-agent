@@ -1,7 +1,7 @@
 // Probe for the drawn-vs-data audit (scripts/twin_audit.sh, tests/e2e/test_twin_audit.py): `window.__twinAudit`
 // reads what is actually in the three.js scene (not the data) so a test can compare it with the API.
 // Read-only; nothing in the app uses it. Scene objects it relies on: group `floor:<id>` (FloorMesh), the Line2 named
-// `route-line` (RouteLine), groups named `closed-marker` (Markers), `closed-bar` (OpeningMarks), `zone-lines` (FloorMesh), the instanced meshes of Things and `[data-audit=campus-route]` (CampusMap2D).
+// `route-line` (RouteLine), groups named `closed-marker` and `closed-fill` (Markers), `closed-bar` (OpeningMarks), `zone-lines` (FloorMesh), the instanced meshes of Things and `[data-audit=campus-route]` (CampusMap2D).
 
 import * as THREE from "three";
 import { useCampus } from "./campus/campusStore";
@@ -121,19 +121,25 @@ export function drawnThings(): number {
   return total;
 }
 
-/** Closed-element markers: one per cluster, `elements` = elements in them. */
-export function drawnClosed(): { markers: number; elements: number; bars: number } {
+/** Closed-element markers: one per cluster (rooms, doors), `elements` = elements in them plus the hatched fills of
+ * closed lift / stair stops (`fills`, one per stop). */
+export function drawnClosed(): { markers: number; elements: number; bars: number; fills: number } {
   let markers = 0;
   let elements = 0;
   let bars = 0;
+  let fills = 0;
   sceneRoot()?.traverse((o) => {
     if (o.name === "closed-bar") bars++;
+    if (o.name === "closed-fill") {
+      fills++;
+      elements += Number(o.userData.count ?? 1);
+    }
     if (o.name === "closed-marker") {
       markers++;
       elements += Number(o.userData.count ?? 1);
     }
   });
-  return { markers, elements, bars };
+  return { markers, elements, bars, fills };
 }
 
 /** Ids of the spaces with at least one drawn vertex across all mounted floors. */

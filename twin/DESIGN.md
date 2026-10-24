@@ -10,6 +10,7 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 - Walls one step (8 %) darker than their slab, never near-black. Furniture neutral and light, machines a little darker; important equipment shows as an icon, not as a colour.
 - Same group colours in 2D and 3D (the 2D plan turns neutral rooms near-white and keeps the hue groups).
 - Motion is 150 ms ease-out, no springs.
+- Closed is one language, in `--danger` (never the safety red), 2D and 3D: a closed lift or stairs keeps its square glyph but with a red edge and a diagonal bar (prohibition style), its slab gets a pale red hatching instead of the violet, and from the mid zoom tier on a "Closed" tag sits beside the glyph; a closed door gets a red bar across its gap; a closed room a red disc. The route card adds one quiet line ("Avoids closed Office lift"), the help legend a "Closed" row. Reopening removes all of it at once (`model/closures.ts`).
 
 ## Tokens
 | Token | Value | Use |
