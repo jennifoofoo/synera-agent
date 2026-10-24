@@ -95,3 +95,21 @@ Ein Forklift-Modus bräuchte: (1) nur Öffnungen und Eingänge mit `width_m >= 3
 4. Start und Ziel: zählt der Weg bis zur Tür des ersten und vom letzten Raum aus, oder vom Raummittelpunkt oder vom Gerät?
 5. Wie lang ist der Weg draußen zwischen zwei Eingängen (im Kit 0 m)?
 6. Bei breiten Öffnungen (14 bis 20 m): wird die Tür-zu-Tür-Distanz zu irgendeinem Punkt der Öffnung gemessen oder zur Mitte?
+
+## Umsetzung
+
+Branch `feat/route-model`, neues Modul `building_agent/routing.py`. `BuildingMap` und das Kit bleiben unverändert.
+
+Was sich geändert hat:
+
+- Neues Routenmodell "Tür-zu-Tür gerade" mit Synera-Vertikalkosten: pro Raum ein Knoten je Tür, Öffnung oder Treppen/Lift-Haltepunkt, Kanten zwischen den Knoten desselben Raums mit der geraden Distanz der Türpositionen (Haltepunkte am Raumanker). Eingänge und "outside" kosten 0. Start und Ziel zählen Tür zu Tür (Variante ohne Anker, weil im Spike kaum ein Unterschied). Treppe 2 m pro Höhenmeter (aus `elevation_m`), Lift 15 m plus 1 m pro Höhenmeter.
+- Sperrungen (Räume, Öffnungen, Verbinder), `step_free` und `via` in Reihenfolge funktionieren wie im Kit. Unerreichbar oder gesperrtes Ziel wirft `MapError`. Rückgabe ist dieselbe `RouteResult`, die Schritte sind wie bei `BuildingMap.directions` formuliert, `bm.last_route` wird gesetzt.
+- Der Graph wird pro Gebäude gecacht, Schlüssel sind Sperrungen, ein Hash über Öffnungen (id, step_free, Breite, Position, Räume) und `step_free`. Änderungen an Sperrungen oder Türen bauen ihn neu.
+
+Wo das neue Modell läuft: `give_directions`, `route_effect` und `compare_normal_length` (`guide_tools.py`, Vorher und Nachher im selben Modell) und das Tool `find_route` in `building_agent/tools.py` (gleicher Name und Docstring, ersetzt das Starter-Tool).
+
+Was beim Kit-Modell bleibt: alle Kinds (`errand`, `what_if_door`, `wide_delivery_count`, `step_free_reachable_count`), die Warm-up-`optimal_length_m` und `BuildingMap.route` selbst. Grund: Diese Zahlen sind mit dem groben Modell gelabelt und würden sonst von den Labels abweichen. Zwei Modelle nebeneinander: grob für Zahlen, Tür-zu-Tür für die Raumfolge, die Synera bewertet.
+
+Messung (Test `tests/test_routing.py`, Maß ist der geodätische Prototyp): auf der gesamten dev- und train-Menge (1457 erreichbare Fälle) haben 99,4 % mindestens 0,99 (osm 97,6 %, swiss 98,8 %, proc und resplan 100 %), Median 1,000, schlechtester Wert 0,938. Der Test nutzt eine Stichprobe von rund 300 Fällen aus allen vier Quellen und prüft auf 98 %, weil die Stichprobe streut (hier 99,0 %). Laufzeit im größten Gebäude (1623 Räume): Graph plus 20 Routen unter 0,2 s.
+
+Risiken: Das Maß ist unser eigener Prototyp, nicht Syneras Checker. Breite Öffnungen sind als Mittelpunkt modelliert.

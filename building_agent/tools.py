@@ -3,18 +3,22 @@
 import functools
 import inspect
 import re
+from dataclasses import asdict
 from pathlib import Path
 
 import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
+from building_agent import routing
 from building_agent.find_space import find_space
 from building_agent.guide_tools import GuideState, make_guide_tools
 from building_agent.registry import Kind, load_kinds
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 from starter_agent.tools import make_tools as make_starter_tools
+
+REPLACED_STARTER_TOOLS = {"find_route"}  # re-defined below on the door-to-door route model
 
 
 def snake_case(name: str, value):
@@ -102,7 +106,28 @@ def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None
             raise ToolError(str(error)) from error
 
     find_space_tool.name = "find_space"
+
+    @beta_tool
+    def find_route(start: str, destination: str, step_free: bool = False, via: list[str] | None = None) -> str:
+        """Shortest walking route between two places, with step-by-step directions and length in metres.
+
+        Args:
+            start: Space id, asset id, or exact room number/name of where the person is.
+            destination: Space id, asset id, or exact room number/name of where they want to go.
+            step_free: True to avoid stairs and steps (wheelchair, trolley, pram).
+            via: Optional list of places to visit in order between start and destination (multi-stop tour).
+        """
+        try:
+            result = routing.route(bm, start, destination, step_free, via)
+        except MapError as error:
+            raise ToolError(str(error)) from error
+        return as_json(asdict(result))
+
     kinds = [kind_tool(bm, kind) for kind in load_kinds().values()]
-    starter = [tool for tool in make_starter_tools(bm, output_directory) if tool.name not in REPLACED_BY_GUIDE]
+    starter = [
+        tool
+        for tool in make_starter_tools(bm, output_directory)
+        if tool.name not in REPLACED_BY_GUIDE | REPLACED_STARTER_TOOLS
+    ]
     guide_tools = make_guide_tools(bm, output_directory, guide or GuideState())
-    return [*starter, find_space_tool, *guide_tools, *kinds]
+    return [*starter, find_route, find_space_tool, *guide_tools, *kinds]
