@@ -9,6 +9,7 @@ from pathlib import Path
 
 import anthropic
 
+from building_agent import routing
 from building_agent.campus_tools import CampusHolder
 from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
@@ -173,7 +174,7 @@ def answer(building_directory: Path, question_text: str) -> str:
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     for attempt in range(RETRIES):
         try:
-            reply = Agent(BuildingMap.load(building_directory), OUTPUT_DIRECTORY).ask(question_text)
+            reply = Agent(routing.load_map(building_directory), OUTPUT_DIRECTORY).ask(question_text)
             break
         except RETRYABLE:
             if attempt == RETRIES - 1:
