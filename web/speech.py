@@ -42,11 +42,15 @@ TABLE_ROW = re.compile(r"^\s*\|")
 RULE_LINE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
 BRACKETED = re.compile(r"\s*\[[^\]]*\]")
 EMPTY_PARENS = re.compile(r"\s*\(\s*[,;]?\s*\)")
-CARD_MARKER = re.compile(r"i understood|ich habe verstanden", re.IGNORECASE)
+CARD_START = (re.compile(r"i understood", re.IGNORECASE), re.compile(r"ich habe verstanden", re.IGNORECASE))
+CARD_MARKER = re.compile(
+    r"i understood|effect on your last route|waiting for the person's yes|ich habe verstanden", re.IGNORECASE
+)
+DEFAULT_LANG = "en"
 # Split after . ! ? but not after common abbreviations.
 SENTENCE_END = re.compile(
     r"(?<=[.!?])(?<!\bz\. B\.)(?<!\bz\.B\.)(?<!\bd\. h\.)(?<!\bd\.h\.)(?<!\bbzw\.)(?<!\bca\.)"
-    r"(?<!\be\.g\.)(?<!\bi\.e\.)\s+"
+    r"(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bapprox\.)(?<!\betc\.)(?<!\bvs\.)\s+"
 )
 SQUARE_METRES = re.compile(r"(?<=\d)\s*(?:m2|m²)(?!\w)")
 METRES = re.compile(r"(?<=\d)\s*m(?![\w²])")
@@ -68,10 +72,42 @@ def _remove_ids(text: str) -> str:
     return re.sub(r"\s{2,}", " ", text).strip()
 
 
-def _pronounce(text: str) -> str:
-    text = SQUARE_METRES.sub(" Quadratmeter", text)
-    text = METRES.sub(" Meter", text)
-    return WC.sub("W C", text)
+UNITS = {
+    "en": (" square metres", " metres", "toilet"),
+    "de": (" Quadratmeter", " Meter", "W C"),
+}
+
+
+ROOM_WORDS = (
+    r"labs?|offices?|rooms?|halls?|kitchens?|toilets?|staircases?|lifts?|räume?|raum|büros?|labore?|küche|"
+    r"treppenhaus|aufzug"
+)
+ROOM_REF_LIST = re.compile(
+    rf"\b(?:{ROOM_WORDS})\s+\d+\.\d+(?:\s*(?:,|and|und|or|oder)\s*\d+\.\d+)*(?!\d)", re.IGNORECASE
+)
+DOTTED_NUMBER = re.compile(r"\d+\.\d+(?!\d)(?!\s*(?:m\b|m2|m²|metres|meters|square|meter|quadratmeter))")
+DIGIT_WORDS = {
+    "en": ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "point"),
+    "de": ("null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun", "Punkt"),
+}
+
+
+def _spell_room_refs(text: str, lang: str) -> str:
+    """Room refs like 0.12 are read digit by digit; measurements (63.4 m) keep normal number reading."""
+    words = DIGIT_WORDS.get(lang, DIGIT_WORDS[DEFAULT_LANG])
+
+    def spell(match: re.Match) -> str:
+        return " ".join(words[10] if c == "." else words[int(c)] for c in match.group())
+
+    return ROOM_REF_LIST.sub(lambda group: DOTTED_NUMBER.sub(spell, group.group()), text)
+
+
+def _pronounce(text: str, lang: str = DEFAULT_LANG) -> str:
+    text = _spell_room_refs(text, lang)
+    square, metres, toilet = UNITS.get(lang, UNITS[DEFAULT_LANG])
+    text = SQUARE_METRES.sub(square, text)
+    text = METRES.sub(metres, text)
+    return WC.sub(toilet, text)
 
 
 def _sentences(text: str) -> list[str]:
@@ -81,7 +117,12 @@ def _sentences(text: str) -> list[str]:
 def _card_core(text: str) -> str:
     """Confirmation card: keep the first sentence from the marker on plus the closing question."""
     sentences = _sentences(text)
-    start = next((i for i, s in enumerate(sentences) if CARD_MARKER.search(s)), 0)
+    start = 0
+    for marker in (*CARD_START, CARD_MARKER):  # English wording first, German second
+        found = next((i for i, s in enumerate(sentences) if marker.search(s)), None)
+        if found is not None:
+            start = found
+            break
     core = [sentences[start]]
     question = next((s for s in reversed(sentences[start + 1 :]) if s.endswith("?")), None)
     if question:
@@ -104,13 +145,17 @@ def _cap(text: str, limit: int) -> str:
     return (cut or text[:limit]) + "."
 
 
-def _more_steps(count: int) -> str:
+def _more_steps(count: int, lang: str = DEFAULT_LANG) -> str:
+    if lang == "de":
+        if count == 1:
+            return "und ein weiterer Schritt, siehe Bildschirm."
+        return f"und {count} weitere Schritte, siehe Bildschirm."
     if count == 1:
-        return "und ein weiterer Schritt, siehe Bildschirm."
-    return f"und {count} weitere Schritte, siehe Bildschirm."
+        return "and one more step, see the screen."
+    return f"and {count} more steps, see the screen."
 
 
-def spoken_version(reply: str, max_chars: int = 400) -> str:
+def spoken_version(reply: str, max_chars: int = 400, lang: str = DEFAULT_LANG) -> str:
     """Turn an agent reply into a short text that is worth reading aloud."""
     prose: list[str] = []
     steps: list[str] = []
@@ -130,15 +175,15 @@ def spoken_version(reply: str, max_chars: int = 400) -> str:
     if CARD_MARKER.search(text) and not steps:
         text = _card_core(text)
     shown = steps[:MAX_STEPS]
-    body = _pronounce(" ".join(part for part in (text, *shown) if part))
+    body = _pronounce(" ".join(part for part in (text, *shown) if part), lang)
     if not body:
         return ""
     if len(steps) <= MAX_STEPS:
         return _cap(body, max_chars)
-    tail = _more_steps(len(steps) - MAX_STEPS)
+    tail = _more_steps(len(steps) - MAX_STEPS, lang)
     result = _cap(body, max_chars - len(tail) - 1)
     # Only announce the remaining steps if the last shown step survived the cap.
-    if _pronounce(shown[-1]) in result:
+    if _pronounce(shown[-1], lang) in result:
         return f"{result} {tail}"
     return result
 

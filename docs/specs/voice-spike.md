@@ -146,7 +146,7 @@ Backend steht (`web/speech.py`, `web/server.py`). Modell `eleven_flash_v2_5`, `l
 
 `GET /api/status` enthält `speech_available` (true, wenn Key und Voice-ID in der Umgebung stehen; die Werte werden nie ausgegeben).
 
-`POST /api/speak`, JSON `{ "text": "<voller Agent-Text>", "voice_id": "<optional>" }`. Der Server kürzt selbst (`spoken_version`), die Seite schickt den ungekürzten Text.
+`POST /api/speak`, JSON `{ "text": "<voller Agent-Text>", "lang": "en" | "de", "voice_id": "<optional>" }`. `lang` ist optional, Standard `en` (die Demo ist englisch); `de` liefert die deutschen Sprechtexte ("und N weitere Schritte, siehe Bildschirm", Quadratmeter). Der Server kürzt selbst (`spoken_version`), die Seite schickt den ungekürzten Text. Der Request braucht `Content-Type: application/json`, Origin und Host müssen `127.0.0.1:<port>` oder `localhost:<port>` sein (sonst 403), höchstens 1 Request pro Sekunde und 30 pro Minute (sonst 429). `voice_id` aus dem Body zählt nur, wenn `ELEVENLABS_VOICE_ID` nicht gesetzt ist, und muss `[A-Za-z0-9]{10,40}` sein (sonst 400).
 
 | Status | Inhalt | Was die Seite tut |
 |---|---|---|
@@ -156,8 +156,8 @@ Backend steht (`web/speech.py`, `web/server.py`). Modell `eleven_flash_v2_5`, `l
 | 503 | JSON `{error}` (kein Key oder keine Voice-ID) | wie 502; besser: `speech_available` aus `/api/status` beim Laden lesen und gleich die Browser-Stimme nutzen |
 
 Push-to-talk:
-1. Klick auf Sprechen: `SpeechRecognition` starten (`lang` de-DE/en-US), Transkript anzeigen.
+1. Klick auf Sprechen: `SpeechRecognition` starten, Standard `lang = "en-US"` (`de-DE` als Option im Umschalter), Transkript anzeigen.
 2. Ende der Erkennung: Text per `/api/chat` senden, Antwort als Text anzeigen.
-3. Danach `POST /api/speak` mit der Antwort, Audio abspielen. Mikro ist während der Wiedergabe aus.
+3. Danach `POST /api/speak` mit der Antwort und dem gewählten `lang` (`en` oder `de`), Audio abspielen. Mikro ist während der Wiedergabe aus.
 4. Nach `ended` die Erkennung nur neu starten, wenn die Antwort eine Rückfrage oder Verständniskarte war.
 5. Stopp oder erneuter Klick auf Sprechen: `audio.pause()` und `recognition.abort()`.

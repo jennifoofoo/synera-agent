@@ -34,12 +34,16 @@ def test_only_three_steps_then_german_tail():
     spoken = spoken_version(reply)
     assert "Go left." in spoken and "Turn right." in spoken
     assert "Walk on" not in spoken
-    assert spoken.endswith("und 2 weitere Schritte, siehe Bildschirm.")
+    assert spoken.endswith("and 2 more steps, see the screen.")
+    assert spoken_version(reply, lang="de").endswith("und 2 weitere Schritte, siehe Bildschirm.")
 
 
 def test_single_extra_step_is_singular():
     spoken = spoken_version("1. A.\n2. B.\n3. C.\n4. D.")
-    assert spoken.endswith("und ein weiterer Schritt, siehe Bildschirm.")
+    assert spoken.endswith("and one more step, see the screen.")
+    assert spoken_version("1. A.\n2. B.\n3. C.\n4. D.", lang="de").endswith(
+        "und ein weiterer Schritt, siehe Bildschirm."
+    )
 
 
 def test_three_steps_have_no_tail():
@@ -58,16 +62,16 @@ def test_markdown_links_tables_rules_and_bold_steps():
 
 
 def test_abbreviations_do_not_end_sentences():
-    reply = "Das Büro ist z. B. Raum 0.12, d. h. im Erdgeschoss, ca. 20 m2 groß. Noch ein Satz."
+    reply = "Das Büro ist z. B. Raum A, d. h. im Erdgeschoss, ca. 20 m2 groß. Noch ein Satz."
     spoken = spoken_version(reply, max_chars=80)
-    assert spoken.endswith("groß.") and "Noch" not in spoken and "z. B. Raum" in spoken
+    assert spoken.endswith("groß.") and "Noch" not in spoken and "z. B. Raum A" in spoken
 
 
 def test_tail_only_if_steps_survived_the_cap():
     steps = "\n".join(f"{i}. Step {i} " + "word " * 10 for i in range(1, 6))
-    assert "weitere" in spoken_version(steps, max_chars=400)
+    assert "more steps" in spoken_version(steps, max_chars=400)
     short = spoken_version(steps, max_chars=60)
-    assert "weitere" not in short and "Step 3" not in short
+    assert "more steps" not in short and "Step 3" not in short
 
 
 def test_raw_ids_and_bracketed_fragments_are_removed():
@@ -86,15 +90,48 @@ def test_confirmation_card_keeps_core_and_question():
 
 
 def test_german_card():
-    spoken = spoken_version("Ich habe verstanden: Aufzug 2 sperren. Auswirkung: Umweg. Soll ich das so machen?")
+    spoken = spoken_version(
+        "Ich habe verstanden: Aufzug 2 sperren. Auswirkung: Umweg. Soll ich das so machen?", lang="de"
+    )
     assert spoken == "Ich habe verstanden: Aufzug 2 sperren. Soll ich das so machen?"
 
 
 def test_pronunciation_table_and_room_numbers():
-    spoken = spoken_version("Room 0.12 has 24 m2 and 30 m² next to the WC, 5 m away.")
-    assert "0.12" in spoken
-    assert "24 Quadratmeter" in spoken and "30 Quadratmeter" in spoken
-    assert "W C" in spoken and "5 Meter" in spoken
+    reply = "Room 0.12 has 24 m2 and 30 m² next to the WC, 5 m away."
+    spoken = spoken_version(reply)
+    assert "zero point one two" in spoken
+    assert "24 square metres" in spoken and "30 square metres" in spoken
+    assert "toilet" in spoken and "5 metres" in spoken
+    german = spoken_version(reply, lang="de")
+    assert "24 Quadratmeter" in german and "W C" in german and "5 Meter" in german and "null Punkt eins zwei" in german
+
+
+def test_english_card_markers_and_abbreviations():
+    reply = (
+        "Effect on your last route: 40 metres longer. I understood: close lift B (e.g. the east one). "
+        "Status: waiting for the person's yes. Shall I do that?"
+    )
+    assert spoken_version(reply) == "I understood: close lift B (e.g. the east one). Shall I do that?"
+    text = "It is approx. 20 m2, i.e. small, etc. and quiet. Next sentence here."
+    assert spoken_version(text, max_chars=60) == "It is approx. 20 square metres, i.e. small, etc. and quiet."
+
+
+def test_room_refs_are_spelled_and_measurements_are_not():
+    assert spoken_version("Lab 0.12 is 63.4 m away") == "Lab zero point one two is 63.4 metres away"
+    assert spoken_version("Lab 0.12 is 63.4 m away", lang="de") == "Lab null Punkt eins zwei is 63.4 Meter away"
+    assert spoken_version("Office 2.30 and Office 2.31.") == (
+        "Office two point three zero and Office two point three one."
+    )
+    assert spoken_version("Rooms 1.02, 1.03 and 1.04 are free.") == (
+        "Rooms one point zero two, one point zero three and one point zero four are free."
+    )
+    assert spoken_version("Raum 0.12 und 0.13", lang="de") == "Raum null Punkt eins zwei und null Punkt eins drei"
+    assert spoken_version("The corridor is 12.5 metres long on floor 2.") == (
+        "The corridor is 12.5 metres long on floor 2."
+    )
+    assert spoken_version("Meeting room 0.12 has 24.5 m2.") == (
+        "Meeting room zero point one two has 24.5 square metres."
+    )
 
 
 def test_cap_at_sentence_boundary():
@@ -300,6 +337,18 @@ def test_rate_limit(env):
     assert app.speak({"text": "Hi"})[0] == 429  # 31st within a minute
     now[0] += 61
     assert app.speak({"text": "Hi"})[0] == 200
+
+
+def test_speak_lang_defaults_to_english(env, server):
+    app, base = server
+    said: list[str] = []
+    app.synthesize = lambda text, voice_id: said.append(text) or b"X"
+    steps = "1. A.\n2. B.\n3. C.\n4. D."
+    post_speak(base, {"text": steps})
+    app.speak_times.clear()  # skip the 1 per second limit
+    post_speak(base, {"text": steps, "lang": "de"})
+    assert said[0].endswith("and one more step, see the screen.")
+    assert said[1].endswith("und ein weiterer Schritt, siehe Bildschirm.")
 
 
 def test_speak_without_key_is_503(monkeypatch, server):

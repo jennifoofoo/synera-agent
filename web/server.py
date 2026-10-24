@@ -13,7 +13,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/door     {first, second, step_free}
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
   POST /api/chat     {message}
-  POST /api/speak    {text, voice_id?}                   audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
+  POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 """
 
 import argparse
@@ -80,7 +80,8 @@ class App:
             return 400, {"error": "Invalid voice id."}
         if not self.allow_speak():
             return 429, {"error": "Too many speech requests, wait a moment."}
-        text = speech.spoken_version(str(body.get("text", "")))
+        lang = "de" if str(body.get("lang", "en")).lower().startswith("de") else "en"
+        text = speech.spoken_version(str(body.get("text", "")), lang=lang)
         if not text:
             return 400, {"error": "Nothing to say."}
         try:
