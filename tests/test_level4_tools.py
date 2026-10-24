@@ -186,7 +186,8 @@ def test_storey_height_is_assumed_then_corrected_by_the_person(rig):
 
 
 def test_storey_height_from_the_building_json_of_the_plans(rig):
-    (rig.uploads / "building.json").write_text(
+    # One building.json per plan (`<stem>.building.json`); a shared one in the folder is ignored on purpose.
+    (rig.uploads / "plan.building.json").write_text(
         json.dumps({"floors": [{"level": 0, "elevation_m": 0.0, "height_m": 3.5}]}), encoding="utf-8"
     )
     rig.build()
