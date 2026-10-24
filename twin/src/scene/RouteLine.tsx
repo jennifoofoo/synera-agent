@@ -111,7 +111,10 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     }
   });
 
-  if (points.length < 2) return null;
+  if (points.length < 2 || !route?.segments) return null;
+  // On a single floor the line may only run to the stairs: the start dot and the destination belong to their own floor.
+  const startsHere = !onlyFloor || route.segments[0].floor_id === onlyFloor;
+  const endsHere = !onlyFloor || route.segments[route.segments.length - 1].floor_id === onlyFloor;
   const guided = !!legPoints;
   // One signal blue in both views, on a thin white casing (1.5 px each side) for contrast on the grey floors.
   // Widths are screen px (Line2), so the line keeps its width at any zoom.
@@ -161,18 +164,23 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         </>
       )}
       {/* ends: constant size on screen. The start is a paper dot with a blue ring (or nothing when "You are here"
-          stands there), the destination a slim pin on its tip. The room labels move above them (Labels.tsx). */}
-      <group position={points[0]} name="route-start">
-        {!hereAtStart && (
-          <ScreenSized>
-            <EndDisc radius={START_DOT_PX} colour={lineColour} order={24} />
-            <EndDisc radius={START_DOT_PX - 2} colour={COLOURS.routeGlow} order={25} />
-          </ScreenSized>
-        )}
-      </group>
-      <group position={points[points.length - 1]} name="route-end">
-        <DestinationPin colour={lineColour} />
-      </group>
+          stands there), the destination a slim red pin on its tip. The room labels move above them (Labels.tsx). */}
+      {startsHere && (
+        <group position={points[0]} name="route-start">
+          {!hereAtStart && (
+            <ScreenSized>
+              <EndDisc radius={START_DOT_PX} colour={lineColour} order={24} />
+              <EndDisc radius={START_DOT_PX - 2} colour={COLOURS.routeGlow} order={25} />
+            </ScreenSized>
+          )}
+        </group>
+      )}
+      {/* the destination in map-app red (its own colour token), only on the floor where the route ends */}
+      {endsHere && (
+        <group position={points[points.length - 1]} name="route-end">
+          <DestinationPin colour={COLOURS.destination} />
+        </group>
+      )}
     </group>
   );
 }
@@ -181,7 +189,7 @@ function EndDisc({ radius, colour, order }: { radius: number; colour: string; or
   return (
     <mesh rotation-x={-Math.PI / 2} renderOrder={order}>
       <circleGeometry args={[radius, 32]} />
-      <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
+      <meshBasicMaterial color={colour} transparent depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
     </mesh>
   );
 }
@@ -200,7 +208,7 @@ function pinShape(radius: number, headY: number, tipY = 0): THREE.Shape {
   return shape;
 }
 
-/** The destination: a slim signal-blue pin with a white core on a thin white casing, always upright on screen and
+/** The destination: a slim red pin with a white core on a thin white casing, always upright on screen and
  * at a constant size; its tip marks the spot (on the floor in 3D, on the plan in 2D). */
 function DestinationPin({ colour }: { colour: string }) {
   const shapes = useMemo(
@@ -216,13 +224,13 @@ function DestinationPin({ colour }: { colour: string }) {
     <Billboard>
       <ScreenSized uniform>
         <mesh geometry={shapes.casing} renderOrder={26}>
-          <meshBasicMaterial color={COLOURS.routeGlow} depthTest={false} />
+          <meshBasicMaterial color={COLOURS.routeGlow} transparent depthTest={false} depthWrite={false} />
         </mesh>
         <mesh geometry={shapes.body} renderOrder={27}>
-          <meshBasicMaterial color={colour} depthTest={false} />
+          <meshBasicMaterial color={colour} transparent depthTest={false} depthWrite={false} />
         </mesh>
         <mesh geometry={shapes.core} renderOrder={28}>
-          <meshBasicMaterial color={COLOURS.routeGlow} depthTest={false} />
+          <meshBasicMaterial color={COLOURS.routeGlow} transparent depthTest={false} depthWrite={false} />
         </mesh>
       </ScreenSized>
     </Billboard>

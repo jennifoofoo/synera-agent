@@ -3,7 +3,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Html } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
 import type { Point } from "../api/types";
 import { samePoint } from "../model/format";
@@ -11,25 +10,10 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { controlsRef } from "./FloorMesh";
-import { Disc, Pulse, Ring } from "./Markers";
+import { Disc, Ring } from "./Markers";
+import { markHereHintSeen } from "../ui/HereChip";
 import "./HerePin.css";
-import { BADGE_LIFT_PX, HERE_CORE_PX, HERE_PULSE_PX, HERE_RIM_PX, ScreenSized } from "./markerLayout";
-
-const HINT_KEY = "twin.here.dragHint";
-const hintSeen = (): boolean => {
-  try {
-    return localStorage.getItem(HINT_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-const markHintSeen = () => {
-  try {
-    localStorage.setItem(HINT_KEY, "1");
-  } catch {
-    /* private mode: the hint just shows again next time */
-  }
-};
+import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, ScreenSized } from "./markerLayout";
 
 function inPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
@@ -118,32 +102,20 @@ interface Drag {
   space_id: string;
 }
 
-/** The "You are here" dot. Pointer down on it, move over the floor, release: the new spot is sent like "I'm here". */
-export function HereDot({ model, floorY, visibleFloors, flat, reducedMotion, colour }: DotProps) {
+/** The "You are here" dot. Pointer down on it, move over the floor, release: the new spot is set like "I'm here".
+ * The one-time "drag to correct" hint lives in the HereChip bar, off the map. */
+export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps) {
   const position = useTwin((s) => s.state?.position ?? null);
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
   const invalidate = useThree((s) => s.invalidate);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [hint, setHint] = useState(false);
   const live = useRef({ position, floorY, flat, model });
   live.current = { position, floorY, flat, model };
   const visibleFloorsRef = useRef(visibleFloors);
   visibleFloorsRef.current = visibleFloors;
   const shownFloor = position && visibleFloors.has(position.floor_id) ? position.floor_id : null;
-
-  // First time the dot shows: a short hint that it can be dragged.
-  useEffect(() => {
-    if (!shownFloor || hintSeen()) return;
-    setHint(true);
-    const timer = setTimeout(() => {
-      setHint(false);
-      markHintSeen();
-    }, 7000);
-    return () => clearTimeout(timer);
-  }, [shownFloor]);
-
   // A new position from the server wins over a leftover drag preview.
   useEffect(() => setDrag(null), [position]);
 
@@ -188,8 +160,7 @@ export function HereDot({ model, floorY, visibleFloors, flat, reducedMotion, col
       } catch {
         /* the window listeners below still follow the pointer */
       }
-      markHintSeen();
-      setHint(false);
+      markHereHintSeen();
       setDragging(true);
       const start: [number, number] = [event.clientX, event.clientY];
       let last: Drag | null = null;
@@ -252,27 +223,12 @@ export function HereDot({ model, floorY, visibleFloors, flat, reducedMotion, col
   const point = drag?.point ?? position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0];
   return (
     <group position={[point[0], floorY(position.floor_id), -point[1]]} name="here-dot">
-      {/* constant size on screen: the pulse never grows past HERE_PULSE_PX, whatever the zoom */}
+      {/* the map-app blue dot: constant size on screen, white rim, a calm accuracy halo, no text */}
       <ScreenSized>
-        <Pulse reducedMotion={reducedMotion || dragging} speed={0.8} amount={0.2}>
-          <Disc radius={HERE_PULSE_PX / 1.2} colour={colour} opacity={0.12} through />
-        </Pulse>
+        <Disc radius={HERE_HALO_PX} colour={colour} opacity={0.16} through />
         <Disc radius={HERE_RIM_PX} colour="#ffffff" opacity={1} through y={0.08} order={30} />
         <Disc radius={HERE_CORE_PX} colour={colour} opacity={1} through y={0.1} order={31} />
       </ScreenSized>
-      {/* the badge sits above the dot with a small gap, the hint below it */}
-      <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-        <div className="chip chip-here here-badge" style={{ transform: `translateY(calc(-50% - ${BADGE_LIFT_PX}px))` }}>
-          You are here
-        </div>
-      </Html>
-      {hint && !dragging && (
-        <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-          <div className="here-drag-hint" style={{ transform: `translateY(calc(50% + ${BADGE_LIFT_PX + 4}px))` }}>
-            Drag to correct your position
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
