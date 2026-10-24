@@ -6,6 +6,7 @@ import { useTwin } from "./store";
 import { Card } from "./ui/Card";
 import { ChangesPill } from "./ui/ChangesPill";
 import { FloorRail } from "./ui/FloorRail";
+import { KeyHelp } from "./ui/KeyHelp";
 import { NewBuilding } from "./ui/NewBuilding";
 import { Omnibox } from "./ui/Omnibox";
 import { Position } from "./ui/Position";
@@ -49,6 +50,7 @@ export function App() {
         <Omnibox />
       </div>
       <NewBuilding />
+      <KeyHelp />
       {loading && <div className="overlay">Loading {building?.name ?? "building"}…</div>}
       {error && <div className="overlay error">{error}</div>}
     </div>

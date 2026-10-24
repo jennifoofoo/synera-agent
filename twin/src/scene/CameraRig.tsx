@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
 import type { BuildingModel } from "../model/model";
 import { useTwin } from "../store";
+import { useCameraKeys } from "./cameraKeys";
 import { useCameraMouse } from "./cameraMouse";
 import { controlsRef, cutawayUniforms } from "./FloorMesh";
 
@@ -58,6 +59,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const size = bounds.size;
   const camera = useThree((s) => s.camera);
   const viewport = useThree((s) => s.size);
+  // The campus site covers this canvas (hidden): it must not react to input then.
+  const inUseNow = useCallback(() => !document.body.classList.contains("campus-site-open"), []);
 
   // The visible area is the window [bottom .. bottom + h] of a taller/wider virtual frame. The frustum must be built
   // for the aspect (and, orthographic, the extents) of that FULL frame, otherwise the crop scales x and y
@@ -261,54 +264,31 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     };
   });
 
-  // Keyboard: arrows pan (Shift + arrows orbit in 3D), + / - zoom, Home = home view. Ignored while typing.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
-      const c = controls.current;
-      if (!c || event.metaKey || event.ctrlKey || event.altKey) return;
-      const animate = !reducedMotion;
-      const step = Math.max(1, c.distance * 0.08);
-      const handled = () => {
-        event.preventDefault();
-        invalidate();
-      };
-      switch (event.key) {
-        case "ArrowLeft":
-          if (event.shiftKey && !flat) void c.rotate(-0.15, 0, animate);
-          else void c.truck(-step, 0, animate);
-          return handled();
-        case "ArrowRight":
-          if (event.shiftKey && !flat) void c.rotate(0.15, 0, animate);
-          else void c.truck(step, 0, animate);
-          return handled();
-        case "ArrowUp":
-          if (event.shiftKey && !flat) void c.rotate(0, -0.1, animate);
-          else void c.truck(0, -step, animate);
-          return handled();
-        case "ArrowDown":
-          if (event.shiftKey && !flat) void c.rotate(0, 0.1, animate);
-          else void c.truck(0, step, animate);
-          return handled();
-        case "+":
-        case "=":
-          if (flat) void c.zoom(c.camera.zoom * 0.5, animate);
-          else void c.dolly(c.distance * 0.25, animate);
-          return handled();
-        case "-":
-        case "_":
-          if (flat) void c.zoom(-c.camera.zoom * 0.33, animate);
-          else void c.dolly(-c.distance * 0.33, animate);
-          return handled();
-        case "Home":
-          useTwin.getState().requestCamera({ kind: "home" });
-          return handled();
+  // Keyboard (table in controlsTable.ts): held keys move the camera per frame (cameraKeys.ts); here the host's keys.
+  const onKey = useCallback(
+    (event: KeyboardEvent) => {
+      const store = useTwin.getState();
+      const key = event.key;
+      if (key === "t" || key === "T") {
+        store.setViewMode(flat ? "3d" : "2d");
+        return true;
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [flat, reducedMotion, invalidate]);
+      const floors = model.floors;
+      let floor = null as (typeof floors)[number] | null;
+      if (/^[1-9]$/.test(key)) floor = floors.find((f) => f.level === Number(key)) ?? null;
+      else if (key === "g" || key === "G") floor = floors.find((f) => f.level === 0) ?? null;
+      else return false;
+      if (floor && floor.id !== store.focusedFloorId) {
+        store.focusFloor(floor.id);
+        if (store.floorMode === "exploded") store.requestCamera({ kind: "floor", floorId: floor.id });
+      }
+      return true;
+    },
+    [flat, model],
+  );
+  const onHome = useCallback(() => useTwin.getState().requestCamera({ kind: "home" }), []);
+  useCameraKeys({ controls, flat, active: inUseNow, onHome, onKey });
+
 
   // Double click on a room or the floor in 3D flies to that room (2D keeps the floor mesh's zoom-in handler).
   const scene = useThree((s) => s.scene);
@@ -342,8 +322,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     },
     [flat, gl, camera, raycaster, scene, model],
   );
-  const inUse = useCallback(() => !document.body.classList.contains("campus-site-open"), []);
-  useCameraMouse({ controls, onDoubleClick, active: inUse });
+  useCameraMouse({ controls, onDoubleClick, active: inUseNow });
 
   // Cutaway: outer walls facing the camera are lowered. In 2D, note when the view was panned away from the floor.
   const direction = new THREE.Vector2();
