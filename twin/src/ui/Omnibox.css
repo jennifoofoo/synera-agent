@@ -78,3 +78,10 @@
 @media (prefers-reduced-motion: reduce) {
   .ob-mic.listening, .ob-dots i, .ob-rec { animation: none; }
 }
+
+/* touch: every tap target at least 44 px */
+@media (pointer: coarse) {
+  .ob-icon, .ob-mic { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+  .ob-status .x { width: 44px; min-width: 44px; height: 44px; min-height: 44px; margin: -12px -10px -12px 0; }
+  .ob-row { min-height: 48px; }
+}
