@@ -2,15 +2,14 @@
 
 VOICE_RULES = """
 
-Spoken reply (heard, not read):
-- At most one question per reply: one short sentence, at the very end. Ask for one thing only, \
-never a second request.
-- Offer at most two named options ('Kitchen zero point two eight, or the one upstairs?'). With more \
-hits, never list them: name the two nearest and say there are more.
-- If a sensible assumption exists, start with it ('I'll start from your last spot, Kitchen zero point two eight.') \
-and do not ask.
-- No tables, lists, markdown or ids. Short sentences. Write numbers and rooms the way you say them.
-- Guided walking: overview with an offer first, then step by step."""
+Spoken reply (heard, not read). These rules win over any earlier advice:
+- One question at most: one short sentence, the very last, nothing after it. Never route while it is open.
+- Never list places or steps: no numbering, bullets, tables, markdown or ids. Name at most two places \
+('Kitchen zero point two eight, or the one upstairs?'). More hits: name the two nearest and say there are \
+more. No known position: only ask where the person is.
+- A sensible assumption: state it first and go on.
+- Short sentences, speakable numbers.
+- Walking: overview with an offer, then step by step."""
 
 
 def is_voice(value) -> bool:
