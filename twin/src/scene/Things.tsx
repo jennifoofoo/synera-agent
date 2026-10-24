@@ -28,16 +28,24 @@ interface Props {
   y: number;
   state: BuildingState | null;
   limit: number;
+  /** 2D plan: only machines and equipment, in a quiet grey (a street map shows no furniture). */
+  flat?: boolean;
 }
 
 /** All things of one floor as one instanced mesh (true size from the footprint) plus an inverted-hull outline. */
-export function Things({ floor, y, state, limit }: Props) {
+export function Things({ floor, y, state, limit, flat = false }: Props) {
   const select = useTwin((s) => s.select);
   const mesh = useRef<THREE.InstancedMesh>(null);
   const outline = useRef<THREE.InstancedMesh>(null);
   const removed = useMemo(() => new Set(state?.removed_assets ?? []), [state?.removed_assets]);
   const moved = state?.moved_assets ?? {};
-  const assets = useMemo(() => floor.assets.filter((asset) => !removed.has(asset.id)).slice(0, limit), [floor, removed, limit]);
+  const assets = useMemo(
+    () =>
+      floor.assets
+        .filter((asset) => !removed.has(asset.id) && (!flat || asset.category === "machine" || asset.category === "equipment"))
+        .slice(0, limit),
+    [floor, removed, limit, flat],
+  );
   const count = assets.length;
 
   useEffect(() => {
@@ -57,7 +65,7 @@ export function Things({ floor, y, state, limit }: Props) {
       temp.scale.set(w + 0.06, h + 0.03, d + 0.06);
       temp.updateMatrix();
       hull.setMatrixAt(index, temp.matrix);
-      instanced.setColorAt(index, colour.set(assetColour(asset)));
+      instanced.setColorAt(index, colour.set(flat ? "#cfd4db" : assetColour(asset)));
     });
     instanced.count = count;
     hull.count = count;
@@ -66,7 +74,7 @@ export function Things({ floor, y, state, limit }: Props) {
     if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
     instanced.computeBoundingSphere();
     hull.computeBoundingSphere();
-  }, [assets, moved, count]);
+  }, [assets, moved, count, flat]);
 
   const onClick = (event: ThreeEvent<MouseEvent>) => {
     if (event.instanceId === undefined) return;
@@ -83,7 +91,7 @@ export function Things({ floor, y, state, limit }: Props) {
         <meshStandardMaterial roughness={0.8} metalness={0.05} />
       </instancedMesh>
       <instancedMesh ref={outline} args={[unitBox, undefined, count]} frustumCulled={false} raycast={() => null}>
-        <meshBasicMaterial color={COLOURS.edge} side={THREE.BackSide} transparent opacity={0.9} />
+        <meshBasicMaterial color={flat ? "#9aa0a6" : COLOURS.edge} side={THREE.BackSide} transparent opacity={0.9} />
       </instancedMesh>
     </group>
   );
