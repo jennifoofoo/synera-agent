@@ -114,7 +114,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       else if (space.room_type === "toilet" && Math.sqrt(space.area_m2) >= 24 * scale) items.push({ id: space.id, point: space.anchor, glyph: "WC", title: space.name });
     }
     for (const opening of floor.openings) {
-      if (opening.kind === "entrance") items.push({ id: opening.id, point: opening.position, glyph: "exit", title: "Entrance / exit" });
+      if (opening.kind === "entrance") items.push({ id: opening.id, point: opening.position, glyph: "exit", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
+      else if (opening.step_free === false) items.push({ id: opening.id, point: opening.position, glyph: "⌇", title: "Not step-free (a step or threshold)" });
     }
     // Icons keep clear of each other and of the text labels (which win).
     const taken = labelled.map((space) => ({ anchor: space.anchor, id: "", point: space.anchor, glyph: "", title: "" }));

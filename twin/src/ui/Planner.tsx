@@ -12,7 +12,7 @@ import { withoutAnswerLine } from "../voice";
 import "./Planner.css";
 
 const IMPACT = "impact";
-const IMPACT_COLOUR = "#f43f5e";
+const IMPACT_COLOUR = "#b3382c";
 const IMPACT_QUESTION = "What changes for routes now, with the closures as they are? At most three short sentences; name only rooms that are worse off now.";
 const THING_CATEGORIES = new Set(["machine", "equipment"]);
 

@@ -1,41 +1,45 @@
-// The look: blue base, colour only for information. Five calm blue groups for room types (they also differ in
-// lightness), neutral things, status colours only for exceptions (ok / warn / danger), turquoise as the accent.
+// The look ("Blueprint minimal"): warm paper, flat graphite greys for the building, one signal colour (Synera blue) for
+// the route, selection and primary actions. State colours (green / red) only for exceptions. Values marked "token"
+// mirror src/styles/tokens.css; change both together.
 
 export type SpaceGroup = "production" | "logistics" | "office" | "technical" | "circulation" | "outdoor";
 
+// Room types differ by lightness only, never by hue.
 export const GROUP_COLOURS: Record<SpaceGroup, { slab: string; wall: string; label: string }> = {
-  production: { slab: "#8fb3dc", wall: "#7ea3cf", label: "Production" },
-  logistics: { slab: "#a6b8cf", wall: "#95a9c3", label: "Logistics" },
-  office: { slab: "#cfdeef", wall: "#bccfe6", label: "Office" },
-  technical: { slab: "#6d8cb4", wall: "#5f7da5", label: "Technical" },
-  circulation: { slab: "#e4ecf5", wall: "#d2deec", label: "Circulation" },
-  outdoor: { slab: "#b7c6d6", wall: "#a7b8ca", label: "Outdoor" },
+  production: { slab: "#b4b8bd", wall: "#a2a7ad", label: "Production" },
+  logistics: { slab: "#c2c2bd", wall: "#b0b0ab", label: "Logistics" },
+  office: { slab: "#dcdad4", wall: "#cbc9c2", label: "Office" },
+  technical: { slab: "#9ea4ac", wall: "#8d949c", label: "Technical" },
+  circulation: { slab: "#ebe8e2", wall: "#dbd8d1", label: "Circulation" },
+  outdoor: { slab: "#cfd0c8", wall: "#bfc0b8", label: "Outdoor" },
 };
 
 export const COLOURS = {
-  edge: "#14305a",
-  edgeGhost: "#466a9a",
-  ghost: "#7f9fc6",
-  ground: "#dfe7f0",
-  background: "#edf2f8",
-  plan: "#f3f1ec", // 2D map background
-  mapBlue: "#4285f4",
-  mapBlueDark: "#1a5fd0",
-  mapRed: "#ea4335",
-  accent: "#5eead4",
-  gold: "#e3b45a",
-  accentBlue: "#60a5fa",
-  thing: "#9fb3c8",
-  machine: "#7f95ad",
-  ok: "#34d399",
-  warn: "#fbbf24",
-  danger: "#f43f5e",
-  route: "#5eead4",
-  routeGlow: "#99f6e4",
-  selection: "#e3b45a",
-  here: "#2dd4bf",
-  added: "#34d399",
-  removed: "#94a3b8",
+  edge: "#2b323d", // wall outlines, graphite
+  edgeGhost: "#7b828c",
+  ghost: "#9aa0a8",
+  ground: "#eae7e1", // token --paper-2
+  background: "#f4f2ee", // token --paper
+  plan: "#f4f2ee", // 2D map background, token --paper
+  signal: "#004fab", // token --signal
+  mapBlue: "#004fab", // 2D route line (the signal colour; the name is historic)
+  mapBlueDark: "#002478", // 2D route casing
+  mapRed: "#1d2430", // 2D destination pin (graphite; the name is historic)
+  accent: "#004fab",
+  gold: "#004fab",
+  stairs: "#8a8372", // stairs shafts, muted taupe
+  accentBlue: "#7a6a9a", // lift shafts, muted violet
+  thing: "#b3b6ba",
+  machine: "#8c929a",
+  ok: "#2f7d5b", // token --ok
+  warn: "#4a5260", // token --warn
+  danger: "#b3382c", // token --danger
+  route: "#004fab",
+  routeGlow: "#ffffff",
+  selection: "#004fab",
+  here: "#004fab", // token --info
+  added: "#2f7d5b",
+  removed: "#8a8f96",
 };
 
 const PRODUCTION = new Set(["production_zone", "assembly_zone", "additive_zone", "quality_lab", "lab", "makerspace"]);
