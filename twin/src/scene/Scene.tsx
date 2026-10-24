@@ -117,7 +117,8 @@ function Stats() {
   }, [model, viewMode, state, invalidate]);
   useFrame(() => {
     const w = window as unknown as { __twinFirstFrame?: number };
-    if (w.__twinFirstFrame === undefined && gl.info.render.triangles > 100) w.__twinFirstFrame = Math.round(performance.now());
+    // With the EffectComposer gl.info holds only the last pass, so count frames instead of triangles.
+    if (w.__twinFirstFrame === undefined && gl.info.render.frame > 2 && buildTimes.size > 0) w.__twinFirstFrame = Math.round(performance.now());
   });
   return null;
 }
