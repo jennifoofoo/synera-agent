@@ -1,3 +1,4 @@
+# ruff: noqa: BLE001, S110, B023
 """Drawn-versus-data audit of the 3D twin (twin/): what the scene really draws against what the JSON API says.
 
 Run it with `scripts/twin_audit.sh` (starts the Python server without an API key and the twin dev server, opens
@@ -77,15 +78,33 @@ def shared_boundaries(first, second):
             continue
         ux, uy = (b[0] - a[0]) / length, (b[1] - a[1]) / length
         for c, d in _edges(second):
-            off = lambda r: abs((r[0] - a[0]) * uy - (r[1] - a[1]) * ux)  # noqa: E731
+            off = lambda r: abs((r[0] - a[0]) * uy - (r[1] - a[1]) * ux)
             if off(c) > SHARED_TOL or off(d) > SHARED_TOL:
                 continue
-            along = lambda r: (r[0] - a[0]) * ux + (r[1] - a[1]) * uy  # noqa: E731
+            along = lambda r: (r[0] - a[0]) * ux + (r[1] - a[1]) * uy
             s0 = max(0.0, min(along(c), along(d)))
             s1 = min(length, max(along(c), along(d)))
             if s1 - s0 > 0.05:
                 found.append(((a[0] + ux * s0, a[1] + uy * s0), (a[0] + ux * s1, a[1] + uy * s1)))
     return found
+
+
+def is_zone(width, length):
+    """Same rule as the twin: an opening of 4 m or more that spans most of the shared boundary is a hall zone line."""
+    return width >= 4 and width >= length * 0.6
+
+
+def zone_midpoints(opening, polygons):
+    """Midpoints of the shared boundary for openings drawn as zone lines (else an empty list)."""
+    if opening["kind"] != "opening" or len(polygons) < 2:
+        return []
+    segs = shared_boundaries(polygons[0], polygons[1])
+    if not segs:
+        return []
+    best = min(segs, key=lambda seg: _nearest_on_edge(seg[0], seg[1], opening["position"])[1])
+    if not is_zone(opening.get("width_m") or 0.9, math.dist(*best)):
+        return []
+    return [((best[0][0] + best[1][0]) / 2, (best[0][1] + best[1][1]) / 2)]
 
 
 def probe_points(opening, polygons):
@@ -102,12 +121,23 @@ def probe_points(opening, polygons):
             _, seg, s, length = best
             ux, uy = (seg[1][0] - seg[0][0]) / length, (seg[1][1] - seg[0][1]) / length
             if opening["kind"] == "opening":
-                lo, hi = (0.0, length) if width >= length - 0.01 else (max(0.0, s - width / 2), min(length, s + width / 2))
+                if is_zone(width, length):
+                    # a hall zone line: no wall along the whole shared boundary
+                    return [
+                        (seg[0][0] + ux * length * k, seg[0][1] + uy * length * k)
+                        for k in (0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95)
+                    ]
+                lo, hi = (
+                    (0.0, length) if width >= length - 0.01 else (max(0.0, s - width / 2), min(length, s + width / 2))
+                )
             else:
                 half = max(0.3, width / 2)
                 lo, hi = max(0.0, s - half), min(length, s + half)
             # inside the gap, away from its ends (an end can be a wall corner)
-            return [(seg[0][0] + ux * (lo + (hi - lo) * k), seg[0][1] + uy * (lo + (hi - lo) * k)) for k in (0.35, 0.5, 0.65)]
+            return [
+                (seg[0][0] + ux * (lo + (hi - lo) * k), seg[0][1] + uy * (lo + (hi - lo) * k))
+                for k in (0.35, 0.5, 0.65)
+            ]
     near = []
     for polygon in polygons:
         for a, b in _edges(polygon):
@@ -224,7 +254,9 @@ class Report:
     def table(self) -> str:
         lines = [f"{'building':26} {'check':26} {'data':>8} {'drawn':>8}  result"]
         for r in self.rows:
-            lines.append(f"{r.building[-26:]:26} {r.check:26} {r.data:>8} {r.drawn:>8}  {'ok' if r.ok else 'MISMATCH'} {r.note}".rstrip())
+            lines.append(
+                f"{r.building[-26:]:26} {r.check:26} {r.data:>8} {r.drawn:>8}  {'ok' if r.ok else 'MISMATCH'} {r.note}".rstrip()
+            )
         bad = sum(not r.ok for r in self.rows)
         lines.append(f"\n{len(self.rows)} checks, {bad} mismatches")
         return "\n".join(lines)
@@ -268,7 +300,13 @@ def check_counts(report, page, key, data):
     drawn_spaces = set(page.evaluate("window.__twinAudit.drawnSpaces()"))
     report.add(key, "spaces", len(spaces), len(drawn_spaces & set(spaces)), drawn_spaces >= set(spaces))
     connectors_drawn = sum(1 for c in data["connectors"] if all(i in drawn_spaces for i in c["space_ids"]))
-    report.add(key, "connectors (all stops)", len(data["connectors"]), connectors_drawn, connectors_drawn == len(data["connectors"]))
+    report.add(
+        key,
+        "connectors (all stops)",
+        len(data["connectors"]),
+        connectors_drawn,
+        connectors_drawn == len(data["connectors"]),
+    )
     per_floor: dict[str, int] = {}
     for a in data["assets"]:
         per_floor[a["floor_id"]] = per_floor.get(a["floor_id"], 0) + 1
@@ -281,9 +319,7 @@ def check_counts(report, page, key, data):
         pts = probe_points(o, [polys[i] for i in o["space_ids"] if i in polys])
         meta.append((o, pts))
         probes.extend([o["floor_id"], p[0], p[1]] for p in (pts or []))
-    blocked = page.evaluate(
-        "(list) => list.map(([f, x, y]) => window.__twinAudit.blockedAt(f, [x, y]))", probes
-    )
+    blocked = page.evaluate("(list) => list.map(([f, x, y]) => window.__twinAudit.blockedAt(f, [x, y]))", probes)
     cursor = 0
     stats: dict[str, dict[str, int]] = {}
     bad_examples: list[str] = []
@@ -300,6 +336,18 @@ def check_counts(report, page, key, data):
             s["gap"] += 1
         elif len(bad_examples) < 3:
             bad_examples.append(f"{o['id'].split('-', 3)[-1]} {o['width_m']}m")
+    zones = [
+        (o, zone_midpoints(o, [polys[i] for i in o["space_ids"] if i in polys]))
+        for o in data["openings"]
+        if o["kind"] == "opening"
+    ]
+    zones = [(o, mids) for o, mids in zones if mids]
+    if zones:
+        dashed = page.evaluate(
+            "(list) => list.map(([f, x, y]) => window.__twinAudit.zoneLineNear(f, [x, y]))",
+            [[o["floor_id"], m[0][0], m[0][1]] for o, m in zones],
+        )
+        report.add(key, "wide openings as zone lines", len(zones), sum(dashed), all(dashed))
     for kind, s in sorted(stats.items()):
         want = s["data"] - s["off_wall"]
         note = f"off-wall in data: {s['off_wall']}" if s["off_wall"] else ""
@@ -379,7 +427,16 @@ def check_closed(report, stack, page, key, data, pair):
         page.wait_for_timeout(300)
         reopened = page.evaluate("window.__twinAudit.drawnClosed()")
         ok = closed["elements"] == expected and reopened["elements"] == 0
-        report.add(key, f"closed {label} drawn", expected, closed["elements"], ok, "" if reopened["elements"] == 0 else "still drawn after reopen")
+        if label == "door":  # a closed door also gets a bar across its gap
+            ok = ok and closed["bars"] == 1 and reopened["bars"] == 0
+        report.add(
+            key,
+            f"closed {label} drawn",
+            expected,
+            closed["elements"],
+            ok,
+            "" if reopened["elements"] == 0 else "still drawn after reopen",
+        )
     if connector and pair:
         route = stack.post("/api/route", {"building": key, "start": pair[0], "destination": pair[1]})["route"]
         used = [c["connector_id"] for c in (route.get("floor_changes") or [])]
@@ -393,8 +450,17 @@ def check_closed(report, stack, page, key, data, pair):
             avoids = (not new.get("ok")) or target not in [c["connector_id"] for c in (new.get("floor_changes") or [])]
             drawn = dedupe(page.evaluate("window.__twinAudit.drawnRoute()"))
             expected = dedupe(p for seg in (new.get("segments") or []) for p in seg["points"]) if new.get("ok") else []
-            matches = len(drawn) == len(expected) and all(math.hypot(d[0] - e[0], d[1] - e[1]) <= ROUTE_TOL for d, e in zip(drawn, expected))
-            report.add(key, "route avoids closed connector", target.split("-")[-1], "avoided" if avoids else "USED", avoids and matches, "" if matches else "drawn line is not the new route")
+            matches = len(drawn) == len(expected) and all(
+                math.hypot(d[0] - e[0], d[1] - e[1]) <= ROUTE_TOL for d, e in zip(drawn, expected)
+            )
+            report.add(
+                key,
+                "route avoids closed connector",
+                target.split("-")[-1],
+                "avoided" if avoids else "USED",
+                avoids and matches,
+                "" if matches else "drawn line is not the new route",
+            )
             page.evaluate(f"(id) => {store}.setClosed(id, false)", target)
             page.evaluate(f"{store}.clearRoute()")
         else:
@@ -466,7 +532,10 @@ def check_building(browser, stack, key, report):
         t3 = time.time()
         check_closed(report, stack, page, key, data, pair)
         check_edits(report, stack, page, key, data)
-        print(f"  open {t1 - t0:.0f} s, counts {t2 - t1:.0f} s, routes {t3 - t2:.0f} s, closed {time.time() - t3:.0f} s", flush=True)
+        print(
+            f"  open {t1 - t0:.0f} s, counts {t2 - t1:.0f} s, routes {t3 - t2:.0f} s, closed {time.time() - t3:.0f} s",
+            flush=True,
+        )
     finally:
         context.close()
         try:
@@ -493,14 +562,23 @@ def check_campus(browser, stack, report):
         firsts.append((b["id"], room["id"]))
     route = stack.post(
         "/api/campus/route",
-        {"start": firsts[0][1], "destination": firsts[1][1], "start_building": firsts[0][0], "destination_building": firsts[1][0]},
+        {
+            "start": firsts[0][1],
+            "destination": firsts[1][1],
+            "start_building": firsts[0][0],
+            "destination_building": firsts[1][0],
+        },
     )
     if not route.get("ok"):
         report.add("campus example", "campus route", "ok", route.get("error", "?"), False)
         return
     expected = []
     for leg in route["legs"]:
-        pts = [leg["from"]["world_point"], leg["to"]["world_point"]] if leg["kind"] == "link" else (leg.get("world_points") or [])
+        pts = (
+            [leg["from"]["world_point"], leg["to"]["world_point"]]
+            if leg["kind"] == "link"
+            else (leg.get("world_points") or [])
+        )
         expected.extend(p for p in pts if p)
     expected = dedupe(expected, 0.01)
     context = browser.new_context(viewport={"width": 1400, "height": 900})
@@ -516,8 +594,17 @@ def check_campus(browser, stack, report):
     d = page.get_attribute("[data-audit=campus-route]", "d")
     nums = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", d)]
     drawn = [(nums[i], -nums[i + 1]) for i in range(0, len(nums) - 1, 2)]
-    ok = len(drawn) == len(expected) and all(math.hypot(a[0] - b[0], a[1] - b[1]) <= 0.02 for a, b in zip(drawn, expected))
-    report.add("campus example", "campus route legs drawn", len(expected), len(drawn), ok, "" if ok else "site-map line differs from the legs' world points")
+    ok = len(drawn) == len(expected) and all(
+        math.hypot(a[0] - b[0], a[1] - b[1]) <= 0.02 for a, b in zip(drawn, expected)
+    )
+    report.add(
+        "campus example",
+        "campus route legs drawn",
+        len(expected),
+        len(drawn),
+        ok,
+        "" if ok else "site-map line differs from the legs' world points",
+    )
     context.close()
 
 
@@ -540,7 +627,9 @@ def run(buildings=None, campus=True, log=print) -> Report:
                 try:
                     check_campus(browser, stack, report)
                 except Exception as error:
-                    report.add("campus example", "audit ran", "-", "-", False, f"{type(error).__name__}: {str(error)[:120]}")
+                    report.add(
+                        "campus example", "audit ran", "-", "-", False, f"{type(error).__name__}: {str(error)[:120]}"
+                    )
         finally:
             browser.close()
     return report
@@ -550,7 +639,9 @@ def main(argv=None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("-n", type=int, default=len(DEFAULT_BUILDINGS), help="number of buildings from the default list")
+    parser.add_argument(
+        "-n", type=int, default=len(DEFAULT_BUILDINGS), help="number of buildings from the default list"
+    )
     parser.add_argument("--building", action="append", help="audit this key instead of the default list (repeatable)")
     parser.add_argument("--no-campus", action="store_true")
     args = parser.parse_args(argv)
