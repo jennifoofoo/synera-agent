@@ -468,7 +468,9 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
             return None
         return bm.spaces[space_id]["floor_id"], rounded(route_draw.drawn_anchor(bm, space_id, drawing))
 
-    def add_point(node: tuple, kind: str = "walk") -> None:
+    def add_point(node: tuple, kind: str = "walk", room: str | None = None) -> None:
+        """Append the node's point; `room`: the room walked from the last point to this one, to bend round its
+        assets (drawing only)."""
         nonlocal current
         located = point_of(node)
         if located is None:
@@ -480,6 +482,11 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
             joined = [current["points"][-1]] if current is not None and current["floor_id"] == floor_id else []
             current = {"floor_id": floor_id, "kind": kind, "points": joined}
             segments.append(current)
+        if room is not None and current["points"] and bm.spaces[room]["floor_id"] == floor_id:
+            bends = route_draw.detour(bm, room, tuple(current["points"][-1]), tuple(point), drawing) or []
+            for bend in map(rounded, bends):
+                if bend != current["points"][-1] and bend != point:
+                    current["points"].append(bend)
         current["points"].append(point)
 
     add_point(path[0])
@@ -511,7 +518,8 @@ def route_geometry(bm: BuildingMap, stops: list[str], legs: list[list[tuple]]) -
         elif not crossing and previous[2] == OUTSIDE and node[2] == OUTSIDE:
             add_point(node, "outside")  # from one entrance to another, outside the building
         else:
-            add_point(node)
+            same_room = previous[2] == node[2] and node[2] in bm.spaces
+            add_point(node, room=node[2] if same_room else None)
     for change in floor_changes:
         going_up = bm.floors[change["to_floor"]]["level"] > bm.floors[change["from_floor"]]["level"]
         change["direction"] = "up" if going_up else "down"
