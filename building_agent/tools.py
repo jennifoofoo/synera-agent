@@ -18,7 +18,7 @@ from building_agent.guide_tools import GuideState, building_signature, make_guid
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
-from building_agent.position import no_position_error
+from building_agent.position import EXACT_POSITION_NOTE, exact_start_point, no_position_error
 from building_agent.position_tools import distance_annotator, make_position_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
@@ -145,16 +145,27 @@ def make_tools(
         """
         if start is None and guide.position is None:
             raise ToolError(no_position_error(guide))
+        point = None
         try:
             conflict = guide_conflict(bm, guide, bm.resolve_space(destination), replace_guide)
             if conflict is not None:
                 return as_json(conflict)
-            result = routing.route(bm, guide.position.space_id if start is None else start, destination, step_free, via)
+            point = exact_start_point(bm, guide) if start is None else None
+            result = routing.route(
+                bm,
+                guide.position.space_id if start is None else start,
+                destination,
+                step_free,
+                via,
+                **({"start_point": point, "start_floor": guide.position.floor_id} if point else {}),
+            )
             remember_route(bm, guide, result, [bm.resolve_space(stop) for stop in via or []])
             guide.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
         assumed = {"start_assumed": bm.describe_space(result.start_space_id)} if start is None else {}
+        if point:
+            assumed["start_assumed"] += f" ({EXACT_POSITION_NOTE})"
         return as_json({**asdict(result), **assumed})
 
     @beta_tool

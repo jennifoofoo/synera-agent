@@ -7,7 +7,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   GET  /api/status                      chat availability and backend
   GET  /api/buildings                   every directory under --data with a building.json
   GET  /api/building?key=dev/...        floors, spaces, openings, connectors, assets, state
-  POST /api/route    {start, destination, step_free, via: []}
+  POST /api/route    {start, destination, step_free, via: [], start_point?: {x, y, floor_id?}, destination_point?: {x, y}}
   POST /api/route/clear
   POST /api/close    {element, closed: true|false}       lift/stairs/door/room id or name
   POST /api/door     {first, second, step_free}
@@ -59,7 +59,7 @@ from starter_agent.building_map import BuildingMap, MapError
 from web import api, campus_api, level4_api, speech, transfer
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
-from web.selection import check_here, check_selection
+from web.selection import check_here, check_route_point, check_selection
 
 # The page is the React twin (twin/), built with `cd twin && npm run build`; the old plain-JS page is gone.
 STATIC = Path(__file__).resolve().parents[1] / "twin" / "dist"
@@ -292,14 +292,29 @@ class App:
             session = self.session(key)
             if path == "/api/route":
                 try:
+                    start, destination = str(body.get("start", "")), str(body.get("destination", ""))
+                    notes, points = [], {}
+                    for field, space, label in (
+                        ("start_point", start, "start point"),
+                        ("destination_point", destination, "destination point"),
+                    ):
+                        if body.get(field) is not None:
+                            checked = check_route_point(
+                                body[field], session.map, session.map.resolve_space(space), label
+                            )
+                            points[field] = list(checked.point) if checked.point else None
+                            notes += [checked.note] if checked.note else []
+                    view = api.route_view(
+                        session,
+                        start,
+                        destination,
+                        bool(body.get("step_free", False)),
+                        [str(stop) for stop in body.get("via") or []],
+                        points.get("start_point"),
+                        points.get("destination_point"),
+                    )
                     return 200, {
-                        "route": api.route_view(
-                            session,
-                            str(body.get("start", "")),
-                            str(body.get("destination", "")),
-                            bool(body.get("step_free", False)),
-                            [str(stop) for stop in body.get("via") or []],
-                        ),
+                        "route": {**view, "notes": notes} if notes else view,
                         "state": api.state_view(session),
                     }
                 except MapError as error:
