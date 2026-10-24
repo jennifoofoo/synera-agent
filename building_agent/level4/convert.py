@@ -18,6 +18,7 @@ from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import linemerge, nearest_points, unary_union
 
 from building_agent.geometry import repaired
+from building_agent.level4.align import align_floors
 from building_agent.level4.schema import DOOR_KINDS, OUTSIDE, ROOM_TYPES, Extraction, Findings, Scale
 from building_agent.level4.segment import SegmentResult
 from building_agent.level4.validate import OUTER_WALL_TOLERANCE_M, Collector, outer_boundary, room_label
@@ -66,6 +67,8 @@ class FloorInput:
     level: int
     extraction: Extraction
     scale: Scale
+    elevation_m: float | None = None  # from the plan's building.json; None = level times the height
+    height_m: float | None = None  # from the plan's building.json; None = the default storey height
 
 
 @dataclass
@@ -682,7 +685,7 @@ def _check_input(floors: list[FloorInput], building_id: str) -> None:
 
 
 def convert_floors_with_findings(
-    floors: list[FloorInput], building_name: str, building_id: str
+    floors: list[FloorInput], building_name: str, building_id: str, height_assumed: str = ""
 ) -> tuple[dict, Findings]:
     """Return the building.json dict and what was repaired or dropped on the way."""
     _check_input(floors, building_id)
@@ -705,15 +708,24 @@ def convert_floors_with_findings(
     if not spaces:
         raise ConvertError("No usable room was found in the plan.")
 
+    if height_assumed:
+        found.add("floor_height_assumed", height_assumed)
     floor_dicts = [
         {
-            "id": floor_ids[level],
-            "level": level,
-            "name": "Ground floor" if level == 0 else (f"Floor {level}" if level > 0 else f"Basement {-level}"),
-            "elevation_m": round(level * FLOOR_HEIGHT_M, 2),
-            "height_m": FLOOR_HEIGHT_M,
+            "id": floor_ids[floor.level],
+            "level": floor.level,
+            "name": "Ground floor"
+            if floor.level == 0
+            else (f"Floor {floor.level}" if floor.level > 0 else f"Basement {-floor.level}"),
+            "elevation_m": round(
+                floor.elevation_m
+                if floor.elevation_m is not None
+                else floor.level * (floor.height_m or FLOOR_HEIGHT_M),
+                2,
+            ),
+            "height_m": floor.height_m or FLOOR_HEIGHT_M,
         }
-        for level in levels
+        for floor in ordered
     ]
     building = {
         "building": {
@@ -732,6 +744,15 @@ def convert_floors_with_findings(
         "vertical_connectors": [],
         "assets": [],
     }
+    if len(levels) > 1:
+        offsets, not_aligned = align_floors(building)
+        moved = {str(level): list(shift) for level, shift in offsets.items() if shift != (0.0, 0.0)}
+        if moved:
+            building["building"]["source_ref"]["floor_offsets_m"] = moved
+        if not not_aligned:
+            building["building"]["source_ref"]["floors_aligned"] = True
+        for level, reason in not_aligned.items():
+            found.add("floor_not_aligned", f"floor {level}: {reason}")
     relink_connectors(building, found)
     return building, Findings(found.findings())
 

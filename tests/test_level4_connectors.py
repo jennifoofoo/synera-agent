@@ -212,7 +212,10 @@ def test_floors_cropped_differently_are_centred_for_the_match():
         )
     building, findings = convert_floors_with_findings(moved, "T", "t1")
     assert len(building["vertical_connectors"]) == 6
-    assert "connector_aligned_by_centre" in codes(findings)
+    # the floors are now lined up by their connectors before linking, so the centring fallback is not needed
+    assert building["building"]["source_ref"]["floor_offsets_m"]["1"][0] != 0
+    assert building["building"]["source_ref"]["floors_aligned"] is True
+    assert "floor_not_aligned" not in codes(findings)
 
 
 def test_osm_lifts_with_equal_frames_link_without_wrong_pairs():

@@ -39,7 +39,10 @@ def room_stacked_with(
     if direction not in ("above", "below"):
         raise MapError("direction must be 'above' or 'below'.")
     source = bm.data["building"].get("source")
-    if source not in STACKED_SOURCES:
+    # a building built from plans has no source of its own; its floors share a frame when the build lined them up
+    # by their stairs and lifts (level4/align.py sets source_ref.floors_aligned)
+    lined_up = (bm.data["building"].get("source_ref") or {}).get("floors_aligned") is True
+    if source not in STACKED_SOURCES and not lined_up:
         raise MapError(f"Floors of this building ({source}) do not share one XY frame; stacking is undefined.")
     start = bm.resolve_space(start)
     space = bm.spaces[start]

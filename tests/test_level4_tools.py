@@ -170,6 +170,31 @@ def test_set_scale_reconverts_and_keeps_fixes(rig):
     assert rig.calls == 1
 
 
+# ---------- storey height ----------
+
+
+def test_storey_height_is_assumed_then_corrected_by_the_person(rig):
+    rig.build()
+    assert rig.draft.building["floors"][0]["height_m"] == 3.0
+    assert any("assumed" in note for note in rig.draft.notes)
+    done = rig.call("fix_draft", action="set_floor_height", known_length_m=3.8)
+    assert "3.8" in done["done"]
+    assert rig.draft.building["floors"][0]["height_m"] == 3.8
+    assert not any(f.code == "floor_height_assumed" for f in rig.draft.findings.items)
+    with pytest.raises(ToolError):
+        rig.call("fix_draft", action="set_floor_height", known_length_m=0.5)
+
+
+def test_storey_height_from_the_building_json_of_the_plans(rig):
+    (rig.uploads / "building.json").write_text(
+        json.dumps({"floors": [{"level": 0, "elevation_m": 0.0, "height_m": 3.5}]}), encoding="utf-8"
+    )
+    rig.build()
+    assert rig.draft.building["floors"][0]["height_m"] == 3.5
+    assert not any(f.code == "floor_height_assumed" for f in rig.draft.findings.items)
+    assert any("building.json" in note for note in rig.draft.notes)
+
+
 # ---------- card and saving ----------
 
 
@@ -179,7 +204,7 @@ def test_preview_card_wording(rig):
     assert card["can be saved"] is True
     assert "nothing saved" in card["status"]
     assert card["I understood"][0]["rooms"] == len(rig.case.truth["spaces"])
-    assert card["problems found"] == "No problems found."
+    assert "storey height" in card["problems found"]  # no height in the plan files, so the card says it assumed one
 
 
 def test_save_only_after_card_and_clear_yes_in_the_next_message(rig):

@@ -7,6 +7,7 @@ import copy
 import json
 import os
 import re
+import statistics
 import tempfile
 import uuid
 from collections.abc import Callable
@@ -40,9 +41,15 @@ from building_agent.level4.extract import (
     _resolve_inside,
     extract_floor,
 )
+from building_agent.level4.floor_height import guess_floor_height
 from building_agent.level4.markers import detect_markers, merge_markers
-from building_agent.level4.plan_files import adopt_vision, compose_names, find_building_json, svg_extraction
-from building_agent.level4.scale_source import find_building_width, find_scale, load_building_json
+from building_agent.level4.plan_files import adopt_vision, compose_names, find_building_json, svg_extraction, svg_title
+from building_agent.level4.scale_source import (
+    find_building_width,
+    find_floor_heights,
+    find_scale,
+    load_building_json,
+)
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.segment import NOISE_NOTE, SCAN_NOTE, match_to_extraction, segment_rooms
 from building_agent.level4.stair_doors import describe_stair_doors, suggest_stairs_then_generic
@@ -61,11 +68,13 @@ FIX_ACTIONS = (
     "set_scale",
     "accept_suggestions",
     "link_floors",
+    "set_floor_height",
 )
 STAIR_TYPES = {"stairwell", "stair", "stairs", "staircase"}
 LIFT_TYPES = {"lift", "elevator"}
 LINK_KINDS = {"stairs": "stair", "stair": "stair", "lift": "lift", "elevator": "lift"}
 CONNECTOR_CODES = {"connector_single_floor", "connector_linked_by_order", "connector_aligned_by_centre"}
+MIN_FLOOR_HEIGHT_M, MAX_FLOOR_HEIGHT_M = 2.0, 12.0
 MAX_STAIR_HALL_M2 = 60.0
 SIDES = {"north": (0, 1), "south": (0, -1), "east": (1, 0), "west": (-1, 0)}
 MAX_CANDIDATES = 5
@@ -134,6 +143,9 @@ class Level4Draft:
     last_level: int = 0
     poor_turn: int | None = None  # turn in which a poor reading was reported; the card needs a later "build it anyway"
     poor_acknowledged: bool = False
+    file_heights: dict = field(default_factory=dict)  # level -> (elevation_m, height_m) from building.json
+    plan_title: str = ""
+    height_override: float | None = None  # set by the person with fix_draft set_floor_height
 
 
 # ---------- pure helpers ----------
@@ -465,10 +477,15 @@ def write_atomic(path: Path, text: str) -> None:
         raise
 
 
-def _to_metres(draft: "Level4Draft"):
+def _to_metres(draft: "Level4Draft", building: dict | None = None):
+    """Image pixels of a floor to building metres, including the shift that lined the floor up with the one below."""
+    moved = ((building or draft.building or {}).get("building", {}).get("source_ref") or {}).get("floor_offsets_m", {})
+
     def convert(level: int, x: float, y: float) -> tuple[float, float]:
         source = draft.floors[level]
-        return pixel_to_metres(source.extraction, source.scale.metres_per_px)(x, y)
+        px, py = pixel_to_metres(source.extraction, source.scale.metres_per_px)(x, y)
+        dx, dy = moved.get(str(level), (0.0, 0.0))
+        return px + dx, py + dy
 
     return convert
 
@@ -508,15 +525,38 @@ def _trusted_scale(draft: Level4Draft) -> bool:
     )
 
 
+def _floor_heights(draft: Level4Draft) -> tuple[dict[int, tuple[float | None, float | None]], float | None, str, str]:
+    """(elevation and height per level, default height, assumption for the card or "", where the height came from)."""
+    if draft.height_override is not None:
+        return {}, draft.height_override, "", f"Storey height {draft.height_override:g} m as you said."
+    given = {level: draft.file_heights[level] for level in draft.floors if level in draft.file_heights}
+    if given:
+        heights = [h for _, h in given.values() if h is not None]
+        fallback = statistics.median(heights) if heights else None
+        return (
+            {level: (e, h if h is not None else fallback) for level, (e, h) in given.items()},
+            fallback,
+            "",
+            "Storey heights from the building.json that came with the plans.",
+        )
+    refs = [room.ref or "" for src in draft.floors.values() for room in src.extraction.rooms]
+    height, why = guess_floor_height(refs, draft.plan_title)
+    return {}, height, f"{height:g} m, because {why}", f"Storey height {height:g} m assumed: {why}."
+
+
 def _rebuild(draft: Level4Draft) -> None:
     """Convert all stored floors, replay the fixes, validate. Raises ToolError when nothing usable results."""
-    inputs = [FloorInput(level, src.extraction, src.scale) for level, src in sorted(draft.floors.items())]
+    heights, default, assumed, height_note = _floor_heights(draft)
+    inputs = [
+        FloorInput(level, src.extraction, src.scale, *heights.get(level, (None, default)))
+        for level, src in sorted(draft.floors.items())
+    ]
     try:
-        building, converted = convert_floors_with_findings(inputs, draft.name, draft.building_id)
-        notes = []
+        building, converted = convert_floors_with_findings(inputs, draft.name, draft.building_id, assumed)
+        notes = [height_note]
         for fix in draft.fixes:
             try:
-                apply_fix(building, fix, _to_metres(draft))
+                apply_fix(building, fix, _to_metres(draft, building))
             except ToolError as error:
                 notes.append(f"An earlier fix ({fix[0]}) no longer applies: {error}")
         converted.items = _relinked(building, converted.items)
@@ -588,6 +628,8 @@ def make_level4_tools(
             checked = _resolve_inside(path, uploads_root)
             svg_read, svg_note, svg_inferred = svg_extraction(checked, uploads_root)
             json_path = find_building_json(checked, uploads_root)
+            draft.file_heights.update(find_floor_heights(load_building_json(json_path)) if json_path else {})
+            draft.plan_title = svg_title(checked, uploads_root) or draft.plan_title
         except ExtractError:
             pass  # extract_floor below says what is wrong with the path
         result: ExtractResult | None = draft.cache.get(key)
@@ -727,7 +769,8 @@ def make_level4_tools(
                 (known_length_m, along, optional level) or "accept_suggestions" (no other arguments: add the
                 doors proposed in the last card; only after the person said yes to the proposal) or "link_floors"
                 (ref on one floor, other_ref on the neighbouring floor, kind "stairs" or "lift", and level and
-                other_level when the room numbers are not unique). set_room_type with stairwell or lift also
+                other_level when the room numbers are not unique) or "set_floor_height" (known_length_m is the storey height
+                in metres, for all floors). set_room_type with stairwell or lift also
                 makes the room a stair or lift and links it to the same stair or lift on the next floor.
             side: For add_entrance: "north", "south", "east" or "west" wall of the room (default: its longest
                 outside wall).
@@ -772,6 +815,21 @@ def make_level4_tools(
                 draft.floors[target] = old
                 raise
             return as_json({"done": f"Scale of floor {target}: {scale.note}.", "problems": describe(draft.findings)})
+        if action == "set_floor_height":
+            if known_length_m is None or not MIN_FLOOR_HEIGHT_M <= known_length_m <= MAX_FLOOR_HEIGHT_M:
+                raise ToolError(
+                    f"set_floor_height needs known_length_m, the storey height in metres ({MIN_FLOOR_HEIGHT_M:g} to {MAX_FLOOR_HEIGHT_M:g})."
+                )
+            old = draft.height_override
+            draft.height_override = known_length_m
+            try:
+                _rebuild(draft)
+            except ToolError:
+                draft.height_override = old
+                raise
+            return as_json(
+                {"done": f"Storey height is now {known_length_m:g} m.", "problems": describe(draft.findings)}
+            )
         if action == "accept_suggestions":
             fix = ("accept_suggestions",)
         elif action == "add_entrance":
@@ -802,7 +860,7 @@ def make_level4_tools(
                 raise ToolError(f"{action} needs ref and other_ref (two room numbers).")
             fix = (action, ref, other_ref, level)
         candidate = copy.deepcopy(building)
-        done = apply_fix(candidate, fix, _to_metres(draft))
+        done = apply_fix(candidate, fix, _to_metres(draft, candidate))
         draft.fixes.append(fix)
         draft.building = candidate
         draft.convert_items = _relinked(candidate, draft.convert_items)
