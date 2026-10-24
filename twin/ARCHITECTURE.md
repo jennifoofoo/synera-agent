@@ -22,9 +22,20 @@ Nothing else by default. Popovers only on click, never hover. No tabs, panels, b
 | `src/scene/**` | everything inside the `<Canvas>`: floors, things, route, markers, labels, camera, effects | **scene session only** |
 | `src/ui/TopBar.tsx`, `src/ui/FloorRail.tsx`, `src/ui/ChangesPill.tsx`, `src/App.tsx` | the shell | scene session |
 | `src/ui/Omnibox.tsx` | ask-or-search input, hits, voice in, spoken replies | **chat/search session** |
-| `src/ui/Card.tsx` | selection card (Route here / I'm here / Close) and reply card, guide step, "You are here" chip | **card/position session** |
+| `src/ui/Card.tsx` | selection card (Route here / I'm here / Close) and reply card | **card session** |
+| `src/ui/Position.tsx` (stub) | "You are here" chip with clear, guide "Step k of n" + Next, arrival text | **position session** |
+| `src/ui/Worker/Mobile.tsx` (stub) | phone: audio unlock, wake lock, bottom-sheet card, mobile audit fixes | **phone session** |
 | `src/voice.ts` | Web Speech in, `/api/speak` out (fallback browser voice), audio unlock, wake lock | chat/search session (mobile session may add unlock/wake lock) |
 | `src/styles.css` | base styles at the top (scene session); each component owns its marked block (`===== Omnibox`, `===== Card`, `===== Phone`). Prefer a component-local `X.css` imported by the component if the block grows. | per block |
+
+Conventions:
+- A UI component reads the store with selectors (`useTwin((s) => s.state)`) and writes only through actions.
+  Never mutate `state`/`model`; never call the API directly from a component (add an action instead).
+- Styles: base tokens in `src/styles.css` `:root` (`--bg --panel --line --text --muted --accent --gold --ok --warn
+  --danger`); each component keeps its own `X.css` next to it (import it in the component) or its marked block.
+  Colours inside the scene come from `src/model/palette.ts`.
+- Ids are the API's ids (`space.id`, `asset.id`, `connector.id`); `flyTo(id)` and `select()` accept them as is.
+- Every fact comes from the API; the UI never computes routes, distances or counts.
 
 Rule: a session edits only its own files/blocks. Need something in the store or scene? Message the scene
 session with the exact field/action you need (name, type, when it changes) instead of editing `scene/`.
