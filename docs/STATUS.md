@@ -37,6 +37,7 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | C. Voice-Oberfläche in der Seite (Mikrofon, Sprachausgabe), nach dem Spike | Leonie | offen (wartet auf Spike) | |
 | D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | offen (wartet auf Spike) | |
 | Fragen an Synera vor Ort: Format, Locate/Route, Level 3 mehrere Gebäude, Freeze, Zeitlimit | wer vor Ort ist | offen | |
+| G. Routen-Modell: Raumfolge mit Tür-zu-Tür-Distanz und Synera-Kosten (Spike: 92,4 % auf 99,6 % volle Punkte), Kit-Modell für errand und what_if_door behalten, siehe `docs/specs/route-metric-spike.md` | Jennifer | offen | |
 | E. Demo-Video, Technik-Text, Pitch (3 Minuten plus 1 Minute Fragen) | beide | offen | |
 | F. Creativity (höchstens zwei Dinge, Entscheidung nach den Spikes) | beide | offen | |
 
