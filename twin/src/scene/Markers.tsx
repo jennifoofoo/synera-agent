@@ -11,6 +11,7 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
+import { HereDot, TapPin } from "./HerePin";
 import { assetSize } from "./Things";
 
 interface Props {
@@ -60,7 +61,7 @@ function clusterDisruptions(model: BuildingModel, closed: string[]): Disruption[
   return clusters;
 }
 
-function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
+export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
   const group = useRef<THREE.Group>(null);
   useFrame(({ clock, invalidate }) => {
     if (!group.current || reducedMotion) return;
@@ -71,7 +72,7 @@ function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { childr
   return <group ref={group}>{children}</group>;
 }
 
-function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean }) {
+export function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 19 : 15}>
       <ringGeometry args={[Math.max(0.05, radius - width), radius, 48]} />
@@ -80,7 +81,7 @@ function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = f
   );
 }
 
-function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean }) {
+export function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean }) {
   return (
     <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 18 : 14}>
       <circleGeometry args={[radius, 48]} />
@@ -125,24 +126,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
 
   return (
     <group>
-      {/* You are here */}
-      {position && shown(position.floor_id) && (
-        <group position={at(position.floor_id, position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0])}>
-          <Pulse reducedMotion={reducedMotion} speed={0.8} amount={0.25}>
-            <Disc radius={flat ? 3 : 1.4} colour={hereColour} opacity={flat ? 0.18 : 0.2} through />
-          </Pulse>
-          {!flat && <Ring radius={1.4} colour={hereColour} width={0.14} opacity={0.7} through />}
-          <Disc radius={flat ? 0.75 : 0.9} colour="#ffffff" opacity={1} through y={0.08} />
-          <Disc radius={flat ? 0.55 : 0.6} colour={hereColour} opacity={1} through y={0.1} />
-          {!flat && (
-            <mesh position-y={0.35}>
-              <sphereGeometry args={[0.32, 16, 16]} />
-              <meshBasicMaterial color={hereColour} />
-            </mesh>
-          )}
-          <group position-y={2.2}>{chip("You are here", "here")}</group>
-        </group>
-      )}
+      {/* You are here (draggable) and the pin of the last floor tap */}
+      <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} colour={hereColour} />
+      <TapPin model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} />
 
       {/* floor changes of the route: where to go up or down (needed in 2D and single-floor views) */}
       {state?.route?.ok &&
@@ -290,17 +276,6 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             return (
               <group position={at(asset.floor_id, moved[asset.id]?.position ?? asset.position)}>
                 <Ring radius={Math.max(size[0], size[2]) * 0.8 + 0.4} colour={COLOURS.selection} width={0.14} />
-              </group>
-            );
-          }
-          if (selection.kind === "point" && selection.point) {
-            return (
-              <group position={at(selection.floor_id, selection.point)}>
-                <Ring radius={0.6} colour={COLOURS.selection} width={0.12} />
-                <mesh position-y={0.2}>
-                  <sphereGeometry args={[0.18, 12, 12]} />
-                  <meshBasicMaterial color={COLOURS.selection} />
-                </mesh>
               </group>
             );
           }

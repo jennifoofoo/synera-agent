@@ -1,0 +1,17 @@
+/* Labels of the "You are here" dot. Uses the shared tokens; the fallbacks keep it readable without them. */
+.here-dot-labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.here-drag-hint {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(20, 48, 90, 0.16));
+  background: var(--panel-solid, #fff);
+  color: var(--text, #10233f);
+  font-size: 11px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(20, 48, 90, 0.18);
+}
