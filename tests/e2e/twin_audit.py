@@ -10,6 +10,7 @@ Checks per building:
            at the opening) drawn versus the data
   gaps     no wall top and no outline line across any opening of kind 'opening' (centre and both ends)
   routes   5 random room pairs: the drawn polyline is the server's route points, in order (tolerance 2 cm)
+  edits    a door added with /api/door is a gap, a door in state.removed_openings is wall again
   closed   /api/close on a door, a room and a connector draws closed markers; reopening removes them; a route
            recomputed with its connector closed does not use it any more
 Once per run: the campus route drawn on the site map follows the legs' world points.
@@ -226,7 +227,7 @@ class Report:
 
 
 def open_building(browser, stack: Stack, key: str):
-    context = browser.new_context(viewport={"width": 1400, "height": 900})
+    context = browser.new_context(viewport={"width": 1100, "height": 420})
     page = context.new_page()
     page.goto(f"{stack.base}/?building={key}")
     page.wait_for_function(
@@ -235,7 +236,7 @@ def open_building(browser, stack: Stack, key: str):
     )
     page.evaluate(
         """() => { const s = window.__twinAudit.store.getState();
-          s.setViewMode('3d'); s.setFloorMode('exploded'); s.setThingsMode('all'); }"""
+          s.setViewMode('3d'); s.setFloorMode('exploded'); s.setThingsMode('all'); window.__twinAudit.store.setState({ ao: false }); }"""
     )
     page.wait_for_function("window.__twinAudit.drawnSpaces().length > 0", timeout=60000)
     page.wait_for_timeout(800)
@@ -376,9 +377,7 @@ def check_closed(report, stack, page, key, data, pair):
             page.evaluate(f"([a, b]) => {store}.route(a, b)", list(pair))
             page.evaluate(f"(id) => {store}.setClosed(id, true)", target)
             page.wait_for_timeout(300)
-            # the UI does not recompute by itself: ask again, as the Directions panel does after a closure
-            page.evaluate(f"([a, b]) => {store}.route(a, b)", list(pair))
-            page.wait_for_timeout(300)
+            # the server recomputes state.route on a closure; the UI just redraws it
             new = page.evaluate(f"{store}.state.route")
             avoids = (not new.get("ok")) or target not in [c["connector_id"] for c in (new.get("floor_changes") or [])]
             drawn = dedupe(page.evaluate("window.__twinAudit.drawnRoute()"))
@@ -389,6 +388,58 @@ def check_closed(report, stack, page, key, data, pair):
             page.evaluate(f"{store}.clearRoute()")
         else:
             report.add(key, "route avoids closed connector", "-", "-", True, "no floor-changing route found, skipped")
+
+
+def _blocked(page, floor_id, point):
+    return page.evaluate("([f, x, y]) => window.__twinAudit.blockedAt(f, [x, y])", [floor_id, point[0], point[1]])
+
+
+def check_edits(report, stack, page, key, data):
+    """Doors added in the session (/api/door) are drawn as gaps; doors removed in the state are wall again."""
+    store = "window.__twinAudit.store.getState()"
+    spaces = {s["id"]: s for s in data["spaces"]}
+    have = {tuple(sorted(o["space_ids"])) for o in data["openings"]}
+    floors = sorted({s["floor_id"] for s in data["spaces"]})
+    pair = None
+    for floor_id in floors[:2]:
+        rooms = [s for s in data["spaces"] if s["floor_id"] == floor_id and s["type"] in ("room", "corridor", "hall")]
+        for i, a in enumerate(rooms):
+            for c in rooms[i + 1 :]:
+                if tuple(sorted((a["id"], c["id"]))) in have:
+                    continue
+                if any(math.dist(*seg) > 1.5 for seg in shared_boundaries(a["polygon"], c["polygon"])):
+                    pair = (a, c)
+                    break
+            if pair:
+                break
+        if pair:
+            break
+    if pair:
+        a, c = pair
+        page.evaluate(f"([a, b]) => {store}.addDoor(a, b)", [a["id"], c["id"]])
+        page.wait_for_timeout(500)
+        door = page.evaluate(f"{store}.state.added_doors[0]")
+        pts = probe_points({"kind": "door", "position": door["position"], "width_m": 0.9}, [a["polygon"], c["polygon"]])
+        mine = [_blocked(page, door["floor_id"], p) for p in pts or []]
+        ok = bool(pts) and all(not b["wall"] and not b["line"] for b in mine)
+        report.add(key, "added door drawn as gap", 1, int(ok), ok)
+        page.evaluate(f"{store}.reset()")
+        page.wait_for_timeout(500)
+    else:
+        report.add(key, "added door drawn as gap", "-", "-", True, "no door-less neighbours, skipped")
+    door = next((o for o in data["openings"] if o["kind"] == "door" and len(o["space_ids"]) == 2), None)
+    if door:
+        pts = probe_points(door, [spaces[i]["polygon"] for i in door["space_ids"]])
+        if pts:
+            page.evaluate(
+                f"(id) => {{ const s = {store}; s.applyState({{ ...s.state, removed_openings: [id] }}); }}", door["id"]
+            )
+            page.wait_for_timeout(500)
+            after = [_blocked(page, door["floor_id"], p) for p in pts]
+            ok = any(b["wall"] for b in after)
+            report.add(key, "removed door drawn as wall", 1, int(ok), ok)
+            page.evaluate(f"{store}.reset()")
+            page.wait_for_timeout(500)
 
 
 def check_building(browser, stack, key, report):
@@ -403,6 +454,7 @@ def check_building(browser, stack, key, report):
         pair = check_routes(report, stack, page, key, data, rng)
         t3 = time.time()
         check_closed(report, stack, page, key, data, pair)
+        check_edits(report, stack, page, key, data)
         print(f"  open {t1 - t0:.0f} s, counts {t2 - t1:.0f} s, routes {t3 - t2:.0f} s, closed {time.time() - t3:.0f} s", flush=True)
     finally:
         context.close()
