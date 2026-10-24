@@ -26,3 +26,13 @@
 .found-dot.many { width: 18px; height: 18px; }
 /* its name, beside the dot, in the route blue with the paper halo of the room labels */
 .label.found-name { color: var(--signal-dark, #002478); font-weight: 600; }
+
+/* Safety symbols in their norm colours (ISO 7010 / ISO 3864): fire extinguisher red, first aid / defibrillator /
+   eyewash green. Icons only, never room fills (DESIGN.md tokens --safety-red / --safety-green). */
+.poi-badge.poi-extinguisher { background: var(--safety-red, #a52019); }
+.poi-badge.poi-firstaid { background: var(--safety-green, #237f52); }
+
+/* Semantic zoom: what enters a zoom tier fades in (150-200 ms), never pops; no animation with reduced motion. */
+@keyframes zoom-fade-in { from { opacity: 0; } }
+.zoom-fade { animation: zoom-fade-in 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .zoom-fade { animation: none; } }
