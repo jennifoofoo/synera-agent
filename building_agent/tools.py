@@ -20,6 +20,7 @@ from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
+from building_agent.task_tools import make_task_tools
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 from starter_agent.tools import make_tools as make_starter_tools
@@ -169,6 +170,7 @@ def make_tools(
         find_forklift_route,
         find_space_tool,
         *make_find_tools(bm),
+        *make_task_tools(bm),
         *make_impact_tools(bm),
         *guide_tools,
         *make_selection_tools(bm, guide),
