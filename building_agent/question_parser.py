@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from building_agent import routing
 from building_agent.registry import load_kinds
 from starter_agent.building_map import BuildingMap
 
@@ -262,7 +263,7 @@ def answer_for_map(bm: BuildingMap, text: str) -> str | None:
 
 def answer_deterministic(building_directory: Path, text: str) -> str | None:
     try:
-        bm = BuildingMap.load(Path(building_directory))
+        bm = routing.load_map(Path(building_directory))  # walking lengths computed once per building and process
     except (OSError, ValueError, KeyError):
         return None
     return answer_for_map(bm, text)
