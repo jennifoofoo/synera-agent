@@ -14,3 +14,4 @@ Short list first. Details below each item if they ask.
 10. **Aisles and docks.** In the data, aisles are named "Main aisle H-C1" and no space has "dock" in its name. How are "Aisle 4" and "dock B" meant in the Sunday questions (names, numbering, which spaces)?
 11. **Time and deliveries.** The deck mentions "Where is the steel drum delivered yesterday?". Will Sunday contain questions about history or deliveries (the data has no timestamps)?
 12. **Access rights.** Do the Sunday buildings or questions include access restrictions (rooms or doors that need a clearance, keycards, safety gear, escorted access)? The data has no such fields.
+13. **Time-dependent changes.** Will Sunday contain closures or maintenance with time windows, uploaded notices (PDF, image, calendar file) or questions "at a given time"? The data has no timestamps.
