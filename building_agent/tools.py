@@ -15,6 +15,13 @@ from starter_agent.tools import as_json
 from starter_agent.tools import make_tools as make_starter_tools
 
 
+def snake_case(name: str, value):
+    """Type parameters are snake_case identifiers ("living_room"), but questions say "living room"."""
+    if name.endswith("_type") and isinstance(value, str):
+        return value.strip().lower().replace(" ", "_")
+    return value
+
+
 def kind_tool(bm: BuildingMap, kind: Kind):
     """Expose a kind as a tool: same signature minus `bm`, docstring from the kind description."""
     signature = inspect.signature(kind.fn)
@@ -22,6 +29,7 @@ def kind_tool(bm: BuildingMap, kind: Kind):
 
     @functools.wraps(kind.fn)
     def run(*args, **kwargs) -> str:
+        kwargs = {name: snake_case(name, value) for name, value in kwargs.items()}
         try:
             return as_json(kind.fn(bm, *args, **kwargs))
         except MapError as error:
@@ -31,7 +39,7 @@ def kind_tool(bm: BuildingMap, kind: Kind):
 
     run.__signature__ = signature.replace(parameters=parameters)
     run.__name__ = kind.name
-    run.__doc__ = f"{kind.description}\n\nSpace parameters take space ids from find_space; floor_id takes a floor id from the building overview."
+    run.__doc__ = f"{kind.description}\n\nSpace parameters take space ids from find_space; floor_id takes a floor id from the building overview; *_type parameters are snake_case identifiers such as lab_bench or living_room."
     return beta_tool(run)
 
 

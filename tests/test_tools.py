@@ -35,3 +35,11 @@ def test_kind_tool_turns_bad_ids_into_tool_errors():
     tool = tool_by_name(make_tools(load_map(building_dir), None), "errand")
     with pytest.raises(ToolError):
         tool(**{**question["inputs"], "start": "not a space id"})
+
+
+def test_type_parameters_accept_spaces_instead_of_underscores():
+    from building_agent.tools import snake_case
+
+    assert snake_case("room_type", "Living Room") == "living_room"
+    assert snake_case("asset_type", "tv stand") == "tv_stand"
+    assert snake_case("start", "Lab 0.12") == "Lab 0.12"
