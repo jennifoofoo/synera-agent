@@ -11,7 +11,6 @@ import { prettyType } from "../model/palette";
 import { HERE, useTwin, type Selection } from "../store";
 import { withoutAnswerLine } from "../voice";
 import "./Card.css";
-import "./HereUi.css";
 import { HereChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
@@ -138,7 +137,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
       : space
         ? `${prettyType(space.room_type)} · ${Math.round(space.area_m2)} m²`
         : "";
-  // A tap on the floor leaves a pin; the card says where exactly (model metres).
+  // A tap on the floor leaves a pin; its exact spot (model metres) is kept as a data attribute only.
   const pointText = selection.point && (selection.kind === "space" || selection.kind === "point") ? formatPoint(selection.point) : "";
   // Rooms (and spots in a room) can be a destination or "where I am"; a thing routes to its room.
   const roomId = roomOf(model, selection);
@@ -163,18 +162,11 @@ function SelectionCard({ model }: { model: BuildingModel }) {
         </div>
         <CloseButton onClick={() => select(null)} />
       </div>
-      <div className="card-line">
+      {/* Coordinates are not for people: only a data attribute for tests and debugging. */}
+      <div className="card-line" data-testid={pointText ? "card-point" : undefined} data-point={pointText || undefined}>
         {floor}
         {floor && context ? " · " : ""}
         {context}
-        {pointText && (
-          <>
-            {" · "}
-            <span className="card-point" data-testid="card-point">
-              Point {pointText}
-            </span>
-          </>
-        )}
       </div>
       {roomId && (
         <div className="card-actions">

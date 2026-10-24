@@ -1,6 +1,6 @@
 """Tap pin and draggable "You are here" dot of the 3D twin (docs: twin/src/scene/HerePin.tsx).
 
-Flow: tap the floor, see the pin and "Point x, y m" on the card, press "I'm here" (pin becomes the dot), drag the dot
+Flow: tap the floor, see the pin and the card (the tapped point "x, y m" is only a data attribute, not shown), press "I'm here" (pin becomes the dot), drag the dot
 about 100 px and check through the API that the position moved to a point inside a room. The chat turn is faked
 (tests/e2e/fake_chat_server.py), so no API key and no cost. Skips without Playwright, a browser, data/dev or twin/dist.
 
@@ -150,7 +150,7 @@ def tap_floor(page) -> str:
             tap(page, size["width"] * fx, size["height"] * fy)
             page.wait_for_timeout(150)
             if page.locator("[data-testid=card-point]").count():
-                return page.locator("[data-testid=card-point]").inner_text()
+                return page.locator("[data-testid=card-point]").get_attribute("data-point")
     pytest.fail("no tap landed on a floor")
 
 
@@ -181,10 +181,11 @@ def test_tap_pin_then_here_then_drag(page, server):
     assert building["state"]["position"] is None
     shot(page, "before-tap")
 
-    # 1. tap: pin at the tapped point, card shows "Point x, y m"
+    # 1. tap: pin at the tapped point; the card keeps "x, y m" as data-point but never shows coordinates
     text = tap_floor(page)
-    match = re.fullmatch(r"Point (-?\d+\.\d), (-?\d+\.\d) m", text)
+    match = re.fullmatch(r"(-?\d+\.\d), (-?\d+\.\d) m", text)
     assert match, text
+    assert text not in page.locator("[data-testid=card-point]").inner_text(), "the card must not show coordinates"
     pin = page.evaluate(SCREEN_OF, "tap-pin")
     assert pin, "no pin in the scene after the tap"
     assert abs(pin["wx"] - float(match[1])) <= 0.06 and abs(pin["wy"] - float(match[2])) <= 0.06

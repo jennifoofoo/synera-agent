@@ -17,14 +17,16 @@ export function ChangesPill() {
     Object.keys(state.widened_openings ?? {}).length +
     state.added_doors.length;
   if (edits) parts.push(`${edits} edit${edits > 1 ? "s" : ""}`);
-  const hasRoute = !!state.route && !worker; // phone: the route's length and clear live in the bottom sheet
+  // A drawn route has its length and its clear (×) in the route card (and on the phone in the sheet), so the
+  // pill no longer repeats it; it only offers to clear a route that failed.
+  const hasRoute = !!state.route && !state.route.ok && !worker;
   if (!parts.length && !hasRoute) return null;
   return (
     <div className="pill">
       {parts.length > 0 && <span>{parts.join(" · ")}</span>}
       {hasRoute && (
         <button onClick={() => void clearRoute()} title="Remove the route">
-          {state.route?.ok ? `${state.route.length_m?.toFixed(0)} m route ×` : "no route ×"}
+          no route ×
         </button>
       )}
       {parts.length > 0 && (
