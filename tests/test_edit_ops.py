@@ -2,6 +2,7 @@
 
 import copy
 import json
+import random
 from functools import cache
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from anthropic.lib.tools import ToolError
 from shapely.geometry import Point, Polygon
 
 from building_agent import edit_ops, routing
+from building_agent.asset_catalog import ASSET_CATALOG
 from building_agent.edit_ops import asset_shape
 from building_agent.find_tools import find_asset
 from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
@@ -394,10 +396,12 @@ def proposals():
         {"action": "remove_door", "element": door["id"]},
         {"action": "widen_door", "element": door["id"], "width_m": 2.0},
         {"action": "move_asset", "element": asset["id"], "to_space": target},
+        {"action": "add_asset", "element": target, "asset_type": "chair", "hint": {"anchor": "NW"}},
+        {"action": "move_asset", "element": asset["id"], "hint": {"anchor": "SE"}},
     ]
 
 
-@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("index", [0, 1, 2, 3, 4])
 def test_guard_same_turn_vague_yes_and_stale_card(index, tmp_path):
     kwargs = proposals()[index]
     bm = fresh()
@@ -425,7 +429,7 @@ def test_guard_same_turn_vague_yes_and_stale_card(index, tmp_path):
     assert building_signature(bm) == snapshot
 
 
-@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("index", [0, 1, 2, 3, 4])
 def test_guard_confirmed_apply_saves_the_edited_building(index, tmp_path):
     kwargs = proposals()[index]
     bm = fresh()
@@ -490,3 +494,45 @@ def test_sweep_every_building_applies_each_op_without_crashing():
                     except MapError:
                         continue
         assert_in_sync(bm)
+
+
+def test_sweep_add_asset_with_a_random_anchor_then_undo_restores_the_building():
+    """One catalogue asset in a random room of every building; footprint inside, mirror in sync, undo exact."""
+    anchors = ["NW", "NE", "SW", "SE", "N", "S", "E", "W", "center"]
+    types = sorted(ASSET_CATALOG)
+    placed = refused = 0
+    for path in BUILDINGS:
+        rng = random.Random(path.parent.name)
+        bm = load(path)
+        rooms = [s for s in bm.spaces.values() if s["type"] == "room"]
+        if not rooms:
+            continue
+        room = rng.choice(rooms)
+        before = building_signature(bm)
+        snapshot = edit_ops.take_snapshot(bm, "add")
+        try:
+            edit = edit_ops.add_asset(bm, rng.choice(types), room["id"], {"anchor": rng.choice(anchors)})
+        except MapError:
+            refused += 1
+            assert building_signature(bm) == before
+            continue
+        placed += 1
+        asset = bm.assets[edit["id"]]
+        assert Polygon(room["polygon"]).buffer(1e-6).contains(asset_shape(asset, *asset["position"])), path
+        assert set(asset) == {
+            "id",
+            "name",
+            "category",
+            "type",
+            "space_id",
+            "floor_id",
+            "position",
+            "footprint",
+            "source",
+        }
+        assert_in_sync(bm)
+        edit_ops.restore_snapshot(bm, snapshot)
+        assert building_signature(bm) == before and edit["id"] not in bm.assets
+        assert bm.removed_assets == [edit["id"]]
+        assert_in_sync(bm)
+    assert placed > 200, (placed, refused)
