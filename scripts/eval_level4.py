@@ -116,7 +116,9 @@ def best_offset(case, converted: dict) -> tuple[float, float]:
     return max(scored, key=lambda item: item[0])[1]
 
 
-def evaluate_floor(building_id: str, level: int, result: ExtractResult, use_markers: bool = False) -> dict:
+def evaluate_floor(
+    building_id: str, level: int, result: ExtractResult, use_markers: bool = False, use_suggest: bool = False
+) -> dict:
     case = floor_case(building_id, level)
     if use_markers:
         found = detect_markers(DATA_DEV / building_id / f"floor_{level}_plain.png")
@@ -127,6 +129,10 @@ def evaluate_floor(building_id: str, level: int, result: ExtractResult, use_mark
     converted, convert_findings = convert_floors_with_findings(
         [FloorInput(level, result.extraction, scale)], building_id, building_id
     )
+    if use_suggest:
+        from building_agent.level4.suggest import apply_suggestions, suggest_doors
+
+        converted = apply_suggestions(converted, suggest_doors(converted))
     findings = validate(converted)
     case = dataclasses.replace(case, extraction=result.extraction, scale=scale)
     case = dataclasses.replace(case, offset=best_offset(case, converted))

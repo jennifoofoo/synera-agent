@@ -37,7 +37,12 @@ def truth_in_image(building_id: str, level: int) -> list[dict] | None:
         return None
     patches = patches[: len(spaces)]
     metres = np.vstack([np.array(space["polygon"]) for space in spaces])
-    pixels = np.vstack([patch[: len(space["polygon"])] if len(patch) >= len(space["polygon"]) else patch for patch, space in zip(patches, spaces)])
+    pixels = np.vstack(
+        [
+            patch[: len(space["polygon"])] if len(patch) >= len(space["polygon"]) else patch
+            for patch, space in zip(patches, spaces)
+        ]
+    )
     if len(metres) != len(pixels):
         return None
     design = np.column_stack([metres[:, 0], -metres[:, 1], np.ones(len(metres))])

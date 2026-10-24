@@ -46,6 +46,8 @@ SMALL_INK_MAX_PX = (24, 60)  # clip range for the longest side of text and dot c
 DOT_REACH_PX = 3
 WALL_GROW_PX = 1  # walls are about 2 px of ink: each room takes the half next to it
 SIMPLIFY_PX = 1.2
+COUNTER_MAX_PX = 40  # fill islands this small (insides of 0, 6, 8, 9) belong to the glyph around them
+COUNTER_MAX_SPAN_PX = 10
 MIN_FILL_SHARE = 0.5  # of non-white pixels that must be flat fills, else this is not a kit-style plan
 
 
@@ -124,6 +126,10 @@ def _label_runs(values: np.ndarray, connectivity: int) -> np.ndarray:
     return out.reshape(height, width)
 
 
+def _close(a, b, tolerance: int) -> bool:
+    return max(abs(x - y) for x, y in zip(a, b)) <= tolerance
+
+
 def _classify(rgb: np.ndarray) -> tuple[np.ndarray, list[tuple[str, tuple[int, int, int]]]]:
     """Per pixel: -2 white, -1 ink (walls, text, markers, anti-aliasing), >= 0 index into the returned fills."""
     height, width, _ = rgb.shape
@@ -138,9 +144,8 @@ def _classify(rgb: np.ndarray) -> tuple[np.ndarray, list[tuple[str, tuple[int, i
         if kind[index] != -1 or counts[index] < EXTRA_FILL_MIN_SHARE * height * width or luma[index] < 170:
             continue
         colour = tuple(int(c) for c in colours[index])
-        near = lambda other: max(abs(a - b) for a, b in zip(colour, other)) <= COLOUR_TOLERANCE  # noqa: E731
-        if any(near(rgb_) for _, rgb_ in fills) or any(
-            max(abs(a - b) for a, b in zip(colour, marker)) <= 30 for marker in MARKER_COLOURS
+        if any(_close(colour, rgb_, COLOUR_TOLERANCE) for _, rgb_ in fills) or any(
+            _close(colour, marker, 30) for marker in MARKER_COLOURS
         ):
             continue
         fills.append((f"fill_{colour[0]:02x}{colour[1]:02x}{colour[2]:02x}", colour))
@@ -159,6 +164,23 @@ def _shift(image: np.ndarray, dy: int, dx: int, fill: int) -> np.ndarray:
         max(-dy, 0) : h + min(-dy, 0), max(-dx, 0) : w + min(-dx, 0)
     ]
     return out
+
+
+def _counters(comp: np.ndarray) -> np.ndarray:
+    """Pixels of tiny compact fill islands, the insides of printed 0, 6, 8, 9."""
+    sizes = np.bincount(comp.ravel())
+    ys, xs = np.nonzero((comp > 0) & (sizes[comp] <= COUNTER_MAX_PX))
+    ids = comp[ys, xs]
+    spans = np.zeros(len(sizes), dtype=int)
+    for axis in (ys, xs):
+        low = np.full(len(sizes), np.iinfo(np.int32).max)
+        high = np.full(len(sizes), -1)
+        np.minimum.at(low, ids, axis)
+        np.maximum.at(high, ids, axis)
+        spans = np.maximum(spans, high - low + 1)
+    compact = (spans <= COUNTER_MAX_SPAN_PX) & (sizes <= COUNTER_MAX_PX)
+    compact[0] = False
+    return compact[comp]
 
 
 def _absorb_small_ink(lab: np.ndarray, comp: np.ndarray) -> np.ndarray:
@@ -285,6 +307,9 @@ def segment_rooms(image_path, simplify_px: float = SIMPLIFY_PX, wall_grow_px: in
     height, width, _ = rgb.shape
     lab, fills = _classify(rgb)
     comp = _label_runs(lab, 4)
+    counters = _counters(comp)
+    lab = np.where(counters, -1, lab)
+    comp = np.where(counters, 0, comp)
     comp = _absorb_small_ink(lab, comp)
     comp = _grow_into_walls(comp, lab, wall_grow_px, _door_dots(rgb))
     non_white = int((lab != -2).sum())
@@ -373,7 +398,9 @@ def match_to_extraction(extraction: Extraction, segment: SegmentResult) -> tuple
         winner = items[0][1]
         new_polygons[winner] = segment.regions[region_index].polygon
         for _, loser in items[1:]:
-            warnings.append(f"room_region_shared: {extraction.rooms[loser].id} keeps its polygon, region went to {extraction.rooms[winner].id}")
+            warnings.append(
+                f"room_region_shared: {extraction.rooms[loser].id} keeps its polygon, region went to {extraction.rooms[winner].id}"
+            )
     rooms = []
     for room_index, room in enumerate(extraction.rooms):
         if room_index in new_polygons:

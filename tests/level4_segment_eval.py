@@ -1,6 +1,6 @@
 """Measure room segmentation against the true polygons of the dev floors (offline).
 
-  uv run python -m tests.level4_segment_eval            # every dev floor, table per source
+uv run python -m tests.level4_segment_eval            # every dev floor, table per source
 """
 
 import statistics
@@ -85,8 +85,10 @@ def run(floors: list[tuple[str, int]]) -> list[dict]:
 
 def summarise(rows: list[dict]) -> list[str]:
     lines = [
-        "| Source | Floors | True rooms | Recall | Precision | IoU median | Area err median | Floors with a missed room "
-        "| Regions merging 2 true rooms | Seconds median (max) |",
+        (
+            "| Source | Floors | True rooms | Recall | Precision | IoU median | Area err median "
+            "| Floors with a missed room | Regions merging 2 true rooms | Seconds median (max) |"
+        ),
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for source in sorted({row["source"] for row in rows}) + ["all"]:
@@ -106,9 +108,54 @@ def summarise(rows: list[dict]) -> list[str]:
     return lines
 
 
+def combination_table() -> list[str]:
+    """Cached model extractions of the 8 default floors: model alone, + markers, + segmentation + markers, each
+    without and with door suggestions. Needs the cache in agent_output/level4_cache."""
+    from scripts import eval_level4 as ev
+
+    lines = [
+        "| Floor | Variant | Room recall | Door recall | Pairs >= 0.99 | Invalid | No route | Pairs |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for building_id, level in ev.parse_floors(None):
+        cached = ev.load_cached(ev.cache_file(building_id, level))
+        if cached is None:
+            continue
+        segmented_result = ev.apply_segment(cached, building_id, level)
+        for name, source, markers in (
+            ("model", cached, False),
+            ("model + markers", cached, True),
+            ("segment", segmented_result, False),
+            ("segment + markers", segmented_result, True),
+        ):
+            for suggest in (False, True):
+                r = ev.evaluate_floor(building_id, level, source, use_markers=markers, use_suggest=suggest)
+                label = name + (" + suggest" if suggest else "")
+                lines.append(
+                    f"| {r['floor']} | {label} | {r['recall']:.2f} | {r['door_recall']:.2f} | {r['judge_full']:.0%} "
+                    f"| {r['judge_invalid']} | {r['judge_no_route']} | {r['judge_pairs']} |"
+                )
+    return lines
+
+
 if __name__ == "__main__":
     result = run(all_floors())
     print("\n".join(summarise(result)))
+    if "--write-log" in sys.argv:
+        from scripts.eval_level4 import DEFAULT_MODEL, write_log
+
+        header = [
+            (
+                f"Segmentation against the true polygons of {len(result)} dev floors (all four sources, no API, "
+                "truth from the floor svg), then the cached model extractions of the 8 default floors with the "
+                "combination model -> segment -> markers -> convert -> validate."
+            ),
+            "",
+            *summarise(result),
+            "",
+            *combination_table(),
+        ]
+        write_log(header, DEFAULT_MODEL, "Room segmentation")
     if "-v" in sys.argv:
         for row in sorted(result, key=lambda r: r["recall"]):
             print(row["floor"], row["true"], row["found"], f"{row['recall']:.2f} {row['precision']:.2f}", row["merges"])
