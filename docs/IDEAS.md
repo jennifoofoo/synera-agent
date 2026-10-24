@@ -156,3 +156,35 @@ Status: geparkt (24.10.2026). Abgleich der Präsentation mit unserem Stand. Alle
 2. 3D mit Agentensteuerung (Idee 2).
 3. Ereignisprotokoll (3b), falls Make-things-move als Extra gewählt wird.
 4. Mehrnutzer und Spielkarte (3e) nur, wenn noch Zeit bleibt. Scan und AR (3d) nicht.
+
+## 4. Zutrittsrechte: "Wo darf ich überhaupt hin?" (Idee von Jennifer, 24.10.2026)
+Status: geparkt. Passt zu den Personas (Facility Manager, Servicetechniker, neue Mitarbeitende) und ist im Alltag sehr realistisch: Nicht jeder darf überall hin.
+
+### Idee
+Die Person hat eine Rolle oder Berechtigungen (Besucher, Mitarbeitende, Servicetechniker, Facility Manager, Admin). Der Agent kennt, welche Räume und Türen eine Berechtigung brauchen, und sagt klar:
+- "Du kommst da nicht hin. Der Serverraum 0.42 braucht Zutritt Stufe 3 (IT). Du hast Stufe 1. Frag bei der IT oder beim Empfang."
+- "Dahin geht es nur mit Sicherheitsausrüstung (Helm, Schutzbrille). In der Produktionszone sind Besucher nicht erlaubt, nur mit Begleitung."
+- "Es gibt einen anderen Weg zu deinem Ziel, der nur über Bereiche führt, die du betreten darfst."
+- Routen führen **nie durch gesperrte Bereiche als Abkürzung**, auch wenn der Weg dann länger ist. Wenn es gar keinen erlaubten Weg gibt, sagt der Agent das und nennt, was fehlt.
+
+### Wichtig: Die Daten enthalten keine Zutrittsrechte
+Weder Türen noch Räume tragen Berechtigungen oder Schlösser (geprüft im README und in den Feldern der Öffnungen und Räume). Wir müssten die Regeln **selbst festlegen**:
+- Ableiten aus Raumart als Standard (zum Beispiel `server_room`, `technical_room`, `warehouse_zone`, `production_zone`, `lab` brauchen mehr als `office` oder `corridor`).
+- Oder eine Richtliniendatei `access_policy.json` pro Gebäude (Rollen, Zonen, Türen mit Kartenleser), wie beim Campus mit Adaptern (JSON, CSV, im Gespräch).
+Wir sagen immer ehrlich: "Das ist eine Beispielregel, kein echtes Berechtigungssystem."
+
+### Aufbau
+- Datenmodell: `Role` (Name, Stufe, Zonen), `AccessPolicy` (Räume und Türen mit `requires` (Stufe, Rolle, Begleitung, Ausrüstung), Standardregeln nach Raumart).
+- Person: Rolle wird im Gespräch genannt ("ich bin Servicetechniker") oder in der Seite gewählt. **Es ist keine Authentifizierung**: Der Agent kann nicht prüfen, wer jemand ist, und darf sich nicht als Sicherheitsfunktion ausgeben. Es ist eine Orientierungshilfe.
+- Routing: Zugangsregeln als Kanten- und Raumfilter im bestehenden Dijkstra (wie `step_free`), mit Grund pro Ausschluss ("Tür 0.12 braucht Karte Stufe 2").
+- Werkzeuge: `set_role(role)`, `can_i_go(destination)`, `why_not(destination)` (listet Hürden und Abhilfe), `route` berücksichtigt die Rolle automatisch. `what_changes`: "Wenn deine Stufe erhöht wird, welche Räume kommen dazu?"
+- Zusammen mit Accessibility: ein gemeinsames Personenprofil (Mobilität plus Rolle), damit der Agent beides nie wieder erfragen muss.
+- Oberfläche: Rollenwähler, gesperrte Räume schraffiert, Hinweis am Ziel ("Zutritt Stufe 3 nötig").
+- Edits: Facility Manager können Rechte ändern ("Serverraum nur noch für IT"), mit Karte und Ja und Undo.
+
+### Aufwand und Risiken
+- Phase 1 (Rollen, Standardregeln nach Raumart, Routing, `can_i_go`, Tests, Live-Skripte): etwa 3 bis 4 Stunden. Phase 2 (Richtliniendatei mit Adaptern, Türen mit Kartenleser, Oberfläche): etwa 3 Stunden.
+- Risiko: Es wirkt wie Sicherheit. Texte müssen klar sagen, dass es Planungshilfe ist. Keine Behauptung wie "du darfst" für sicherheitskritische Räume, nur "nach der hinterlegten Regel".
+- Risiko: Eine Rolle ist nur eine Angabe der Person. Sensible Regeln gehören nicht in Prompts, sondern in die Richtlinie auf dem Server. Berechtigungen nicht in Logs schreiben.
+- Frage an Synera: Gibt es Berechtigungen in den Sonntagsdaten oder Fragen dazu? (vermutlich nein)
+- Einordnung für das Ideation-Gate: Starke Alltagsgeschichte und billig auf unserem Routing, aber **keine Rubrik der Jury nennt sie**. Als Creativity-Extra neben Accessibility und 3D denkbar, nicht als Ersatz.
