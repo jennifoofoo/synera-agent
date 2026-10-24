@@ -146,7 +146,7 @@ export function Scene() {
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
     >
       {flat ? (
-        <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} up={[0, 0, -1]} />
+        <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} />
       ) : (
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
