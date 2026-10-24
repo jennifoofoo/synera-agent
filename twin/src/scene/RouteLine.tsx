@@ -48,9 +48,10 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     started.current = performance.now();
   }, [points]);
 
-  useFrame(() => {
+  useFrame(({ invalidate }) => {
     const elapsed = (performance.now() - started.current) / 1000;
     const drawn = reducedMotion ? 1 : Math.min(1, elapsed / 1.4);
+    if (!reducedMotion && points.length > 1) invalidate(); // keeps the draw-in and the pulse moving under frameloop="demand"
     for (const ref of [line, glow]) {
       const material = ref.current?.material as THREE.ShaderMaterial & { dashOffset: number } | undefined;
       if (material) material.dashOffset = total * (1 - drawn);

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { CameraControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
-import type CameraControlsImpl from "camera-controls";
+import CameraControlsImpl from "camera-controls";
 import type { BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { cutawayUniforms } from "./FloorMesh";
@@ -34,6 +34,10 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const floorMode = useTwin((s) => s.floorMode);
   const profile = useTwin((s) => s.profile);
   const bottomInset = useTwin((s) => s.bottomInset);
+  const viewMode = useTwin((s) => s.viewMode);
+  const focusedFloorId = useTwin((s) => s.focusedFloorId);
+  const invalidate = useThree((s) => s.invalidate);
+  const flat = viewMode === "2d";
   const { bounds } = model;
   const size = bounds.size;
   const camera = useThree((s) => s.camera);
@@ -50,14 +54,25 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     camera.updateProjectionMatrix();
   }, [camera, viewport.width, viewport.height, bottomInset]);
 
-  // Limits follow the building.
+  // Limits follow the building; the 2D plan is locked straight down, north up: pan and zoom only.
   useEffect(() => {
     const c = controls.current;
     if (!c) return;
     c.minDistance = Math.max(2, size * 0.04);
     c.maxDistance = size * 4;
-    c.minPolarAngle = 0.08;
-    c.maxPolarAngle = Math.PI / 2 - 0.12;
+    c.minZoom = 0.2;
+    c.maxZoom = 60;
+    c.minPolarAngle = flat ? 0 : 0.08;
+    c.maxPolarAngle = flat ? 0 : Math.PI / 2 - 0.12;
+    c.minAzimuthAngle = flat ? 0 : -Infinity;
+    c.maxAzimuthAngle = flat ? 0 : Infinity;
+    const A = CameraControlsImpl.ACTION;
+    c.mouseButtons.left = flat ? A.TRUCK : A.ROTATE;
+    c.mouseButtons.right = A.TRUCK;
+    c.mouseButtons.wheel = flat ? A.ZOOM : A.DOLLY;
+    c.touches.one = flat ? A.TOUCH_TRUCK : A.TOUCH_ROTATE;
+    c.touches.two = flat ? A.TOUCH_ZOOM_TRUCK : A.TOUCH_DOLLY_TRUCK;
+    if (flat) void c.rotateTo(0, 0, false);
     c.smoothTime = 0.32;
     c.draggingSmoothTime = 0.08;
     c.dollyToCursor = true;
@@ -65,7 +80,20 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const margin = size * 0.6;
     c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, -1, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
     c.boundaryFriction = 0.2;
-  }, [bounds, size, topY]);
+    invalidate();
+  }, [bounds, size, topY, flat, invalidate]);
+
+  // Entering 2D or changing the floor in 2D frames the focused floor.
+  useEffect(() => {
+    const c = controls.current;
+    if (!c || !flat || !focusedFloorId) return;
+    const floor = model.floorById.get(focusedFloorId);
+    if (!floor) return;
+    const y = floorY(floor.id);
+    const box = new THREE.Box3(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+    fitBox(c, box, !reducedMotion, 0.9);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flat, focusedFloorId, camera]);
 
   // Requests from the store.
   useEffect(() => {
@@ -74,6 +102,13 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const animate = !reducedMotion;
     const box = new THREE.Box3();
     if (request.kind === "home") {
+      if (flat) {
+        const floor = model.floorById.get(focusedFloorId ?? "") ?? model.floors[0];
+        const y = floorY(floor.id);
+        box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+        fitBox(c, box, animate, 0.9);
+        return;
+      }
       box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
       void c.rotateTo(HOME_AZIMUTH, profile === "worker" ? Math.PI / 5 : HOME_POLAR, animate);
       fitBox(c, box, animate, 0.95);
@@ -133,22 +168,18 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       fitBox(c, box, animate, 1.6);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request.nonce, floorMode]);
+  }, [request.nonce, floorMode, camera]);
 
   // Cutaway: outer walls facing the camera are lowered.
   const direction = new THREE.Vector2();
   useFrame(() => {
     direction.set(camera.position.x - bounds.cx, camera.position.z + bounds.cy).normalize();
     cutawayUniforms.uCamDir.value.copy(direction);
-    cutawayUniforms.uCut.value = cutaway ? 1 : 0;
+    cutawayUniforms.uCut.value = cutaway && !flat ? 1 : 0;
+    cutawayUniforms.uFlat.value = flat ? 1 : 0;
   });
 
   return (
-    <CameraControls
-      ref={controls}
-      makeDefault
-      mouseButtons={{ left: 1, middle: 8, right: 2, wheel: 8 }}
-      touches={{ one: 32, two: 1024, three: 64 }}
-    />
+    <CameraControls key={flat ? "2d" : "3d"} ref={controls} makeDefault />
   );
 }

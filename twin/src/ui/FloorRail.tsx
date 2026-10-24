@@ -10,19 +10,27 @@ export function FloorRail() {
   const setFloorMode = useTwin((s) => s.setFloorMode);
   const requestCamera = useTwin((s) => s.requestCamera);
   const state = useTwin((s) => s.state);
-  if (!model || model.floors.length < 2) return null;
+  const viewMode = useTwin((s) => s.viewMode);
+  const setViewMode = useTwin((s) => s.setViewMode);
+  if (!model) return null;
+  const flat = viewMode === "2d";
   const routeFloors = new Set(state?.route?.ok ? state.route.floors : []);
   return (
     <div className="floorrail" role="radiogroup" aria-label="Floor">
-      <button
-        className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
-        onClick={() => setFloorMode(floorMode === "exploded" ? "stacked" : "exploded")}
-        title={floorMode === "exploded" ? "Stack the floors" : "Pull the floors apart"}
-        aria-pressed={floorMode === "exploded"}
-      >
-        ⇕
+      <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
+        {flat ? "3D" : "2D"}
       </button>
-      {[...model.floors].reverse().map((floor) => {
+      {!flat && model.floors.length > 1 && (
+        <button
+          className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
+          onClick={() => setFloorMode(floorMode === "exploded" ? "stacked" : "exploded")}
+          title={floorMode === "exploded" ? "Stack the floors" : "Pull the floors apart"}
+          aria-pressed={floorMode === "exploded"}
+        >
+          ⇕
+        </button>
+      )}
+      {model.floors.length > 1 && [...model.floors].reverse().map((floor) => {
         const active = floor.id === focusedFloorId;
         return (
           <button
@@ -31,8 +39,9 @@ export function FloorRail() {
             aria-checked={active}
             className={`rail-floor ${active ? "active" : ""} ${active && floorMode === "single" ? "single" : ""}`}
             onClick={() => {
-              if (active) setFloorMode(floorMode === "single" ? "stacked" : "single");
-              else {
+              if (active) {
+                if (!flat) setFloorMode(floorMode === "single" ? "stacked" : "single");
+              } else {
                 focusFloor(floor.id);
                 if (floorMode === "exploded") requestCamera({ kind: "floor", floorId: floor.id });
               }

@@ -13,6 +13,7 @@
     "@react-three/drei": "9.122.0",
     "@react-three/fiber": "8.18.0",
     "@react-three/postprocessing": "2.19.1",
+    "camera-controls": "2.10.1",
     "cmdk": "1.1.1",
     "fuse.js": "7.5.0",
     "n8ao": "2.0.1",

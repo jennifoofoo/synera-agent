@@ -1,8 +1,9 @@
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import * as THREE from "three";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, GizmoHelper, GizmoViewcube, Grid, PerformanceMonitor } from "@react-three/drei";
-import { EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
+import { ContactShadows, GizmoHelper, GizmoViewcube, Grid, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
+
+// Postprocessing (N8AO etc.) is planner-only and loaded on demand, so phones never download it.
+const Effects = lazy(() => import("./Effects"));
 import { floorElevation, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
@@ -26,7 +27,9 @@ function Building({ model }: { model: BuildingModel }) {
   const selection = useTwin((s) => s.selection);
   const reducedMotion = useTwin((s) => s.reducedMotion);
   const profile = useTwin((s) => s.profile);
+  const viewMode = useTwin((s) => s.viewMode);
   const worker = profile === "worker";
+  const flat = viewMode === "2d";
 
   const elevations = useMemo(() => new Map(model.floors.map((floor) => [floor.id, floorElevation(floor, model, floorMode)])), [model, floorMode]);
   const floorY = useCallback((floorId: string) => elevations.get(floorId) ?? 0, [elevations]);
@@ -34,8 +37,8 @@ function Building({ model }: { model: BuildingModel }) {
   const topY = Math.max(...model.floors.map((floor) => floorTop(floor.id)));
   const focused = focusedFloorId ?? model.floors[0]?.id ?? null;
   const visibleFloors = useMemo(
-    () => new Set(model.floors.filter((floor) => floorMode !== "single" || floor.id === focused).map((floor) => floor.id)),
-    [model, floorMode, focused],
+    () => new Set(model.floors.filter((floor) => (floorMode !== "single" && !flat) || floor.id === focused).map((floor) => floor.id)),
+    [model, floorMode, focused, flat],
   );
   const closed = useMemo(() => new Set(state?.closed ?? []), [state?.closed]);
   const route = state?.route ?? null;
@@ -52,12 +55,12 @@ function Building({ model }: { model: BuildingModel }) {
           <group key={floor.id}>
             <FloorMesh floor={floor} model={model} y={floorY(floor.id)} ghost={ghost} visible={visible} />
             {showThings && <Things floor={floor} y={floorY(floor.id)} state={state} limit={thingsMode === "all" ? ALL_THINGS_LIMIT : NEAR_THINGS_LIMIT} />}
-            {isFocused && visible && <Labels floor={floor} model={model} y={floorY(floor.id)} limit={worker ? 14 : 36} />}
+            {isFocused && visible && <Labels floor={floor} model={model} y={floorY(floor.id)} limit={flat ? (worker ? 30 : 80) : worker ? 14 : 36} flat={flat} />}
           </group>
         );
       })}
-      {floorMode !== "single" && <Shafts model={model} floorY={floorY} floorTop={floorTop} closed={closed} />}
-      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={floorMode === "single" ? focused : null} reducedMotion={reducedMotion} />
+      {floorMode !== "single" && !flat && <Shafts model={model} floorY={floorY} floorTop={floorTop} closed={closed} />}
+      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={floorMode === "single" || flat ? focused : null} reducedMotion={reducedMotion} />
       <Markers
         model={model}
         state={state}
@@ -70,7 +73,7 @@ function Building({ model }: { model: BuildingModel }) {
         worker={worker}
       />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
-      {!worker && (
+      {!worker && !flat && (
         <ContactShadows
           key={`${model.building.key}-${floorMode}`}
           position={[model.bounds.cx, Math.min(...model.floors.map((floor) => floor.elevation_m)) - 0.25, -model.bounds.cy]}
@@ -111,7 +114,9 @@ export function Scene() {
   const model = useTwin((s) => s.model);
   const profile = useTwin((s) => s.profile);
   const ao = useTwin((s) => s.ao);
+  const viewMode = useTwin((s) => s.viewMode);
   const worker = profile === "worker";
+  const flat = viewMode === "2d";
   const size = model?.bounds.size ?? 60;
   const groundY = (model ? Math.min(...model.floors.map((floor) => floor.elevation_m)) : 0) - 0.3;
   const centre: [number, number, number] = model ? [model.bounds.cx, groundY, -model.bounds.cy] : [0, groundY, 0];
@@ -123,12 +128,17 @@ export function Scene() {
   return (
     <Canvas
       dpr={dpr}
-      camera={{ fov: 38, near: 0.5, far: size * 12, position: [centre[0] + size, size * 0.9, centre[2] + size] }}
-      gl={{ antialias: !ao, powerPreference: "high-performance", logarithmicDepthBuffer: false }}
+      frameloop={worker ? "demand" : "always"}
+      gl={{ antialias: !ao || worker, powerPreference: "high-performance", logarithmicDepthBuffer: false }}
       onPointerMissed={() => select(null)}
       shadows={false}
       style={{ touchAction: "none" }}
     >
+      {flat ? (
+        <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} up={[0, 0, -1]} />
+      ) : (
+        <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
+      )}
       <color attach="background" args={[COLOURS.background]} />
       <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />
       <hemisphereLight args={["#ffffff", "#9fb4cc", 1.0]} />
@@ -160,17 +170,15 @@ export function Scene() {
       />
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
-      {!worker && (
+      {!worker && !flat && (
         <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={2}>
           <GizmoViewcube color="#17345f" hoverColor="#2b5a95" textColor="#dbe7f5" strokeColor="#5eead4" opacity={0.92} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
         </GizmoHelper>
       )}
-      {ao && !worker && (
-        <EffectComposer multisampling={0} enableNormalPass={false}>
-          <N8AO aoRadius={2.2} intensity={2.4} distanceFalloff={1.2} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color("#1f3a63")} />
-          <SMAA />
-          <Vignette eskil={false} offset={0.3} darkness={0.22} />
-        </EffectComposer>
+      {ao && !worker && !flat && (
+        <Suspense fallback={null}>
+          <Effects quality={quality} />
+        </Suspense>
       )}
     </Canvas>
   );

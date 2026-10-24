@@ -61,8 +61,9 @@ function clusterDisruptions(model: BuildingModel, closed: string[]): Disruption[
 
 function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
   const group = useRef<THREE.Group>(null);
-  useFrame(({ clock }) => {
+  useFrame(({ clock, invalidate }) => {
     if (!group.current || reducedMotion) return;
+    invalidate();
     const s = 1 + amount * (0.5 + 0.5 * Math.sin(clock.elapsedTime * speed * Math.PI));
     group.current.scale.set(s, 1, s);
   });
@@ -136,6 +137,30 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           <group position-y={2.2}>{chip("You are here", "here")}</group>
         </group>
       )}
+
+      {/* floor changes of the route: where to go up or down (needed in 2D and single-floor views) */}
+      {state?.route?.ok &&
+        state.route.floor_changes?.map((change, index) => {
+          const fromFloor = model.floorById.get(change.from_floor);
+          const toFloor = model.floorById.get(change.to_floor);
+          const arrow = change.direction === "up" ? "↑" : "↓";
+          return (
+            <group key={`fc-${index}`}>
+              {shown(change.from_floor) && (
+                <group position={at(change.from_floor, change.from_point)}>
+                  <Ring radius={0.9} colour={COLOURS.route} width={0.14} through />
+                  <group position-y={1.4}>{chip(`${arrow} ${change.name} to ${toFloor?.name ?? change.to_floor}`, "route")}</group>
+                </group>
+              )}
+              {shown(change.to_floor) && (
+                <group position={at(change.to_floor, change.to_point)}>
+                  <Ring radius={0.9} colour={COLOURS.route} width={0.14} through />
+                  <group position-y={1.4}>{chip(`from ${fromFloor?.name ?? change.from_floor}`, "route")}</group>
+                </group>
+              )}
+            </group>
+          );
+        })}
 
       {/* guide: destination of the current leg */}
       {guide?.active &&

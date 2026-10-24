@@ -15,7 +15,7 @@ interface Props {
 }
 
 /** Shared uniforms for the dollhouse cutaway: direction from the building centre to the camera, and on/off. */
-export const cutawayUniforms = { uCamDir: { value: new THREE.Vector2(0, 1) }, uCut: { value: 1 } };
+export const cutawayUniforms = { uCamDir: { value: new THREE.Vector2(0, 1) }, uCut: { value: 1 }, uFlat: { value: 0 } };
 
 export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
   const select = useTwin((s) => s.select);

@@ -58,23 +58,27 @@ class Builder {
   normals: number[] = [];
   colours: number[] = [];
   wallNormals: number[] = [];
+  walls: number[] = []; // 1 for wall vertices (flattened in the 2D plan), 0 for slabs
   spaceIndices: number[] = [];
   indices: number[] = [];
   lines: number[] = [];
   lineWallNormals: number[] = [];
+  lineWalls: number[] = [];
 
-  vertex(x: number, y: number, z: number, n: [number, number, number], c: THREE.Color, wn: [number, number], sid: number): number {
+  vertex(x: number, y: number, z: number, n: [number, number, number], c: THREE.Color, wn: [number, number], sid: number, wall = 0): number {
     this.positions.push(x, y, -z);
     this.normals.push(n[0], n[1], n[2]);
     this.colours.push(c.r, c.g, c.b);
     this.wallNormals.push(wn[0], wn[1]);
+    this.walls.push(wall);
     this.spaceIndices.push(sid);
     return this.positions.length / 3 - 1;
   }
 
-  line(a: [number, number, number], b: [number, number, number], wn: [number, number]) {
+  line(a: [number, number, number], b: [number, number, number], wn: [number, number], wall = 0) {
     this.lines.push(a[0], a[1], -a[2], b[0], b[1], -b[2]);
     this.lineWallNormals.push(wn[0], wn[1], wn[0], wn[1]);
+    this.lineWalls.push(wall, wall);
   }
 
   /** A vertical quad (wall piece) between two ground points, from y0 to y1, both sides. */
@@ -101,17 +105,17 @@ class Builder {
       [corners[3], corners[0], [-dx / length, 0, dy / length]],
     ];
     for (const [p, q, n] of sides) {
-      const i0 = this.vertex(p[0], y0, p[1], n, colour, outward, sid);
-      const i1 = this.vertex(q[0], y0, q[1], n, colour, outward, sid);
-      const i2 = this.vertex(q[0], y1, q[1], n, colour, outward, sid);
-      const i3 = this.vertex(p[0], y1, p[1], n, colour, outward, sid);
+      const i0 = this.vertex(p[0], y0, p[1], n, colour, outward, sid, 1);
+      const i1 = this.vertex(q[0], y0, q[1], n, colour, outward, sid, 1);
+      const i2 = this.vertex(q[0], y1, q[1], n, colour, outward, sid, 1);
+      const i3 = this.vertex(p[0], y1, p[1], n, colour, outward, sid, 1);
       this.indices.push(i0, i1, i2, i0, i2, i3);
     }
-    const t = corners.map((c) => this.vertex(c[0], y1, c[1], [0, 1, 0], colour, outward, sid));
+    const t = corners.map((c) => this.vertex(c[0], y1, c[1], [0, 1, 0], colour, outward, sid, 1));
     this.indices.push(t[0], t[1], t[2], t[0], t[2], t[3]);
-    // Edge lines along the top of the wall (both long sides) and along the bottom of the outer face.
-    this.line([corners[0][0], y1, corners[0][1]], [corners[1][0], y1, corners[1][1]], outward);
-    this.line([corners[3][0], y1, corners[3][1]], [corners[2][0], y1, corners[2][1]], outward);
+    // Edge lines along the top of the wall (both long sides); in the 2D plan they become the wall lines.
+    this.line([corners[0][0], y1, corners[0][1]], [corners[1][0], y1, corners[1][1]], outward, 1);
+    this.line([corners[3][0], y1, corners[3][1]], [corners[2][0], y1, corners[2][1]], outward, 1);
   }
 
   slab(polygon: Point[], top: number, colour: THREE.Color, sid: number) {
@@ -144,6 +148,7 @@ class Builder {
     solid.setAttribute("normal", new THREE.Float32BufferAttribute(this.normals, 3));
     solid.setAttribute("color", new THREE.Float32BufferAttribute(this.colours, 3));
     solid.setAttribute("wallNormal", new THREE.Float32BufferAttribute(this.wallNormals, 2));
+    solid.setAttribute("wall", new THREE.Float32BufferAttribute(this.walls, 1));
     solid.setAttribute("spaceIndex", new THREE.Float32BufferAttribute(this.spaceIndices, 1));
     solid.setIndex(this.indices);
     solid.computeBoundingSphere();
@@ -152,6 +157,7 @@ class Builder {
     const edges = new THREE.BufferGeometry();
     edges.setAttribute("position", new THREE.Float32BufferAttribute(this.lines, 3));
     edges.setAttribute("wallNormal", new THREE.Float32BufferAttribute(this.lineWallNormals, 2));
+    edges.setAttribute("wall", new THREE.Float32BufferAttribute(this.lineWalls, 1));
     edges.computeBoundingSphere();
     return { solid, edges };
   }
@@ -278,18 +284,27 @@ export function outlineGeometry(polygon: Point[], y: number): THREE.BufferGeomet
   return geometry;
 }
 
-/** Injects the dollhouse cutaway: outer walls facing the camera are lowered to CUTAWAY_HEIGHT. */
-export function withCutaway<T extends THREE.Material>(material: T, uniforms: { uCamDir: { value: THREE.Vector2 }; uCut: { value: number } }): T {
+export const FLAT_WALL_HEIGHT = 0.05;
+
+/** Injects the dollhouse cutaway (outer walls facing the camera lowered to CUTAWAY_HEIGHT) and the 2D plan
+ * (uFlat = 1: every wall lowered to FLAT_WALL_HEIGHT, so the wall-top edge lines become the plan's wall lines). */
+export function withCutaway<T extends THREE.Material>(
+  material: T,
+  uniforms: { uCamDir: { value: THREE.Vector2 }; uCut: { value: number }; uFlat: { value: number } },
+): T {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCamDir = uniforms.uCamDir;
     shader.uniforms.uCut = uniforms.uCut;
+    shader.uniforms.uFlat = uniforms.uFlat;
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
         `#include <common>
         attribute vec2 wallNormal;
+        attribute float wall;
         uniform vec2 uCamDir;
-        uniform float uCut;`,
+        uniform float uCut;
+        uniform float uFlat;`,
       )
       .replace(
         "#include <begin_vertex>",
@@ -298,6 +313,7 @@ export function withCutaway<T extends THREE.Material>(material: T, uniforms: { u
           float facing = dot(wallNormal, uCamDir);
           float cut = step(0.3, facing) * uCut;
           transformed.y = mix(transformed.y, min(transformed.y, ${CUTAWAY_HEIGHT.toFixed(2)}), cut);
+          transformed.y = mix(transformed.y, min(transformed.y, ${FLAT_WALL_HEIGHT.toFixed(2)}), uFlat * wall);
         }`,
       );
   };
