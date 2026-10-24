@@ -22,8 +22,8 @@ export function voiceHint(error?: string): string {
   }
   if (error === "not-allowed") {
     return ios
-      ? "Microphone is blocked. Tap ᴀA in the address bar › Website Settings › Microphone › Allow, then tap the mic again."
-      : "Microphone is blocked. Allow it for this site in the browser's address bar, then tap the mic again.";
+      ? "Microphone is blocked. Tap ᴀA › Website Settings › Microphone › Allow, then tap the mic again."
+      : "Microphone is blocked. Allow it in this site's settings (the icon left of the web address), then tap the mic again.";
   }
   if (error === "service-not-allowed") {
     return ios
