@@ -241,8 +241,9 @@ def move_asset(bm: BuildingMap, asset_ref: str, to_space: str) -> dict:
     new_letter = None
     if len(present) == 1 and letters[0] and letters[0][1] is None:
         sibling = present[0]
+        before = sibling["name"]
         rename(sibling, join_name(letters[0][0], new_ref, "A", letters[0][2]))
-        renamed.append({"id": sibling["id"], "old": sibling["aliases"][-1], "new": sibling["name"]})
+        renamed.append({"id": sibling["id"], "old": before, "new": sibling["name"]})
         new_letter = "B"
     elif present:
         highest = max((letter_index(p[1]) for p in letters if p and p[1]), default=0)

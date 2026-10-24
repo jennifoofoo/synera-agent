@@ -252,7 +252,7 @@ class JudgeRouter:
     # -- indexes over the building, rebuilt when openings or connectors change --
 
     def _index(self) -> tuple[dict[str, list[dict]], dict[str, list[dict]]]:
-        key = (len(self.bm.openings), len(self.bm.connectors))
+        key = (tuple(self.bm.openings), tuple(self.bm.connectors))
         if getattr(self, "_index_key", None) != key:
             openings: dict[str, list[dict]] = {}
             connectors: dict[str, list[dict]] = {}

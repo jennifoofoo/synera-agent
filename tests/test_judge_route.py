@@ -426,3 +426,20 @@ def test_unknown_place_is_a_reason_not_a_crash(syn):
 def test_closed_start_is_a_reason(syn):
     syn.closed.add("S1")
     assert "closed" in judge_route(syn, "S1", "W")["reason"]
+
+
+def test_forklift_index_notices_remove_then_add_door():
+    from pathlib import Path
+
+    from building_agent.judge_route import router_for
+    from starter_agent.building_map import BuildingMap
+
+    bm = BuildingMap.load(Path("data/dev/proc-factory-dev-003"))
+    router = router_for(bm)
+    router._index()
+    removed = next(iter(bm.openings))
+    opening = bm.openings.pop(removed)
+    bm.openings["swapped-door"] = {**opening, "id": "swapped-door"}  # same count, different ids
+    key_before = router._index_key
+    router._index()
+    assert router._index_key != key_before

@@ -370,7 +370,8 @@ def make_find_tools(bm: BuildingMap) -> list:
         """Find equipment or furniture by type or name when the person's words may fit several items,
         e.g. "the second press", "the printer in H-A3", "press on line 4". Groups hits by room and type
         with a stable order (the -A/-B/-C suffix is first/second/third). If needs_choice is true, do NOT
-        pick one: ask the person the returned question. Hints (like "line 4") are guesses to confirm.
+        pick one: ask the person the returned question (but if the message contains 'Answer:' nobody can reply:
+        take the most plausible candidate and say which). Hints (like "line 4") are guesses to confirm.
 
         Args:
             query: Type words, name words, optionally an ordinal (first, second, last) or "line/bay/zone N".
@@ -387,7 +388,8 @@ def make_find_tools(bm: BuildingMap) -> list:
     def find_connector_tool(kind: str, direction: str | None = None, floor_level: int | None = None) -> str:
         """Pick a lift, stairs or entrance by compass word ("the east lift", "north stairs"). Use it when there
         are several. Always tell the person the returned assumption (which side of the plan the direction
-        means). If needs_choice is true, ask the returned question instead of guessing. Left and right are
+        means). If needs_choice is true, ask the returned question instead of guessing (if the message contains 'Answer:', take the closest
+        candidate and say so). Left and right are
         not supported: ask which one is meant.
 
         Args:
