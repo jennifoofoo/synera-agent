@@ -52,6 +52,8 @@
 .route-facts b { color: var(--text); }
 .route-facts .ok { color: var(--ok); }
 .route-facts .warn { color: var(--warn); }
+.route-links { display: inline-flex; gap: 14px; }
+.card button.link.quiet-link { color: var(--muted); }
 .route-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
 
 /* You are here chip */

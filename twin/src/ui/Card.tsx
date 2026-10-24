@@ -90,6 +90,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const routeTo = useTwin((s) => s.route);
   const ask = useTwin((s) => s.ask);
   const armHere = useTwin((s) => s.armHere);
+  const dismissReply = useTwin((s) => s.dismissReply);
   const busy = useTwin((s) => s.chatBusy);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,6 +118,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
       // Known start: the route comes straight from the routing API, no language model involved.
       try {
         await routeTo(position.space_id, roomId);
+        dismissReply(); // the route summary replaces an older reply
         select(null);
       } catch (e) {
         setError((e as Error).message);
@@ -277,6 +279,7 @@ function routeFacts(model: BuildingModel, route: Route) {
 
 function RouteLine({ model, route }: { model: BuildingModel; route: Route }) {
   const clearRoute = useTwin((s) => s.clearRoute);
+  const ask = useTwin((s) => s.ask);
   const facts = routeFacts(model, route);
   return (
     <div className="route-line">
@@ -287,15 +290,22 @@ function RouteLine({ model, route }: { model: BuildingModel; route: Route }) {
         </span>
         <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
       </span>
-      <button className="link" onClick={() => void clearRoute()}>
-        Clear route
-      </button>
+      <span className="route-links">
+        <button className="link" onClick={() => void ask("guide me")}>
+          Guide me
+        </button>
+        <button className="link quiet-link" onClick={() => void clearRoute()}>
+          Clear
+        </button>
+      </span>
     </div>
   );
 }
 
 function RouteCard({ model, route }: { model: BuildingModel; route: Route }) {
   const clearRoute = useTwin((s) => s.clearRoute);
+  const ask = useTwin((s) => s.ask);
+  const busy = useTwin((s) => s.chatBusy);
   const facts = routeFacts(model, route);
   return (
     <Sheet className="card-route" label={`Route to ${facts.destination}`} onClose={() => void clearRoute()}>
@@ -312,6 +322,11 @@ function RouteCard({ model, route }: { model: BuildingModel; route: Route }) {
           {facts.floors} {facts.floors === 1 ? "floor" : "floors"}
         </span>
         <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
+      </div>
+      <div className="card-actions">
+        <button className="primary" disabled={busy} onClick={() => void ask("guide me")}>
+          Guide me
+        </button>
       </div>
     </Sheet>
   );
