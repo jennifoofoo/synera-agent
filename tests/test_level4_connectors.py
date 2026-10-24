@@ -91,7 +91,10 @@ def built_pairs(building: dict) -> set[frozenset]:
     "name,expected",
     [
         ("Staircase 1", "stair"),
-        ("Stair hall 0.35", "stair"),
+        ("Stair hall 0.35", None),
+        ("Stairs and Lift", "stair"),
+        ("Elevator lobby", None),
+        ("Lift motor room", None),
         ("Treppenhaus", "stair"),
         ("Lift 2", "lift"),
         ("Aufzug", "lift"),
@@ -174,7 +177,8 @@ def test_swiss_stair_hall_links_stairs_and_asks_for_the_lift():
     refs = {s["ref"] for s in building["spaces"] if s["id"] in linked}
     assert "0.35" in refs and refs & {"1.34", "1.35"}
     assert level4_tools.connector_question(building).startswith("lift_not_found")
-    assert not validate(building).errors or "no_vertical_connectors" not in codes(validate(building))
+    assert "no_vertical_connectors" not in codes(validate(building))
+    assert len(building["vertical_connectors"]) >= 1 and "connector_missing_stop" not in codes(validate(building))
 
 
 def test_one_stair_on_each_floor_links_by_order_even_when_far_apart():
@@ -548,3 +552,73 @@ def test_duplicate_refs_and_random_hints_never_crash_or_break_the_connectors():
         relink_connectors(building, Collector())  # linking again changes nothing
         again = describe(validate(building))
         assert "building_invalid" not in again
+
+
+# ---------- one floor: nothing is retyped from words or colour ----------
+
+
+def test_single_floor_named_lobbies_halls_and_motor_rooms_stay_what_they_are():
+    case = floor_case(PROC, 0)
+    names = {
+        "0.18": ("Elevator lobby", "hall", "lobby"),
+        "0.02": ("Stair hall", "room", "lobby"),
+        "0.03": ("Lift motor room", "room", "generic_room"),
+        "0.06": (None, "room", "generic_room"),
+    }
+    rooms = []
+    for room in strip_types(case.extraction, keep_names=True, fill=True).rooms:
+        if room.ref in names:
+            name, kind, room_type = names[room.ref]
+            room = dataclasses.replace(
+                room, name=name, type=kind, room_type=room_type, fill="orange" if not name else None
+            )
+        rooms.append(room)
+    building, findings = convert_floors_with_findings(
+        [FloorInput(0, dataclasses.replace(case.extraction, rooms=rooms), case.scale)], "T", "t1"
+    )
+    by_ref = {s["ref"]: s for s in building["spaces"]}
+    assert by_ref["0.18"]["type"] == "hall" and by_ref["0.02"]["type"] == "room" and by_ref["0.03"]["type"] == "room"
+    assert by_ref["0.06"]["type"] == "room"  # an orange room alone on one floor is not a stair
+    assert "connector_typed_by_hint" not in codes(findings)
+    assert "0.18" in level4_tools.entrance_candidates(building)  # the hall is still offered as the entrance
+
+
+@pytest.mark.parametrize(
+    "model_type,room_type,name",
+    [
+        ("hall", "lobby", "Elevator lobby"),
+        ("room", "lobby", "Stair hall"),
+        ("room", "generic_room", "Lift motor room"),
+        ("corridor", "generic_room", "Stairs"),
+        ("room", "generic_room", "Lifting room"),
+    ],
+)
+def test_several_floors_do_not_retype_these_either(model_type, room_type, name):
+    floors = []
+    for level in (0, 1):
+        case = floor_case(PROC, level)
+        rooms = [
+            dataclasses.replace(r, type=model_type, room_type=room_type, name=name) if r.ref in ("0.18", "1.18") else r
+            for r in strip_types(case.extraction, keep_names=False).rooms
+        ]
+        floors.append(FloorInput(level, dataclasses.replace(case.extraction, rooms=rooms), case.scale))
+    building, _ = convert_floors_with_findings(floors, "T", "t1")
+    room = next(s for s in building["spaces"] if s["ref"] == "0.18")
+    assert room["type"] == model_type
+
+
+def test_a_stairs_and_lift_room_gets_both_connectors_and_routes_step_free():
+    from building_agent import routing
+
+    floors = floors_of(PROC, keep_names=False)
+    for floor in floors:
+        for index, room in enumerate(floor.extraction.rooms):
+            if room.ref in ("0.04", "1.04"):
+                floor.extraction.rooms[index] = dataclasses.replace(room, name="Stairs and Lift")
+    building, _ = convert_floors_with_findings(floors, "T", "t1")
+    both = [c for c in building["vertical_connectors"] if c["name"] == "Stairs and Lift"]
+    assert sorted(c["kind"] for c in both) == ["lift", "stairs"]
+    assert both[0]["space_ids"] == both[1]["space_ids"]
+    spaces = {s["ref"]: s["id"] for s in building["spaces"]}
+    result = routing.route(BuildingMap(building), spaces["0.06"], spaces["1.06"], step_free=True)
+    assert result.length_m > 0

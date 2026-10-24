@@ -42,14 +42,15 @@ FLOOR_HEIGHT_M = 3.0
 MIN_STAIR_OVERLAP = 0.3  # of the smaller room
 CONNECTOR_KIND = {"stair": "stairs", "lift": "lift"}
 MANUAL_ID_MARK = "-VM"
-# Rules that make a room a stair or a lift (checked in this order, whole words only, case-insensitive):
-# 1. the model type says stair or lift; 2. its room_type is stairwell or lift; 3. its name, ref or room_type has one
-# of these words (underscores count as spaces, so 'Lifting' and 'shifted' never match); 4. no name, a generic type
-# and the kit plan colour: orange fill = stairs, purple fill = lift (see segment.PALETTE).
+# Rules that make a room a stair or a lift, only when the draft has several floors (checked in this order):
+# 1. the model type says stair or lift (also on one floor); 2. its room_type is stairwell or lift; 3. a plain room
+# (model type room, generic room_type) whose whole name or ref is only these words, numbers and letters, so
+# 'Staircase 2' and 'Stairs and Lift' count but 'Elevator lobby', 'Lift motor room' and 'Lifting' do not; 4. no name,
+# a plain room and the kit plan colour: orange fill = stairs, purple fill = lift (see segment.PALETTE).
 STAIR_WORDS = ("stair", "stairs", "staircase", "stairwell", "treppe", "treppen", "treppenhaus", "treppenraum")
 LIFT_WORDS = ("lift", "lifts", "elevator", "elevators", "aufzug", "aufzuege", "fahrstuhl")
 FILL_KIND = {"orange": "stair", "purple": "lift"}
-NEUTRAL_ROOM_TYPES = {"", "generic_room", "corridor", "lobby", "hall", "circulation", "stairwell", "lift"}
+LABEL_FILLER = {"and", "und", "or", "oder", "main", "no", "nr"}
 STAIR_RE = re.compile(r"\b(" + "|".join(STAIR_WORDS) + r")\b", re.IGNORECASE)
 LIFT_RE = re.compile(r"\b(" + "|".join(LIFT_WORDS) + r")\b", re.IGNORECASE)
 DEFAULT_NAME = re.compile(r"^room\b", re.IGNORECASE)
@@ -84,25 +85,49 @@ def _words(*parts: object) -> str:
     return " ".join(str(part).replace("_", " ") for part in parts if part not in (None, ""))
 
 
+def _connector_label(text: str | None) -> str | None:
+    """'stair' or 'lift' when the whole label is only connector words, numbers and letters ('Staircase 2', 'Stairs and
+    Lift', 'Treppenhaus'), else None ('Elevator lobby', 'Lift motor room', 'Lifting room')."""
+    words = re.findall(r"[^\W\d_]+", _words(text).lower())
+    kinds = set()
+    for word in words:
+        if word in STAIR_WORDS:
+            kinds.add("stair")
+        elif word in LIFT_WORDS:
+            kinds.add("lift")
+        elif word not in LABEL_FILLER and len(word) > 1:
+            return None
+    return "stair" if "stair" in kinds else ("lift" if kinds else None)
+
+
 def detect_connector(
-    model_type: str, room_type: str | None, name: str | None, ref: str | None, fill: str | None = None
+    model_type: str,
+    room_type: str | None,
+    name: str | None,
+    ref: str | None,
+    fill: str | None = None,
+    several_floors: bool = True,
 ) -> tuple[str | None, str]:
-    """('stair' | 'lift' | None, why) for one room, by the rules at STAIR_WORDS. why is 'model', 'words' or 'fill'."""
+    """('stair' | 'lift' | None, why) for one room, by the rules at STAIR_WORDS. why is 'model', 'words' or 'fill'.
+    Only the model type counts on a single floor. Name and ref count only for a plain room (never a lobby, hall or
+    corridor) whose whole label is a connector word."""
     if model_type in CONNECTOR_KIND:
         return model_type, "model"
+    if not several_floors:
+        return None, ""
     given_type = (room_type or "").strip().lower()
     if given_type == "stairwell":
         return "stair", "words"
     if given_type == "lift":
         return "lift", "words"
-    if given_type in NEUTRAL_ROOM_TYPES:
-        text = _words(name, ref, given_type)
-        if STAIR_RE.search(text):
-            return "stair", "words"
-        if LIFT_RE.search(text):
-            return "lift", "words"
-    if model_type == "room" and given_type in ("", "generic_room") and not name and fill in FILL_KIND:
-        return FILL_KIND[fill], "fill"  # type: ignore[index]
+    plain = model_type == "room" and given_type in ("", "generic_room")
+    if plain:
+        for label in (name, ref):
+            kind = _connector_label(label)
+            if kind:
+                return kind, "words"
+        if not name and fill in FILL_KIND:
+            return FILL_KIND[fill], "fill"  # type: ignore[index]
     return None, ""
 
 
@@ -329,7 +354,7 @@ def _door_width(width_px: object, scale: float) -> float:
 
 
 def _convert_floor(
-    floor_input: FloorInput, floor_id: str, found: Collector
+    floor_input: FloorInput, floor_id: str, found: Collector, several_floors: bool = True
 ) -> tuple[list[dict], list[dict], list[_Room]]:
     extraction, scale = floor_input.extraction, floor_input.scale.metres_per_px
     raw_rooms = list(extraction.rooms or [])
@@ -374,7 +399,7 @@ def _convert_floor(
         kind = room.type if room.type in ROOM_TYPES else "room"  # type: ignore[attr-defined]
         ref = str(room.ref).strip() if room.ref not in (None, "") else None  # type: ignore[attr-defined]
         given = str(room.name).strip() if room.name not in (None, "") else None  # type: ignore[attr-defined]
-        detected, _ = detect_connector(kind, room.room_type, given, ref, getattr(room, "fill", None))  # type: ignore[attr-defined]
+        detected, _ = detect_connector(kind, room.room_type, given, ref, getattr(room, "fill", None), several_floors)  # type: ignore[attr-defined]
         if detected and kind not in CONNECTOR_KIND:
             kind = detected
             found.add("connector_typed_by_hint", ref or given or f"{floor_id}-S{number:03d}")
@@ -669,7 +694,9 @@ def convert_floors_with_findings(
     openings: list[dict] = []
     rooms: dict[int, list[_Room]] = {}
     for floor in ordered:
-        floor_spaces, floor_openings, floor_rooms = _convert_floor(floor, floor_ids[floor.level], found)
+        floor_spaces, floor_openings, floor_rooms = _convert_floor(
+            floor, floor_ids[floor.level], found, len(ordered) > 1
+        )
         spaces += floor_spaces
         openings += floor_openings
         rooms[floor.level] = floor_rooms
