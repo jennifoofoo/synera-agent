@@ -35,7 +35,11 @@ export function HandsFreeStatus({ className = "" }: { className?: string }) {
   const status = useTwin((s) => s.handsFreeStatus);
   const heard = useTwin((s) => s.handsFreeHeard);
   const notice = useTwin((s) => s.handsFreeNotice);
+  const followUpOpen = useTwin((s) => s.followUpOpen);
+  const spoken = useTwin((s) => s.handsFreeSpoken);
   if (!on && !notice) return null;
+  // The "Say Hey Wanda" hint only until something was said; afterwards the lit button says enough.
+  if (on && status === "listening" && spoken) return null;
   return (
     <div className={`hf-status ${on ? status : "notice"} ${className}`} role="status" aria-live="polite">
       {!on ? (
@@ -52,7 +56,7 @@ export function HandsFreeStatus({ className = "" }: { className?: string }) {
       ) : status === "heard" ? (
         <>
           <span className="hf-dot live" aria-hidden />
-          <span className="hf-text strong">{heard || "Yes?"}</span>
+          <span className="hf-text strong">{heard || (followUpOpen ? "Listening…" : "Yes?")}</span>
         </>
       ) : (
         <>
