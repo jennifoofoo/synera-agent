@@ -1,6 +1,6 @@
 // One input with ONE inline completion: the best matching place appears as grey ghost text after what was typed.
 // Enter, → , Tab or a tap on the grey text accepts it (onPick). A short list of matches only on a laptop, with ↓.
-// Used by the Omnibox and the directions From/To fields. Owner: chat/search session.
+// Used by the Omnibox (Autocomplete) and the directions From/To fields (PlaceInput). Owner: chat/search session.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import Fuse from "fuse.js";
@@ -84,20 +84,20 @@ export function usePlaces(kinds: PlaceKind[] = ALL_KINDS) {
         });
     return result;
   }, [model, kindsKey]);
-  const fuse = useMemo(
-    () =>
-      new Fuse(places, {
-        keys: [
-          { name: "title", weight: 0.6 },
-          { name: "ref", weight: 0.25 },
-          { name: "type", weight: 0.15 },
-        ],
-        threshold: 0.32,
-        ignoreLocation: true,
-      }),
-    [places],
-  );
+  const fuse = useMemo(() => placeIndex(places), [places]);
   return { places, fuse };
+}
+
+export function placeIndex(places: PlaceHit[]): Fuse<PlaceHit> {
+  return new Fuse(places, {
+    keys: [
+      { name: "title", weight: 0.6 },
+      { name: "ref", weight: 0.25 },
+      { name: "type", weight: 0.15 },
+    ],
+    threshold: 0.32,
+    ignoreLocation: true,
+  });
 }
 
 const startsWith = (hit: PlaceHit, lower: string) => hit.title.toLowerCase().startsWith(lower);
@@ -121,6 +121,10 @@ export interface AutocompleteProps {
   placeholder?: string;
   /** Which places to offer; default all. */
   kinds?: PlaceKind[];
+  /** Places offered before the building's own (e.g. "Your location"). */
+  extraPlaces?: PlaceHit[];
+  /** Never show the ↓ list, only the ghost text. */
+  noList?: boolean;
   /** Enter when there is no completion (the Omnibox asks the agent). */
   onEnter?: (text: string) => void;
   /** True when this text should get no completion (e.g. a sentence in the Omnibox). */
@@ -145,6 +149,8 @@ export function Autocomplete({
   onPick,
   placeholder,
   kinds,
+  extraPlaces,
+  noList,
   onEnter,
   noCompletion,
   listPlacement = "below",
@@ -159,7 +165,9 @@ export function Autocomplete({
   onFocus,
   onBlur,
 }: AutocompleteProps) {
-  const { places, fuse } = usePlaces(kinds);
+  const own = usePlaces(kinds);
+  const places = useMemo(() => (extraPlaces?.length ? [...extraPlaces, ...own.places] : own.places), [extraPlaces, own.places]);
+  const fuse = useMemo(() => (extraPlaces?.length ? placeIndex(places) : own.fuse), [extraPlaces, places, own.fuse]);
   const ownRef = useRef<HTMLInputElement>(null);
   const inputRef = outerRef ?? ownRef;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -176,7 +184,7 @@ export function Autocomplete({
     const found = fuse.search(query, { limit: maxHits }).map((result) => result.item);
     return completion ? [completion, ...found.filter((hit) => hit.id !== completion.id)].slice(0, maxHits) : found;
   }, [open, query, fuse, maxHits, completion]);
-  const showList = open && rows.length > 0 && !readOnly && !coarsePointer();
+  const showList = open && rows.length > 0 && !readOnly && !noList && !coarsePointer();
 
   // Ghost text after the typed text: the rest of the title, or "→ title" when the match is not a prefix.
   const ghost = completion
@@ -243,7 +251,7 @@ export function Autocomplete({
           } else if ((event.key === "ArrowRight" || event.key === "Tab") && atEnd && completion && !showList && !event.shiftKey) {
             event.preventDefault();
             accept(completion);
-          } else if (event.key === "ArrowDown" && query && !coarsePointer()) {
+          } else if (event.key === "ArrowDown" && query && !noList && !coarsePointer()) {
             event.preventDefault();
             if (!open) {
               setOpen(true);
@@ -294,5 +302,63 @@ export function Autocomplete({
         </ul>
       )}
     </div>
+  );
+}
+
+/** The directions panel's place value for "Your location" (the card session's HERE). */
+export const HERE_PLACE = "here";
+
+const HERE_HIT: PlaceHit = {
+  id: HERE_PLACE,
+  kind: "room",
+  title: "Your location",
+  subtitle: "Where you are",
+  spaceId: null,
+  floorId: "",
+  ref: "here my location current position me",
+  type: "",
+};
+
+export interface PlaceInputProps {
+  placeholder?: string;
+  autoFocus?: boolean;
+  /** Offer "Your location" (picks HERE_PLACE). */
+  includeHere?: boolean;
+  /** A space id (rooms, stairs/lifts) or HERE_PLACE. */
+  onPick: (place: string) => void;
+  /** Esc on an empty field. */
+  onCancel?: () => void;
+  ariaLabel?: string;
+  className?: string;
+  inputRef?: RefObject<HTMLInputElement>;
+}
+
+const ROOMS_AND_STAIRS: PlaceKind[] = ["room", "connector"];
+
+/** A From/To field: the same inline ghost completion as the Omnibox, rooms and stairs/lifts only, no list. */
+export function PlaceInput({ placeholder, autoFocus, includeHere, onPick, onCancel, ariaLabel, className, inputRef }: PlaceInputProps) {
+  const [text, setText] = useState("");
+  const extra = useMemo(() => (includeHere ? [HERE_HIT] : undefined), [includeHere]);
+  return (
+    <Autocomplete
+      value={text}
+      onChange={setText}
+      kinds={ROOMS_AND_STAIRS}
+      extraPlaces={extra}
+      noList
+      onPick={(hit) => {
+        setText("");
+        onPick(hit.id === HERE_PLACE ? HERE_PLACE : (hit.spaceId ?? hit.id));
+      }}
+      onEscape={() => {
+        if (!text) onCancel?.();
+      }}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      ariaLabel={ariaLabel}
+      className={className}
+      inputRef={inputRef}
+      enterKeyHint="go"
+    />
   );
 }

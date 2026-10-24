@@ -6,14 +6,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTwin } from "../store";
 import { keepAwake, listen, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
-import { Autocomplete, type PlaceHit, type PlaceKind } from "./Autocomplete";
+import { Autocomplete, type PlaceHit } from "./Autocomplete";
 import { voiceHint } from "./phoneHints";
 import "./Omnibox.css";
 
 const QUESTION_START =
   /^(where|what|which|how|who|why|when|is|are|can|could|would|do|does|did|show|find|take|bring|route|guide|walk|lead|navigate|get|close|open|reopen|block|add|list|count|tell|give|help|i'?m|i am|we|my|please)\b/i;
 const VOICE_PREF = "twin.voiceOut";
-const ROOMS_ONLY: PlaceKind[] = ["room"];
 
 function looksLikeQuestion(text: string): boolean {
   const trimmed = text.trim();
@@ -34,8 +33,6 @@ export function Omnibox() {
   const select = useTwin((s) => s.select);
   const focusFloor = useTwin((s) => s.focusFloor);
   const requestCamera = useTwin((s) => s.requestCamera);
-  // The old "Where are you?" start-pick mode was replaced by the Directions panel (From/To fields).
-  const pickingFor = null as string | null;
 
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
@@ -176,11 +173,9 @@ export function Omnibox() {
 
   const placeholder = listening
     ? "Listening…"
-    : pickingFor
-      ? "Where are you?"
-      : chatAvailable
-        ? "Ask or search…"
-        : "Search rooms and things…";
+    : chatAvailable
+      ? "Ask or search…"
+      : "Search rooms and things…";
 
   return (
     <div className="omnibox" ref={rootRef}>
@@ -230,12 +225,9 @@ export function Omnibox() {
           onPick={go}
           onEnter={(message) => void submit(message)}
           noCompletion={looksLikeQuestion}
-          kinds={pickingFor ? ROOMS_ONLY : undefined}
-          maxHits={pickingFor ? 5 : 6}
           listPlacement="above"
           placeholder={placeholder}
-          ariaLabel={pickingFor ? "Where are you?" : "Ask or search"}
-          autoFocus={!!pickingFor}
+          ariaLabel="Ask or search"
           readOnly={listening}
           enterKeyHint={looksLikeQuestion(text) ? "send" : "search"}
           onEscape={stopSpeaking}
