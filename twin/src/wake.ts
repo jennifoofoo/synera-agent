@@ -1,4 +1,4 @@
-// Wake word matcher for "Hey Wanda" (pure, no imports: unit tested in twin/tests/wake.test.mjs).
+// Wake word matcher for "Hey Wanda" (pure, no imports: unit tested in twin/src/wake.test.ts).
 // Speech recognition mishears the name a lot ("Evander", "E Wander", "hey vanda", "Juanda"), so the first one to
 // three tokens are compared by sound, not spelling. Only the START of the utterance counts, and the real English
 // words "wander"/"wonder" only count after a greeting ("hey wonder") or alone, so "I wonder where" and

@@ -27,7 +27,45 @@ _NODE_ITEMS: dict[str, tuple[str, str]] = {}
 _RESULTS: dict[tuple[str, str], dict[str, str]] = defaultdict(dict)
 
 
+# Browser tests must stay silent: no spoken replies through the speakers while someone works on the machine.
+SILENT_PAGE = """
+(() => {
+  try {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.speak = (u) => { setTimeout(() => { u && u.onend && u.onend(new Event("end")); }, 0); };
+    }
+    const quiet = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () { this.muted = true; this.volume = 0; return quiet.call(this); };
+  } catch (e) {}
+})();
+"""
+
+
+def _silence_playwright() -> None:
+    """Mute every browser the e2e tests start (Chromium flag) and silence speech and audio in every page."""
+    try:
+        from playwright.sync_api import Browser, BrowserType
+    except ImportError:
+        return
+    if getattr(BrowserType, "_silenced", False):
+        return
+    launch, new_context = BrowserType.launch, Browser.new_context
+
+    def silent_launch(self, *args, **kwargs):
+        if self.name == "chromium":
+            kwargs["args"] = [*(kwargs.get("args") or []), "--mute-audio"]
+        return launch(self, *args, **kwargs)
+
+    def silent_context(self, *args, **kwargs):
+        context = new_context(self, *args, **kwargs)
+        context.add_init_script(SILENT_PAGE)
+        return context
+
+    BrowserType.launch, Browser.new_context, BrowserType._silenced = silent_launch, silent_context, True
+
+
 def pytest_configure(config):
+    _silence_playwright()
     config.addinivalue_line("markers", "e2e: browser tests with Playwright (need `uv sync --group e2e`)")
     config.addinivalue_line("markers", "audit(item, title): which docs/mobile-audit.md item a test protects")
 

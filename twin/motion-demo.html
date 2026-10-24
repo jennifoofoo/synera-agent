@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Walk with me demo</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 12px; background: #f6f6f4; color: #222; }
+      fieldset { border: 1px solid #ccc; margin: 0 0 8px; padding: 6px 8px; }
+      input { width: 16em; }
+      button { margin: 2px; }
+      canvas { background: #fff; border: 1px solid #ccc; width: 100%; max-width: 640px; height: auto; touch-action: none; }
+      #info { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <p>Dev only (not in the build). Needs the API: <code>uv run python -m web</code>. Click the plan for "I'm here".</p>
+    <fieldset>
+      <label>Building <input id="building" value="dev/osm-way22744230" /></label>
+      <label>From <input id="start" value="osm-way22744230-F0-S001" /></label>
+      <label>To <input id="destination" value="osm-way22744230-F2-S010" /></label>
+      <button id="load">Load route</button>
+    </fieldset>
+    <fieldset>
+      <button id="sensors">Use phone sensors</button>
+      <button data-sim="0">Sim stop</button>
+      <button data-sim="1.5">Sim 1.5 steps/s</button>
+      <button data-sim="2">Sim 2 steps/s</button>
+      <button id="next">Next (through stairs)</button>
+      <button id="confirm">I'm at the end of this leg</button>
+    </fieldset>
+    <canvas id="plan" width="640" height="420"></canvas>
+    <div id="info"></div>
+    <script type="module" src="/src/motion/demo.ts"></script>
+  </body>
+</html>

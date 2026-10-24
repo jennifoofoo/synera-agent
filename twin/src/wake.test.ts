@@ -1,10 +1,9 @@
-// Wake word table: run with `npm test` in twin/ (node's own test runner, TypeScript types stripped by node).
-import assert from "node:assert/strict";
-import { test } from "node:test";
-import { parseWake } from "../src/wake.ts";
+// Wake word table: run with `npm test` in twin/ (vitest).
+import { expect, test } from "vitest";
+import { parseWake } from "./wake";
 
 // [what the recogniser wrote, the question that remains]
-const POSITIVES = [
+const POSITIVES: [string, string][] = [
   ["Hey Wanda", ""],
   ["hey wanda where is the toilet", "where is the toilet"],
   ["Hey, Wanda! Where is the toilet?", "where is the toilet"],
@@ -58,12 +57,12 @@ const NEGATIVES = [
 
 for (const [said, rest] of POSITIVES) {
   test(`wakes: ${JSON.stringify(said)}`, () => {
-    assert.deepEqual(parseWake(said), { rest });
+    expect(parseWake(said)).toEqual({ rest });
   });
 }
 
 for (const said of NEGATIVES) {
   test(`does not wake: ${JSON.stringify(said)}`, () => {
-    assert.equal(parseWake(said), null);
+    expect(parseWake(said)).toBeNull();
   });
 }

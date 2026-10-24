@@ -39,6 +39,7 @@ In `main` seit 01:00: Raumfarben, Geisterbild-Fix (Puffer der Nachbearbeitung be
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
 - Folge-Modus: nach jeder gesprochenen Antwort etwa 8 s zuhören, ohne Wake Word und ohne Knopf.
+- Route in 3D, Fix läuft auf `fix/twin-route-start-depth`: Linie startet am blauen Punkt (`start_point` an `/api/route`) und wird in 3D von Wänden verdeckt (Tiefentest an, nur in 3D). Kleine Änderungen in `store.ts` und `scene/RouteLine.tsx`, Leonie bitte beim 3D-Look kurz abstimmen.
 Dateien: `twin/src/handsFree.ts`, `twin/src/voice.ts` (Leonie: bitte dort gerade nichts parallel ändern).
 
 ## 3D-Look (Leonie, 25.10. nachts): Diagnose und Richtung von Jennifers Sitzung
