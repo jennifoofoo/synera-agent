@@ -87,9 +87,11 @@ export function Phone() {
     if (s.selection) s.select(null);
     else if (s.replyShown) s.dismissReply();
     else if (s.floorMode !== "stacked") s.setFloorMode("stacked");
+    else if (s.campusHook?.back()) return; // a campus building -> the site
     else s.requestCamera({ kind: "home" });
   };
-  const backLabel = selection ? "Close" : replyShown ? "Dismiss reply" : floorMode !== "stacked" ? "All floors" : "Home view";
+  const campusBack = useTwin.getState().campusHook?.backLabel() ?? null;
+  const backLabel = selection ? "Close" : replyShown ? "Dismiss reply" : floorMode !== "stacked" ? "All floors" : (campusBack ?? "Home view");
 
   return (
     <>

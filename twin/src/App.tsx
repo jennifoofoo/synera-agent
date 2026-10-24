@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { CampusCard } from "./campus/CampusCard";
+import { CampusSite } from "./campus/CampusSite";
 import { Scene } from "./scene/Scene";
 import { useTwin } from "./store";
 import { Card } from "./ui/Card";
@@ -26,6 +28,7 @@ export function App() {
   return (
     <div className={`app ${profile} ${flat ? "flat" : "solid"}`}>
       <Scene />
+      <CampusSite />
       <TopBar />
       <FloorRail />
       <Recenter />
@@ -34,6 +37,7 @@ export function App() {
       <Phone />
       <Position />
       <div className="dock">
+        <CampusCard />
         <Card />
         <Omnibox />
       </div>

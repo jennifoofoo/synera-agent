@@ -32,6 +32,18 @@ export interface CameraRequest {
   radius?: number;
 }
 
+// ===== Campus hook (twin-campus session): set by campus/campusStore, null without a campus.
+export interface CampusHook {
+  /** "Route here" while "You are here" is in another campus building: routes across buildings, true if handled. */
+  routeHere: (destinationSpaceId: string) => Promise<boolean>;
+  /** Clearing the route on screen clears the whole campus route; true if there was one. */
+  clearRoute: () => boolean;
+  /** One step back inside the campus (tapped link -> site, building -> site); true if it went back. */
+  back: () => boolean;
+  /** Label for that step, or null when the campus has nothing to go back to. */
+  backLabel: () => string | null;
+}
+
 export interface ChatMessage {
   id: number;
   role: "user" | "agent";
@@ -81,6 +93,9 @@ interface TwinState {
   chatBusy: boolean;
   voiceOut: boolean;
   hereArmed: boolean;
+  campusHook: CampusHook | null;
+  /** A campus route is shown: the route on screen is one leg of it (the campus card shows the legs). */
+  campusRoute: boolean;
 
   // --- start pick (owner: card session). "Route here" without a known position: the next room the person taps
   // or picks in the Omnibox is where they are; the card then routes to this destination space id. null = off.
@@ -165,6 +180,8 @@ export const useTwin = create<TwinState>((set, get) => ({
   voiceOut: false,
   hereArmed: false,
   pickingStartFor: null,
+  campusHook: null,
+  campusRoute: false,
 
   async loadBuildings() {
     try {
@@ -278,6 +295,7 @@ export const useTwin = create<TwinState>((set, get) => ({
     if (result.route.ok && result.route.floors?.length) set({ focusedFloorId: result.route.floors[0] });
   },
   async clearRoute() {
+    if (get().campusHook?.clearRoute()) return;
     const key = get().buildingKey;
     if (!key) return;
     set({ state: (await api.clearRoute(key)).state });
