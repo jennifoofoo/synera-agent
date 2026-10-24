@@ -8,6 +8,7 @@ from pathlib import Path
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
+from building_agent import routing
 from building_agent.directions import DirectionsSession
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -85,14 +86,17 @@ def route_effect(before: BuildingMap, after: BuildingMap) -> dict | None:
     effect = {
         "route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}"
     }
-    for label, building in (("length_before_m", copy.deepcopy(before)), ("length_after_m", after)):
+    for label, building in (("length_before_m", before), ("length_after_m", after)):
+        previous = building.last_route
         try:
-            effect[label] = building.route(*ends).length_m
+            effect[label] = routing.route(building, *ends).length_m
         except MapError:
             effect[label] = None
             effect.setdefault(
                 "note", "There is no route " + ("now." if label == "length_before_m" else "after this change.")
             )
+        finally:
+            building.last_route = previous
     return effect
 
 
@@ -101,7 +105,7 @@ def compare_normal_length(bm: BuildingMap, route) -> float | None:
     stops = [route.start_space_id, route.destination_space_id]
     last = bm.last_route
     try:
-        normal = copy.deepcopy(bm).route(*stops, False).length_m
+        normal = routing.route(bm, *stops, False).length_m
     except MapError:
         normal = None
     bm.last_route = last
@@ -129,7 +133,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             via: Optional places to visit in order before the destination.
         """
         try:
-            route = bm.route(start, destination, step_free, via)
+            route = routing.route(bm, start, destination, step_free, via)
             state.session = DirectionsSession.from_route(bm, route)
             state.signature = building_signature(bm)
         except MapError as error:
