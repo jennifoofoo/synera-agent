@@ -52,10 +52,14 @@ def kind_tool(bm: BuildingMap, kind: Kind):
     def run(*args, **kwargs) -> str:
         try:
             kwargs = {name: resolve_type(bm, name, value) for name, value in kwargs.items()}
+            try:
+                signature.bind(bm, *args, **kwargs)
+            except TypeError as error:  # a wrong argument list is the model's mistake, not a kind bug
+                raise ToolError(f"Wrong arguments for {kind.name}: {error}") from error
             return as_json(kind.fn(bm, *args, **kwargs))
         except MapError as error:
             raise ToolError(str(error)) from error
-        except (KeyError, ValueError, AttributeError, TypeError, nx.NodeNotFound) as error:
+        except (KeyError, ValueError, nx.NodeNotFound) as error:
             raise ToolError(f"Invalid argument: {error}. Use space ids from find_space and floor ids from the overview.") from error
 
     run.__signature__ = signature.replace(parameters=parameters)

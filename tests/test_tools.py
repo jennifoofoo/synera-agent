@@ -59,3 +59,13 @@ def test_shortened_type_resolves_to_the_building_type_and_unknown_lists_valid_on
     with pytest.raises(MapError, match="Valid values"):
         resolve_type(bm, "room_type", "no_such_type_at_all")
     assert resolve_type(bm, "floor_id", "F1") == "F1"
+
+
+def test_wrong_argument_list_is_a_tool_error_but_kind_bugs_are_not_masked():
+    import pytest
+    from anthropic.lib.tools import ToolError
+
+    building_dir, question = labelled_questions("errand")[0]
+    tool = tool_by_name(make_tools(load_map(building_dir), None), "errand")
+    with pytest.raises(ToolError, match="Wrong arguments"):
+        tool(start=question["inputs"]["start"])  # missing parameters

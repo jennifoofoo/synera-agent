@@ -13,8 +13,10 @@ def repaired(polygon: Polygon) -> Polygon:
     if polygon.is_valid:
         return polygon
     fixed = polygon.buffer(0)
-    if isinstance(fixed, MultiPolygon):
+    if isinstance(fixed, MultiPolygon) and fixed.geoms:
         fixed = max(fixed.geoms, key=lambda part: part.area)
+    if fixed.is_empty or not isinstance(fixed, Polygon):
+        return polygon  # degenerate input: nothing better to offer than the original
     return fixed
 
 

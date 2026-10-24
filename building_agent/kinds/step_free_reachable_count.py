@@ -1,3 +1,5 @@
+import copy
+
 import networkx as nx
 
 from building_agent.registry import Kind
@@ -9,18 +11,17 @@ def step_free_reachable_count(bm: BuildingMap, closed: str, start: str, floor_id
 
     Step-free graph, no stairs or steps. Only spaces of type "room" count, not corridors, stairwells or lifts."""
     element = bm.find_element(closed)
+    start = bm.resolve_space(start)
     if floor_id not in bm.floors:
         raise MapError(f"Unknown floor {floor_id}.")
-    was_closed = element in bm.closed
-    bm.closed.add(element)
-    try:
-        graph = bm.graph(step_free=True)
-        if start not in graph:
-            raise MapError(f"{bm.describe_space(start)} cannot be entered step-free.")
-        reachable = nx.node_connected_component(graph, start)
-    finally:
-        if not was_closed:
-            bm.closed.discard(element)
+    if start == element:
+        raise MapError(f"{bm.describe_space(start)} is the closed element itself.")
+    out_of_service = copy.copy(bm)  # shallow copy with its own closed set: the shared map is never touched
+    out_of_service.closed = bm.closed | {element}
+    graph = out_of_service.graph(step_free=True)
+    if start not in graph:
+        raise MapError(f"{bm.describe_space(start)} cannot be entered step-free.")
+    reachable = nx.node_connected_component(graph, start)
     rooms = sorted(
         space_id
         for space_id in reachable

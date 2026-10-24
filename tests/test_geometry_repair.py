@@ -26,3 +26,8 @@ def test_space_polygon_survives_a_broken_space_in_the_building():
         assert space_polygon(bm, space_id).is_valid
     finally:
         bm.spaces[space_id]["polygon"] = original
+
+
+def test_degenerate_polygon_falls_back_to_the_original():
+    line = Polygon([(0, 0), (1, 1), (2, 2)])
+    assert repaired(line).equals(line)
