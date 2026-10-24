@@ -28,7 +28,7 @@ Parameter heißen wie die `inputs` in train/dev. Rückgabe ist ein Dict mit gena
 | Typ (Testfragen) | Wer | Signatur | Rückgabe |
 |---|---|---|---|
 | errand (20), fertig | Jennifer | `(bm, start, asset_type, floor_id, room_type)` | `length_m`, `via`, `target` |
-| floor_area_total (33) | Jennifer | `(bm, floor_id, room_type)` | `area_m2`, `count` |
+| floor_area_total (33) | Jennifer | `(bm, floor_id, room_type)` | `total_m2`, `count`, `space_ids` |
 | straight_line_3d (15) | Jennifer | `(bm, first, second)` | `distance_m` |
 | shared_walls_count (26) | Leonie | `(bm, start)` | `count`, `space_ids` |
 | largest_room (21) | Leonie | `(bm, floor_id, room_type)` | `space_id`, `name`, `area_m2` |

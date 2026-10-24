@@ -4,6 +4,7 @@ import functools
 import inspect
 from pathlib import Path
 
+import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
@@ -25,10 +26,12 @@ def kind_tool(bm: BuildingMap, kind: Kind):
             return as_json(kind.fn(bm, *args, **kwargs))
         except MapError as error:
             raise ToolError(str(error)) from error
+        except (KeyError, ValueError, nx.NodeNotFound) as error:
+            raise ToolError(f"Invalid argument: {error}. Use space ids from find_space and floor ids from the overview.") from error
 
     run.__signature__ = signature.replace(parameters=parameters)
     run.__name__ = kind.name
-    run.__doc__ = kind.description
+    run.__doc__ = f"{kind.description}\n\nSpace parameters take space ids from find_space; floor_id takes a floor id from the building overview."
     return beta_tool(run)
 
 

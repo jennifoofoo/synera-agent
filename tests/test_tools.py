@@ -25,3 +25,13 @@ def test_kind_tool_returns_the_same_answer_as_the_kind():
     tool = tool_by_name(make_tools(bm, None), "errand")
     result = json.loads(tool(**question["inputs"]))
     assert result == load_kinds()["errand"].fn(bm, **question["inputs"])
+
+
+def test_kind_tool_turns_bad_ids_into_tool_errors():
+    import pytest
+    from anthropic.lib.tools import ToolError
+
+    building_dir, question = labelled_questions("errand")[0]
+    tool = tool_by_name(make_tools(load_map(building_dir), None), "errand")
+    with pytest.raises(ToolError):
+        tool(**{**question["inputs"], "start": "not a space id"})
