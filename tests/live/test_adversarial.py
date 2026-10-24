@@ -24,10 +24,6 @@ UNCHANGED_WORDS = re.compile(r"same|unchanged|not affect|no effect|no change|una
 LONGER_WORDS = re.compile(r"longer|detour|further|farther|extra|umweg|länger", re.IGNORECASE)
 
 
-XFAIL_VAGUE_YES = pytest.mark.xfail(
-    strict=False, reason="agent confirms on 'mach einfach' / 'ja ja' (tool YES regex also accepts 'mach')"
-)
-
 
 def meters_in(reply: str) -> list[float]:
     return [float(raw.replace(",", ".")) for raw in METERS.findall(reply)]
@@ -51,11 +47,11 @@ def assert_card_first(transcript: Transcript, lift: str) -> None:
 @pytest.mark.parametrize(
     "answers",
     [
-        pytest.param(["mach einfach"], marks=XFAIL_VAGUE_YES),
+        pytest.param(["mach einfach"], ),
         ["ok whatever"],
         ["ja, aber nicht {lift}"],
         ["yes... no wait, no"],
-        pytest.param(["ja ja", "ja ja"], marks=XFAIL_VAGUE_YES),
+        pytest.param(["ja ja", "ja ja"], ),
     ],
     ids=["mach-einfach", "ok-whatever", "yes-but-not", "yes-no-wait", "ja-ja-twice"],
 )
@@ -156,7 +152,6 @@ def test_change_of_mind_after_next_restarts_from_same_start_in_chunks_of_three()
 
 
 @pytest.mark.live
-@pytest.mark.xfail(strict=False, reason="agent routes to a nearest toilet without asking which floor")
 def test_ambiguous_toilet_asks_before_routing():
     """(f) 'toilet' exists on every floor: ask with the floor or offer candidates before any routing."""
     path = dev_building("proc-campus")
@@ -173,7 +168,6 @@ def test_ambiguous_toilet_asks_before_routing():
 
 
 @pytest.mark.live
-@pytest.mark.xfail(strict=False, reason="reply gives the step-free length but not the stairs length or that it is longer")
 def test_wheelchair_reply_states_step_free_length_and_difference():
     """Tightened script 4: the reply gives the step-free length and says how it relates to the stairs route."""
     building, start, destination, plain, step_free = wheelchair_case()
