@@ -115,8 +115,8 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
       <mesh
         geometry={built.solid}
         material={ghost ? materials.ghostSolid : materials.solid}
-        onClick={ghost ? undefined : onClick}
-        onDoubleClick={ghost ? undefined : onDoubleClick}
+        onClick={ghost || !visible ? undefined : onClick}
+        onDoubleClick={ghost || !visible ? undefined : onDoubleClick}
         renderOrder={ghost ? 10 : 0}
         layers-mask={ghost ? 2 : 1}
         userData={{ floorId: floor.id, ghost }}

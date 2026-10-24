@@ -1,3 +1,4 @@
+import { useKeyHelp } from "../scene/controlsTable";
 import { useTwin } from "../store";
 
 /** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
@@ -35,8 +36,8 @@ export function FloorRail() {
       {!flat && model.floors.length > 1 && (
         <button
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
-          onClick={() => setFloorMode(floorMode === "exploded" ? "stacked" : "exploded")}
-          title={floorMode === "exploded" ? "Stack the floors" : "Pull the floors apart"}
+          onClick={() => setFloorMode(floorMode === "exploded" ? "single" : "exploded")}
+          title={floorMode === "exploded" ? "Show only this floor" : "Show all floors"}
           aria-pressed={floorMode === "exploded"}
         >
           ⇕
@@ -66,8 +67,13 @@ export function FloorRail() {
         );
       })}
       {profile !== "worker" && (
-        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view" aria-label="Home view">
+        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view: the whole building" aria-label="Home view">
           ⌂
+        </button>
+      )}
+      {profile !== "worker" && (
+        <button className="rail-toggle rail-help" onClick={() => useKeyHelp.getState().setOpen(true)} title="Help: controls and map symbols (?)" aria-label="Help: controls and map symbols">
+          ?
         </button>
       )}
     </div>

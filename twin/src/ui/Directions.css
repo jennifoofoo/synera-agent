@@ -25,7 +25,7 @@
 .dir-side { display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
 .dir-swap { width: 34px; min-width: 34px; min-height: 34px; padding: 0; border-radius: var(--radius-sm); font-size: 16px; color: var(--muted); }
 .dir-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); padding: 0 2px; }
-.dir-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
+.dir-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--muted); } /* a rare option: quiet */
 .dir-toggle input { width: 16px; height: 16px; accent-color: var(--signal); margin: 0; }
 .dir-hint { margin-left: auto; }
 .dir-error { margin: 0; }

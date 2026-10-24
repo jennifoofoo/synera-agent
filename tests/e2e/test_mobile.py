@@ -139,8 +139,8 @@ def open_route(page) -> tuple[str, str]:
 
 
 def start_walk(page) -> None:
-    """Start on the route card: step-by-step directions on the client (Walk.tsx), no agent call."""
-    page.get_by_role("button", name="Start", exact=True).tap()
+    """Guide me on the route card: step-by-step directions on the client (Walk.tsx), no agent call."""
+    page.get_by_role("button", name="Guide me", exact=True).tap()
     page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
     page.wait_for_timeout(800)
 
@@ -187,7 +187,7 @@ def test_no_overflow_no_errors(open_page, landscape):
 @audit("1", "chat input at least 16 px (no iOS zoom)")
 def test_chat_input_font_size(open_page):
     page = open_page()
-    page.get_by_role("button", name="Chat").tap()
+    page.get_by_role("button", name="Ask", exact=True).tap()
     page.wait_for_timeout(300)
     size = page.evaluate("() => parseFloat(getComputedStyle(document.querySelector('.omnibox-input input')).fontSize)")
     assert size >= 16, f"chat input is {size}px"
@@ -258,7 +258,7 @@ def test_route_flow(open_page):
     top = box(page, ".directions")
     sheet = box(page, ".phone-sheet")
     assert top and sheet, "directions panel or summary card missing"
-    assert page.get_by_role("button", name="Start", exact=True).is_visible()
+    assert page.get_by_role("button", name="Guide me", exact=True).is_visible()
     route = page.evaluate(PROJECT, page.evaluate(ROUTE_POINTS))
     middle = (route["top"] + route["bottom"]) / 2
     assert top["bottom"] - 2 <= middle <= sheet["top"] + 2, (
@@ -293,7 +293,7 @@ def test_walk_sheet(open_page, landscape):
     for i in range(buttons.count()):
         b = buttons.nth(i).bounding_box()
         assert b and b["height"] >= 44 and b["y"] + b["height"] <= height, f"step button {i}: {b}"
-    end = page.get_by_role("button", name="End directions").bounding_box()
+    end = page.get_by_role("button", name="End route").bounding_box()
     assert end and end["y"] >= 0 and end["y"] + end["height"] <= height, end
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
     sheet = box(page, ".phone-sheet")
@@ -318,7 +318,7 @@ def test_wake_lock_while_guiding(open_page):
     start_walk(page)
     page.wait_for_timeout(300)
     assert page.evaluate("() => window.__wake") > before, "no wake lock request while walking"
-    page.get_by_role("button", name="End directions").tap()
+    page.get_by_role("button", name="End route").tap()
     page.wait_for_timeout(400)
     assert walk_step(page) is None
     assert page.evaluate("() => window.__released") >= 1, "wake lock not released after walking"
@@ -350,7 +350,7 @@ def test_audio_unlock(open_page):
 def test_chat_keyboard(open_page, landscape):
     page = open_page(FAKE_KEYBOARD, landscape=landscape)
     tap_room(page)
-    page.get_by_role("button", name="Chat").tap()
+    page.get_by_role("button", name="Ask", exact=True).tap()
     page.wait_for_timeout(300)
     keyboard = 200 if landscape else 336
     page.evaluate(f"() => window.__kb({keyboard})")

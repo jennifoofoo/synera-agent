@@ -5,9 +5,8 @@
 import * as THREE from "three";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
 import type { BuildingState, Opening, Point, Space } from "../api/types";
-import { GROUP_COLOURS, spaceGroup, type SpaceGroup } from "../model/palette";
+import { GROUP_COLOURS, GROUP_INDEX, PLAN_GLSL, isIndustrial, spaceGroup } from "../model/palette";
 
-const GROUP_INDEX: Record<SpaceGroup, number> = { production: 0, logistics: 1, office: 2, technical: 3, circulation: 4, outdoor: 5 };
 import type { FloorModel } from "../model/model";
 
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -403,10 +402,11 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
       gapsBySpace.set(spaceId, list);
     }
   }
+  const industrial = isIndustrial(floor.spaces);
   floor.spaces.forEach((space: Space, sid) => {
     const polygon = polygons[sid];
     if (polygon.length < 3) return;
-    const group = spaceGroup(space.type, space.room_type);
+    const group = spaceGroup(space.type, space.room_type, { name: space.name, industrial });
     const palette = GROUP_COLOURS[group];
     builder.currentGroup = GROUP_INDEX[group];
     const gaps = gapsBySpace.get(space.id) ?? [];
@@ -499,13 +499,8 @@ export function withCutaway<T extends THREE.Material>(
         `#include <color_vertex>
         #ifdef USE_COLOR
         {
-          // 2D plan: map colours like a street map. Corridors white, rooms near-white, stairs/lifts and outdoor
-          // a little greyer, walls grey.
-          vec3 plan = vec3(0.975, 0.97, 0.955);
-          if (roomGroup > 3.5 && roomGroup < 4.5) plan = vec3(1.0);
-          if (roomGroup > 2.5 && roomGroup < 3.5) plan = vec3(0.93, 0.93, 0.915);
-          if (roomGroup > 4.5) plan = vec3(0.925, 0.925, 0.905);
-          if (wall > 0.5) plan = vec3(0.72, 0.72, 0.70);
+          // 2D plan: map colours like a street map. Corridors white, rooms near-white, the sought-after groups keep
+          // their pale hue, walls grey (palette.ts PLAN_GLSL).${PLAN_GLSL}
           vColor.rgb = mix(vColor.rgb, plan, uFlat);
         }
         #endif`,

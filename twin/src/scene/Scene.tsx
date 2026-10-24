@@ -4,7 +4,7 @@ import { GizmoHelper, GizmoViewcube, OrthographicCamera, PerformanceMonitor, Per
 
 // Postprocessing (N8AO etc.) is planner-only and loaded on demand, so phones never download it.
 const Effects = lazy(() => import("./Effects"));
-import { floorElevation, type BuildingModel } from "../model/model";
+import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
@@ -14,7 +14,7 @@ import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
-import { Shafts } from "./Shafts";
+import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
 import { Things } from "./Things";
 
 const NEAR_THINGS_LIMIT = 6000;
@@ -33,16 +33,20 @@ function Building({ model }: { model: BuildingModel }) {
   const worker = profile === "worker";
   const flat = viewMode === "2d";
 
-  const elevations = useMemo(() => new Map(model.floors.map((floor) => [floor.id, floorElevation(floor, model, floorMode)])), [model, floorMode]);
+  const focused = focusedFloorId ?? model.floors[0]?.id ?? null;
+  // Floor rule (floorVisibility.tsx): active floor full, floors below as outlines, floors above hidden; a route over
+  // several floors shows exactly its floors, stacked apart.
+  const routeFloorsKey = flat ? "" : (routeFloorIds(state?.route)?.join("|") ?? "");
+  const routeFloors = useMemo(() => (routeFloorsKey ? routeFloorsKey.split("|") : null), [routeFloorsKey]);
+  const elevations = useMemo(
+    () => new Map(model.floors.map((floor) => [floor.id, floorLayout(floor, model, floorMode, routeFloors)])),
+    [model, floorMode, routeFloors],
+  );
   const floorY = useCallback((floorId: string) => elevations.get(floorId) ?? 0, [elevations]);
   const floorTop = useCallback((floorId: string) => (elevations.get(floorId) ?? 0) + (model.floorById.get(floorId)?.height_m ?? 3), [elevations, model]);
   const topY = Math.max(...model.floors.map((floor) => floorTop(floor.id)));
-  const focused = focusedFloorId ?? model.floors[0]?.id ?? null;
-  const visibleFloors = useMemo(
-    () => new Set(model.floors.filter((floor) => (floorMode !== "single" && !flat) || floor.id === focused).map((floor) => floor.id)),
-    [model, floorMode, focused, flat],
-  );
-  const closed = useMemo(() => new Set(state?.closed ?? []), [state?.closed]);
+  const roles = useMemo(() => floorRoles(model, focused, floorMode, flat, routeFloors), [model, focused, floorMode, flat, routeFloors]);
+  const visibleFloors = useMemo(() => new Set(model.floors.filter((floor) => roles.get(floor.id) === "full").map((floor) => floor.id)), [model, roles]);
   const route = state?.route ?? null;
   const guideSegments = state?.guide?.active ? state.guide.leg.segments : null;
 
@@ -50,19 +54,19 @@ function Building({ model }: { model: BuildingModel }) {
     <group>
       {model.floors.map((floor) => {
         const isFocused = floor.id === focused;
-        const ghost = floorMode === "stacked" && !isFocused;
         const visible = visibleFloors.has(floor.id);
-        const showThings = visible && thingsMode !== "off" && (thingsMode === "all" ? !ghost : isFocused);
+        const showThings = visible && thingsMode !== "off" && (thingsMode === "all" || isFocused);
         return (
           <group key={floor.id}>
-            <FloorMesh floor={floor} model={model} y={floorY(floor.id)} ghost={ghost} visible={visible} />
+            <FloorMesh floor={floor} model={model} y={floorY(floor.id)} ghost={false} visible={visible} />
+            {roles.get(floor.id) === "outline" && <FloorOutline floor={floor} y={floorY(floor.id)} />}
             {showThings && <Things floor={floor} y={floorY(floor.id)} state={state} limit={thingsMode === "all" ? ALL_THINGS_LIMIT : NEAR_THINGS_LIMIT} flat={flat} />}
             {isFocused && visible && <Labels floor={floor} model={model} y={floorY(floor.id)} limit={flat ? (worker ? 30 : 80) : worker ? 14 : 36} flat={flat} />}
           </group>
         );
       })}
-      {floorMode !== "single" && !flat && <Shafts model={model} floorY={floorY} floorTop={floorTop} closed={closed} />}
-      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={floorMode === "single" || flat ? focused : null} reducedMotion={reducedMotion} flat={flat} />
+      {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
+      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} />
       <Markers
         model={model}
         state={state}
@@ -127,6 +131,10 @@ export function Scene() {
   // Adaptive quality: the PerformanceMonitor steps this down when frames drop (pixel ratio, AO quality).
   const [quality, setQuality] = useState(2);
   const dpr = worker ? [1, 1.5][Math.min(quality, 1)] : [1, 1.5, 2][quality];
+  // Test hook (tests/e2e/test_twin_ghost.py): step the quality like the PerformanceMonitor does.
+  useEffect(() => {
+    (window as unknown as { __twinSetQuality: (q: number) => void }).__twinSetQuality = (q) => setQuality(Math.max(0, Math.min(2, q)));
+  }, []);
 
   return (
     <Canvas

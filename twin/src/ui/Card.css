@@ -71,3 +71,24 @@
 .worker .card button.link { min-height: 32px; font-size: 14px; }
 .worker .here-chip .here-name { min-height: 36px; }
 .worker .here-chip .x { min-width: 36px; min-height: 36px; }
+
+/* One drag handle per sheet: a card a pixel wider than the sheet (the × with its negative margin) gave the sheet body
+   a horizontal scrollbar, and its thumb looked like a second handle (▬) at the bottom of the sheet. */
+.phone-sheet .sheet-body { overflow-x: hidden; }
+
+/* route card: one line ("30 m to X · 4 steps · step-free"), Guide me + End route, the steps behind "Steps" */
+.route-summary { display: flex; align-items: baseline; gap: 8px; font-size: 14px; line-height: 1.4; }
+.route-summary .route-dot { align-self: center; }
+.route-sentence { min-width: 0; font-variant-numeric: tabular-nums; }
+.route-sentence strong { font-weight: 600; }
+.route-sentence .ok { color: var(--ok); }
+.route-sentence .warn { color: var(--warn); }
+.card button.link.route-steps-toggle { margin-top: 8px; }
+.worker .card button.link.route-steps-toggle { min-height: 44px; min-width: 64px; margin-top: 2px; text-align: left; }
+.route-steps { margin: 6px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.45; color: var(--ink-2); max-height: 30vh; overflow: auto; }
+.route-details { margin-top: 6px; font-size: 13px; color: var(--ink-2); }
+/* text buttons: no box, a tight focus ring only for the keyboard (a box showed around "less") */
+.card button.link { border-radius: 2px; -webkit-tap-highlight-color: transparent; }
+.card button.link:hover { background: transparent; text-decoration: underline; }
+.card button.link:focus:not(:focus-visible) { outline: none; }
+.card button.link:focus-visible { outline-offset: 2px; }
