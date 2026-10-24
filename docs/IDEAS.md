@@ -319,3 +319,19 @@ Wanda kennt den Standort der Person (gesagt, geklickt, am Gerät oder entlang de
 
 ### Risiken
 Falsche Sicherheit ist schlimmer als keine Antwort: kein Versprechen wie "das ist der sichere Weg", immer "kürzester Weg im Plan, folge den echten Schildern". Gesperrte Bereiche kennt nur, was jemand gemeldet hat. Stufenfrei heißt nicht barrierefrei evakuierbar (Aufzüge im Brandfall sperren), das gehört in den Hinweis.
+
+## 9. Echte Räume als 3D-Scan einblenden (Matterport o. ä.) (Idee von Leonie, 24.10.2026)
+Status: geparkt.
+
+### Idee
+Neben dem Modell aus dem Grundriss zeigt die App für einen Raum den **echten Raum** als begehbaren 3D-Scan (360-Grad-Ansicht). Beim Begleiten: "So sieht es an der nächsten Abzweigung aus", oder beim Fund: "Hier steht der 3D-Drucker" mit Blick in den echten Raum.
+
+### Was es gibt
+- **Matterport:** Räume mit 360-Kamera oder iPhone mit LiDAR scannen, Ergebnis ist ein begehbarer "Digital Twin". Einbinden per iframe oder **Showcase SDK** (Kamera steuern, Markierungen "Mattertags" setzen, Position abfragen). Braucht Konto, gescannte Räume und für das SDK einen kostenpflichtigen Plan mit SDK-Key.
+- Freie Alternativen: iPhone-LiDAR-Apps (z. B. Polycam, Scaniverse) exportieren Meshes oder Gaussian Splats, die man direkt in three.js laden kann.
+
+### Was das für uns heißt
+- Unsere Daten haben **keine Scans**, nur Grundrisse. Für eine Demo müssten wir selbst einen Raum scannen (z. B. den Hackathon-Raum mit dem iPhone) und ihn einem Raum im Modell zuordnen.
+- Passt zu Level 5 "Capture on site" und zur Foto-Ortung (Idee 7): Scan zeigt, wo man steht.
+- Aufwand: iframe-Einbindung eines fertigen Matterport-Rundgangs ca. 1 h; Kopplung mit Route und Markierungen über das SDK 4 bis 6 h; eigener Scan als Splat im Twin 3 bis 5 h.
+- Haken: Kosten und Konto bei Matterport, Datenschutz bei Scans echter Räume, die Jury prüft Level 1 bis 4 auf Grundrissen, nicht auf Scans.
