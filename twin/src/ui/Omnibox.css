@@ -73,7 +73,7 @@
 .ob-history { padding: 6px 10px; display: flex; flex-direction: column; gap: 8px; }
 .ob-history li + li { border-top: 1px solid var(--line); padding-top: 8px; }
 .ob-q { color: var(--muted); font-size: 12.5px; }
-.ob-a { white-space: pre-wrap; font-size: 13.5px; }
+.ob-a { white-space: pre-wrap; font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   .ob-mic.listening, .ob-dots i, .ob-rec { animation: none; }

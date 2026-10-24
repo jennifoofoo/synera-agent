@@ -43,6 +43,7 @@ export function Omnibox() {
   const speechAvailable = useTwin((s) => s.speechAvailable);
   const voiceOut = useTwin((s) => s.voiceOut);
   const setVoiceOut = useTwin((s) => s.setVoiceOut);
+  const dismissReply = useTwin((s) => s.dismissReply);
   const flyTo = useTwin((s) => s.flyTo);
   const select = useTwin((s) => s.select);
   const focusFloor = useTwin((s) => s.focusFloor);
@@ -255,7 +256,12 @@ export function Omnibox() {
     chat.forEach((message, index) => {
       if (message.role !== "agent") return;
       const before = chat[index - 1];
-      result.push({ id: message.id, question: before?.role === "user" ? before.text : "", answer: spokenText(message.text) });
+      const failed = /^The (agent|request) failed/.test(message.text);
+      result.push({
+        id: message.id,
+        question: before?.role === "user" ? before.text : "",
+        answer: failed ? "Something went wrong, please ask again." : spokenText(message.text),
+      });
     });
     return result.slice(-5).reverse();
   }, [chat]);
@@ -381,7 +387,11 @@ export function Omnibox() {
           <button
             type="button"
             className={`ob-icon ${history ? "on" : ""}`}
-            onClick={() => setHistory((on) => !on)}
+            onClick={() => {
+              // One card at a time: the history replaces the reply card while it is open.
+              if (!history) dismissReply();
+              setHistory(!history);
+            }}
             aria-label={history ? "Hide earlier replies" : "Show earlier replies"}
             aria-pressed={history}
             title="Earlier replies"
