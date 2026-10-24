@@ -69,7 +69,7 @@ body.campus-site-open .floorrail, body.campus-site-open .recenter, body.campus-s
 /* campus card */
 .campus-steps { position: relative; list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .campus-step {
-  min-height: 30px; padding: 4px 10px; border-radius: 999px; font-size: 13px; background: #fff; border: 1px solid var(--line); color: var(--muted);
+  min-height: 30px; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 13px; background: var(--surface); border: 1px solid var(--line); color: var(--muted);
 }
 .campus-step .n { font-variant-numeric: tabular-nums; font-weight: 600; }
 .campus-step.done { color: var(--muted); background: var(--paper); }
