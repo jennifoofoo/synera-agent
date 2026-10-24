@@ -1,7 +1,7 @@
 /* ===== Card (owner: card/position session). Uses the base tokens from styles.css. */
 .card {
   position: relative; padding: 12px 14px; border-radius: 14px; background: var(--panel-solid);
-  border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(20, 48, 90, 0.14);
   transition: transform 0.18s ease;
   animation: card-in 0.18s ease-out;
 }
@@ -12,10 +12,10 @@
 .card-line, .card-muted { color: var(--muted); font-size: 13px; }
 .card-line { margin-top: 2px; }
 .card-kicker { font-weight: 600; font-size: 13px; }
-.card-note { color: var(--warn); font-size: 12.5px; margin-top: 6px; }
+.card-note { color: #a86b12; font-size: 12.5px; margin-top: 6px; }
 .card-actions { display: flex; gap: 8px; margin-top: 10px; }
 .card-actions button { flex: 1; }
-.card button.primary { background: var(--accent); border-color: var(--accent); color: #062a2a; font-weight: 600; }
+.card button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .card button.primary:hover { filter: brightness(1.06); }
 .card button.quiet { flex: 0 0 auto; border-color: transparent; background: transparent; color: var(--muted); }
 .card button.link {
@@ -23,8 +23,8 @@
 }
 
 /* selection: the one place with gold */
-.card-selection { border-color: rgba(227, 180, 90, 0.55); box-shadow: inset 3px 0 0 var(--gold), 0 10px 30px rgba(0, 0, 0, 0.28); }
-.sel-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px rgba(227, 180, 90, 0.25); }
+.card-selection { border-color: rgba(201, 150, 46, 0.55); box-shadow: inset 3px 0 0 var(--gold), 0 10px 30px rgba(20, 48, 90, 0.14); }
+.sel-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 3px rgba(201, 150, 46, 0.22); }
 
 /* reply: 3 lines, then "more" */
 .card-reply-body { display: flex; align-items: flex-start; gap: 8px; }
@@ -50,8 +50,8 @@
 .route-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
 .route-facts { display: inline-flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 13px; }
 .route-facts b { color: var(--text); }
-.route-facts .ok { color: var(--ok); }
-.route-facts .warn { color: var(--warn); }
+.route-facts .ok { color: #1f8f6a; }
+.route-facts .warn { color: #a86b12; }
 .route-links { display: inline-flex; gap: 14px; }
 .card button.link.quiet-link { color: var(--muted); }
 .route-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }

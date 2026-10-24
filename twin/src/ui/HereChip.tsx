@@ -2,26 +2,24 @@
 // Owner: the Card/Position session.
 
 import { useState } from "react";
-import { api } from "../api/client";
 import { useTwin } from "../store";
 
 export function HereChip() {
   const model = useTwin((s) => s.model);
   const buildingKey = useTwin((s) => s.buildingKey);
   const position = useTwin((s) => s.state?.position ?? null);
-  const applyState = useTwin((s) => s.applyState);
+  const ask = useTwin((s) => s.ask);
   const flyTo = useTwin((s) => s.flyTo);
   const [clearing, setClearing] = useState(false);
   if (!model || !buildingKey || !position) return null;
   const space = model.spaceById.get(position.space_id);
   const name = space?.name || model.connectorBySpace.get(position.space_id)?.name || position.space_id;
 
-  // The position only changes through the server: context.here {clear: true} travels with one chat message.
+  // The position only changes through the server: context.here {clear: true} travels with one chat message; the agent's reply shows in the card.
   const clear = async () => {
     setClearing(true);
     try {
-      const reply = await api.chat(buildingKey, "Forget where I am.", { here: { clear: true } });
-      if (reply.state) applyState(reply.state);
+      await ask("Forget where I am.", false, { here: { clear: true } });
     } finally {
       setClearing(false);
     }
