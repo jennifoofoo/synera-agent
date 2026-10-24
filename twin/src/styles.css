@@ -115,13 +115,7 @@ button.x:hover { color: var(--text); }
 .hits button.first { background: rgba(201, 150, 46, 0.14); }
 .hit-sub { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ===== Card (owner: card/position session) ===== */
-.card { padding: 10px 12px; border-radius: var(--radius); background: var(--panel-solid); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(20, 48, 90, 0.14); }
-.card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.card-line, .card-who { color: var(--muted); font-size: 13px; }
-.card-text { white-space: pre-wrap; max-height: 30vh; overflow: auto; }
-.card-note { color: var(--warn); font-size: 12.5px; margin-top: 4px; }
-.card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+/* ===== Card (owner: card/position session): see src/ui/Card.css ===== */
 
 /* ===== Phone (owner: mobile session) ===== */
 .worker .dock { bottom: 10px; width: calc(100vw - 16px); }
