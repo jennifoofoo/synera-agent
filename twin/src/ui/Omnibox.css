@@ -85,3 +85,13 @@
   .ob-status .x { width: 44px; min-width: 44px; height: 44px; min-height: 44px; margin: -12px -10px -12px 0; }
   .ob-row { min-height: 48px; }
 }
+
+/* inline completion: the typed text (invisible) followed by the rest of the best match in grey */
+.ob-field { position: relative; flex: 1; min-width: 0; display: flex; }
+.ob-field input { width: 100%; }
+.ob-ghost {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none; white-space: pre; overflow: hidden;
+  display: flex; align-items: center; border: 0;
+}
+.ob-typed { visibility: hidden; }
+.ob-suggest { color: var(--muted); opacity: 0.8; pointer-events: auto; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
