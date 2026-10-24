@@ -22,11 +22,18 @@ export function App() {
   const loading = useTwin((s) => s.loading);
   const error = useTwin((s) => s.error);
   const flat = useTwin((s) => s.viewMode === "2d");
+  const topInset = useTwin((s) => s.topInset);
+  const bottomInset = useTwin((s) => s.bottomInset);
+  const rightInset = useTwin((s) => s.rightInset);
+  const directionsOpen = useTwin((s) => s.directions !== null);
   useEffect(() => {
     void loadBuildings();
   }, [loadBuildings]);
   return (
-    <div className={`app ${profile} ${flat ? "flat" : "solid"}`}>
+    <div
+      className={`app ${profile} ${flat ? "flat" : "solid"} ${directionsOpen ? "directions-open" : ""}`}
+      style={{ "--top-inset": `${topInset}px`, "--bottom-inset": `${bottomInset}px`, "--right-inset": `${rightInset}px` } as React.CSSProperties}
+    >
       <Scene />
       <CampusSite />
       <TopBar />

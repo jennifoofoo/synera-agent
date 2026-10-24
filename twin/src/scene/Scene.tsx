@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, GizmoHelper, GizmoViewcube, Grid, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
+import { GizmoHelper, GizmoViewcube, Grid, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 
 // Postprocessing (N8AO etc.) is planner-only and loaded on demand, so phones never download it.
 const Effects = lazy(() => import("./Effects"));
@@ -74,19 +74,6 @@ function Building({ model }: { model: BuildingModel }) {
         flat={flat}
       />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
-      {!worker && !flat && (
-        <ContactShadows
-          key={`${model.building.key}-${floorMode}`}
-          position={[model.bounds.cx, Math.min(...model.floors.map((floor) => floor.elevation_m)) - 0.25, -model.bounds.cy]}
-          scale={model.bounds.size * 1.6}
-          blur={2.4}
-          opacity={0.35}
-          far={topY + 4}
-          resolution={512}
-          frames={1}
-          color="#1a3560"
-        />
-      )}
     </group>
   );
 }

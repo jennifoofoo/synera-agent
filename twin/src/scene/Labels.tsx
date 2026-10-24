@@ -13,6 +13,16 @@ interface Props {
 }
 
 const centre = new THREE.Vector3();
+
+/** Tabler Icons "door-exit" (MIT, https://tabler.io/icons): a door with an arrow out. */
+const EXIT_ICON = (
+  <svg viewBox="0 0 24 24" aria-hidden>
+    <path d="M13 12v.01" />
+    <path d="M3 21h18" />
+    <path d="M5 21v-16a2 2 0 0 1 2 -2h7.5m2.5 10.5v7.5" />
+    <path d="M14 7h7m-3 -3l3 3l-3 3" />
+  </svg>
+);
 const LABEL_PX = 150; // typical label width on screen
 const MIN_ROOM_PX = 56; // a room narrower than this on screen gets no label
 
@@ -67,7 +77,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       else if (space.room_type === "toilet" && Math.sqrt(space.area_m2) >= 24 * scale) items.push({ id: space.id, point: space.anchor, glyph: "WC", title: space.name });
     }
     for (const opening of floor.openings) {
-      if (opening.kind === "entrance") items.push({ id: opening.id, point: opening.position, glyph: "⎆", title: "Entrance" });
+      if (opening.kind === "entrance") items.push({ id: opening.id, point: opening.position, glyph: "exit", title: "Entrance / exit" });
     }
     // Icons keep clear of each other and of the text labels (which win).
     const taken = labelled.map((space) => ({ anchor: space.anchor, id: "", point: space.anchor, glyph: "", title: "" }));
@@ -82,7 +92,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       ))}
       {pois.map((poi) => (
         <Html key={`poi-${poi.id}`} position={[poi.point[0], 0, -poi.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-          <div className="poi" title={poi.title}>{poi.glyph}</div>
+          <div className="poi" title={poi.title}>{poi.glyph === "exit" ? EXIT_ICON : poi.glyph}</div>
         </Html>
       ))}
     </group>
