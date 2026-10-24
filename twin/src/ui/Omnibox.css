@@ -117,3 +117,10 @@
 .ob-chip:hover { background: var(--paper-2); }
 .worker .ob-chip { min-height: 44px; font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }
+/* Phone: an open input with a bottom sheet below is the sheet's top row (one surface, no floating box above it). */
+.worker .dock:has(> .phone-sheet) > .omnibox.expanded { margin: 0 calc(-8px - var(--safe-r, 0px)) -8px calc(-8px - var(--safe-l, 0px)); position: relative; z-index: 1; }
+.worker .dock:has(> .phone-sheet) > .omnibox.expanded .omnibox-input { border-radius: 12px 12px 0 0; border-width: 1px 0 0; box-shadow: none; padding-left: calc(6px + var(--safe-l, 0px)); padding-right: calc(8px + var(--safe-r, 0px)); }
+.worker .dock:has(> .omnibox.expanded) > .phone-sheet { border-radius: 0; box-shadow: none; }
+.worker .dock:has(> .phone-sheet) > .omnibox.expanded .ob-chips { padding: 0 calc(8px + var(--safe-r, 0px)) 8px calc(8px + var(--safe-l, 0px)); }
+.worker .dock:has(> .omnibox.expanded) > .phone-sheet .sheet-grip { height: 8px; } /* one handle, not one in the middle of the surface */
+.worker .dock:has(> .omnibox.expanded) > .phone-sheet .sheet-handle { display: none; }
