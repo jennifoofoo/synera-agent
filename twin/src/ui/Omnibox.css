@@ -23,7 +23,8 @@
 .ob-icon { width: 36px; height: 36px; min-height: 36px; }
 .ob-icon:hover { color: var(--text); }
 .ob-icon.on { color: var(--gold); }
-.ob-icon.off { color: var(--muted); opacity: 0.75; }
+/* spoken replies off: plainly visible, not just dimmer */
+.ob-icon.off { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .ob-mic {
   width: 42px; height: 42px; min-height: 42px; color: var(--text);
   background: color-mix(in srgb, var(--text) 9%, transparent); border: 1px solid var(--line);
@@ -89,6 +90,14 @@
 }
 .ob-fab:hover { background: var(--panel-solid); }
 .ob-fab svg { width: 22px; height: 22px; }
+.ob-talk { position: relative; }
 .ob-talk.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: ob-pulse 1.4s ease-out infinite; }
+/* spoken replies off: a muted-speaker badge on the Talk button */
+.ob-badge {
+  position: absolute; top: -3px; right: -3px; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--danger);
+  border: 2px solid var(--panel-solid); pointer-events: none;
+}
+.ob-fab .ob-badge svg { width: 14px; height: 14px; }
 .omnibox.collapsed .ob-status { align-self: flex-end; }
 @media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }

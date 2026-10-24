@@ -120,9 +120,21 @@ export function Omnibox() {
     [ask],
   );
 
+  // Stop listening now: the UI leaves the listening state at once; the listener sends what it heard (send) or
+  // drops it, releases the mic and then runs onEnd. Safe to call when not listening.
+  const stopListening = useCallback((send: boolean) => {
+    const listener = listenerRef.current;
+    if (!listener) return;
+    setListening(false);
+    setHeard("");
+    if (send) listener.stop();
+    else listener.cancel();
+  }, []);
+
+  // A toggle: the listener ref, not the `listening` state, says whether a listen is running (no stale closure).
   const toggleMic = () => {
-    if (listening) {
-      listenerRef.current?.stop();
+    if (listenerRef.current) {
+      stopListening(true);
       return;
     }
     const problem = speechInputProblem();
@@ -135,20 +147,44 @@ export function Omnibox() {
     setHeard("");
     setListening(true);
     keepAwake("listening", true);
-    listenerRef.current = listen("en-US", {
-      onInterim: setHeard,
+    const listener: Listener = listen("en-US", {
+      onInterim: (said) => {
+        if (listenerRef.current === listener) setHeard(said);
+      },
       onFinal: (said) => void submit(said, true),
       onEnd: (error) => {
-        listenerRef.current = null;
+        if (listenerRef.current === listener) listenerRef.current = null;
         keepAwake("listening", false);
         setListening(false);
         setHeard("");
         if (error) setNotice(voiceHint(error === "unsupported" ? undefined : error));
       },
     });
+    listenerRef.current = listener;
   };
 
+  // Leaving drops the listen: unmount, the page going to the background, another building, the directions sheet.
   useEffect(() => () => listenerRef.current?.cancel(), []);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") stopListening(false);
+    };
+    const onPageHide = () => stopListening(false);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [stopListening]);
+  useEffect(
+    () =>
+      useTwin.subscribe((state, before) => {
+        const sheetToggled = (state.directions === null) !== (before.directions === null);
+        if (sheetToggled || state.buildingKey !== before.buildingKey) stopListening(false);
+      }),
+    [stopListening],
+  );
 
   // Close the input again when it loses focus with nothing typed (not while listening or busy).
   const collapseIfIdle = () => {
@@ -239,7 +275,7 @@ export function Omnibox() {
           ) : listening ? (
             <>
               <span className="ob-rec" aria-hidden />
-              {heard ? <span className="ob-heard">{heard}</span> : "Listening… tap the mic again to send"}
+              {heard ? <span className="ob-heard">{heard}</span> : "Listening… tap again to send"}
             </>
           ) : (
             <>
@@ -311,7 +347,7 @@ export function Omnibox() {
           aria-pressed={listening}
           title={listening ? "Tap to send" : "Tap and speak"}
         >
-          <MicIcon />
+          {listening ? <StopIcon /> : <MicIcon />}
         </button>
       </form>
 
@@ -330,7 +366,7 @@ export function Omnibox() {
           <button
             type="button"
             className={`ob-fab ob-talk mic ${listening ? "listening" : ""}`}
-            aria-label={listening ? "Stop and send" : "Talk"}
+            aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
             aria-pressed={listening}
             title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
             disabled={busy}
@@ -341,7 +377,12 @@ export function Omnibox() {
             onContextMenu={(event) => event.preventDefault()}
             onClick={talkClick}
           >
-            {voiceOut ? <MicIcon /> : <MicMutedIcon />}
+            {listening ? <StopIcon /> : <MicIcon />}
+            {!voiceOut && !listening && (
+              <span className="ob-badge" aria-hidden>
+                <MutedIcon />
+              </span>
+            )}
           </button>
         </div>
       )}
@@ -368,31 +409,33 @@ function ChatIcon() {
   );
 }
 
-/** Mic with a small slash in the corner: spoken replies are off. */
-function MicMutedIcon() {
+/** Filled square: tap to stop listening. */
+function StopIcon() {
   return (
     <svg {...iconProps}>
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-      <path d="M17 3.5l4 4" strokeWidth={2.2} />
+      <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" />
     </svg>
   );
 }
+
+// Speaker body shared by both speaker icons, so on and muted line up exactly.
+const SPEAKER_BODY = "M3.5 9.5h3l4.5-4v13l-4.5-4h-3z";
 
 function SpeakerIcon() {
   return (
     <svg {...iconProps}>
-      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
-      <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+      <path d={SPEAKER_BODY} fill="currentColor" fillOpacity={0.15} />
+      <path d="M14.5 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" />
     </svg>
   );
 }
 
+/** Standard "speaker muted": the same speaker with a full X where the sound waves were. */
 function MutedIcon() {
   return (
     <svg {...iconProps}>
-      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
-      <path d="M16 9.5l5 5M21 9.5l-5 5" />
+      <path d={SPEAKER_BODY} fill="currentColor" fillOpacity={0.15} />
+      <path d="M15 9.5l5.5 5.5M20.5 9.5L15 15" strokeWidth={2} />
     </svg>
   );
 }
