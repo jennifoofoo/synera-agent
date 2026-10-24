@@ -7,10 +7,11 @@ import itertools
 import math
 import statistics
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 
-from shapely.geometry import Point, Polygon
-from shapely.ops import nearest_points
+from shapely.geometry import LineString, MultiLineString, Point, Polygon
+from shapely.ops import linemerge, nearest_points, unary_union
 
 from building_agent.geometry import repaired
 from building_agent.level4.schema import DOOR_KINDS, OUTSIDE, ROOM_TYPES, Extraction, Findings, Scale
@@ -21,6 +22,12 @@ MIN_DOOR_WIDTH_M = 0.7
 MAX_DOOR_WIDTH_M = 2.5
 DEFAULT_DOOR_WIDTH_M = 0.9
 SNAP_TOLERANCE_M = 0.05
+DOOR_MOVED_WARN_M = 0.5
+MAX_DOOR_SNAP_M = ADJACENT_DISTANCE_M
+DOOR_CLAMP_SHARE = 0.1
+WALL_BUFFER_M = 0.25
+SHARED_WALL_GAP_M = 0.1
+MIN_EXTERIOR_STRETCH_M = 0.3
 MIN_ROOM_AREA_M2 = 0.05
 FLOOR_HEIGHT_M = 3.0
 MIN_STAIR_OVERLAP = 0.3
@@ -176,6 +183,54 @@ def _usable(ring: list[tuple[float, float]]) -> Polygon | None:
     return polygon
 
 
+# ---------- door snapping ----------
+
+
+def _lines(geometry) -> list[LineString]:
+    """The line parts of a shapely result, merged where they continue each other."""
+    parts = [g for g in getattr(geometry, "geoms", [geometry]) if isinstance(g, LineString) and g.length > 1e-6]
+    merged = linemerge(parts) if len(parts) > 1 else (parts[0] if parts else None)
+    if merged is None:
+        return []
+    return list(merged.geoms) if isinstance(merged, MultiLineString) else [merged]
+
+
+def shared_wall(first: Polygon, second: Polygon) -> list[LineString]:
+    """The stretches of first's outline that run along second (where the two polygons are closest)."""
+    reach = first.distance(second) + WALL_BUFFER_M
+    return _lines(first.boundary.intersection(second.boundary.buffer(reach)))
+
+
+def exterior_wall(room: Polygon, others: list[Polygon]) -> list[LineString]:
+    """The stretches of the room's outline that no other room touches."""
+    boundary = room.boundary
+    near = [other.buffer(SHARED_WALL_GAP_M) for other in others if other.distance(room) <= SHARED_WALL_GAP_M]
+    if near:
+        boundary = boundary.difference(unary_union(near))
+    lines = _lines(boundary)
+    return [line for line in lines if line.length >= MIN_EXTERIOR_STRETCH_M] or lines
+
+
+def point_on_wall(stretches: list[LineString], point: Point, width_m: float = 0.0) -> Point | None:
+    """The spot on the nearest stretch closest to `point`, pulled slightly in from the stretch ends."""
+    if not stretches:
+        return None
+    line = min(stretches, key=lambda item: item.distance(point))
+    along = line.project(point)
+    margin = width_m * DOOR_CLAMP_SHARE
+    if line.length > 2 * margin:
+        along = min(max(along, margin), line.length - margin)
+    return line.interpolate(along)
+
+
+def pixel_to_metres(extraction: Extraction, scale: float) -> Callable[[float, float], tuple[float, float]]:
+    """Image pixels (y down) to building metres (y up), the frame the converter uses."""
+    ys = [y for room in extraction.rooms or [] for ring in [_ring(room)] if ring for _, y in ring]
+    height = _finite(extraction.height_px)
+    flip = height if height is not None and height > 0 else (max(ys) if ys else 0.0)
+    return lambda x, y: (x * scale, (flip - y) * scale)
+
+
 def _door_width(width_px: object, scale: float) -> float:
     pixels = _finite(width_px)
     if pixels is None or pixels <= 0:
@@ -189,12 +244,7 @@ def _convert_floor(
     extraction, scale = floor_input.extraction, floor_input.scale.metres_per_px
     raw_rooms = list(extraction.rooms or [])
     entries = [(room, _ring(room)) for room in raw_rooms]
-    ys = [y for _, ring in entries if ring for _, y in ring]
-    height = _finite(extraction.height_px)
-    flip = height if height is not None and height > 0 else (max(ys) if ys else 0.0)
-
-    def to_m(x: float, y: float) -> tuple[float, float]:
-        return (x * scale, (flip - y) * scale)
+    to_m = pixel_to_metres(extraction, scale)
 
     kept: list[tuple[object, list[tuple[float, float]]]] = []
     seen_ids: set[str] = set()
@@ -288,18 +338,27 @@ def _convert_floor(
             continue
         point = Point(*to_m(*spot))
         ends = [id_map[i] for i in ids if i != OUTSIDE]
-        if any(room.polygon.distance(point) > ADJACENT_DISTANCE_M for room in ends):
+        if any(room.polygon.distance(point) > MAX_DOOR_SNAP_M for room in ends):
             found.add("door_not_on_wall", label)
             continue
-        first = nearest_points(boundary(ends[0]), point)[0]
+        width = _door_width(door.width_px, scale)
         if len(ends) == 2:
-            second = nearest_points(boundary(ends[1]), first)[0]
-            if first.distance(second) > 2 * ADJACENT_DISTANCE_M:  # the midpoint is then within 0.6 m of both
+            spot_m = point_on_wall(shared_wall(ends[0].polygon, ends[1].polygon), point, width)
+            if spot_m is None:
+                spot_m = nearest_points(boundary(ends[0]), point)[0]
+            second = nearest_points(boundary(ends[1]), spot_m)[0]
+            if spot_m.distance(second) > 2 * ADJACENT_DISTANCE_M:  # the midpoint is then within 0.6 m of both
                 found.add("door_not_on_wall", label)
                 continue
-            position = [(first.x + second.x) / 2, (first.y + second.y) / 2]
+            position = [(spot_m.x + second.x) / 2, (spot_m.y + second.y) / 2]
         else:
-            position = [first.x, first.y]
+            others = [room.polygon for room in rooms if room is not ends[0]]
+            spot_m = point_on_wall(exterior_wall(ends[0].polygon, others), point, width)
+            if spot_m is None:
+                spot_m = nearest_points(boundary(ends[0]), point)[0]
+            position = [spot_m.x, spot_m.y]
+        if point.distance(Point(position)) > DOOR_MOVED_WARN_M:
+            found.add("door_moved", label)
         kind = "entrance" if any(outside) else (door.kind if door.kind in DOOR_KINDS else "door")
         openings.append(
             {
@@ -308,7 +367,7 @@ def _convert_floor(
                 "space_ids": [OUTSIDE if flag else id_map[i].space_id for i, flag in zip(ids, outside, strict=True)],
                 "kind": kind,
                 "position": [round(position[0], 3), round(position[1], 3)],
-                "width_m": _door_width(door.width_px, scale),
+                "width_m": width,
                 "step_free": True,
                 "synthetic": False,
             }

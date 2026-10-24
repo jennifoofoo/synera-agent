@@ -15,25 +15,33 @@ from pathlib import Path
 
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
+from shapely.geometry import LineString, Point, Polygon
+from shapely.strtree import STRtree
 
 from building_agent.guide_tools import NO, YES, GuideState
 from building_agent.level4.convert import (
     ConvertError,
     FloorInput,
     convert_floors_with_findings,
+    exterior_wall,
+    pixel_to_metres,
+    point_on_wall,
     scale_from_bar,
     scale_from_known_length,
 )
 from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.validate import describe, validate
-from starter_agent.building_map import BuildingMap, MapError
+from starter_agent.building_map import NEW_DOOR_WIDTH_M, BuildingMap, MapError
 from starter_agent.tools import as_json
 
 BUILDINGS_ROOT = Path("agent_output") / "buildings"
 ALONG = ("building_width", "room", "door")
-FIX_ACTIONS = ("add_door", "remove_door", "set_room_type", "set_scale")
-ACCEPT = re.compile(r"\b(trotzdem|anyway|dennoch|accept|akzeptiere|mit den problemen)\b", re.IGNORECASE)
+FIX_ACTIONS = ("add_door", "remove_door", "add_entrance", "set_room_type", "set_scale")
+SIDES = {"north": (0, 1), "south": (0, -1), "east": (1, 0), "west": (-1, 0)}
+MAX_CANDIDATES = 5
+ENTRANCE_ROOM_TYPES = {"lobby", "hall"}
+ACCEPT = re.compile(r"\b(trotzdem|anyway|nevertheless|dennoch|accept|akzeptiere|mit den problemen)\b", re.IGNORECASE)
 ROOM_TYPE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
 ASK_SCALE = (
     "The plan has no printed scale bar and no known length was given. Ask the person for ONE length they know in "
@@ -100,9 +108,82 @@ def resolve_ref(building: dict, reference: str, level: int | None = None) -> dic
     return found[0]
 
 
-def apply_fix(building: dict, fix: tuple) -> str:
+def _unique_opening_id(building: dict, opening: dict) -> None:
+    """Give `opening` an id that no other opening of the building uses."""
+    taken = {other["id"] for other in building["openings"] if other is not opening}
+    base, number = opening["id"], 1
+    while opening["id"] in taken:
+        number += 1
+        opening["id"] = f"{base}-{number}"
+
+
+def _straight_pieces(lines: list[LineString]) -> list[LineString]:
+    return [LineString(pair) for line in lines for pair in zip(line.coords[:-1], line.coords[1:], strict=True)]
+
+
+def _floor_polygons(building: dict, floor_id: str) -> dict[str, Polygon]:
+    return {s["id"]: Polygon(s["polygon"]) for s in building["spaces"] if s["floor_id"] == floor_id}
+
+
+def _exterior_stretches(building: dict, space: dict) -> list[LineString]:
+    polygons = _floor_polygons(building, space["floor_id"])
+    others = [shape for space_id, shape in polygons.items() if space_id != space["id"]]
+    return exterior_wall(polygons[space["id"]], others)
+
+
+def _add_entrance(building: dict, fix: tuple, to_metres) -> str:
+    _, reference, level, side, point_px, step_free = fix
+    space = resolve_ref(building, reference, level)
+    if any(OUTSIDE in o["space_ids"] and space["id"] in o["space_ids"] for o in building["openings"]):
+        raise ToolError(f"{_label(space)} already has an entrance.")
+    stretches = _exterior_stretches(building, space)
+    if not stretches:
+        raise ToolError(
+            f"{_label(space)} has no outside wall (other rooms touch it on every side), so it cannot have an "
+            "entrance. Ask which room is next to the outside."
+        )
+    pieces = _straight_pieces(stretches)
+    width = NEW_DOOR_WIDTH_M
+    if point_px is not None:
+        floor_level = next(f["level"] for f in building["floors"] if f["id"] == space["floor_id"])
+        if to_metres is None:
+            raise ToolError("A point on the image cannot be used here.")
+        spot = point_on_wall(pieces, Point(*to_metres(floor_level, *point_px)), width)
+    elif side is not None:
+        centre = Polygon(space["polygon"]).centroid
+        direction = SIDES[side]
+        scored = [
+            (((m.x - centre.x) * direction[0] + (m.y - centre.y) * direction[1]), piece)
+            for piece in pieces
+            for m in [piece.interpolate(0.5, normalized=True)]
+        ]
+        best = max(scored, key=lambda item: item[0])
+        if best[0] <= 0:
+            raise ToolError(f"{_label(space)} has no outside wall on the {side} side.")
+        spot = best[1].interpolate(0.5, normalized=True)
+    else:
+        spot = max(pieces, key=lambda piece: piece.length).interpolate(0.5, normalized=True)
+    numbers = len(building["openings"]) + 1
+    opening = {
+        "id": f"{space['floor_id']}-O-new{numbers}",
+        "floor_id": space["floor_id"],
+        "space_ids": [space["id"], OUTSIDE],
+        "kind": "entrance",
+        "position": [round(spot.x, 3), round(spot.y, 3)],
+        "width_m": width,
+        "step_free": step_free,
+        "synthetic": False,
+    }
+    building["openings"].append(opening)
+    _unique_opening_id(building, opening)
+    return f"Entrance added to {_label(space)}" + ("" if step_free else " (with steps)") + "."
+
+
+def apply_fix(building: dict, fix: tuple, to_metres=None) -> str:
     """Apply one deterministic fix to `building` in place and return what was done. Raises ToolError."""
     action = fix[0]
+    if action == "add_entrance":
+        return _add_entrance(building, fix, to_metres)
     if action == "set_room_type":
         _, reference, room_type, level = fix
         space = resolve_ref(building, reference, level)
@@ -120,12 +201,43 @@ def apply_fix(building: dict, fix: tuple) -> str:
         except MapError as error:
             raise ToolError(str(error)) from error
         opening["synthetic"] = False
+        _unique_opening_id(building, opening)
         return f"Door added between {_label(first)} and {_label(second)}."
     before = len(building["openings"])
     building["openings"] = [o for o in building["openings"] if set(o["space_ids"]) != pair]
     if len(building["openings"]) == before:
         raise ToolError(f"There is no door between {_label(first)} and {_label(second)}.")
     return f"Door removed between {_label(first)} and {_label(second)}."
+
+
+def entrance_candidates(building: dict) -> list[str]:
+    """Up to 5 room refs on the lowest floor for 'which room has the entrance': lobbies and halls first, then
+    rooms with the longest outside wall."""
+    lowest = min(building["floors"], key=lambda floor: floor["level"])
+    spaces = [space for space in building["spaces"] if space["floor_id"] == lowest["id"]]
+    polygons = _floor_polygons(building, lowest["id"])
+    ids = list(polygons)
+    tree = STRtree([polygons[i] for i in ids])
+    ranked = []
+    for space in spaces:
+        shape = polygons[space["id"]]
+        nearby = [polygons[ids[j]] for j in tree.query(shape.buffer(0.3)) if ids[j] != space["id"]]
+        outside = sum(line.length for line in exterior_wall(shape, nearby))
+        first = space.get("room_type") in ENTRANCE_ROOM_TYPES or space.get("type") in ENTRANCE_ROOM_TYPES
+        if outside > 0:
+            ranked.append((not first, -outside, _label(space)))
+    return [label for _, _, label in sorted(ranked)[:MAX_CANDIDATES]]
+
+
+def entrance_question(building: dict) -> str | None:
+    """A plain question when no room of the draft has an entrance, else None."""
+    if any(OUTSIDE in opening["space_ids"] for opening in building["openings"]):
+        return None
+    candidates = entrance_candidates(building)
+    text = "The plan shows no entrance. Ask the person which room the entrance is in, then call fix_draft with action add_entrance."
+    if candidates:
+        text += " Likely rooms: " + ", ".join(candidates) + "."
+    return text
 
 
 def counts(building: dict, level: int | None = None) -> dict:
@@ -151,6 +263,14 @@ def write_atomic(path: Path, text: str) -> None:
         raise
 
 
+def _to_metres(draft: "Level4Draft"):
+    def convert(level: int, x: float, y: float) -> tuple[float, float]:
+        source = draft.floors[level]
+        return pixel_to_metres(source.extraction, source.scale.metres_per_px)(x, y)
+
+    return convert
+
+
 def _rebuild(draft: Level4Draft) -> None:
     """Convert all stored floors, replay the fixes, validate. Raises ToolError when nothing usable results."""
     inputs = [FloorInput(level, src.extraction, src.scale) for level, src in sorted(draft.floors.items())]
@@ -159,7 +279,7 @@ def _rebuild(draft: Level4Draft) -> None:
         notes = []
         for fix in draft.fixes:
             try:
-                apply_fix(building, fix)
+                apply_fix(building, fix, _to_metres(draft))
             except ToolError as error:
                 notes.append(f"An earlier fix ({fix[0]}) no longer applies: {error}")
         checked = validate(building)
@@ -260,6 +380,9 @@ def make_level4_tools(
             "problems": describe(draft.findings),
             "next": "Draft only, nothing saved. Call preview_draft to show the person the card.",
         }
+        question = entrance_question(draft.building)
+        if question:
+            summary["question"] = question
         if fresh:
             summary["seconds"] = round(result.seconds, 1)
             summary["cost_usd"] = round(result.cost_usd, 4)
@@ -276,12 +399,21 @@ def make_level4_tools(
         known_length_m: float | None = None,
         along: str = "building_width",
         level: int | None = None,
+        side: str | None = None,
+        point_px: list[float] | None = None,
+        steps: bool = False,
     ) -> str:
         """Correct the draft deterministically, then show the card again with preview_draft.
+        If the plan shows no entrance, ask which room it is in and call fix_draft add_entrance.
 
         Args:
-            action: "add_door" (ref, other_ref), "remove_door" (ref, other_ref), "set_room_type" (ref, room_type)
-                or "set_scale" (known_length_m, along, optional level).
+            action: "add_door" (ref, other_ref), "remove_door" (ref, other_ref), "add_entrance" (ref, optional
+                side or point_px, optional steps), "set_room_type" (ref, room_type) or "set_scale"
+                (known_length_m, along, optional level).
+            side: For add_entrance: "north", "south", "east" or "west" wall of the room (default: its longest
+                outside wall).
+            point_px: For add_entrance: [x, y] in image pixels, the entrance goes to the outside wall nearest to it.
+            steps: For add_entrance: True only if the person says the entrance has steps.
             ref: Room number, name or id of the (first) room.
             other_ref: Second room of the door.
             room_type: New type as snake_case identifier, e.g. "stairwell", "kitchen", "toilet", "office".
@@ -313,7 +445,21 @@ def make_level4_tools(
                 draft.floors[target] = old
                 raise
             return as_json({"done": f"Scale of floor {target}: {scale.note}.", "problems": describe(draft.findings)})
-        if action == "set_room_type":
+        if action == "add_entrance":
+            if not ref:
+                raise ToolError("add_entrance needs ref (the room with the entrance).")
+            if side is not None:
+                side = side.strip().lower()
+                if side not in SIDES:
+                    raise ToolError("side must be north, south, east or west (or give point_px instead).")
+            point = None
+            if point_px is not None:
+                try:
+                    point = (float(point_px[0]), float(point_px[1]))
+                except (TypeError, ValueError, IndexError):
+                    raise ToolError("point_px must be [x, y] in image pixels.") from None
+            fix = ("add_entrance", ref, level, side, point, not steps)
+        elif action == "set_room_type":
             normal = (room_type or "").strip().lower().replace(" ", "_")
             if not ref or not ROOM_TYPE.match(normal):
                 raise ToolError("set_room_type needs ref and a room_type like 'kitchen' or 'stairwell'.")
@@ -323,13 +469,17 @@ def make_level4_tools(
                 raise ToolError(f"{action} needs ref and other_ref (two room numbers).")
             fix = (action, ref, other_ref, level)
         candidate = copy.deepcopy(building)
-        done = apply_fix(candidate, fix)
+        done = apply_fix(candidate, fix, _to_metres(draft))
         draft.fixes.append(fix)
         draft.building = candidate
         draft.findings = Findings(draft.convert_items + validate(candidate).items)
         draft.version += 1
         draft.card_turn = None
-        return as_json({"done": done, "problems": describe(draft.findings)})
+        reply = {"done": done, "problems": describe(draft.findings)}
+        question = entrance_question(candidate)
+        if question:
+            reply["question"] = question
+        return as_json(reply)
 
     @beta_tool
     def preview_draft() -> str:
@@ -361,8 +511,11 @@ def make_level4_tools(
         if not errors.ok:
             card["saving blocked"] = (
                 "There are problems that normally block saving. Fix them, or the person must say clearly they want "
-                "to save anyway ('trotzdem speichern')."
+                "to save anyway ('trotzdem speichern' or 'save it anyway')."
             )
+        question = entrance_question(building)
+        if question:
+            card["question"] = question
         if draft.notes:
             card["notes"] = draft.notes
         draft.card_turn, draft.card_version, draft.card_blocked = state.turn, draft.version, not errors.ok
@@ -390,13 +543,16 @@ def make_level4_tools(
             raise ToolError("The card is out of date (the person did not answer it right away). Call preview_draft.")
         if card_version != draft.version:
             raise ToolError("The draft changed since the card was shown. Call preview_draft again.")
-        if confirmed and (not YES.search(user_reply) or NO.search(user_reply)):
+        errors = draft.findings.errors
+        accepting = bool(
+            (errors or blocked) and accept_problems and ACCEPT.search(user_reply) and not NO.search(user_reply)
+        )
+        if confirmed and not accepting and (not YES.search(user_reply) or NO.search(user_reply)):
             raise ToolError("That reply is not a clear yes. Ask the person again, then call preview_draft anew.")
         if not confirmed:
             return as_json({"saved": False, "note": "Not saved. The draft is kept, you can still fix it."})
-        errors = draft.findings.errors
         if errors or blocked:
-            if not (accept_problems and ACCEPT.search(user_reply)):
+            if not accepting:
                 raise ToolError(
                     "The draft still has problems that block saving: "
                     + describe(Findings(errors))
@@ -413,19 +569,22 @@ def make_level4_tools(
         bm_holder.bm = new_map
         state.session = None
         state.pending = None
-        draft.card_turn = None
         if on_saved is not None:
             on_saved(path)
         accepted = describe(Findings(errors)) if errors else None
-        return as_json(
-            {
-                "saved": True,
-                "path": str(path),
-                "building_id": draft.building_id,
-                **counts(building),
-                "accepted_problems": accepted,
-                "note": "This building is now the active one; questions use it.",
-            }
-        )
+        result = {
+            "saved": True,
+            "path": str(path),
+            "building_id": draft.building_id,
+            **counts(building),
+            "accepted_problems": accepted,
+            "note": (
+                "This building is now the active one. The building has changed. "
+                "Ask your question again in your next message."
+            ),
+        }
+        fresh = Level4Draft(cache=draft.cache)  # a second plan starts clean and gets its own building id
+        draft.__dict__.update(fresh.__dict__)
+        return as_json(result)
 
     return [build_from_plan, fix_draft, preview_draft, save_building]

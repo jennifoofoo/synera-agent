@@ -193,7 +193,7 @@ def test_save_only_after_card_and_clear_yes_in_the_next_message(rig):
     result = rig.call("save_building", confirmed=True, user_reply="Ja, bitte")
     assert result["saved"] is True
     path = Path(result["path"])
-    assert path == rig.buildings / rig.draft.building_id / "building.json"
+    assert path == rig.buildings / result["building_id"] / "building.json"
     assert rig.saved == [path]
     assert rig.holder.bm is not rig.first_map
 
