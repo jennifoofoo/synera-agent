@@ -1,0 +1,431 @@
+"""Level 4 step 2: conversation tools that build a building from floor plan images.
+
+Flow: build_from_plan (draft, never the active map) -> fix_draft -> preview_draft (the understanding card)
+-> save_building after a clear yes in the NEXT message. The confirmation rules are the ones of confirm_change."""
+
+import copy
+import json
+import os
+import re
+import tempfile
+import uuid
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from anthropic import beta_tool
+from anthropic.lib.tools import ToolError
+
+from building_agent.guide_tools import NO, YES, GuideState
+from building_agent.level4.convert import (
+    ConvertError,
+    FloorInput,
+    convert_floors_with_findings,
+    scale_from_bar,
+    scale_from_known_length,
+)
+from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
+from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
+from building_agent.level4.validate import describe, validate
+from starter_agent.building_map import BuildingMap, MapError
+from starter_agent.tools import as_json
+
+BUILDINGS_ROOT = Path("agent_output") / "buildings"
+ALONG = ("building_width", "room", "door")
+FIX_ACTIONS = ("add_door", "remove_door", "set_room_type", "set_scale")
+ACCEPT = re.compile(r"\b(trotzdem|anyway|dennoch|accept|akzeptiere|mit den problemen)\b", re.IGNORECASE)
+ROOM_TYPE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
+ASK_SCALE = (
+    "The plan has no printed scale bar and no known length was given. Ask the person for ONE length they know in "
+    "metres (the width of the whole building, the width of one room, or a door width), then call build_from_plan "
+    "again with known_length_m (and along). The image is already read, so this costs nothing extra."
+)
+
+
+@dataclass
+class BMHolder:
+    """The active BuildingMap of the session; save_building replaces `bm`."""
+
+    bm: BuildingMap
+
+
+@dataclass
+class FloorSource:
+    extraction: Extraction
+    scale: Scale
+    scale_args: dict
+
+
+@dataclass
+class Level4Draft:
+    floors: dict[int, FloorSource] = field(default_factory=dict)
+    fixes: list[tuple] = field(default_factory=list)
+    building: dict | None = None
+    findings: Findings = field(default_factory=Findings)
+    convert_items: list = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    building_id: str = field(default_factory=lambda: f"plan-{uuid.uuid4().hex[:8]}")
+    name: str = "Uploaded building"
+    version: int = 0
+    card_turn: int | None = None
+    card_version: int = -1
+    card_blocked: bool = False
+    cache: dict = field(default_factory=dict)
+    cost_usd: float = 0.0
+    last_level: int = 0
+
+
+# ---------- pure helpers ----------
+
+
+def _label(space: dict) -> str:
+    return space.get("ref") or space.get("name") or space["id"]
+
+
+def resolve_ref(building: dict, reference: str, level: int | None = None) -> dict:
+    """One space by ref, name or id (case-insensitive). Raises ToolError with candidates when unclear."""
+    wanted = str(reference).strip().lower()
+    floor_level = {floor["id"]: floor["level"] for floor in building["floors"]}
+    found = [
+        space
+        for space in building["spaces"]
+        if (level is None or floor_level[space["floor_id"]] == level)
+        and wanted in {str(space["id"]).lower(), str(space.get("ref") or "").lower(), str(space["name"]).lower()}
+    ]
+    if not found:
+        raise ToolError(f"No room '{reference}' in the draft. Use a room number as shown in the card.")
+    if len(found) > 1:
+        floors = ", ".join(sorted({str(floor_level[space["floor_id"]]) for space in found}))
+        raise ToolError(f"'{reference}' is ambiguous (floors {floors}). Say which floor with level.")
+    return found[0]
+
+
+def apply_fix(building: dict, fix: tuple) -> str:
+    """Apply one deterministic fix to `building` in place and return what was done. Raises ToolError."""
+    action = fix[0]
+    if action == "set_room_type":
+        _, reference, room_type, level = fix
+        space = resolve_ref(building, reference, level)
+        space["room_type"] = room_type
+        return f"{_label(space)} is now a {room_type.replace('_', ' ')}."
+    first, second = resolve_ref(building, fix[1], fix[3]), resolve_ref(building, fix[2], fix[3])
+    pair = {first["id"], second["id"]}
+    if first["id"] == second["id"]:
+        raise ToolError("A door needs two different rooms.")
+    if action == "add_door":
+        if any(set(opening["space_ids"]) == pair for opening in building["openings"]):
+            raise ToolError("These two rooms already have a door between them.")
+        try:
+            opening = BuildingMap(building).add_door(first["id"], second["id"])
+        except MapError as error:
+            raise ToolError(str(error)) from error
+        opening["synthetic"] = False
+        return f"Door added between {_label(first)} and {_label(second)}."
+    before = len(building["openings"])
+    building["openings"] = [o for o in building["openings"] if set(o["space_ids"]) != pair]
+    if len(building["openings"]) == before:
+        raise ToolError(f"There is no door between {_label(first)} and {_label(second)}.")
+    return f"Door removed between {_label(first)} and {_label(second)}."
+
+
+def counts(building: dict, level: int | None = None) -> dict:
+    floor_ids = {floor["id"] for floor in building["floors"] if level is None or floor["level"] == level}
+    spaces = [s for s in building["spaces"] if s["floor_id"] in floor_ids]
+    openings = [o for o in building["openings"] if o["floor_id"] in floor_ids]
+    entrances = [o for o in openings if OUTSIDE in o["space_ids"]]
+    return {"rooms": len(spaces), "doors": len(openings) - len(entrances), "entrances": len(entrances)}
+
+
+def write_atomic(path: Path, text: str) -> None:
+    """Write `text` to `path` so that readers see the old file or the whole new one, never a part."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle, temp_name = tempfile.mkstemp(dir=path.parent, prefix=".building-", suffix=".tmp")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as file:
+            file.write(text)
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temp_name, path)
+    except BaseException:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
+
+
+def _rebuild(draft: Level4Draft) -> None:
+    """Convert all stored floors, replay the fixes, validate. Raises ToolError when nothing usable results."""
+    inputs = [FloorInput(level, src.extraction, src.scale) for level, src in sorted(draft.floors.items())]
+    try:
+        building, converted = convert_floors_with_findings(inputs, draft.name, draft.building_id)
+        notes = []
+        for fix in draft.fixes:
+            try:
+                apply_fix(building, fix)
+            except ToolError as error:
+                notes.append(f"An earlier fix ({fix[0]}) no longer applies: {error}")
+        checked = validate(building)
+    except ConvertError as error:
+        raise ToolError(str(error)) from error
+    except (ValueError, ArithmeticError, TypeError, KeyError, IndexError):
+        raise ToolError(
+            "This plan could not be converted (odd numbers or shapes). Try another image or scale."
+        ) from None
+    draft.building = building
+    draft.convert_items = converted.items
+    draft.findings = Findings(converted.items + checked.items)
+    draft.notes = notes
+    draft.version += 1
+    draft.card_turn = None
+
+
+# ---------- tools ----------
+
+
+def make_level4_tools(
+    bm_holder: BMHolder,
+    output_directory: Path,
+    state: GuideState,
+    on_saved: Callable[[Path], None] | None = None,
+    uploads_root: Path = DEFAULT_ALLOWED_ROOT,
+    buildings_root: Path = BUILDINGS_ROOT,
+) -> list:
+    draft = getattr(state, "level4", None)
+    if draft is None:
+        draft = state.level4 = Level4Draft()
+
+    def need_draft() -> dict:
+        if draft.building is None:
+            raise ToolError("There is no draft yet. Call build_from_plan with an image first.")
+        return draft.building
+
+    @beta_tool
+    def build_from_plan(
+        image_path: str, level: int = 0, known_length_m: float | None = None, along: str = "building_width"
+    ) -> str:
+        """Read ONE floor plan image from the upload folder and build a DRAFT building (not saved, not active).
+        Needs the floor (level) and, unless the plan has a printed scale bar, ONE length the person knows.
+        If this returns an error asking for the scale, ask the person and call it again with known_length_m.
+        Call it once per floor; then show the card with preview_draft.
+
+        Args:
+            image_path: Path of the PNG or JPG inside agent_output/uploads (or just the file name).
+            level: Floor of this image (0 = ground floor, 1 = first floor, -1 = basement).
+            known_length_m: A length in metres the person knows, e.g. the width of the whole building.
+            along: What that length is: "building_width", "room" (its shorter side) or "door".
+        """
+        if along not in ALONG:
+            raise ToolError(f"along must be one of {ALONG}.")
+        path = Path(image_path)
+        if not path.is_absolute() and len(path.parts) == 1:
+            path = Path(uploads_root) / path
+        try:
+            stamp = path.stat()
+            key = (str(path), stamp.st_mtime_ns, stamp.st_size)
+        except OSError:
+            key = (str(path), None, None)
+        result: ExtractResult | None = draft.cache.get(key)
+        fresh = result is None
+        if fresh:
+            try:
+                result = extract_floor(path, allowed_root=uploads_root)
+            except ExtractError as error:
+                raise ToolError(str(error)) from error
+            draft.cache[key] = result
+            draft.cost_usd += result.cost_usd
+        extraction = result.extraction
+        try:
+            if known_length_m is not None:
+                scale = scale_from_known_length(extraction, known_length_m, along)
+            else:
+                scale = scale_from_bar(extraction)
+        except ConvertError as error:
+            raise ToolError(str(error)) from error
+        if scale is None:
+            raise ToolError(ASK_SCALE)
+        previous = draft.floors.get(level)
+        draft.floors[level] = FloorSource(extraction, scale, {"known_length_m": known_length_m, "along": along})
+        try:
+            _rebuild(draft)
+        except ToolError:
+            if previous is None:
+                del draft.floors[level]
+            else:
+                draft.floors[level] = previous
+            raise
+        draft.last_level = level
+        summary = {
+            "floor": level,
+            **counts(draft.building, level),
+            "scale": scale.note,
+            "scale_source": scale.source,
+            "problems": describe(draft.findings),
+            "next": "Draft only, nothing saved. Call preview_draft to show the person the card.",
+        }
+        if fresh:
+            summary["seconds"] = round(result.seconds, 1)
+            summary["cost_usd"] = round(result.cost_usd, 4)
+        if result.warnings:
+            summary["warnings"] = result.warnings
+        return as_json(summary)
+
+    @beta_tool
+    def fix_draft(
+        action: str,
+        ref: str | None = None,
+        other_ref: str | None = None,
+        room_type: str | None = None,
+        known_length_m: float | None = None,
+        along: str = "building_width",
+        level: int | None = None,
+    ) -> str:
+        """Correct the draft deterministically, then show the card again with preview_draft.
+
+        Args:
+            action: "add_door" (ref, other_ref), "remove_door" (ref, other_ref), "set_room_type" (ref, room_type)
+                or "set_scale" (known_length_m, along, optional level).
+            ref: Room number, name or id of the (first) room.
+            other_ref: Second room of the door.
+            room_type: New type as snake_case identifier, e.g. "stairwell", "kitchen", "toilet", "office".
+            known_length_m: For set_scale, a length in metres the person knows.
+            along: For set_scale: "building_width", "room" (ref is that room) or "door".
+            level: Floor to disambiguate a room number, or the floor whose scale is set (default: last built).
+        """
+        building = need_draft()
+        if action not in FIX_ACTIONS:
+            raise ToolError(f"action must be one of {FIX_ACTIONS}.")
+        if action == "set_scale":
+            if known_length_m is None:
+                raise ToolError("set_scale needs known_length_m.")
+            if along not in ALONG:
+                raise ToolError(f"along must be one of {ALONG}.")
+            target = level if level is not None else draft.last_level
+            if target not in draft.floors:
+                raise ToolError(f"There is no floor {target} in the draft.")
+            source = draft.floors[target]
+            try:
+                scale = scale_from_known_length(source.extraction, known_length_m, along, ref)
+            except ConvertError as error:
+                raise ToolError(str(error)) from error
+            old = draft.floors[target]
+            draft.floors[target] = FloorSource(source.extraction, scale, {"known_length_m": known_length_m})
+            try:
+                _rebuild(draft)
+            except ToolError:
+                draft.floors[target] = old
+                raise
+            return as_json({"done": f"Scale of floor {target}: {scale.note}.", "problems": describe(draft.findings)})
+        if action == "set_room_type":
+            normal = (room_type or "").strip().lower().replace(" ", "_")
+            if not ref or not ROOM_TYPE.match(normal):
+                raise ToolError("set_room_type needs ref and a room_type like 'kitchen' or 'stairwell'.")
+            fix = ("set_room_type", ref, normal, level)
+        else:
+            if not ref or not other_ref:
+                raise ToolError(f"{action} needs ref and other_ref (two room numbers).")
+            fix = (action, ref, other_ref, level)
+        candidate = copy.deepcopy(building)
+        done = apply_fix(candidate, fix)
+        draft.fixes.append(fix)
+        draft.building = candidate
+        draft.findings = Findings(draft.convert_items + validate(candidate).items)
+        draft.version += 1
+        draft.card_turn = None
+        return as_json({"done": done, "problems": describe(draft.findings)})
+
+    @beta_tool
+    def preview_draft() -> str:
+        """The understanding card for the draft, in plain words: what was understood and which problems exist.
+        Show it to the person, then wait for their answer in their NEXT message before save_building."""
+        building = need_draft()
+        errors = Findings(draft.findings.errors)
+        floors = {floor["id"]: floor for floor in building["floors"]}
+        by_floor: dict[str, list[str]] = {}
+        for space in building["spaces"]:
+            by_floor.setdefault(space["floor_id"], []).append(_label(space))
+        understood = []
+        for floor_id, labels in by_floor.items():
+            floor = floors[floor_id]
+            understood.append(
+                {
+                    "floor": floor["name"],
+                    **counts(building, floor["level"]),
+                    "room numbers": labels[:40],
+                    "scale": draft.floors[floor["level"]].scale.note,
+                }
+            )
+        card = {
+            "I understood": understood,
+            "problems found": describe(draft.findings),
+            "can be saved": errors.ok,
+            "status": "nothing saved yet, waiting for the person's yes",
+        }
+        if not errors.ok:
+            card["saving blocked"] = (
+                "There are problems that normally block saving. Fix them, or the person must say clearly they want "
+                "to save anyway ('trotzdem speichern')."
+            )
+        if draft.notes:
+            card["notes"] = draft.notes
+        draft.card_turn, draft.card_version, draft.card_blocked = state.turn, draft.version, not errors.ok
+        return as_json(card)
+
+    @beta_tool
+    def save_building(confirmed: bool, user_reply: str, accept_problems: bool = False) -> str:
+        """Save the draft as a building and make it the active one (call only after preview_draft).
+        Only call this after the person answered the card in a NEW message.
+
+        Args:
+            confirmed: True only if the person clearly said yes to the card.
+            user_reply: The person's answer to the card, copied word for word from their last message.
+            accept_problems: True only if the card said saving is blocked and the person explicitly said they
+                want to save anyway.
+        """
+        building = need_draft()
+        if draft.card_turn is None:
+            raise ToolError("No card was shown. Call preview_draft, show it, and wait for the person's answer.")
+        if state.turn == draft.card_turn:
+            raise ToolError("Ask the person first: show the card and wait for their answer in a new message.")
+        card_turn, card_version, blocked = draft.card_turn, draft.card_version, draft.card_blocked
+        draft.card_turn = None
+        if state.turn > card_turn + 1:
+            raise ToolError("The card is out of date (the person did not answer it right away). Call preview_draft.")
+        if card_version != draft.version:
+            raise ToolError("The draft changed since the card was shown. Call preview_draft again.")
+        if confirmed and (not YES.search(user_reply) or NO.search(user_reply)):
+            raise ToolError("That reply is not a clear yes. Ask the person again, then call preview_draft anew.")
+        if not confirmed:
+            return as_json({"saved": False, "note": "Not saved. The draft is kept, you can still fix it."})
+        errors = draft.findings.errors
+        if errors or blocked:
+            if not (accept_problems and ACCEPT.search(user_reply)):
+                raise ToolError(
+                    "The draft still has problems that block saving: "
+                    + describe(Findings(errors))
+                    + " Fix them, or call preview_draft and ask whether to save anyway."
+                )
+            if any(finding.code == "building_invalid" for finding in errors):
+                raise ToolError("The building data is incomplete and cannot be saved at all.")
+        path = buildings_root / draft.building_id / "building.json"
+        try:
+            write_atomic(path, json.dumps(building, indent=1, ensure_ascii=False))
+            new_map = BuildingMap.load(path)
+        except (OSError, ValueError, KeyError) as error:
+            raise ToolError(f"The building could not be saved ({type(error).__name__}). Nothing was changed.") from None
+        bm_holder.bm = new_map
+        state.session = None
+        state.pending = None
+        draft.card_turn = None
+        if on_saved is not None:
+            on_saved(path)
+        accepted = describe(Findings(errors)) if errors else None
+        return as_json(
+            {
+                "saved": True,
+                "path": str(path),
+                "building_id": draft.building_id,
+                **counts(building),
+                "accepted_problems": accepted,
+                "note": "This building is now the active one; questions use it.",
+            }
+        )
+
+    return [build_from_plan, fix_draft, preview_draft, save_building]
