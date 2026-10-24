@@ -1,62 +1,59 @@
 # Demo script
 
-Persona: Sam, a new service technician on the first day. Does not know a single room name, has the phone in one hand.
-Language: English, voice in and out. Building: pick one procedural factory or campus from `data/dev` that has a lift, a machine hall and a coffee spot. Run the whole script once beforehand and fix the building and wording that work.
+Persona: a new technician, day 1, hands full, phone in one hand. Does not know a single room name. Language: English, voice in and out. The assistant is called Wanda in the video (a name for the voice, not a name in the code). Building: one factory or campus from `data/dev` with a lift and a coffee machine. Run the whole script once beforehand and fix the building and the wording that work.
 
-Legend: MUST = works in main today. OPTIONAL = needs a feature that is not merged at the time of writing. Check `docs/STATUS.md` before recording and use the fallback if the feature is not in main.
+State checked against `main` at fe67dc3. Legend: **MAIN** = server and page work today. **NEEDS PAGE PART** = the server side is on main, the page side is not (Leonie's open work in `docs/STATUS.md`), so there is a fallback shot. Re-check `docs/STATUS.md` before recording.
 
 ## 90-second video
 
-| Time | On screen | Said (voice) | Must work |
-|---|---|---|---|
-| 0:00 to 0:08 | Web page, building loaded, empty chat | Voiceover: "First day, new building, no idea where anything is. Sam just asks." | Page loads, building picker shows the building |
-| 0:08 to 0:20 | Mic button pressed, Sam speaks, plan pulses on the hit | Sam: "Where can I get a coffee?" Agent answers aloud with the room and floor | MUST: voice in (browser), find tool, hit pulses on the plan, ElevenLabs reply |
-| 0:20 to 0:38 | Route drawn and animated on the plan, floor switch marker | Sam: "Take me there, I am at the main entrance." Agent: three short steps with landmarks ("turn left at the CNC mill") | MUST: route animation, landmark directions, 3 steps per turn |
-| 0:38 to 0:46 | Chat: "next" | Sam: "Next." Agent gives the next three steps | MUST: next_steps |
-| 0:46 to 1:00 | Route turns step-free, longer, lift shown | Sam: "My colleague uses a wheelchair, what is the way for her?" Agent: step-free route, says how much longer, or says honestly if none | MUST: step-free routing |
-| 1:00 to 1:18 | Confirmation card appears on screen, then the plan updates | Sam: "Lift 1 is out for maintenance." Agent shows a card with the effect on the route. Sam: "Yes." Route recomputes ("37 m longer, now via lift 2") | MUST: propose_change, card, clear-yes guard, what_changes |
-| 1:18 to 1:30 | Close-up of the card, then the title line | Voiceover: "Every number comes from tested code. The model only talks, and nothing changes without a clear yes." | none |
+| # | Scene | On screen | Wanda says | User says | Sec | Status |
+|---|---|---|---|---|---|---|
+| 1 | Day 1 | Page loaded, empty chat | (voiceover) "First day, new building, no idea where anything is." | | 6 | MAIN |
+| 2 | Position | Chat: the person says where they are | "Got it, you are at the main entrance." | "I'm at the main entrance." | 8 | Chat text MAIN. Blue dot NEEDS PAGE PART (`feat/position-page`). Fallback: show the chip-free chat reply and the route start on the plan. |
+| 3 | Nearest | Hit pulses on the plan | "The nearest coffee machine is in Kitchen 0.12, 14 m away. Is that the one you mean?" | "Where is the coffee machine?" | 10 | Nearest search and assumption sentence MAIN (`find_nearest`). Pulse on the plan from chat hits: check on the page; if it does not pulse, show the route instead. Spoken rules (one short question, no lists) NEEDS PAGE PART: the page must send `voice: true`. |
+| 4 | Offer | Chat | "It is on the ground floor, about a minute. Do you want me to guide you while you walk?" | "Yes." | 8 | Overview with offer and guided walking MAIN (`walk.py`). |
+| 5 | Guided walk | Route animates, steps three at a time | "Leave through the door ahead, turn left at the press." | | 12 | Directions with landmarks MAIN. Auto-Pace timer (check-in after the estimated time) NEEDS PAGE PART. Fallback: user says "next". |
+| 6 | Position again | Route restarts from the new spot | "From the lift: take it up one floor, then ..." | "I'm at the lift, where next?" | 10 | Position along the route MAIN (server). Moving dot NEEDS PAGE PART. |
+| 7 | Facility manager | Confirmation card with the effect on the route | "Closing lift 1 makes your route 37 m longer, via lift 2. Shall I close it?" | "Close lift 1 for maintenance." | 12 | Card MAIN |
+| 8 | Yes | Plan redraws live, lift marked closed | "Done. New route via lift 2." | "Yes." | 10 | Clear-yes guard and live route change MAIN |
+| 9 | Level 4 (optional) | Drop a plan image, building appears in seconds, rooms with no way out in red, then a route in it | "I built 28 rooms. Two have no way out, want a door suggestion?" | "Route from room 0.03 to 0.21." | 14 | Upload page MAIN (`/api/level4/*`, merged, not browser-checked by Jennifer). Switching the page to the saved building NEEDS PAGE PART (W-L4b is merged locally, check). Image route only (vision, about 10 s); the SVG route is not on main. Fallback: terminal recording of `proc-campus-dev-000` floor 0. |
+| 10 | Close | Title line | (voiceover) "Every number comes from tested code. Nothing changes without a clear yes." | | 6 | MAIN |
 
-### Optional shots (each has a fallback)
+Total with scene 9: 96 s. Without scene 9: 82 s. Cut scene 3 or 6 first if over 90.
 
-| Slot | Optional shot | Needs | Fallback shot |
-|---|---|---|---|
-| after 1:00 | Sam says "Put the second press next to the CNC" and the asset moves on the plan after the card (placement by voice) | placement by voice merged and wired in the page | Same card flow with "Close lift 1" (already in the table) |
-| replaces 1:18 to 1:30 | 3D view with a walkthrough of the route | 3D view merged | Plan with route animation, stacked floors via the floor switcher |
-| extra 5 s | Two buildings connected, route across the walkway (Level 3) | Level 3 campus merged | Skip. Mention in the pitch as "specified, not shipped" only if it is not merged |
-| extra 8 s | Drop a floor plan image, the building appears with a red room "no way out" and a door suggestion (Level 4 upload page) | Level 4 upload page in `web/` (today Level 4 runs through chat tools with a file in `agent_output/uploads/`, not through the page) | Screen recording of the terminal or chat building a clean plan (`proc-campus-dev-000` floor 0), plus the table from `docs/eval-log.md` for one second |
+Rows 3, 4, 5, 6 need exact numbers in the voice track: record once, then copy the real numbers from the screen into the script.
 
 ## 3-minute pitch outline
 
 | Time | Part | Content |
 |---|---|---|
-| 0:00 to 0:25 | Problem | Floor plans are PDFs, machines live in spreadsheets, the person who knows left. Outdoors we type and follow a line, indoors nobody can. |
-| 0:25 to 0:50 | Solution | Talk to the building. Deterministic core (graph of rooms, doors, lifts), LLM only as interaction layer. Show the architecture picture for 10 s. |
-| 0:50 to 1:50 | Live demo moment | One live run: voice question, route, step-free, lift closed, card, yes, new route. Same flow as the video, shortened. Have the recording ready as backup. |
-| 1:50 to 2:20 | Numbers | Dev sample 72 of 72, route sequences at full points 92.4 % to 99.6 % after the door-to-door model (estimate), Level 4 on clean plans recall 1.00 at about 0.02 USD per floor. Honest line: weak on dense Swiss plans, the agent warns and asks. |
-| 2:20 to 2:45 | What we added that was not asked | Understanding card with clear-yes guard, "what changes" for the whole building, plan upload with validation and door suggestions, parser fast path that answers known question types without an LLM call. Add only what is merged and shown. |
-| 2:45 to 3:00 | Close | "Ask your building, and trust the answer." Repo, `BENCHMARK.md`, one command. |
+| 0:00 to 0:25 | Problem | Floor plans are PDFs, machines live in spreadsheets, the person who knows left. Outdoors you type and follow a line. Indoors nobody can. |
+| 0:25 to 0:50 | Idea | Talk to the building. A deterministic core (graph of rooms, doors, stairs, lifts) does all the computing. The model only picks tools and phrases replies. |
+| 0:50 to 1:50 | Demo | The video flow, live or recorded: where is the coffee, guided walk, "I'm at the lift", close the lift with card and yes, route changes. |
+| 1:50 to 2:15 | What is different | Deterministic core. Asks back instead of guessing. Shows what it understood before any change. Independent verification: a separate agent re-implemented the 145 test answers (all match). |
+| 2:15 to 2:40 | Numbers | Warm-up oracle 369 of 369. Our routing vs 1.1.0 labels: 1338 of 1338 at full marks. Parser 648 of 655 benchmark questions correct, 0 wrong, no API call. Level 4 on clean plans: recall 1.00, about 11 s and 0.02 USD a floor. Weak on dense Swiss plans (door recall 0.31). Sources: `docs/submission/TECHNICAL_EXPLANATION.md`. |
+| 2:40 to 3:00 | Next | Accessibility mode (door widths, remembered profile, spec in `docs/specs/accessibility-mode.md`), time-bound closures (`docs/specs/live-updates.md`), a safety helper for exits (idea only, not built, `docs/IDEAS.md`). |
 
-## Likely Q&A (1 minute)
+## Likely Q&A
 
-1. **How do you stop the LLM from making things up?** It computes nothing. Tools return facts from the building data, replies end with one `Answer:` line, an unknown room is never routed to, similar names are offered.
-2. **What if the model misunderstands a change request?** Every change shows a card with its effect first. The tool refuses unless the person's later message is a clear yes. Tested with adversarial variants (double yes, "yes but not lift 1", topic switch).
-3. **How do you score on routes?** Door-to-door graph with the organisers' stair and lift costs. In our own estimate 99.6 % of 672 sample cases reach full points, against 92.4 % with the kit model. We have not seen the organisers' scorer.
-4. **Does it work on a building you have not seen?** One command, nothing hard-coded. A sweep runs all question kinds on all 280 buildings, and `scripts/preflight.py` checks a new building in seconds.
-5. **How good is the plan upload (Level 4)?** Clean plans: all rooms and doors, area error 0.6 % median. Dense Swiss plans: recall 0.79 and door recall 0.31 median, so it warns about unreachable rooms and proposes doors that a person confirms.
-6. **What does it cost and how fast is it?** About 11 s and 0.02 USD per floor for plan reading (list price). Known benchmark questions need no API call at all.
-7. **What is voice built on?** Browser speech recognition in, ElevenLabs out, key on the server. Works best in Chrome or Edge. German and English both work, the demo is English.
-8. **What did you not build?** Windows (not in the data), real campus links (our format is invented), forklift rules are only roughly tested, 3D and AR only if shown. Say what is missing, do not hide it.
+1. **Why not photos of the plan?** A photo adds perspective, light and noise, and the scale is unknown. We take a clean plan image and read it with vision, then validate the result. The `scan` style scored lowest in our style test (graph Jaccard 0.05, `docs/eval-log.md`). Photos are not supported.
+2. **Why SVG?** (Only if the SVG path is merged by the freeze.) A vector plan gives exact room outlines and door points, so no guessing. On `main` today Level 4 reads PNG through vision. Say which one is shown.
+3. **What if the plan has no scale?** The agent asks for one known length, for example a door or a room width. A wrong scale makes every length wrong, the graph and the route order stay right.
+4. **How do you know the answers are right?** Three checks. Tests against all labelled questions, the 369 of 369 oracle and 1338 route cases against the 1.1.0 labels, and a separate agent that re-implemented the 145 test answers without our code and matched all of them. We have not seen the organisers' scorer for the test set.
+5. **What is not solved?** No positioning (the person says where they are). Door widths and equipment are not in a plan, so Level 4 estimates them. Dense Swiss plans lose rooms and doors. No closures with times. Forklift rules are rough. The campus format is our own, nothing in the data links buildings.
+6. **Why not the new shortest-path algorithm from Tsinghua?** Our graph has under 2000 nodes and a route takes about 4 ms. Speed is not the bottleneck. The hard part is the geometry inside rooms (door to door, 15 cm from walls). Switching the algorithm would change nothing measurable.
+7. **How does it handle ambiguity?** Name or number in the sentence wins. Otherwise the nearest hit from the stated position, said out loud with one check question. Otherwise it asks with at most two options. It never routes several candidates and picks one silently.
+8. **Security and safety?** Every change needs a card and a clear yes in the person's next message, tested with adversarial variants (double yes, topic switch, "yes but not lift 1"). Position and Auto-Pace ticks never change the building. API keys stay on the server. The phone tunnel link is public while it runs. There is no evacuation feature, and nothing here is an escape plan.
 
 ## Recording checklist
 
-- Browser: Chrome or Edge (Web Speech API), clean profile, no bookmarks bar, zoom 110 to 125 %, window about 1280 x 720 or larger.
-- Mic: permission granted for `127.0.0.1:8765` before recording, test a 5 s clip, headset mic, quiet room, no keyboard clatter.
-- `.env` has `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`. Check the status line of the page says chat and speech are available. The speaker button is on, not muted.
-- English: language selector on English, English voice, speak slowly and in whole sentences.
-- Data copy: building from `data/dev` loaded, `Reset building` clicked, no closures left from earlier runs.
-- No secrets on screen: no terminal with `.env`, no key in the browser, no personal tabs or notifications. Do not show `.env` in any editor.
-- Run the script twice without recording, then record. Keep the first good take.
-- Backup: record the full flow once as a screen recording with audio and keep the file next to the live demo, plus a second take with typed input in case the mic fails.
-- Network: if Wi-Fi is bad, `/api/speak` fails and browser voice is the fallback, say nothing and keep going.
-- Length: video at most 90 seconds, export, watch it once with the sound off to check that the plan alone tells the story.
+- Devices: laptop with Chrome (Web Speech API), phone for the mobile shot, headset mic. Window 1280 x 720 or larger, zoom 110 to 125 %, no bookmarks bar.
+- Phone over https: `scripts/tunnel.sh` (needs `brew install cloudflared`). The microphone only works on https. The link is public while it runs, share it with nobody, stop it with Ctrl+C.
+- Keys in `.env`: `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`. Never show `.env` in an editor or terminal. Check that the page status says chat and speech are available and the speaker is not muted.
+- Quiet room, no keyboard clatter, test a 5 s clip. Grant the mic permission for the page address before recording.
+- English everywhere, speak slowly in whole sentences.
+- Building loaded, `Reset building` clicked, no closures left from earlier runs.
+- No notifications, no personal tabs.
+- Run the script twice without recording, then record. Keep the first good take. Also record one take with typed input in case the mic fails.
+- If Wi-Fi is bad, `/api/speak` fails and the browser voice is the fallback.
+- Export at most 90 s and watch it once with the sound off to check the plan alone tells the story.

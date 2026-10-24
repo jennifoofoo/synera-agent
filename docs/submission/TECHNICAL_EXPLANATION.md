@@ -1,82 +1,50 @@
 # Talk to Your Building: technical explanation
 
-Track 01 entry. Run instructions: `BENCHMARK.md`. Index of all submission documents: `docs/submission/README.md`.
+Track 01 entry. Run instructions: `BENCHMARK.md`. State of `main` at commit fe67dc3 (24 Oct 2026).
 
 ## Idea
 
-Every fact comes from deterministic Python. The LLM does not compute: it picks tools, asks only what is missing, shows what it understood, and words the reply. A wrong sentence can therefore only come from a wrong tool call, and tool calls are tested.
+Every fact comes from deterministic Python. The model does not compute. It picks tools, asks only what is missing, shows what it understood and phrases the reply. A wrong sentence can only come from a wrong tool call, and the tools are tested against labelled answers.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  U[Person: text or voice] --> W[Web page: chat, 2D plan, mic, speaker]
-  W --> S[Session agent: Claude with tool use]
-  Q[Benchmark question] --> P[Question parser fast path]
-  P -->|known template| K
-  P -->|no match| S
-  S --> K[Kind functions: 9 question kinds]
-  S --> R[Routing model: door to door]
-  S --> G[Guide tools: directions, what changes, find]
-  S --> C[Confirmation card with clear-yes guard]
-  C -->|clear yes only| B
-  K --> B[(BuildingMap: rooms, doors, lifts, assets)]
-  R --> B
-  G --> B
-  S --> L4[Level 4: plan image to building]
-  L4 --> V[Vision extract, colour markers, convert, validate, door suggestions]
-  V --> B
-  W -->|reply text| T[ElevenLabs speech out]
-```
+- **Core** (`building_agent/`): a graph of rooms, doors, stairs and lifts. Routes use the kit 1.1.0 model: door to door, 15 cm clearance from walls, stairs 2 m per metre climbed, a lift 15 m per ride plus 1 m per metre, no route through the outside (`building_agent/routing.py`). One file per question kind in `building_agent/kinds/` (9 kinds).
+- **Parser fast path** (`building_agent/question_parser.py`): the benchmark questions follow sentence templates. If a whole sentence matches and every name resolves uniquely, a kind function answers with no API call. Everything else goes to the agent.
+- **Session agent** (`agent.py`, `guide_tools.py`): Claude with tool use. Finds rooms, assets and lifts, routes, gives directions with landmarks (3 steps per turn), answers "what changes if X is closed", edits the building.
+- **Changes** (close a lift, add or widen a door, move an asset) first show a card with the effect on the current route. `confirm_change` refuses unless the person's own later message is a clear yes.
+- **Interaction**: position ("I'm at the lift"), nearest search, guided walking with Auto-Pace (an estimated time per step, then a short check-in; no positioning), spoken-reply rules for voice. Speech in via the browser, speech out via ElevenLabs. Campus endpoints for several buildings (`web/campus_api.py`).
+- **Level 4** (`building_agent/level4/`): Claude vision reads a plan image, a colour detector finds door markers, the converter snaps doors to walls, a validator flags rooms with no way out, door suggestions are proposals only.
 
-- **Question parser fast path** (`building_agent/question_parser.py`): the published benchmark sentences follow fixed templates. If the whole sentence matches and every name resolves uniquely, a kind function answers with no LLM call. Anything else goes to the agent.
-- **Kind functions** (`building_agent/kinds/`): one file per question kind, each tested against the labelled answers.
-- **Routing** (`building_agent/routing.py`): one graph node per door and connector, straight distance between doors inside a room, stairs 2 m per metre of height, lift 15 m plus 1 m per metre (the organisers' scoring note). Kit-labelled numbers (errand, what_if_door) stay on the kit model because the labels come from it.
-- **Session agent** (`building_agent/agent.py`, `guide_tools.py`): keeps the conversation and the building state. Tools: find (rooms, assets, lifts), route, step-by-step directions with landmarks (3 steps per turn, "next", "repeat"), forklift route, "what changes" for a closure, edit proposals.
-- **Confirmation card**: every change (close, add or remove door, widen door, move asset) first shows a card with the effect on the current route. `confirm_change` refuses unless the person's own reply, in a later message, is a clear yes.
-- **Web page** (`web/`): 2D plan with animated route, closures, doors, find hits that pulse, chat, mic button, speaker.
-- **Voice**: speech in via the browser (Web Speech API), speech out via ElevenLabs `eleven_flash_v2_5`. The key stays on the server.
-- **Level 4** (`building_agent/level4/`): Claude vision reads a floor plan, a deterministic colour detector finds door, opening and entrance markers, the converter snaps doors to walls and entrances to the outer wall, the validator flags rooms with no way out, door suggestions are proposals only. Nothing is saved without the card and a clear yes.
-
-## Stack
-
-Python 3.12+ with uv, shapely, networkx, Claude API with tool use (Sonnet 5.5 for plan reading), stdlib `http.server`, plain JS and SVG (no build step), ElevenLabs text to speech, pytest, ruff.
+Stack: Python 3.12, uv, shapely, networkx, Claude API (Sonnet 5.5), stdlib `http.server`, plain JS and SVG, ElevenLabs.
 
 ## What we measured
 
-All numbers come from files in this repo. "Estimate" means we scored against our own reimplementation of the organisers' rule, not their scorer.
+"Estimate" means our own reading of the scoring rule, not the organisers' scorer.
 
 | Measure | Result | Source |
 |---|---|---|
-| Dev sample, agent end to end | 72 of 72 | `docs/HANDOFF.md` |
-| Warm-up questions, tools alone | 369 of 369 | `docs/HANDOFF.md`, `docs/STATUS.md` |
-| Warm-up, agent, mixed set | 18 of 18 | `docs/STATUS.md` |
-| Closures (assume_closed) | 26 of 29 | `docs/STATUS.md` |
-| Live conversation tests | 22 of 22 | `docs/HANDOFF.md` |
-| Run on `data/test` | 24 of 24 formally valid (old routing model, correctness is not scored there) | `docs/HANDOFF.md` |
-| Route sequences at full points, kit model | 92.4 % of 672 cases (estimate) | `docs/specs/route-metric-spike.md` |
-| Route sequences at full points, door to door | 99.6 % of the same cases (estimate, spike prototype) | `docs/specs/route-metric-spike.md` |
-| Level 4, 5 clean floors | recall 1.00, precision 1.00, door recall 1.00, median area error 0.6 % | `docs/eval-log.md` |
-| Level 4, 2 Swiss floors | median recall 0.79, median door recall 0.31 | `docs/eval-log.md` |
-| Level 4, 1 OSM floor | recall 0.86, door recall 0.74 with markers | `docs/eval-log.md` |
-| Level 4 cost and time | median 10.9 s and 0.023 USD per floor (list price, not checked against an invoice) | `docs/eval-log.md` |
-| Colour marker detection, 117 dev floors | door recall 0.98 to 1.00, precision 1.00 | `docs/eval-log.md` |
-| Door suggestions, simulated gaps | rooms with a way out 46 % to 100 %, suggestion precision 83 % | `docs/eval-log.md` |
-| Entrance fix, factory plan | invalid route sequences 108 to 0 | `docs/eval-log.md` |
+| Warm-up oracle | 369 of 369 | `uv run python -m starter_agent.evaluate data/dev --oracle` |
+| Our routing vs the 1.1.0 labels (route, step-free, closure, tour; 1338 cases) | full marks 100 %, worst length ratio 0.9991 | `uv run python scripts/eval_warmup.py data/train data/dev --routes` |
+| Parser on all labelled train and dev benchmark questions | 648 of 655 correct, 0 wrong; 7 fall through to the model (4 of 7 correct there, see note) | own script: parser, then `benchmark/score.py`, over `data/{train,dev}/*/questions.jsonl` |
+| Test file `data/test` | 145 of 145 answered by the parser, file valid, 17 s, no key | `BENCHMARK.md` |
+| Independent re-implementation of the 145 test answers by a separate agent (not our kind code) | errand 20/20, wide delivery 18/18, what-if 3/3, shared walls 26/26, stacked 9/9, areas and straight line 69/69 | session scratch scripts, not in the repo |
+| Offline tests | 3392 passed, 4 skipped, 2 failed. Both failures are wall-clock limits, measured at machine load 11 (one passes alone, the 40 s sweep took 52 s). Lint clean. | `scripts/check.sh`, 14 min 27 s |
+| Live suite | 54 tests exist (`pytest -m live --collect-only`). Last recorded run: 20 passed, 2 failed (older, 22-test suite). Not rerun for this document (costs money). | session log |
+| Level 4, 5 clean floors (medians) | recall 1.00, precision 1.00, door recall 1.00, area error 0.6 %; 8 floors: 10.9 s and 0.023 USD per floor (list price) | `docs/eval-log.md`, run 2026-10-24 |
+
+Note on the 4 of 7: that figure comes from the team's earlier run and is not in a repo file. Treat it as unverified.
+
+## Levels
+
+- **1 Locate**: done in the agent (groups, "east lift", ambiguity asks back). Hits are not yet drawn from chat on the page.
+- **2 Route**: done (step-free, closures, tours, turn hints). Forklift routes are rough.
+- **3 Scale**: several floors done. Campus format, adapters and routing exist, but the format is our own invention.
+- **4 Build**: plan image to building through vision, validation, saving. Clean plans good, dense plans weak.
 
 ## Limits
 
-- Level 4 is strong on clean plans with printed room numbers. On dense Swiss and OSM plans it misses rooms and doors. The agent warns about unreachable rooms and proposes doors, a person confirms. Route quality stays low there: 6 % and 3 % of room pairs at full points on the two Swiss floors (`docs/eval-log.md`).
-- The plans carry no scale bar, so the agent asks for one known length. A wrong scale makes all lengths wrong, the graph stays right.
-- The data has no windows, so there is nothing to answer or draw about them.
-- Forklift rules (aisles and openings of 3 m or wider) follow the data but are only roughly tested.
-- Nothing in the data links buildings, so the campus format (Level 3) is our own invention (`docs/specs/level3-campus.md`).
-- Route numbers are against our own reading of the scoring note. Open questions for the organisers: `docs/SYNERA_QUESTIONS.md`.
-
-## How we tested
-
-- Tests are the contract: each question kind has a test against labelled answers. No merge without `scripts/check.sh` green (format, lint, tests, no API key needed).
-- A sweep runs every question kind on all 280 buildings. It found a real crash (empty wall line in `what_if_door`).
-- Live conversation scripts with tricky users: vague question, wrong room, change of mind, wheelchair user, hands full, facility manager (`docs/specs/interaction-scripts.md`).
-- Adversarial variants: terse "just do it", typos, topic switch between card and yes, double yes, "yes, but not lift 1". A change never happens without a clear yes.
-- `scripts/preflight.py` checks an unseen building in seconds.
+- Door widths and equipment are not in a plan, so Level 4 estimates them (every built door is 0.9 m wide, so wide-delivery questions fail on built buildings). Room types from a plan are partial.
+- Level 4 on Swiss and OSM plans: recall 0.79 and 0.86, door recall 0.31 and 0.67. Route quality there is low: 6 % and 3 % of room pairs at full points on the two Swiss floors (`docs/eval-log.md`, judge metric). The agent warns and proposes doors, a person confirms.
+- Plans carry no scale bar, so the agent asks for one known length. A wrong scale makes every length wrong, the graph stays right.
+- No positioning: the person says where they are. No time-bound closures yet.
+- Several page parts are not on `main` yet: blue position dot, Auto-Pace timer, mobile layout, hands-free "Hey Wanda" (`docs/STATUS.md`). The server side exists for position and Auto-Pace.
