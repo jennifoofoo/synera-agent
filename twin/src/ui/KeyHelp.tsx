@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { KEY_CONTROLS, MOUSE_CONTROLS, useKeyHelp } from "../scene/controlsTable";
 import { PoiBadge, POI_LEGEND } from "../scene/poiIcons";
+import { AllFloorsIcon, ResetViewIcon } from "./FloorRail";
 import * as palette from "../model/palette";
 
 /** Room colours from palette.ts (LEGEND_GROUPS, added by the room-colours branch); none while it is not merged. */
@@ -63,6 +64,18 @@ export function KeyHelp() {
             <span>{row.label}</span>
           </li>
         ))}
+        <li>
+          <span className="keyhelp-icon">
+            <AllFloorsIcon />
+          </span>
+          <span>All floors (3D, beside the floor numbers)</span>
+        </li>
+        <li>
+          <span className="keyhelp-icon">
+            <ResetViewIcon />
+          </span>
+          <span>Reset view: the whole building</span>
+        </li>
         <li className="wide">
           <span className="keyhelp-shape" aria-hidden />
           <span>Machine, rack or furniture (darker and named: a landmark of your route)</span>

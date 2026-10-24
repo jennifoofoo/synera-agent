@@ -19,3 +19,4 @@
 .keyhelp-room { flex: none; width: 22px; height: 14px; border-radius: 2px; border: 1px solid var(--hairline, rgba(29, 36, 48, 0.2)); }
 .keyhelp-legend .poi-badge { flex: none; }
 .keyhelp-shape { flex: none; width: 22px; height: 12px; margin: 5px 0; background: #c3c0b9; border-radius: 1px; }
+.keyhelp-icon { flex: none; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line, #d8e0ea); border-radius: 4px; color: var(--ink-2); }

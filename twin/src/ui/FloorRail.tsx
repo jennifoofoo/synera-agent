@@ -1,5 +1,5 @@
 import { useKeyHelp } from "../scene/controlsTable";
-import { useTwin } from "../store";
+import { isPhone, useTwin } from "../store";
 
 /** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
  * again = only this floor; the ⇕ toggle pulls the floors apart. Floors on the route carry a dot. */
@@ -28,7 +28,8 @@ export function FloorRail() {
       // Phone.css places the rail from --rail-top (portrait: right edge above the dock; landscape: left edge).
       style={directionsOpen && topInset > 0 && profile === "worker" ? ({ "--rail-top": `${topInset + 8}px` } as React.CSSProperties) : undefined}
     >
-      {profile !== "worker" && (
+      {/* 2D/3D at every width; only real phones (coarse pointer and small screen) stay 2D */}
+      {!isPhone() && (
         <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
           {flat ? "3D" : "2D"}
         </button>
@@ -38,9 +39,10 @@ export function FloorRail() {
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
           onClick={() => setFloorMode(floorMode === "exploded" ? "single" : "exploded")}
           title={floorMode === "exploded" ? "Show only this floor" : "Show all floors"}
+          aria-label="All floors"
           aria-pressed={floorMode === "exploded"}
         >
-          ⇕
+          <AllFloorsIcon />
         </button>
       )}
       {model.floors.length > 1 && [...model.floors].reverse().map((floor) => {
@@ -67,8 +69,8 @@ export function FloorRail() {
         );
       })}
       {profile !== "worker" && (
-        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view: the whole building" aria-label="Home view">
-          ⌂
+        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Reset view: the whole building" aria-label="Reset view">
+          <ResetViewIcon />
         </button>
       )}
       {profile !== "worker" && (
@@ -77,5 +79,27 @@ export function FloorRail() {
         </button>
       )}
     </div>
+  );
+}
+
+const railIcon = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+
+/** Three stacked floor plates (Tabler "stack-2" style): show all floors apart. */
+export function AllFloorsIcon() {
+  return (
+    <svg {...railIcon}>
+      <path d="M12 4 4 8l8 4 8-4z" />
+      <path d="m4 12 8 4 8-4" />
+      <path d="m4 16 8 4 8-4" />
+    </svg>
+  );
+}
+
+/** Four frame corners (Tabler "maximize" style): back to the view of the whole building. */
+export function ResetViewIcon() {
+  return (
+    <svg {...railIcon}>
+      <path d="M4 8V6a2 2 0 0 1 2-2h2M4 16v2a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v2M16 20h2a2 2 0 0 0 2-2v-2" />
+    </svg>
   );
 }
