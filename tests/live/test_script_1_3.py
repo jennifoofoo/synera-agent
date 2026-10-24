@@ -88,7 +88,7 @@ def assert_searched_before_routing(transcript: Transcript) -> None:
 
 def assert_no_invented_places(bm: BuildingMap, transcript: Transcript) -> None:
     for index, call in routing_calls(transcript):
-        if call.is_error:
+        if call.is_error or "needs_confirmation" in call.result:  # a question to the person is not a route
             continue
         assert effective_start(bm, transcript, index, call) is not None, f"{call.name} has no valid start"
         assert resolve(bm, call.args.get("destination")) is not None, (
@@ -127,7 +127,10 @@ def test_script_1_vague_coffee_searches_then_routes_or_asks(pick):
     for call in routed:
         assert resolve(bm, call.args["destination"]) in plausible, "routed to a place that is not a coffee spot"
     if len(coffee_asset_space_ids(bm)) == 1:
-        assert routed, "one clear coffee spot exists but the agent did not route"
+        # Under the position design the agent may answer with where it is (find_for_task or find_nearest, with the
+        # room and a distance from the person) instead of routing; both meet 'a clear coffee spot gets an answer'.
+        where = [bm.spaces[space_id]["name"].lower() for space_id in coffee_asset_space_ids(bm)]
+        assert routed or any(name in turn.reply.lower() for name in where), "no route and no answer that says where"
     else:
         assert routed or asks_something(turn.reply), "neither routed nor asked which coffee spot"
 

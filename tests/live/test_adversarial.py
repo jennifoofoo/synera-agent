@@ -45,7 +45,12 @@ def close_request(lift: str) -> str:
 def assert_card_first(transcript: Transcript, lift: str) -> None:
     first = transcript.turns[0]
     assert first.called("propose_change"), "no propose_change in turn 1"
-    assert lift.lower() in first.reply.lower() and "?" in first.reply, "turn 1 did not show a card with a question"
+    reply = first.reply.lower()
+    assert lift.lower() in reply, "turn 1 did not name the element"
+    asks = "?" in reply or re.search(
+        r"\b(yes|ja)\b", reply
+    )  # 'Should I close it?' or 'Please reply yes'; that nothing changed is asserted on the state
+    assert asks, "turn 1 did not show a card that asks for a yes"
 
 
 @pytest.mark.live
@@ -137,7 +142,11 @@ def test_bare_room_request_without_start_does_not_invent_one():
 
 @pytest.mark.live
 def test_change_of_mind_after_next_restarts_from_same_start_in_chunks_of_three():
-    """(e) Route, 'weiter', then a new destination: same start, new route, never more than 3 steps."""
+    """(e) Route, 'weiter', then a new destination: same start, new route, never more than 3 steps.
+
+    Changed with the walk design: the start is often left out of the second call (the position is used), so the
+    start is read from the tool's `start_assumed` (effective_start); a guided walk asks before dropping the old
+    destination, so the check looks at the route that follows; steps come one per reply (at most 3 holds)."""
     building, start, destination = long_route_case()
     bm = BuildingMap.load(building)
     start_floor = bm.spaces[bm.resolve_space(start)]["floor_id"]
@@ -158,7 +167,11 @@ def test_change_of_mind_after_next_restarts_from_same_start_in_chunks_of_three()
     )
     assert_no_invented_places(bm, transcript)
     assert all(len(steps) <= 3 for _, _, steps in step_lists(transcript))
-    fresh = [call for index, call in transcript.calls("give_directions") if index == 2 and not call.is_error]
+    fresh = [
+        call
+        for index, call in transcript.calls("give_directions")
+        if index == 2 and not call.is_error and "needs_confirmation" not in call.result
+    ]  # asking first ('I am guiding you to X, switch?') is allowed; the route that follows must keep the start
     assert fresh, "no new give_directions after the change of mind"
     for call in fresh:
         assert effective_start(bm, transcript, 2, call) == bm.resolve_space(start), "start changed"
