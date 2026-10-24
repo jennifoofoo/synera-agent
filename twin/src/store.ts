@@ -58,6 +58,8 @@ interface TwinState {
   viewMode: ViewMode;
   /** Height in px of UI covering the bottom of the viewport (dock / sheet); the camera frames above it. */
   bottomInset: number;
+  /** Width in px of UI covering the right edge (planner side sheet); the camera frames left of it. */
+  rightInset: number;
   /** A Level 4 draft (new building from floor plans) is shown instead of the building; set by ui/newBuildingStore. */
   draft: boolean;
   /** 2D: the plan was panned away from the floor (shows the recenter button). Set by the scene. */
@@ -91,6 +93,7 @@ interface TwinState {
   setProfile: (profile: Profile | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setBottomInset: (px: number) => void;
+  setRightInset: (px: number) => void;
   setFloorMode: (mode: FloorMode) => void;
   focusFloor: (floorId: string | null) => void;
   setThingsMode: (mode: ThingsMode) => void;
@@ -141,6 +144,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   profileForced: false,
   viewMode: autoProfile() === "worker" ? "2d" : "3d",
   bottomInset: 0,
+  rightInset: 0,
   draft: false,
   offCentre: false,
   floorMode: "stacked",
@@ -208,6 +212,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   setBottomInset(bottomInset) {
     if (bottomInset !== get().bottomInset) set({ bottomInset });
+  },
+  setRightInset(rightInset) {
+    if (rightInset !== get().rightInset) set({ rightInset });
   },
   setFloorMode(floorMode) {
     set({ floorMode });

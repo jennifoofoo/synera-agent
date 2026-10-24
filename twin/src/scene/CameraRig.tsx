@@ -35,6 +35,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const floorMode = useTwin((s) => s.floorMode);
   const profile = useTwin((s) => s.profile);
   const bottomInset = useTwin((s) => s.bottomInset);
+  const rightInset = useTwin((s) => s.rightInset);
   const viewMode = useTwin((s) => s.viewMode);
   const focusedFloorId = useTwin((s) => s.focusedFloorId);
   const invalidate = useThree((s) => s.invalidate);
@@ -50,10 +51,12 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const w = viewport.width;
     const h = viewport.height;
     const inset = Math.min(bottomInset, h * 0.6);
-    if (inset > 0) camera.setViewOffset(w, h + inset, 0, inset, w, h);
+    const right = Math.min(rightInset, w * 0.6);
+    if (inset > 0 || right > 0) camera.setViewOffset(w + right, h + inset, 0, inset, w, h);
     else camera.clearViewOffset();
     camera.updateProjectionMatrix();
-  }, [camera, viewport.width, viewport.height, bottomInset]);
+    invalidate();
+  }, [camera, viewport.width, viewport.height, bottomInset, rightInset, invalidate]);
 
   // Limits follow the building; the 2D plan is locked straight down, north up: pan and zoom only.
   useEffect(() => {
