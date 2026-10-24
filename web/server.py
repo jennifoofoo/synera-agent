@@ -31,6 +31,8 @@ Level 3, campus (web/campus_api.py; one CampusHolder shared by the page and the 
 
 Level 4, new building from floor plans (web/level4_api.py; POSTs need a same-origin page):
   POST /api/level4/upload               raw PNG/JPG body (<= 10 MB) -> {upload_id, width, height}
+  POST /api/level4/attach?upload_id=plan-...&kind=svg|building_json   raw svg (image/svg+xml) or building.json
+                                        (application/json) body of an uploaded plan -> {upload_id, kind, bytes}
   POST /api/level4/build  {floors: [{upload_id, level, known_length_m | scale_bar, along}], name?}
   GET  /api/level4/status               background reading progress
   GET  /api/level4/preview              draft in the building_view shape + findings + red spots
@@ -209,6 +211,9 @@ class App:
 
     def upload(self, data: bytes) -> tuple[int, dict]:
         return 200, self.level4.upload(data)
+
+    def attach(self, query: dict, data: bytes) -> tuple[int, dict]:
+        return 200, self.level4.attach((query.get("upload_id") or [""])[0], (query.get("kind") or [""])[0], data)
 
     def post_level4(self, path: str, body: dict) -> tuple[int, dict]:
         studio = self.level4
@@ -444,10 +449,36 @@ def make_handler(app: App) -> type:
             data = self.rfile.read(length)
             self.run(lambda: app.upload(data))
 
+        def run_attach(self, query: dict) -> None:
+            """Raw svg or building.json body for an uploaded plan (named by its id, never by a path)."""
+            kind = (query.get("kind") or [""])[0]
+            wanted = level4_api.ATTACHMENTS.get(kind)
+            if wanted is None:
+                self.send_json(400, {"error": f"kind must be one of {', '.join(level4_api.ATTACHMENTS)}."})
+                return
+            if not self.speak_request_allowed((wanted[1],)):
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if length <= 0:
+                self.send_json(411, {"error": "The upload needs a Content-Length."})
+                return
+            if length > wanted[2]:
+                self.close_connection = True  # the body is not read
+                self.send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "The file is too large."})
+                return
+            data = self.rfile.read(length)
+            self.run(lambda: app.attach(query, data))
+
         def do_POST(self) -> None:
             url = urlparse(self.path)
             if url.path == "/api/level4/upload":
                 self.run_upload()
+                return
+            if url.path == "/api/level4/attach":
+                self.run_attach(parse_qs(url.query))
                 return
             if url.path.startswith(("/api/speak", "/api/level4/")) and not self.speak_request_allowed():
                 return

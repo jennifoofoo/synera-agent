@@ -7,6 +7,7 @@ import copy
 import json
 import os
 import re
+import statistics
 import tempfile
 import uuid
 from collections.abc import Callable
@@ -33,8 +34,23 @@ from building_agent.level4.convert import (
     scale_from_known_length,
     tag_fills,
 )
-from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
+from building_agent.level4.extract import (
+    DEFAULT_ALLOWED_ROOT,
+    ExtractError,
+    ExtractResult,
+    _resolve_inside,
+    extract_floor,
+)
+from building_agent.level4.floor_height import guess_floor_height
+from building_agent.level4.furniture import attach_plan_assets, plan_furniture
 from building_agent.level4.markers import detect_markers, merge_markers
+from building_agent.level4.plan_files import adopt_vision, compose_names, find_building_json, svg_extraction, svg_title
+from building_agent.level4.scale_source import (
+    find_building_width,
+    find_floor_heights,
+    find_scale,
+    load_building_json,
+)
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.segment import NOISE_NOTE, SCAN_NOTE, match_to_extraction, segment_rooms
 from building_agent.level4.stair_doors import describe_stair_doors, suggest_stairs_then_generic
@@ -53,11 +69,13 @@ FIX_ACTIONS = (
     "set_scale",
     "accept_suggestions",
     "link_floors",
+    "set_floor_height",
 )
 STAIR_TYPES = {"stairwell", "stair", "stairs", "staircase"}
 LIFT_TYPES = {"lift", "elevator"}
 LINK_KINDS = {"stairs": "stair", "stair": "stair", "lift": "lift", "elevator": "lift"}
 CONNECTOR_CODES = {"connector_single_floor", "connector_linked_by_order", "connector_aligned_by_centre"}
+MIN_FLOOR_HEIGHT_M, MAX_FLOOR_HEIGHT_M = 2.0, 12.0
 MAX_STAIR_HALL_M2 = 60.0
 SIDES = {"north": (0, 1), "south": (0, -1), "east": (1, 0), "west": (-1, 0)}
 MAX_CANDIDATES = 5
@@ -78,6 +96,10 @@ ASK_CLEARER = (
     "If the person wants to go on with this reading anyway, they say 'build it anyway' (or 'trotzdem'); show the "
     "card first, saving still needs the card and a clear yes in their next message."
 )
+SOURCE_WORDS = {
+    "svg": "the vector file (svg) next to the plan: exact room outlines, doors and room numbers",
+    "image": "the plan image, read by the vision model",
+}
 ASK_SCALE = (
     "The plan has no printed scale bar and no known length was given. Ask the person for ONE length they know in "
     "metres (the width of the whole building, the width of one room, or a door width), then call build_from_plan "
@@ -99,6 +121,7 @@ class FloorSource:
     scale_args: dict
     added_from_segments: int = 0  # rooms that exist only because the colour analysis found them
     scan_fallback: bool = False  # segmentation was rejected (scan, photo, noise): the model's rooms stand alone
+    source: str = "image"  # "svg" (rooms, doors and numbers read from the vector file) or "image" (vision pipeline)
 
 
 @dataclass
@@ -121,6 +144,9 @@ class Level4Draft:
     last_level: int = 0
     poor_turn: int | None = None  # turn in which a poor reading was reported; the card needs a later "build it anyway"
     poor_acknowledged: bool = False
+    file_heights: dict = field(default_factory=dict)  # level -> (elevation_m, height_m) from building.json
+    plan_title: str = ""
+    height_override: float | None = None  # set by the person with fix_draft set_floor_height
 
 
 # ---------- pure helpers ----------
@@ -452,12 +478,44 @@ def write_atomic(path: Path, text: str) -> None:
         raise
 
 
-def _to_metres(draft: "Level4Draft"):
+def _to_metres(draft: "Level4Draft", building: dict | None = None):
+    """Image pixels of a floor to building metres, including the shift that lined the floor up with the one below."""
+    moved = ((building or draft.building or {}).get("building", {}).get("source_ref") or {}).get("floor_offsets_m", {})
+
     def convert(level: int, x: float, y: float) -> tuple[float, float]:
         source = draft.floors[level]
-        return pixel_to_metres(source.extraction, source.scale.metres_per_px)(x, y)
+        px, py = pixel_to_metres(source.extraction, source.scale.metres_per_px)(x, y)
+        dx, dy = moved.get(str(level), (0.0, 0.0))
+        return px + dx, py + dy
 
     return convert
+
+
+def plan_json_scale(json_path: Path | None, level: int) -> Scale | None:
+    """Scale from a scale field of the building.json that came with the plan (per floor first), else None."""
+    data = load_building_json(json_path) if json_path is not None else None
+    hit = find_scale(data, level) if data is not None else None
+    if hit is None:
+        return None
+    return Scale(hit.metres_per_px, "building_json", f"taken from building.json ({hit.key}, read as {hit.reading})")
+
+
+def plan_json_width_scale(json_path: Path | None, level: int, extraction: Extraction) -> Scale | None:
+    """Scale from the building width in the building.json and the exact room outlines of an svg, else None."""
+    data = load_building_json(json_path) if json_path is not None else None
+    width = find_building_width(data, level) if data is not None else None
+    if width is None:
+        return None
+    try:
+        scale = scale_from_known_length(extraction, width.metres, "building_width")
+    except ConvertError:
+        return None
+    return Scale(
+        scale.metres_per_px,
+        "building_json",
+        f"worked out from the building width of {width.metres:g} m in building.json ({width.key}) "
+        "and the exact room outlines in the svg",
+    )
 
 
 def _trusted_scale(draft: Level4Draft) -> bool:
@@ -468,17 +526,41 @@ def _trusted_scale(draft: Level4Draft) -> bool:
     )
 
 
+def _floor_heights(draft: Level4Draft) -> tuple[dict[int, tuple[float | None, float | None]], float | None, str, str]:
+    """(elevation and height per level, default height, assumption for the card or "", where the height came from)."""
+    if draft.height_override is not None:
+        return {}, draft.height_override, "", f"Storey height {draft.height_override:g} m as you said."
+    given = {level: draft.file_heights[level] for level in draft.floors if level in draft.file_heights}
+    if given:
+        heights = [h for _, h in given.values() if h is not None]
+        fallback = statistics.median(heights) if heights else None
+        return (
+            {level: (e, h if h is not None else fallback) for level, (e, h) in given.items()},
+            fallback,
+            "",
+            "Storey heights from the building.json that came with the plans.",
+        )
+    refs = [room.ref or "" for src in draft.floors.values() for room in src.extraction.rooms]
+    height, why = guess_floor_height(refs, draft.plan_title)
+    return {}, height, f"{height:g} m, because {why}", f"Storey height {height:g} m assumed: {why}."
+
+
 def _rebuild(draft: Level4Draft) -> None:
     """Convert all stored floors, replay the fixes, validate. Raises ToolError when nothing usable results."""
-    inputs = [FloorInput(level, src.extraction, src.scale) for level, src in sorted(draft.floors.items())]
+    heights, default, assumed, height_note = _floor_heights(draft)
+    inputs = [
+        FloorInput(level, src.extraction, src.scale, *heights.get(level, (None, default)))
+        for level, src in sorted(draft.floors.items())
+    ]
     try:
-        building, converted = convert_floors_with_findings(inputs, draft.name, draft.building_id)
-        notes = []
+        building, converted = convert_floors_with_findings(inputs, draft.name, draft.building_id, assumed)
+        notes = [height_note]
         for fix in draft.fixes:
             try:
-                apply_fix(building, fix, _to_metres(draft))
+                apply_fix(building, fix, _to_metres(draft, building))
             except ToolError as error:
                 notes.append(f"An earlier fix ({fix[0]}) no longer applies: {error}")
+        attach_plan_assets(building, inputs)  # furniture hook 2/2: items read from the plan's furniture glyphs
         converted.items = _relinked(building, converted.items)
         checked = validate(building, _trusted_scale(draft))
     except ConvertError as error:
@@ -540,46 +622,93 @@ def make_level4_tools(
             key = (str(path), stamp.st_mtime_ns, stamp.st_size)
         except OSError:
             key = (str(path), None, None)
+        # The vector file of the plan (floor_<n>.svg next to the image) is looked up from the image that is already
+        # known to lie inside the upload folder; nothing the browser or the message says can point elsewhere.
+        svg_read, svg_note, svg_inferred = None, "", 0
+        json_path: Path | None = None
+        try:
+            checked = _resolve_inside(path, uploads_root)
+            svg_read, svg_note, svg_inferred = svg_extraction(checked, uploads_root)
+            json_path = find_building_json(checked, uploads_root)
+            draft.file_heights.update(find_floor_heights(load_building_json(json_path)) if json_path else {})
+            draft.plan_title = svg_title(checked, uploads_root) or draft.plan_title
+        except ExtractError:
+            pass  # extract_floor below says what is wrong with the path
         result: ExtractResult | None = draft.cache.get(key)
         fresh = result is None
+        vision_problem = ""
         if fresh:
             try:
                 result = extract_floor(path, allowed_root=uploads_root)
             except ExtractError as error:
-                raise ToolError(str(error)) from error
-            draft.cache[key] = result
-            draft.cost_usd += result.cost_usd
-        extraction = result.extraction
+                if svg_read is None:
+                    raise ToolError(str(error)) from error
+                vision_problem = str(error)  # the svg alone still gives rooms, doors and numbers
+                result = None
+                fresh = False
+            else:
+                draft.cache[key] = result
+                draft.cost_usd += result.cost_usd
         seg_warnings: list[str] = []
-        try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
-            found_segments = segment_rooms(path)
-            extraction, seg_warnings = match_to_extraction(extraction, found_segments)
-            draft.marker_notes = seg_warnings[:10]
-            if NOISE_NOTE not in seg_warnings:
-                extraction = tag_fills(extraction, found_segments)
-        except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
-            draft.marker_notes = [f"Room outline detection was skipped ({type(error).__name__})."]
-        try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
-            extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
-            draft.marker_notes = (seg_warnings + marker_warnings)[:10]
-        except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
-            draft.marker_notes = (
-                draft.marker_notes + [f"Door marker detection was skipped ({type(error).__name__})."]
-            )[:10]
+        if svg_read is not None:
+            extraction, adopted = adopt_vision(svg_read, result.extraction if result else None)
+            extraction = compose_names(extraction)
+            numbered = sum(room.ref is not None for room in extraction.rooms)
+            draft.marker_notes = [
+                f"Read from the vector file (svg) next to the plan: {len(extraction.rooms)} rooms, "
+                f"{len(extraction.doors)} doors, entrances and openings; {numbered} room numbers"
+                + (f" ({svg_inferred} of them worked out from the numbering order)." if svg_inferred else "."),
+                (
+                    f"Names and room types come from the image reading for {adopted} of {len(extraction.rooms)} rooms."
+                    if result is not None
+                    else "Names and room types could not be read from the image"
+                    + (f" ({vision_problem})" if vision_problem else "")
+                    + ", so rooms are named by their number only."
+                ),
+            ]
+            origin = "svg"
+        else:
+            extraction = result.extraction
+            origin = "image"
+            if svg_note:
+                draft.marker_notes = [svg_note]
+        if origin == "image":
+            marker_start = [svg_note] if svg_note else []
+            try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
+                found_segments = segment_rooms(path)
+                extraction, seg_warnings = match_to_extraction(extraction, found_segments)
+                draft.marker_notes = marker_start + seg_warnings[:10]
+                if NOISE_NOTE not in seg_warnings:
+                    extraction = tag_fills(extraction, found_segments)
+            except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
+                draft.marker_notes = marker_start + [f"Room outline detection was skipped ({type(error).__name__})."]
+            try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
+                extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
+                draft.marker_notes = (marker_start + seg_warnings + marker_warnings)[:10]
+            except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
+                draft.marker_notes = (
+                    draft.marker_notes + [f"Door marker detection was skipped ({type(error).__name__})."]
+                )[:10]
         try:
+            scale = None
             if known_length_m is not None:
                 scale = scale_from_known_length(extraction, known_length_m, along)
             else:
-                scale = scale_from_bar(extraction)
+                scale = plan_json_scale(json_path, level) or scale_from_bar(extraction)
+                if scale is None and origin == "svg":
+                    scale = plan_json_width_scale(json_path, level, extraction)
         except ConvertError as error:
             raise ToolError(str(error)) from error
         if scale is None:
             raise ToolError(ASK_SCALE)
+        if origin == "svg":  # furniture hook 1/2: room types and items from the plan's furniture glyphs
+            extraction, furniture_note = plan_furniture(extraction, checked, uploads_root, scale, level)
+            draft.marker_notes += [furniture_note] if furniture_note else []
         previous = draft.floors.get(level)
         scanned = any(note in seg_warnings for note in (SCAN_NOTE, NOISE_NOTE))
         added = sum(warning.startswith("room_added_from_image") for warning in seg_warnings)
         draft.floors[level] = FloorSource(
-            extraction, scale, {"known_length_m": known_length_m, "along": along}, added, scanned
+            extraction, scale, {"known_length_m": known_length_m, "along": along}, added, scanned, origin
         )
         try:
             _rebuild(draft)
@@ -595,6 +724,7 @@ def make_level4_tools(
             **counts(draft.building, level),
             "scale": scale.note,
             "scale_source": scale.source,
+            "read_from": SOURCE_WORDS[origin],
             "problems": describe(draft.findings),
             "next": "Draft only, nothing saved. Call preview_draft to show the person the card.",
         }
@@ -616,7 +746,7 @@ def make_level4_tools(
         if fresh:
             summary["seconds"] = round(result.seconds, 1)
             summary["cost_usd"] = round(result.cost_usd, 4)
-        if result.warnings:
+        if result is not None and result.warnings:
             summary["warnings"] = result.warnings
         return as_json(summary)
 
@@ -644,7 +774,8 @@ def make_level4_tools(
                 (known_length_m, along, optional level) or "accept_suggestions" (no other arguments: add the
                 doors proposed in the last card; only after the person said yes to the proposal) or "link_floors"
                 (ref on one floor, other_ref on the neighbouring floor, kind "stairs" or "lift", and level and
-                other_level when the room numbers are not unique). set_room_type with stairwell or lift also
+                other_level when the room numbers are not unique) or "set_floor_height" (known_length_m is the storey height
+                in metres, for all floors). set_room_type with stairwell or lift also
                 makes the room a stair or lift and links it to the same stair or lift on the next floor.
             side: For add_entrance: "north", "south", "east" or "west" wall of the room (default: its longest
                 outside wall).
@@ -681,6 +812,7 @@ def make_level4_tools(
                 scale,
                 {"known_length_m": known_length_m, "along": along},
                 source.added_from_segments,
+                source=source.source,
             )
             try:
                 _rebuild(draft)
@@ -688,6 +820,21 @@ def make_level4_tools(
                 draft.floors[target] = old
                 raise
             return as_json({"done": f"Scale of floor {target}: {scale.note}.", "problems": describe(draft.findings)})
+        if action == "set_floor_height":
+            if known_length_m is None or not MIN_FLOOR_HEIGHT_M <= known_length_m <= MAX_FLOOR_HEIGHT_M:
+                raise ToolError(
+                    f"set_floor_height needs known_length_m, the storey height in metres ({MIN_FLOOR_HEIGHT_M:g} to {MAX_FLOOR_HEIGHT_M:g})."
+                )
+            old = draft.height_override
+            draft.height_override = known_length_m
+            try:
+                _rebuild(draft)
+            except ToolError:
+                draft.height_override = old
+                raise
+            return as_json(
+                {"done": f"Storey height is now {known_length_m:g} m.", "problems": describe(draft.findings)}
+            )
         if action == "accept_suggestions":
             fix = ("accept_suggestions",)
         elif action == "add_entrance":
@@ -718,7 +865,7 @@ def make_level4_tools(
                 raise ToolError(f"{action} needs ref and other_ref (two room numbers).")
             fix = (action, ref, other_ref, level)
         candidate = copy.deepcopy(building)
-        done = apply_fix(candidate, fix, _to_metres(draft))
+        done = apply_fix(candidate, fix, _to_metres(draft, candidate))
         draft.fixes.append(fix)
         draft.building = candidate
         draft.convert_items = _relinked(candidate, draft.convert_items)
@@ -760,6 +907,7 @@ def make_level4_tools(
                     **counts(building, floor["level"]),
                     "room numbers": labels[:40],
                     "scale": draft.floors[floor["level"]].scale.note,
+                    "read from": SOURCE_WORDS[draft.floors[floor["level"]].source],
                 }
             )
         poor = poor_reasons(draft)

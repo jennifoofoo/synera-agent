@@ -212,7 +212,10 @@ def test_floors_cropped_differently_are_centred_for_the_match():
         )
     building, findings = convert_floors_with_findings(moved, "T", "t1")
     assert len(building["vertical_connectors"]) == 6
-    assert "connector_aligned_by_centre" in codes(findings)
+    # the floors are now lined up by their connectors before linking, so the centring fallback is not needed
+    assert building["building"]["source_ref"]["floor_offsets_m"]["1"][0] != 0
+    assert building["building"]["source_ref"]["floors_aligned"] is True
+    assert "floor_not_aligned" not in codes(findings)
 
 
 def test_osm_lifts_with_equal_frames_link_without_wrong_pairs():
@@ -486,8 +489,13 @@ def test_cached_swiss_asks_and_link_floors_repairs_it(tmp_path, monkeypatch):
     for kind, first, second in (("stairs", "0.35", "1.34"), ("lift", "0.35", "1.34"), ("stairs", "0.35", "1.35")):
         rig.call("fix_draft", action="link_floors", ref=first, other_ref=second, kind=kind, level=0, other_level=1)
     result = live.evaluate_building(SWISS, BuildingMap(rig.draft.building))
-    assert result["cross_floor"]["normal"]["full"] == result["cross_floor"]["normal"]["pairs"] == 350
-    assert result["cross_floor"]["step_free"]["full"] == result["cross_floor"]["step_free"]["pairs"] == 225
+    # Every pair the kit 1.1.0 labels can walk (the pair counts follow the building data, not constants) is walked
+    # with full marks on the repaired building, normal and step free.
+    assert result["original_connectors_0_1"]["count"] == 3  # the stairs, the lift and the second stairs of the labels
+    for mode in ("normal", "step_free"):
+        cross = result["cross_floor"][mode]
+        assert cross["pairs"] > 0 and cross["full"] == cross["pairs"]
+        assert cross["invalid"] == 0 and cross["no_route"] == 0
 
 
 def test_cached_osm_does_not_crash_and_links_nothing_wrong(tmp_path, monkeypatch):
