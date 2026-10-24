@@ -23,6 +23,26 @@ def snake_case(name: str, value):
     return value
 
 
+def known_types(bm: BuildingMap, name: str) -> set[str]:
+    if name == "asset_type":
+        return {asset["type"] for asset in bm.assets.values()}
+    return {space["room_type"] for space in bm.spaces.values()}
+
+
+def resolve_type(bm: BuildingMap, name: str, value):
+    """Map a shortened type ("generic", "ups") to the one building type it stands for; refuse if unclear."""
+    value = snake_case(name, value)
+    if not (name.endswith("_type") and isinstance(value, str)):
+        return value
+    types = known_types(bm, name)
+    if value in types:
+        return value
+    close = [kind for kind in types if kind.startswith(value + "_") or value in kind.split("_")]
+    if len(close) == 1:
+        return close[0]
+    raise MapError(f"Unknown {name} '{value}'. Valid values here: {', '.join(sorted(types))}.")
+
+
 def kind_tool(bm: BuildingMap, kind: Kind):
     """Expose a kind as a tool: same signature minus `bm`, docstring from the kind description."""
     signature = inspect.signature(kind.fn)
@@ -30,8 +50,8 @@ def kind_tool(bm: BuildingMap, kind: Kind):
 
     @functools.wraps(kind.fn)
     def run(*args, **kwargs) -> str:
-        kwargs = {name: snake_case(name, value) for name, value in kwargs.items()}
         try:
+            kwargs = {name: resolve_type(bm, name, value) for name, value in kwargs.items()}
             return as_json(kind.fn(bm, *args, **kwargs))
         except MapError as error:
             raise ToolError(str(error)) from error

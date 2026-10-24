@@ -43,3 +43,19 @@ def test_type_parameters_accept_spaces_instead_of_underscores():
     assert snake_case("room_type", "Living Room") == "living_room"
     assert snake_case("asset_type", "tv stand") == "tv_stand"
     assert snake_case("start", "Lab 0.12") == "Lab 0.12"
+
+
+def test_shortened_type_resolves_to_the_building_type_and_unknown_lists_valid_ones():
+    import pytest
+
+    from building_agent.tools import known_types, resolve_type
+    from starter_agent.building_map import MapError
+
+    building_dir, _ = labelled_questions("floor_area_total")[0]
+    bm = load_map(building_dir)
+    room_types = known_types(bm, "room_type")
+    some = min(room_types)
+    assert resolve_type(bm, "room_type", some.replace("_", " ").upper()) == some
+    with pytest.raises(MapError, match="Valid values"):
+        resolve_type(bm, "room_type", "no_such_type_at_all")
+    assert resolve_type(bm, "floor_id", "F1") == "F1"
