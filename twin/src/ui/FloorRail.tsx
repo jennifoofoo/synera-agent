@@ -36,8 +36,8 @@ export function FloorRail() {
       {!flat && model.floors.length > 1 && (
         <button
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
-          onClick={() => setFloorMode(floorMode === "exploded" ? "stacked" : "exploded")}
-          title={floorMode === "exploded" ? "Stack the floors" : "Pull the floors apart"}
+          onClick={() => setFloorMode(floorMode === "exploded" ? "single" : "exploded")}
+          title={floorMode === "exploded" ? "Show only this floor" : "Show all floors"}
           aria-pressed={floorMode === "exploded"}
         >
           ⇕
