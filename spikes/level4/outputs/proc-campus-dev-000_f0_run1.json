@@ -1,0 +1,1073 @@
+{
+ "building_id": "proc-campus-dev-000",
+ "floor_index": 0,
+ "model": "claude-sonnet-5-5",
+ "image": "data/dev/proc-campus-dev-000/floor_0_plain.png",
+ "image_size_px": [
+  276,
+  1059
+ ],
+ "seconds": 13.2,
+ "input_tokens": 1017,
+ "output_tokens": 2885,
+ "stop_reason": "end_turn",
+ "raw_text": "{\"scale\":{\"bar_px\":null,\"bar_m\":null},\"rooms\":[{\"id\":\"r1\",\"ref\":\"0.01\",\"name\":null,\"type\":\"corridor\",\"room_type\":\"corridor\",\"polygon_px\":[[122,57],[155,57],[155,1021],[122,1021]]},{\"id\":\"r2\",\"ref\":\"0.02\",\"name\":null,\"type\":\"room\",\"room_type\":\"lecture hall\",\"polygon_px\":[[39,57],[122,57],[122,114],[39,114]]},{\"id\":\"r3\",\"ref\":\"0.03\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,114],[122,114],[122,172],[39,172]]},{\"id\":\"r4\",\"ref\":\"0.04\",\"name\":null,\"type\":\"room\",\"room_type\":\"toilet\",\"polygon_px\":[[39,172],[122,172],[122,228],[39,228]]},{\"id\":\"r5\",\"ref\":\"0.05\",\"name\":null,\"type\":\"room\",\"room_type\":\"toilet\",\"polygon_px\":[[39,228],[122,228],[122,262],[39,262]]},{\"id\":\"r6\",\"ref\":\"0.06\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,262],[122,262],[122,313],[39,313]]},{\"id\":\"r7\",\"ref\":\"0.07\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,313],[122,313],[122,409],[39,409]]},{\"id\":\"r8\",\"ref\":\"0.08\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,409],[122,409],[122,494],[39,494]]},{\"id\":\"r9\",\"ref\":\"0.09\",\"name\":null,\"type\":\"room\",\"room_type\":\"toilet\",\"polygon_px\":[[39,494],[122,494],[122,549],[39,549]]},{\"id\":\"r10\",\"ref\":\"0.10\",\"name\":null,\"type\":\"room\",\"room_type\":\"toilet\",\"polygon_px\":[[39,549],[122,549],[122,584],[39,584]]},{\"id\":\"r11\",\"ref\":\"0.11\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,584],[122,584],[122,673],[39,673]]},{\"id\":\"r12\",\"ref\":\"0.12\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,673],[122,673],[122,754],[39,754]]},{\"id\":\"r13\",\"ref\":\"0.13\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,754],[122,754],[122,815],[39,815]]},{\"id\":\"r14\",\"ref\":\"0.14\",\"name\":null,\"type\":\"room\",\"room_type\":\"toilet\",\"polygon_px\":[[39,815],[122,815],[122,871],[39,871]]},{\"id\":\"r15\",\"ref\":\"0.15\",\"name\":null,\"type\":\"room\",\"room_type\":\"toilet\",\"polygon_px\":[[39,871],[122,871],[122,906],[39,906]]},{\"id\":\"r16\",\"ref\":\"0.16\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,906],[122,906],[122,961],[39,961]]},{\"id\":\"r17\",\"ref\":\"0.17\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[39,961],[122,961],[122,1021],[39,1021]]},{\"id\":\"r18\",\"ref\":\"0.18\",\"name\":null,\"type\":\"room\",\"room_type\":\"entrance hall\",\"polygon_px\":[[155,57],[238,57],[238,145],[155,145]]},{\"id\":\"r19\",\"ref\":\"0.19\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,145],[238,145],[238,195],[155,195]]},{\"id\":\"r20\",\"ref\":\"0.20\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,195],[238,195],[238,275],[155,275]]},{\"id\":\"r21\",\"ref\":\"0.21\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,275],[238,275],[238,345],[155,345]]},{\"id\":\"r22\",\"ref\":\"0.22\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,345],[238,345],[238,410],[155,410]]},{\"id\":\"r28\",\"ref\":\"0.28\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,410],[238,410],[238,526],[155,526]]},{\"id\":\"r23\",\"ref\":\"0.23\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,526],[238,526],[238,612],[155,612]]},{\"id\":\"r27\",\"ref\":\"0.27\",\"name\":null,\"type\":\"room\",\"room_type\":\"lecture hall\",\"polygon_px\":[[155,612],[238,612],[238,821],[155,821]]},{\"id\":\"r24\",\"ref\":\"0.24\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,821],[238,821],[238,874],[155,874]]},{\"id\":\"r25\",\"ref\":\"0.25\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,874],[238,874],[238,946],[155,946]]},{\"id\":\"r26\",\"ref\":\"0.26\",\"name\":null,\"type\":\"room\",\"room_type\":\"room\",\"polygon_px\":[[155,946],[238,946],[238,1021],[155,1021]]}],\"doors\":[{\"rooms\":[\"r1\",\"outside\"],\"kind\":\"entrance\",\"position_px\":[138,57],\"width_px\":12},{\"rooms\":[\"r18\",\"outside\"],\"kind\":\"entrance\",\"position_px\":[238,101],\"width_px\":12},{\"rooms\":[\"r1\",\"r2\"],\"kind\":\"door\",\"position_px\":[122,86],\"width_px\":8},{\"rooms\":[\"r1\",\"r3\"],\"kind\":\"door\",\"position_px\":[122,143],\"width_px\":8},{\"rooms\":[\"r1\",\"r4\"],\"kind\":\"door\",\"position_px\":[122,200],\"width_px\":8},{\"rooms\":[\"r1\",\"r5\"],\"kind\":\"door\",\"position_px\":[122,245],\"width_px\":8},{\"rooms\":[\"r1\",\"r6\"],\"kind\":\"door\",\"position_px\":[122,288],\"width_px\":8},{\"rooms\":[\"r1\",\"r7\"],\"kind\":\"door\",\"position_px\":[122,361],\"width_px\":8},{\"rooms\":[\"r1\",\"r8\"],\"kind\":\"door\",\"position_px\":[122,451],\"width_px\":8},{\"rooms\":[\"r1\",\"r9\"],\"kind\":\"door\",\"position_px\":[122,522],\"width_px\":8},{\"rooms\":[\"r1\",\"r10\"],\"kind\":\"door\",\"position_px\":[122,567],\"width_px\":8},{\"rooms\":[\"r1\",\"r11\"],\"kind\":\"door\",\"position_px\":[122,628],\"width_px\":8},{\"rooms\":[\"r1\",\"r12\"],\"kind\":\"door\",\"position_px\":[122,713],\"width_px\":8},{\"rooms\":[\"r1\",\"r13\"],\"kind\":\"door\",\"position_px\":[122,785],\"width_px\":8},{\"rooms\":[\"r1\",\"r14\"],\"kind\":\"door\",\"position_px\":[122,843],\"width_px\":8},{\"rooms\":[\"r1\",\"r15\"],\"kind\":\"door\",\"position_px\":[122,888],\"width_px\":8},{\"rooms\":[\"r1\",\"r16\"],\"kind\":\"door\",\"position_px\":[122,933],\"width_px\":8},{\"rooms\":[\"r1\",\"r17\"],\"kind\":\"door\",\"position_px\":[122,991],\"width_px\":8},{\"rooms\":[\"r1\",\"r18\"],\"kind\":\"door\",\"position_px\":[155,101],\"width_px\":8},{\"rooms\":[\"r1\",\"r19\"],\"kind\":\"door\",\"position_px\":[155,170],\"width_px\":8},{\"rooms\":[\"r1\",\"r20\"],\"kind\":\"door\",\"position_px\":[155,235],\"width_px\":8},{\"rooms\":[\"r1\",\"r21\"],\"kind\":\"door\",\"position_px\":[155,310],\"width_px\":8},{\"rooms\":[\"r1\",\"r22\"],\"kind\":\"door\",\"position_px\":[155,377],\"width_px\":8},{\"rooms\":[\"r1\",\"r28\"],\"kind\":\"door\",\"position_px\":[155,468],\"width_px\":8},{\"rooms\":[\"r1\",\"r23\"],\"kind\":\"door\",\"position_px\":[155,569],\"width_px\":8},{\"rooms\":[\"r1\",\"r27\"],\"kind\":\"door\",\"position_px\":[155,717],\"width_px\":8},{\"rooms\":[\"r1\",\"r24\"],\"kind\":\"door\",\"position_px\":[155,848],\"width_px\":8},{\"rooms\":[\"r1\",\"r25\"],\"kind\":\"door\",\"position_px\":[155,910],\"width_px\":8},{\"rooms\":[\"r1\",\"r26\"],\"kind\":\"door\",\"position_px\":[155,984],\"width_px\":8}]}",
+ "extraction": {
+  "scale": {
+   "bar_px": null,
+   "bar_m": null
+  },
+  "rooms": [
+   {
+    "id": "r1",
+    "ref": "0.01",
+    "name": null,
+    "type": "corridor",
+    "room_type": "corridor",
+    "polygon_px": [
+     [
+      122,
+      57
+     ],
+     [
+      155,
+      57
+     ],
+     [
+      155,
+      1021
+     ],
+     [
+      122,
+      1021
+     ]
+    ]
+   },
+   {
+    "id": "r2",
+    "ref": "0.02",
+    "name": null,
+    "type": "room",
+    "room_type": "lecture hall",
+    "polygon_px": [
+     [
+      39,
+      57
+     ],
+     [
+      122,
+      57
+     ],
+     [
+      122,
+      114
+     ],
+     [
+      39,
+      114
+     ]
+    ]
+   },
+   {
+    "id": "r3",
+    "ref": "0.03",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      114
+     ],
+     [
+      122,
+      114
+     ],
+     [
+      122,
+      172
+     ],
+     [
+      39,
+      172
+     ]
+    ]
+   },
+   {
+    "id": "r4",
+    "ref": "0.04",
+    "name": null,
+    "type": "room",
+    "room_type": "toilet",
+    "polygon_px": [
+     [
+      39,
+      172
+     ],
+     [
+      122,
+      172
+     ],
+     [
+      122,
+      228
+     ],
+     [
+      39,
+      228
+     ]
+    ]
+   },
+   {
+    "id": "r5",
+    "ref": "0.05",
+    "name": null,
+    "type": "room",
+    "room_type": "toilet",
+    "polygon_px": [
+     [
+      39,
+      228
+     ],
+     [
+      122,
+      228
+     ],
+     [
+      122,
+      262
+     ],
+     [
+      39,
+      262
+     ]
+    ]
+   },
+   {
+    "id": "r6",
+    "ref": "0.06",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      262
+     ],
+     [
+      122,
+      262
+     ],
+     [
+      122,
+      313
+     ],
+     [
+      39,
+      313
+     ]
+    ]
+   },
+   {
+    "id": "r7",
+    "ref": "0.07",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      313
+     ],
+     [
+      122,
+      313
+     ],
+     [
+      122,
+      409
+     ],
+     [
+      39,
+      409
+     ]
+    ]
+   },
+   {
+    "id": "r8",
+    "ref": "0.08",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      409
+     ],
+     [
+      122,
+      409
+     ],
+     [
+      122,
+      494
+     ],
+     [
+      39,
+      494
+     ]
+    ]
+   },
+   {
+    "id": "r9",
+    "ref": "0.09",
+    "name": null,
+    "type": "room",
+    "room_type": "toilet",
+    "polygon_px": [
+     [
+      39,
+      494
+     ],
+     [
+      122,
+      494
+     ],
+     [
+      122,
+      549
+     ],
+     [
+      39,
+      549
+     ]
+    ]
+   },
+   {
+    "id": "r10",
+    "ref": "0.10",
+    "name": null,
+    "type": "room",
+    "room_type": "toilet",
+    "polygon_px": [
+     [
+      39,
+      549
+     ],
+     [
+      122,
+      549
+     ],
+     [
+      122,
+      584
+     ],
+     [
+      39,
+      584
+     ]
+    ]
+   },
+   {
+    "id": "r11",
+    "ref": "0.11",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      584
+     ],
+     [
+      122,
+      584
+     ],
+     [
+      122,
+      673
+     ],
+     [
+      39,
+      673
+     ]
+    ]
+   },
+   {
+    "id": "r12",
+    "ref": "0.12",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      673
+     ],
+     [
+      122,
+      673
+     ],
+     [
+      122,
+      754
+     ],
+     [
+      39,
+      754
+     ]
+    ]
+   },
+   {
+    "id": "r13",
+    "ref": "0.13",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      754
+     ],
+     [
+      122,
+      754
+     ],
+     [
+      122,
+      815
+     ],
+     [
+      39,
+      815
+     ]
+    ]
+   },
+   {
+    "id": "r14",
+    "ref": "0.14",
+    "name": null,
+    "type": "room",
+    "room_type": "toilet",
+    "polygon_px": [
+     [
+      39,
+      815
+     ],
+     [
+      122,
+      815
+     ],
+     [
+      122,
+      871
+     ],
+     [
+      39,
+      871
+     ]
+    ]
+   },
+   {
+    "id": "r15",
+    "ref": "0.15",
+    "name": null,
+    "type": "room",
+    "room_type": "toilet",
+    "polygon_px": [
+     [
+      39,
+      871
+     ],
+     [
+      122,
+      871
+     ],
+     [
+      122,
+      906
+     ],
+     [
+      39,
+      906
+     ]
+    ]
+   },
+   {
+    "id": "r16",
+    "ref": "0.16",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      906
+     ],
+     [
+      122,
+      906
+     ],
+     [
+      122,
+      961
+     ],
+     [
+      39,
+      961
+     ]
+    ]
+   },
+   {
+    "id": "r17",
+    "ref": "0.17",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      39,
+      961
+     ],
+     [
+      122,
+      961
+     ],
+     [
+      122,
+      1021
+     ],
+     [
+      39,
+      1021
+     ]
+    ]
+   },
+   {
+    "id": "r18",
+    "ref": "0.18",
+    "name": null,
+    "type": "room",
+    "room_type": "entrance hall",
+    "polygon_px": [
+     [
+      155,
+      57
+     ],
+     [
+      238,
+      57
+     ],
+     [
+      238,
+      145
+     ],
+     [
+      155,
+      145
+     ]
+    ]
+   },
+   {
+    "id": "r19",
+    "ref": "0.19",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      145
+     ],
+     [
+      238,
+      145
+     ],
+     [
+      238,
+      195
+     ],
+     [
+      155,
+      195
+     ]
+    ]
+   },
+   {
+    "id": "r20",
+    "ref": "0.20",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      195
+     ],
+     [
+      238,
+      195
+     ],
+     [
+      238,
+      275
+     ],
+     [
+      155,
+      275
+     ]
+    ]
+   },
+   {
+    "id": "r21",
+    "ref": "0.21",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      275
+     ],
+     [
+      238,
+      275
+     ],
+     [
+      238,
+      345
+     ],
+     [
+      155,
+      345
+     ]
+    ]
+   },
+   {
+    "id": "r22",
+    "ref": "0.22",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      345
+     ],
+     [
+      238,
+      345
+     ],
+     [
+      238,
+      410
+     ],
+     [
+      155,
+      410
+     ]
+    ]
+   },
+   {
+    "id": "r28",
+    "ref": "0.28",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      410
+     ],
+     [
+      238,
+      410
+     ],
+     [
+      238,
+      526
+     ],
+     [
+      155,
+      526
+     ]
+    ]
+   },
+   {
+    "id": "r23",
+    "ref": "0.23",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      526
+     ],
+     [
+      238,
+      526
+     ],
+     [
+      238,
+      612
+     ],
+     [
+      155,
+      612
+     ]
+    ]
+   },
+   {
+    "id": "r27",
+    "ref": "0.27",
+    "name": null,
+    "type": "room",
+    "room_type": "lecture hall",
+    "polygon_px": [
+     [
+      155,
+      612
+     ],
+     [
+      238,
+      612
+     ],
+     [
+      238,
+      821
+     ],
+     [
+      155,
+      821
+     ]
+    ]
+   },
+   {
+    "id": "r24",
+    "ref": "0.24",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      821
+     ],
+     [
+      238,
+      821
+     ],
+     [
+      238,
+      874
+     ],
+     [
+      155,
+      874
+     ]
+    ]
+   },
+   {
+    "id": "r25",
+    "ref": "0.25",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      874
+     ],
+     [
+      238,
+      874
+     ],
+     [
+      238,
+      946
+     ],
+     [
+      155,
+      946
+     ]
+    ]
+   },
+   {
+    "id": "r26",
+    "ref": "0.26",
+    "name": null,
+    "type": "room",
+    "room_type": "room",
+    "polygon_px": [
+     [
+      155,
+      946
+     ],
+     [
+      238,
+      946
+     ],
+     [
+      238,
+      1021
+     ],
+     [
+      155,
+      1021
+     ]
+    ]
+   }
+  ],
+  "doors": [
+   {
+    "rooms": [
+     "r1",
+     "outside"
+    ],
+    "kind": "entrance",
+    "position_px": [
+     138,
+     57
+    ],
+    "width_px": 12
+   },
+   {
+    "rooms": [
+     "r18",
+     "outside"
+    ],
+    "kind": "entrance",
+    "position_px": [
+     238,
+     101
+    ],
+    "width_px": 12
+   },
+   {
+    "rooms": [
+     "r1",
+     "r2"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     86
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r3"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     143
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r4"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     200
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r5"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     245
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r6"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     288
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r7"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     361
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r8"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     451
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r9"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     522
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r10"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     567
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r11"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     628
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r12"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     713
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r13"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     785
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r14"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     843
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r15"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     888
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r16"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     933
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r17"
+    ],
+    "kind": "door",
+    "position_px": [
+     122,
+     991
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r18"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     101
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r19"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     170
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r20"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     235
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r21"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     310
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r22"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     377
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r28"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     468
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r23"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     569
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r27"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     717
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r24"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     848
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r25"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     910
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r26"
+    ],
+    "kind": "door",
+    "position_px": [
+     155,
+     984
+    ],
+    "width_px": 8
+   }
+  ]
+ }
+}
