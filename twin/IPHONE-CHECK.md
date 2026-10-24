@@ -1,14 +1,14 @@
 # iPhone check (worker view, ~10 min)
 
-Prerequisite: `scripts/tunnel.sh` running, open the https link in **Safari** on the iPhone. Things only a real iPhone can show:
+Run `scripts/tunnel.sh`, then open the https link in **Safari** on the iPhone. These ten points can only be checked on a real iPhone:
 
-1. Page loads without sideways scroll or zoom; header (‹, name, 🔍) sits below the notch / Dynamic Island, input sits above the home bar.
-2. Pull down / up on the plan and on the header: no rubber-band bounce, the page never scrolls away.
-3. Tap 🔍: keyboard opens, the input stays visible directly above the keyboard, Safari does not zoom in. Close the keyboard: layout snaps back (no gap at the bottom).
-4. Tap a room: bottom sheet slides up with 2–3 lines + buttons; swipe it down on the grip = closes; ‹ also closes.
-5. First tap anywhere, then ask by mic: Safari asks for the microphone once; the spoken reply plays (no silent failure). Mute switch on? Note whether audio still plays.
-6. Deny the mic (ᴀA › Website Settings › Microphone › Deny), tap 🎤: the hint names exactly that path.
-7. Start a guided route ("guide me to …"), leave the phone untouched > auto-lock time: the screen stays on. Switch apps and back: it still stays on.
-8. Rotate to landscape: input moves bottom right, floor buttons scroll, nothing overlaps; rotate back.
-9. Pinch / two-finger orbit on the plan feels smooth (no stutter while turning); phone does not get warm after 2 min idle.
-10. Every button hits on the first try with the thumb (≥44 px); no button needs a long press or hover to explain itself.
+1. The page opens in the 2D plan with no sideways scroll and no zoom. The header (‹, name, 🔍) sits below the notch or Dynamic Island, and the input sits above the home bar.
+2. In 2D, one finger pans and pinch zooms the plan, and room names are readable. Swiping on the header or input causes no rubber-band bounce.
+3. Tap 🔍: the keyboard opens, the input stays visible right above it, and Safari does not zoom in. Close the keyboard: the layout snaps back with no gap at the bottom.
+4. Tap a room: a sheet with 2–3 lines and buttons slides up over the lower part only, and the room stays visible above it. Swiping the sheet down closes it, and so does ‹.
+5. Tap once anywhere, then ask something with the mic. Safari asks for the microphone once and the reply is spoken. Also try with the mute switch on and note whether audio still plays.
+6. Block the mic (ᴀA › Website Settings › Microphone › Deny) and tap the mic: the hint names exactly that path.
+7. Start a guided route ("guide me to …") and leave the phone untouched past the auto-lock time: the screen stays on. Switch to another app and back: it still stays on.
+8. Tap 3D and back to 2D: one tap each way, and the plan keeps the same floor.
+9. Turn the phone sideways: the input moves to the bottom right, the floor buttons stay reachable, and nothing overlaps. Turn it back.
+10. Every button hits on the first try with your thumb, and nothing needs a long press or hover to explain itself. The phone does not get warm after 2 minutes idle.
