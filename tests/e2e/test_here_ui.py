@@ -314,3 +314,40 @@ def test_labels_clear_of_markers(page, server):
                 assert not overlap(label, box), f"label {room['name']} overlaps {name} in {view}: {label} {box}"
         shot(page, f"labels-{view}")
     assert not page.errors, page.errors
+
+
+ROUTE_STATE = "() => { const r = window.__twinAudit.store.getState().state.route; return r && r.ok ? r : null; }"
+
+
+def test_route_starts_at_here_dot(page, server):
+    """From "You are here" with a dot, the route line starts at the dot (start_point), not at the room's anchor."""
+    if page.kind != "desktop":
+        pytest.skip("one viewport is enough: the start point is sent by the store, not by the layout")
+    key = page.evaluate("localStorage.getItem('twin.building')")
+    building = get_json(f"{server}/api/building?key={key}")
+    tap_floor(page)
+    page.get_by_role("button", name="I'm here").click()
+    page.wait_for_function("window.__twinScene.getObjectByName('here-dot')", timeout=10000)
+    here = page.evaluate(PAGE_POSITION)
+    assert here and here["point"]
+    rooms = sorted(
+        (s for s in building["spaces"] if s["floor_id"] == here["floor_id"] and s["id"] != here["space_id"]),
+        key=lambda s: -s["area_m2"],
+    )
+    route = None
+    for room in rooms[:8]:
+        page.evaluate("(id) => window.__twinAudit.store.getState().openDirections(id)", room["id"])
+        try:
+            page.wait_for_function(f"({ROUTE_STATE})()", timeout=5000)
+        except Exception:  # noqa: BLE001 - not routable, try the next room
+            page.evaluate("() => window.__twinAudit.store.getState().closeDirections()")
+            continue
+        route = page.evaluate(ROUTE_STATE)
+        break
+    assert route, "no routable room from the here dot"
+    page.wait_for_timeout(1800)  # the line draws in
+    shot(page, "route-from-here-3d")
+    first = route["segments"][0]["points"][0]
+    gap = ((first[0] - here["point"][0]) ** 2 + (first[1] - here["point"][1]) ** 2) ** 0.5
+    assert gap <= 0.3, f"the route starts {gap:.2f} m from the here dot: {first} vs {here['point']}"
+    assert not page.errors, page.errors
