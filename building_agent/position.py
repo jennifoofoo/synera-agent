@@ -195,3 +195,20 @@ def nearest(
         f"Nearest {label}: {place_label(bm, first['space_id'])}, {far}. Do you mean a different one?"
     )
     return result
+
+
+# ---------- exact start point ----------
+
+EXACT_POSITION_NOTE = "from your exact position"
+
+
+def exact_start_point(bm: BuildingMap, state) -> tuple[float, float] | None:
+    """The point to start a route at when the person gave no start: the session position's own point, if it has
+    one that lies in its room. Never in a benchmark message ('Answer:'), never from message text."""
+    position = getattr(state, "position", None)
+    if position is None or position.point is None or "answer:" in str(getattr(state, "last_user_text", "")).lower():
+        return None
+    try:
+        return routing.check_point(bm, position.space_id, position.point, position.floor_id)
+    except MapError:
+        return None
