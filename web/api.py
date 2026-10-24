@@ -291,6 +291,9 @@ def guide_view(session: Session) -> dict | None:
         "step_count": info["step_count"],
         "leg": {"from_space_id": info["from"], "to_space_id": info["to"], "points": points, "segments": segments},
         "target_space_id": info["target"],
+        "expected_seconds": info.get("expected_seconds", 0),  # auto-pace: the page's timer is this plus 5 s
+        "pace": info.get("pace", "off"),
+        "pace_paused": info.get("pace_paused", False),
     }
 
 

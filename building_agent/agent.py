@@ -112,6 +112,7 @@ class Agent(StarterAgent):
         if hasattr(self.guide, "undo"):
             self.guide.undo.clear()
         self.guide.position = self.guide.walk = None  # another building: the old position means nothing
+        self.guide.pace = None  # and the auto-pace timer belongs to the old walk
         self.map = building_map
         self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building, campus=self.campus)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)

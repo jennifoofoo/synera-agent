@@ -24,8 +24,11 @@ Handy-Demo: `scripts/tunnel.sh` startet die Seite mit https-Tunnel (Mikrofon geh
 - Aktivierungswort "Hey Wanda" (Teil B der Spec): `continuous`-Erkennung, Ähnlichkeitsliste (wonda, wander), nur Sätze mit dem Wort am Anfang lösen aus, nur das Wort: Ton und "I'm here.", Barge-in (Ausgabe stoppen), Neustart nach Stille, Schalter "Hands-free" Default aus, sichtbares Mikrofon-Symbol und Mute. Erst bauen, wenn der Handtest zeigt, dass die normale Erkennung mit Raumnummern brauchbar ist.
 - Antworten kommen mit Pausen (0,8 s) und Tempo 0,85 aus `/api/speak`, kein Seitenwechsel nötig.
 
-## 4. Auto-Pace (Spec `docs/specs/auto-pace.md`, nach Position)
-Schalter "Auto-Pace" (Default aus), Timer nach jedem gesprochenen Schritt (erwartete Gehzeit plus 5 s, kommt vom Server), danach Chat-Aufruf mit Kontext `{guide_tick: true}`. Anzeige "wartet auf dich". Der Server-Teil (`building_agent/pace.py`) liegt bereit, die Anbindung kommt nach dem Merge von Position.
+## 4. Auto-Pace (Spec `docs/specs/auto-pace.md`, Abschnitt "Vertrag für die Seite", Server fertig)
+- Schalter "Auto-Pace" (Default aus, Stufen Nachfragen und Weitersagen): sendet bei jedem Chat-Aufruf das Top-Level-Feld `pace: "off" | "ask" | "say"` (wie `voice`).
+- `state.guide` hat neu `expected_seconds`, `pace`, `pace_paused`. Nach der Sprachausgabe eines Schritts Timer starten: `expected_seconds + 5` s. Jede Äußerung der Person, `pace_paused: true` oder `guide: null` stoppt ihn.
+- Läuft der Timer ab: `POST /api/chat` mit `message: ""`, `pace` und `context: {guide_tick: true, guide_step: state.guide.step_index}` (echter Boolean, nie als Text). Die Antwort ist normales `reply` plus `state`: sprechen und danach Timer neu starten (Stufe `say`) oder auf die Person warten (Stufe `ask`). Ist `tick_ignored: true` (reply leer): nichts tun, keinen Timer starten.
+- Anzeige "wartet auf dich" bei `pace_paused: true`. Der Server hängt die Dauer selbst an den Schritt, die Seite sagt nichts dazu.
 
 ## 5. Level 3 in der Seite (Gebäudewahl, Route über Gebäude)
 Die Endpunkte stehen auf `feat/web-campus-gzip` (Spec mit allen Feldern: `docs/specs/level3-campus.md`, Abschnitt "Page API").
