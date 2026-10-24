@@ -26,7 +26,15 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .worker .building-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .worker .building-name select { font-size: 16px; }
 .worker .pill { top: calc(var(--head-y) + 52px); right: calc(var(--safe-r) + 8px); }
-.worker .pill button { min-height: 36px; padding: 4px 10px; }
+.worker .pill button { min-height: 36px; padding: 4px 10px; position: relative; }
+/* the pill stays slim, but its buttons take a 44+ px tap (an invisible margin around them) */
+.worker .pill button::after { content: ""; position: absolute; left: -4px; right: -4px; top: -5px; bottom: -5px; }
+.worker .dir-accept { min-width: 44px; min-height: 44px; }
+/* same for the slim "You are here" chip and the text links on the route card */
+.worker .here-chip .here-name, .worker .here-chip .x, .worker .card button.link { position: relative; }
+.worker .here-chip .here-name::after, .worker .here-chip .x::after { content: ""; position: absolute; inset: -4px 0; }
+.worker .card button.link::after { content: ""; position: absolute; inset: -6px -4px; }
+.worker .dir-toggle { min-height: 44px; }
 
 /* floors: left edge, 44 px, scrolls when the phone is on its side */
 .worker .floorrail {
