@@ -132,7 +132,10 @@ export interface AutocompleteProps {
   /** Where the laptop list (↓) opens; never on touch screens. */
   listPlacement?: "above" | "below";
   maxHits?: number;
+  /** Every Escape (after the component's own handling). */
   onEscape?: () => void;
+  /** Escape with no list open and an empty field: the person wants out (e.g. stop editing a directions field). */
+  onCancel?: () => void;
   inputRef?: RefObject<HTMLInputElement>;
   autoFocus?: boolean;
   ariaLabel?: string;
@@ -156,6 +159,7 @@ export function Autocomplete({
   listPlacement = "below",
   maxHits = 6,
   onEscape,
+  onCancel,
   inputRef: outerRef,
   autoFocus,
   ariaLabel,
@@ -263,7 +267,10 @@ export function Autocomplete({
           } else if (event.key === "Escape") {
             if (open) setOpen(false);
             else if (text) onChange("");
-            else input.blur();
+            else {
+              input.blur();
+              onCancel?.();
+            }
             onEscape?.();
           }
         }}
@@ -350,9 +357,7 @@ export function PlaceInput({ placeholder, autoFocus, includeHere, onPick, onCanc
         setText("");
         onPick(hit.id === HERE_PLACE ? HERE_PLACE : (hit.spaceId ?? hit.id));
       }}
-      onEscape={() => {
-        if (!text) onCancel?.();
-      }}
+      onCancel={onCancel}
       placeholder={placeholder}
       autoFocus={autoFocus}
       ariaLabel={ariaLabel}
