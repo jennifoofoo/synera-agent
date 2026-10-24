@@ -1,0 +1,144 @@
+{
+ "_source": "POST /api/route on dev/osm-way22744230 (Stairwell N0317D to Toilet N2320A), kit and steps dropped",
+ "ok": true,
+ "model": "people",
+ "start": "osm-way22744230-F0-S001",
+ "destination": "osm-way22744230-F2-S010",
+ "via": [],
+ "step_free": false,
+ "length_m": 93.3,
+ "space_path": [
+  "osm-way22744230-F0-S001",
+  "osm-way22744230-F-1-S039",
+  "osm-way22744230-F-1-S029",
+  "osm-way22744230-F-1-S056",
+  "osm-way22744230-F-1-S017",
+  "osm-way22744230-F-1-S055",
+  "osm-way22744230-F-1-S032",
+  "osm-way22744230-F1-S016",
+  "osm-way22744230-F2-S040",
+  "osm-way22744230-F2-S042",
+  "osm-way22744230-F2-S005",
+  "osm-way22744230-F2-S010"
+ ],
+ "differs_from_kit": false,
+ "segments": [
+  {
+   "floor_id": "osm-way22744230-F0",
+   "kind": "walk",
+   "points": [
+    [
+     -0.21,
+     24.82
+    ]
+   ]
+  },
+  {
+   "floor_id": "osm-way22744230-F-1",
+   "kind": "walk",
+   "points": [
+    [
+     -0.86,
+     23.22
+    ],
+    [
+     -2.09,
+     20.24
+    ],
+    [
+     -8.05,
+     6.92
+    ],
+    [
+     -9.43,
+     0.76
+    ],
+    [
+     2.59,
+     -4.41
+    ],
+    [
+     2.78,
+     -4.49
+    ],
+    [
+     15.49,
+     -10.39
+    ],
+    [
+     21.24,
+     -13.38
+    ],
+    [
+     21.16,
+     -13.57
+    ],
+    [
+     20.9,
+     -16.06
+    ]
+   ]
+  },
+  {
+   "floor_id": "osm-way22744230-F2",
+   "kind": "walk",
+   "points": [
+    [
+     21.12,
+     -14.37
+    ],
+    [
+     24.16,
+     -9.33
+    ],
+    [
+     23.15,
+     -8.05
+    ],
+    [
+     22.59,
+     -7.87
+    ]
+   ]
+  }
+ ],
+ "floor_changes": [
+  {
+   "connector_id": "osm-way22744230-V03",
+   "kind": "stairs",
+   "name": "Stairs 2",
+   "from_floor": "osm-way22744230-F0",
+   "to_floor": "osm-way22744230-F-1",
+   "from_point": [
+    -0.21,
+    24.82
+   ],
+   "to_point": [
+    -0.86,
+    23.22
+   ],
+   "direction": "down"
+  },
+  {
+   "connector_id": "osm-way22744230-V02",
+   "kind": "stairs",
+   "name": "Stairs 1",
+   "from_floor": "osm-way22744230-F-1",
+   "to_floor": "osm-way22744230-F2",
+   "from_point": [
+    20.9,
+    -16.06
+   ],
+   "to_point": [
+    21.12,
+    -14.37
+   ],
+   "direction": "up"
+  }
+ ],
+ "floors": [
+  "osm-way22744230-F0",
+  "osm-way22744230-F-1",
+  "osm-way22744230-F2"
+ ]
+}

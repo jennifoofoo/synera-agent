@@ -17,17 +17,24 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return payload;
 }
 
+/** Exact route ends inside the start/destination rooms (e.g. the "You are here" dot); the server checks them. */
+export interface RoutePoints {
+  start_point?: { x: number; y: number; floor_id?: string };
+  destination_point?: { x: number; y: number; floor_id?: string };
+}
+
 export const api = {
   status: () => getJson<Status>("/api/status"),
   buildings: () => getJson<{ buildings: BuildingListEntry[] }>("/api/buildings").then((r) => r.buildings),
   building: (key: string) => getJson<Building>(`/api/building?key=${encodeURIComponent(key)}`),
-  route: (building: string, start: string, destination: string, stepFree = false, via: string[] = []) =>
+  route: (building: string, start: string, destination: string, stepFree = false, via: string[] = [], points: RoutePoints = {}) =>
     postJson<{ route: Route; state: BuildingState }>("/api/route", {
       building,
       start,
       destination,
       step_free: stepFree,
       via,
+      ...points,
     }),
   clearRoute: (building: string) => postJson<{ state: BuildingState }>("/api/route/clear", { building }),
   close: (building: string, element: string, closed: boolean) =>

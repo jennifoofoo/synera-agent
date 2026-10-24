@@ -87,6 +87,8 @@ export interface FloorChange {
 export interface Route {
   ok: boolean;
   error?: string;
+  /** The same message for people: room names, closures named, no ids. */
+  message?: string;
   start?: string;
   destination?: string;
   via?: string[];

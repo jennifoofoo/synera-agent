@@ -10,6 +10,7 @@ import { useTwin } from "./store";
 import { voiceHint } from "./ui/phoneHints";
 import { earcon, isSpeaking, keepAwake, recognitionCtor, speak, stopSpeaking, type Recognition, type RecognitionResult } from "./voice";
 import { placeAt, walkMinutes, walkNow } from "./walkInfo";
+import { ABOUT_THERE, walkWithMeDriving } from "./walkWithMe";
 
 export type Command = "next" | "back" | "repeat" | "howFar" | "stop" | "where";
 
@@ -77,7 +78,7 @@ function runLocal(command: Command): void {
       if (last) {
         state.stopWalk();
         void state.clearRoute();
-        say("You're there.");
+        say(walkWithMeDriving() ? ABOUT_THERE : "You're there.");
       } else state.setWalkStep(step + 1); // the step sheet reads the new step out
       return;
     case "back":
@@ -91,7 +92,7 @@ function runLocal(command: Command): void {
       if (left === null) say(`${steps.length - step} steps left.`);
       else {
         const minutes = walkMinutes(left);
-        say(`${left} metres left, about ${minutes} minute${minutes === 1 ? "" : "s"}.`);
+        say(`${walkWithMeDriving() ? "About " : ""}${left} metres left, about ${minutes} minute${minutes === 1 ? "" : "s"}.`);
       }
       return;
     }

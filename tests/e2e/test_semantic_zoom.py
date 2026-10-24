@@ -74,7 +74,17 @@ def factory_url(tmp_path_factory):
     shutil.copytree(source, data / "dev" / BUILDING)
     port = _free_port()
     env = {k: v for k, v in os.environ.items() if "API_KEY" not in k and not k.startswith("ANTHROPIC")}
-    command = [sys.executable, "-m", "tests.e2e.fake_chat_server", "--data", str(data), "--port", str(port), "--env-file", str(data / "no.env")]
+    command = [
+        sys.executable,
+        "-m",
+        "tests.e2e.fake_chat_server",
+        "--data",
+        str(data),
+        "--port",
+        str(port),
+        "--env-file",
+        str(data / "no.env"),
+    ]
     proc = subprocess.Popen(command, cwd=REPO, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     url = f"http://127.0.0.1:{port}/"
     try:
@@ -108,7 +118,11 @@ def chromium(playwright_instance):
 
 
 def _open(chromium, playwright_instance, url, device, reduced_motion="no-preference"):
-    options = dict(playwright_instance.devices["Pixel 7"]) if device == "phone" else {"viewport": {"width": 1280, "height": 800}, "device_scale_factor": 1}
+    options = (
+        dict(playwright_instance.devices["Pixel 7"])
+        if device == "phone"
+        else {"viewport": {"width": 1280, "height": 800}, "device_scale_factor": 1}
+    )
     context = chromium.new_context(**options, reduced_motion=reduced_motion)
     page = context.new_page()
     page.errors = []
@@ -160,7 +174,9 @@ def test_each_zoom_level_adds_its_kinds_without_overlap(device, factory_url, chr
 
 @pytest.mark.parametrize("reduced", [False, True])
 def test_new_labels_fade_in_unless_reduced_motion(reduced, factory_url, chromium, playwright_instance):
-    context, page = _open(chromium, playwright_instance, factory_url, "desktop", "reduce" if reduced else "no-preference")
+    context, page = _open(
+        chromium, playwright_instance, factory_url, "desktop", "reduce" if reduced else "no-preference"
+    )
     try:
         _zoom(page, 0, 0.05)
         animation = page.evaluate(

@@ -2,6 +2,7 @@
 // Shared by the step sheet (ui/Walk.tsx) and the hands-free voice commands (handsFree.ts).
 
 import { useTwin, walkSteps } from "./store";
+import { honestLine, useWalkMotion } from "./walkWithMe";
 
 /** Walking time in whole minutes (1.2 m/s indoors, at least 1). */
 export function walkMinutes(lengthM: number): number {
@@ -41,7 +42,10 @@ export function placeAt(steps: string[], step: number): string | null {
 /** The current walk in plain words, or null when not walking. */
 export function walkNow(): { steps: string[]; step: number; last: boolean; left: number | null } | null {
   const { walkStep, state } = useTwin.getState();
-  const steps = walkSteps().map(readable);
+  const steps = walkSteps().map(readable).map(honestLine);
   if (walkStep === null || !steps.length) return null;
-  return { steps, step: walkStep, last: walkStep >= steps.length - 1, left: metresLeft(steps, walkStep, state?.route?.length_m) };
+  // Walk with me on: the module's estimate of the metres left (still "about", never a located position).
+  const estimate = useWalkMotion.getState().estimate;
+  const left = estimate ? Math.round(estimate.distanceLeftM) : metresLeft(steps, walkStep, state?.route?.length_m);
+  return { steps, step: walkStep, last: walkStep >= steps.length - 1, left };
 }

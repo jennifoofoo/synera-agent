@@ -4,7 +4,7 @@
 
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Html } from "@react-three/drei";
+import { Html, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import type { BuildingState, Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
@@ -314,9 +314,20 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             const asset = model.assetById.get(selection.id);
             if (!asset) return null;
             const size = assetSize(asset);
+            // A tight outline of the footprint (rotated like the thing, 0.15 m padding); walls hide it in 3D.
+            const rotation = moved[asset.id]?.rotation_deg ?? asset.footprint?.rotation_deg ?? 0;
+            const [hw, hd, y] = [size[0] / 2 + 0.15, size[2] / 2 + 0.15, 0.06];
             return (
-              <group position={at(asset.floor_id, moved[asset.id]?.position ?? asset.position)}>
-                <Ring radius={Math.max(size[0], size[2]) * 0.8 + 0.4} colour={COLOURS.selection} width={0.14} />
+              <group position={at(asset.floor_id, moved[asset.id]?.position ?? asset.position)} rotation-y={THREE.MathUtils.degToRad(rotation)}>
+                <Line
+                  name="asset-selection"
+                  points={[[-hw, y, -hd], [hw, y, -hd], [hw, y, hd], [-hw, y, hd], [-hw, y, -hd]]}
+                  color={COLOURS.selection}
+                  lineWidth={3}
+                  depthTest={!flat}
+                  depthWrite={false}
+                  renderOrder={16}
+                />
               </group>
             );
           }

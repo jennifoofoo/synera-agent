@@ -602,7 +602,13 @@ async function routeDirections(): Promise<void> {
     if (state?.route) useTwin.setState({ state: withPendingHere((await api.clearRoute(buildingKey)).state) });
     return;
   }
-  const result = await api.route(buildingKey, start, destination, directions.stepFree);
+  // "Here" with a dot: the route starts (or ends) at the dot, not at the room's anchor.
+  const here = state?.position?.point ? { x: state.position.point[0], y: state.position.point[1], floor_id: state.position.floor_id } : null;
+  const points = {
+    ...(here && directions.from === HERE ? { start_point: here } : {}),
+    ...(here && directions.to === HERE ? { destination_point: here } : {}),
+  };
+  const result = await api.route(buildingKey, start, destination, directions.stepFree, [], points);
   if (run !== directionsRun || !useTwin.getState().directions) return; // a newer pick or a close won
   useTwin.setState({ state: withPendingHere(result.state), replyShown: false });
   if (result.route.ok && result.route.floors?.length) useTwin.setState({ focusedFloorId: result.route.floors[0] });

@@ -9,8 +9,9 @@ import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { PIN_HEAD_PX, PIN_HEAD_Y_PX, START_DOT_PX, ScreenSized } from "./markerLayout";
 
-/** Height of the route line above the floor (m): just above it, drawn without depth test so it never flickers
- * with the floor. Labels.tsx anchors a route end's label at the same height. */
+/** Height of the route line above the floor (m): high enough above the slab that it never flickers with the floor,
+ * so in 3D it can be depth-tested (walls hide it); the flat 2D plan draws it without depth test. Labels.tsx anchors a
+ * route end's label at the same height. */
 export const LIFT = 0.15;
 const DRAW_IN_S = 1.4;
 /** Route line width on screen (px), 2D and 3D, and its white casing on each side. */
@@ -140,7 +141,8 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         dashed
         dashSize={total}
         gapSize={total}
-        depthTest={false}
+        depthTest={!flat}
+        depthWrite={false}
         renderOrder={20}
       />
       <Line
@@ -154,13 +156,14 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         dashed
         dashSize={total}
         gapSize={total}
-        depthTest={false}
+        depthTest={!flat}
+        depthWrite={false}
         renderOrder={21}
       />
       {legPoints && (
         <>
-          <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} depthTest={false} renderOrder={22} />
-          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} depthTest={false} renderOrder={23} />
+          <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} depthTest={!flat} depthWrite={false} renderOrder={22} />
+          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} depthTest={!flat} depthWrite={false} renderOrder={23} />
         </>
       )}
       {/* ends: constant size on screen. The start is a paper dot with a blue ring (or nothing when "You are here"
