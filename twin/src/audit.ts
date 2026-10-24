@@ -1,9 +1,10 @@
 // Probe for the drawn-vs-data audit (scripts/twin_audit.sh, tests/e2e/test_twin_audit.py): `window.__twinAudit`
 // reads what is actually in the three.js scene (not the data) so a test can compare it with the API.
 // Read-only; nothing in the app uses it. Scene objects it relies on: group `floor:<id>` (FloorMesh), the Line2 named
-// `route-line` (RouteLine), groups named `closed-marker` (Markers) and the instanced meshes of Things.
+// `route-line` (RouteLine), groups named `closed-marker` (Markers), the instanced meshes of Things and `[data-audit=campus-route]` (CampusMap2D).
 
 import * as THREE from "three";
+import { useCampus } from "./campus/campusStore";
 import { useTwin } from "./store";
 
 type Pt = [number, number];
@@ -112,11 +113,11 @@ export function drawnClosed(): { markers: number; elements: number } {
   return { markers, elements };
 }
 
-/** Number of distinct spaces with at least one drawn vertex across all mounted floors. */
-export function drawnSpaces(): number {
+/** Ids of the spaces with at least one drawn vertex across all mounted floors. */
+export function drawnSpaces(): string[] {
   const seen = new Set<string>();
   const model = useTwin.getState().model;
-  if (!model) return 0;
+  if (!model) return [];
   for (const [floorId, group] of floorGroups()) {
     const floor = model.floorById.get(floorId);
     if (!floor) continue;
@@ -130,9 +131,9 @@ export function drawnSpaces(): number {
       }
     });
   }
-  return seen.size;
+  return [...seen];
 }
 
 if (typeof window !== "undefined") {
-  (window as unknown as { __twinAudit: unknown }).__twinAudit = { store: useTwin, blockedAt, drawnRoute, drawnThings, drawnClosed, drawnSpaces };
+  (window as unknown as { __twinAudit: unknown }).__twinAudit = { store: useTwin, campus: useCampus, blockedAt, drawnRoute, drawnThings, drawnClosed, drawnSpaces };
 }
