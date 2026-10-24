@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { Html } from "@react-three/drei";
-import type { Point, Space } from "../api/types";
+import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
 import { LABEL_LIFT, guideNextPoint } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
-import { PoiBadge, POI_PX, type PoiKind } from "./poiIcons";
+import { useLandmarks } from "./landmarks";
+import { PoiBadge, POI_PX, amenityKindOf, type PoiKind } from "./poiIcons";
 
 interface Props {
   floor: FloorModel;
@@ -22,6 +23,7 @@ const FIT_OVERFLOW = 1.15; // a name may run 15 % past its room's width
 const CHAR_PX = 6.8; // average glyph width of the 12 px label font
 const LABEL_H_PX = 16;
 const GAP_PX = 4; // free space kept around every label and badge
+const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
 
 interface Box {
@@ -33,7 +35,8 @@ interface Box {
 
 type Item =
   | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string }
-  | { kind: "room"; id: string; point: Point; space: Space };
+  | { kind: "room"; id: string; point: Point; space: Space }
+  | { kind: "thing"; id: string; point: Point; asset: Asset; landmark: boolean };
 
 function overlaps(a: Box, b: Box): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
@@ -102,7 +105,15 @@ function poiKindOf(space: Space, model: BuildingModel): PoiKind | null {
 
 /** What one zoom tier shows, in priority order (earlier items win collisions). Deterministic: sorted by a fixed
  * key with the id as tie-break, so the same scale always gives the same set. */
-function candidates(floor: FloorModel, model: BuildingModel, tier: MapTier, scale: number, limit: number): Item[] {
+function candidates(
+  floor: FloorModel,
+  model: BuildingModel,
+  tier: MapTier,
+  scale: number,
+  limit: number,
+  flat: boolean,
+  landmarks: ReadonlySet<string>,
+): Item[] {
   const pois: Item[] = [];
   const rooms: Space[] = [];
   for (const space of floor.spaces) {
@@ -115,7 +126,24 @@ function candidates(floor: FloorModel, model: BuildingModel, tier: MapTier, scal
       pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
     else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
   }
-  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, step: 4 };
+  // 2D, from mid on: the amenity symbols (coffee, printer, fire extinguisher, first aid). Landmarks of the current
+  // directions always carry their name; machine names from near on (see mapZoom.ts).
+  const landmarkItems: Item[] = [];
+  const machineNames: Item[] = [];
+  if (flat) {
+    for (const asset of floor.assets) {
+      // Fire extinguishers hang every few metres: only from near on, else they pepper the overview.
+      const kind = amenityKindOf(asset.type);
+      const amenity = kind && (tier === "near" || (tier === "mid" && kind !== "extinguisher")) ? kind : null;
+      if (amenity) pois.push({ kind: "poi", id: asset.id, point: asset.position, poi: amenity, title: asset.name });
+      if (landmarks.has(asset.id)) landmarkItems.push({ kind: "thing", id: asset.id, point: asset.position, asset, landmark: true });
+      else if (tier === "near" && asset.category === "machine" && asset.name)
+        machineNames.push({ kind: "thing", id: asset.id, point: asset.position, asset, landmark: false });
+    }
+    landmarkItems.sort((a, b) => a.id.localeCompare(b.id));
+    machineNames.sort((a, b) => a.id.localeCompare(b.id));
+  }
+  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, step: 4, firstaid: 5, extinguisher: 6, coffee: 7, printer: 8 };
   pois.sort((a, b) => (a.kind === "poi" && b.kind === "poi" ? poiRank[a.poi] - poiRank[b.poi] : 0) || a.id.localeCompare(b.id));
   // Every tier: the zones (largest rooms), whatever their size on screen. Mid and near add every room whose
   // name (nearly) fits inside it at this scale. Tiers are cumulative, like a street map.
@@ -129,7 +157,7 @@ function candidates(floor: FloorModel, model: BuildingModel, tier: MapTier, scal
           return space.name.length * CHAR_PX * scale <= w * FIT_OVERFLOW && LABEL_H_PX * scale <= h;
         });
   const named = [...zones, ...fitting].slice(0, limit).map((space): Item => ({ kind: "room", id: space.id, point: space.anchor, space }));
-  return [...pois, ...named];
+  return [...pois, ...landmarkItems, ...named, ...machineNames];
 }
 
 /** Room names and points of interest of the focused floor, in fixed zoom tiers (see mapZoom.ts). Lower
@@ -138,6 +166,7 @@ function candidates(floor: FloorModel, model: BuildingModel, tier: MapTier, scal
  * marker (screen px) so the marker never covers it. */
 export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
+  const landmarks = useLandmarks();
   const state = useTwin((s) => s.state);
   const route = state?.route ?? null;
   // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
@@ -188,14 +217,15 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const result: Item[] = [...markedItems];
     const selected = selectedId ? model.spaceById.get(selectedId) : undefined;
     const selectedPx = selected && selected.floor_id === floor.id ? selected.polygon.map(px) : null;
-    for (const item of candidates(floor, model, tier, scale, limit)) {
+    for (const item of candidates(floor, model, tier, scale, limit, flat, landmarks)) {
       if (marks.has(item.id)) continue;
-      const halfW = item.kind === "poi" ? POI_PX / 2 : (item.space.name.length * CHAR_PX) / 2;
+      const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : "";
+      const halfW = item.kind === "poi" ? POI_PX / 2 : (text.length * CHAR_PX) / 2;
       const halfH = item.kind === "poi" ? POI_PX / 2 : LABEL_H_PX / 2;
-      const box = boxOf(item.point, halfW, halfH);
+      const box = boxOf(item.point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
       if (kept.some((other) => overlaps(box, other))) continue;
       if (item.kind === "room" && selectedPx && boxOnPolygon(box, selectedPx)) continue;
-      if (item.kind === "room") {
+      if (item.kind === "room" || (item.kind === "thing" && !item.landmark)) { // landmarks keep their name on the route
         const clear = { x0: box.x0 - ROUTE_CLEAR_PX, y0: box.y0 - ROUTE_CLEAR_PX, x1: box.x1 + ROUTE_CLEAR_PX, y1: box.y1 + ROUTE_CLEAR_PX };
         if (routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)))) continue;
       }
@@ -203,13 +233,19 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return result;
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, selectedId]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, selectedId, flat, landmarks]);
 
   return (
     <group position-y={y + 0.5}>
       {shown.map((item) =>
         item.kind === "room" ? (
           <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
+        ) : item.kind === "thing" ? (
+          <Html key={`thing-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
+            <div className={`label label-halo label-plan label-thing ${item.landmark ? "label-landmark" : ""}`} data-label-asset={item.asset.id} style={{ transform: `translateY(calc(-50% - ${THING_LIFT_PX}px))` }}>
+              {item.asset.name}
+            </div>
+          </Html>
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             <PoiBadge kind={item.poi} title={item.title} />

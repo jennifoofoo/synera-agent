@@ -16,4 +16,4 @@
 .keyhelp-legend li { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
 .keyhelp-legend li:last-child { grid-column: 1 / -1; }
 .keyhelp-legend .poi-badge { flex: none; }
-.keyhelp-shape { flex: none; width: 22px; height: 12px; margin: 5px 0; background: #c9c6bf; border-radius: 1px; }
+.keyhelp-shape { flex: none; width: 22px; height: 12px; margin: 5px 0; background: #c3c0b9; border-radius: 1px; }
