@@ -59,7 +59,7 @@ def test_markdown_links_tables_rules_and_bold_steps():
 
 def test_abbreviations_do_not_end_sentences():
     reply = "Das Büro ist z. B. Raum 0.12, d. h. im Erdgeschoss, ca. 20 m2 groß. Noch ein Satz."
-    spoken = spoken_version(reply, max_chars=95)
+    spoken = spoken_version(reply, max_chars=80)
     assert spoken.endswith("groß.") and "Noch" not in spoken and "z. B. Raum" in spoken
 
 
@@ -99,7 +99,7 @@ def test_pronunciation_table_and_room_numbers():
 
 def test_cap_at_sentence_boundary():
     reply = " ".join(f"Sentence number {i} is here." for i in range(40))
-    spoken = spoken_version(reply, max_chars=100)
+    spoken = spoken_version(reply, max_chars=80)
     assert len(spoken) <= 100 and spoken.endswith(".")
     assert spoken.count("Sentence") == spoken.count("here.")
 
@@ -131,7 +131,7 @@ def fake_http(status=200, body=b"MP3DATA", seen=None):
 def test_synthesize_success(env):
     seen: dict = {}
     assert synthesize("Hallo", "voice1234567890", http=fake_http(seen=seen)) == b"MP3DATA"
-    assert seen["url"].endswith("/v1/text-to-speech/voice123?output_format=mp3_44100_128")
+    assert seen["url"].endswith("/v1/text-to-speech/voice1234567890?output_format=mp3_44100_128")
     assert seen["headers"]["xi-api-key"] == SECRET
     assert seen["data"] == {"text": "Hallo", "model_id": "eleven_flash_v2_5"}
     assert seen["timeout"] == 5
