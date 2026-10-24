@@ -158,6 +158,24 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         return as_json({"steps": state.session.repeat(), "steps_remaining": state.session.remaining()})
 
     @beta_tool
+    def assume_closed(element: str) -> str:
+        """Apply a closure the person STATES as a fact while asking for something else, for example
+        "The east lift is closed for maintenance. How do I get from A to B?". It takes effect at once for this
+        conversation, with no confirmation, so routes already respect it. Use propose_change instead whenever the
+        person asks you to close, reopen or add something ("please close Lift 1", "add a door").
+
+        Args:
+            element: Name or id of the lift, staircase, door or room that is closed.
+        """
+        try:
+            target = bm.find_element(element)
+        except MapError as error:
+            raise ToolError(str(error)) from error
+        bm.closed.add(target)
+        state.log.append({"turn": state.turn, "assumed_closed": target})
+        return as_json({"closed": element_label(bm, target), "all_closed": sorted(bm.closed)})
+
+    @beta_tool
     def propose_change(action: str, element: str, other: str | None = None, step_free: bool = True) -> str:
         """Prepare a change to the building and return an understanding card. Changes nothing yet.
         Show the card to the person, wait for their explicit yes in their NEXT message, then call confirm_change.
@@ -224,4 +242,4 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             }
         )
 
-    return [give_directions, next_steps, repeat_steps, propose_change, confirm_change]
+    return [give_directions, next_steps, repeat_steps, assume_closed, propose_change, confirm_change]

@@ -37,13 +37,19 @@ def sample_per_kind(questions: list, per_kind: int) -> list:
     return [item for kind in sorted(by_kind) for item in rng.sample(by_kind[kind], min(per_kind, len(by_kind[kind])))]
 
 
-def run(directory: Path, limit: int | None, per_kind: int | None, oracle: bool) -> None:
+def run(
+    directory: Path, limit: int | None, per_kind: int | None, oracle: bool, kind: str | None, max_dollars: float
+) -> None:
     results: Counter[tuple[str, bool]] = Counter()
     usage: Counter[str] = Counter()
     shown = 0
-    questions = load_questions(directory, limit)
+    questions = load_questions(directory, None)
+    if kind:
+        questions = [item for item in questions if item[1]["kind"] == kind]
     if per_kind:
         questions = sample_per_kind(questions, per_kind)
+    if limit:
+        questions = questions[:limit]
     for building_directory, question in questions:
         bm = BuildingMap.load(building_directory)
         if oracle:
@@ -56,6 +62,9 @@ def run(directory: Path, limit: int | None, per_kind: int | None, oracle: bool) 
                 print(f"[warmup] {question['id']}: API error {error}")
                 reply = ""
             usage.update(session.usage)
+            if dollars(usage) > max_dollars:
+                print(f"[warmup] stopping: estimated cost ${dollars(usage):.2f} passed --max-dollars {max_dollars}")
+                break
         correct = score(question, bm, reply)
         results[(question["kind"], correct)] += 1
         print(f"[warmup] {question['id']:40s} {question['kind']:20s} {'OK ' if correct else 'BAD'}")
@@ -63,8 +72,8 @@ def run(directory: Path, limit: int | None, per_kind: int | None, oracle: bool) 
             print(json.dumps(structured_entry(question["id"], question["kind"], bm, reply), ensure_ascii=False)[:400])
             shown += 1
     print("\nkind                  correct / total")
-    for kind in sorted({kind for kind, _ in results}):
-        print(f"  {kind:20s} {results[(kind, True)]:4d} / {results[(kind, True)] + results[(kind, False)]}")
+    for name in sorted({name for name, _ in results}):
+        print(f"  {name:20s} {results[(name, True)]:4d} / {results[(name, True)] + results[(name, False)]}")
     print(f"  {'all':20s} {sum(c for (_, ok), c in results.items() if ok):4d} / {sum(results.values())}")
     if usage:
         print(f"tokens: {dict(usage)}  estimated cost: ${dollars(usage):.2f} (Opus prices, even if --model is cheaper)")
@@ -76,13 +85,26 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--per-kind", type=int, default=None, help="sample N questions per kind (seeded)")
     parser.add_argument("--model", default=None, help="override the agent model (default: the agent's own)")
+    parser.add_argument("--kind", default=None, help="only one question kind, e.g. route_with_closure")
+    parser.add_argument("--max-dollars", type=float, default=3.0, help="stop a live run above this estimate")
     parser.add_argument("--oracle", action="store_true", help="tools only, no API calls")
     arguments = parser.parse_args()
-    if not arguments.oracle and arguments.limit is None and arguments.per_kind is None:
-        parser.error("a live run needs --limit N or --per-kind N (it costs money); use --oracle for the free check")
+    for name in ("limit", "per_kind"):
+        value = getattr(arguments, name)
+        if value is not None and value < 1:
+            parser.error(f"--{name.replace('_', '-')} must be at least 1")
+    if not arguments.oracle and arguments.limit is None and arguments.per_kind is None and not arguments.kind:
+        parser.error("a live run needs --limit, --per-kind or --kind (it costs money); use --oracle for the free check")
     if arguments.model:
         starter_module.MODEL = arguments.model
-    run(arguments.directory, arguments.limit, arguments.per_kind, arguments.oracle)
+    run(
+        arguments.directory,
+        arguments.limit,
+        arguments.per_kind,
+        arguments.oracle,
+        arguments.kind,
+        arguments.max_dollars,
+    )
 
 
 if __name__ == "__main__":

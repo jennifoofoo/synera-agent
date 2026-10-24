@@ -161,3 +161,29 @@ def test_vague_or_conditional_replies_do_not_confirm(tmp_path, reply):
     with pytest.raises(ToolError):
         tools["confirm_change"](confirmed=True, user_reply=reply)
     assert bm.closed == set()
+
+
+def test_stated_closure_applies_at_once_and_routes_respect_it(tmp_path):
+    bm, (start, end) = route_question()
+    tools, state = tools_by_name(bm, tmp_path)
+    state.begin_turn()
+    before = json.loads(tools["give_directions"](start=start, destination=end))["length_m"]
+    connector = next(iter(bm.connectors))
+    result = json.loads(tools["assume_closed"](element=connector))
+    assert connector in bm.closed and connector in " ".join(result["all_closed"])
+    try:
+        after = json.loads(tools["give_directions"](start=start, destination=end))["length_m"]
+    except ToolError:
+        after = None  # no route any more is also a valid effect of a closure
+    assert after is None or after >= before
+
+
+def test_agent_tools_include_assume_closed():
+    from building_agent.tools import make_tools
+
+    building_dir, _ = labelled_questions("errand")[0]
+    assert "assume_closed" in {tool.name for tool in make_tools(load_map(building_dir), tmp_dir())}
+
+
+def tmp_dir():
+    return Path("agent_output") / "test"
