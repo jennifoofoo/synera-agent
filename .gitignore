@@ -7,3 +7,6 @@ agent_output/
 team_*.csv
 # Kit data is 300+ MB and re-downloadable from the kit repo
 data/
+
+# Local role marker for Claude sessions
+.claude/role

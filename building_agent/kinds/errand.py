@@ -1,24 +1,8 @@
-"""Routing-based question kinds (Jennifer). Pure functions over a BuildingMap, tested against train/dev inputs."""
-
 import networkx as nx
-from shapely.geometry import Polygon
 
+from building_agent.geometry import largest_space_id
+from building_agent.registry import Kind
 from starter_agent.building_map import BuildingMap, MapError
-
-
-def space_area(bm: BuildingMap, space_id: str) -> float:
-    return Polygon(bm.spaces[space_id]["polygon"]).area
-
-
-def largest_space_id(bm: BuildingMap, floor_id: str, room_type: str) -> str:
-    candidates = [
-        space["id"]
-        for space in bm.spaces.values()
-        if space["floor_id"] == floor_id and space["room_type"] == room_type
-    ]
-    if not candidates:
-        raise MapError(f"No {room_type} on floor {floor_id}.")
-    return max(candidates, key=lambda space_id: space_area(bm, space_id))
 
 
 def errand(bm: BuildingMap, start: str, asset_type: str, floor_id: str, room_type: str) -> dict:
@@ -43,3 +27,14 @@ def errand(bm: BuildingMap, start: str, asset_type: str, floor_id: str, room_typ
         "via": via,
         "target": target,
     }
+
+
+KIND = Kind(
+    name="errand",
+    fn=errand,
+    description=(
+        "Walking distance for an errand: go from `start` to the nearest room that holds `asset_type`, "
+        "then carry it (stairs allowed) to the largest `room_type` room on floor `floor_id`. "
+        "Returns length_m, the pick-up room (via) and the target room."
+    ),
+)

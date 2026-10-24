@@ -1,6 +1,6 @@
 import pytest
 
-from building_agent.queries_routing import errand
+from building_agent.kinds.errand import errand
 from tests.conftest import labelled_questions, load_map
 
 CASES = labelled_questions("errand")

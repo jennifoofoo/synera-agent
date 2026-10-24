@@ -3,20 +3,28 @@
 Industrial Agents Hackathon 2026, Track 01 "Talk to Your Building". Kit README: `README.md` (read sections 3, 4, 6 first).
 
 ## Start here (every session, both people)
-1. `git pull`, then read `docs/specs/core-2d.md` (the contract: question kinds, signatures, rules, file ownership) and `docs/STATUS.md` (who works on what).
-2. Work only on your own files and your claimed rows. Ownership: Leonie `geometry.py`, `queries.py` (floor_area_total, shared_walls_count, largest_room, straight_line_3d, room_stacked, wide_delivery_count); Jennifer `queries_routing.py`, `tools.py`, `agent.py`, `directions.py`, `registry.py` (errand done, what_if_door).
-3. Tests are the contract: add `tests/test_<kind>.py` using `labelled_questions(kind)` from `tests/conftest.py` (example: `tests/test_errand.py`). No merge without a test.
+1. **Who are you working for?** Check `git config user.name` and `gh api user --jq .login`: `jennifoofoo` is Jennifer, `leoniemerkl` is Leonie. If unclear, ask once ("Jennifer oder Leonie?") and store the answer in `.claude/role` (git-ignored). Work only from that person's list.
+2. `git pull`, then read `docs/specs/core-2d.md` (the contract: kinds, signatures, rules, tasks per person) and `docs/STATUS.md` (who owns which kind, blockers).
+3. Work only on your own kinds and claimed rows. If you need to change someone else's file, do not: add a line under "Blocker" in `docs/STATUS.md` and continue elsewhere.
+4. Tests are the contract. No merge without a test.
 
 ## Principle
-Every fact comes from deterministic Python (`building_agent/queries.py`), the LLM only picks tools and phrases the reply.
+Every fact comes from deterministic Python (`building_agent/kinds/`), the LLM only picks tools and phrases the reply.
 Replies must end with exactly one `Answer:` line (the scorer reads only that).
+
+## One file per question kind
+- `building_agent/kinds/<kind>.py`: the function plus `KIND = Kind(name, fn, description)`. File name equals kind name. First parameter is `bm` (a `BuildingMap`).
+- `tests/test_<kind>.py`: use `labelled_questions(kind)` from `tests/conftest.py` (example: `tests/test_errand.py`).
+- A row for the kind in `docs/STATUS.md`.
+- Nothing else to edit: `building_agent/registry.py` finds the file, `tools.py` builds the tool. `tests/test_registry.py` fails if any of this is missing.
+- Shared helpers go into `building_agent/geometry.py`, only when two kinds need them.
 
 ## Layout
 - `starter_agent/`, `benchmark/`: kit code, do not edit. Reuse `BuildingMap` (routing model is already correct).
-- `building_agent/`: our code. `geometry.py`, `queries.py`, `tools.py`, `agent.py`.
-- `tests/`: one test per question kind against dev/train answers, no API calls.
+- `building_agent/`: our code. `kinds/`, `registry.py`, `geometry.py`, `tools.py`, `agent.py`, `directions.py`.
+- `tests/`: one test per kind against dev/train answers, no API calls.
 - `data/`: kit data, git-ignored (get it with `scripts/get_data.sh`).
-- `docs/STATUS.md`: who works on what, file ownership, priorities.
+- `docs/STATUS.md`: who works on what. `docs/specs/core-2d.md`: the spec.
 
 ## Setup (new machine or fresh worktree)
 1. `uv sync`
@@ -31,13 +39,11 @@ Replies must end with exactly one `Answer:` line (the scorer reads only that).
 - `uv run --env-file .env python -m benchmark.evaluate data/dev --agent building_agent.agent:answer --per-kind 3`
 
 ## Teamwork (two people, each with her own Claude session)
-- At session start: `git pull`, then read `docs/STATUS.md`.
 - Before working on a task: claim it in `docs/STATUS.md` (name, status, branch), commit and push first.
-- One branch per task (`feat/q-<kind>`), small merges to `main`, `uv run pytest` green before merging.
+- One branch per task (`feat/q-<kind>`), `git pull --rebase` before push, small merges to `main`, `uv run pytest` green before merging.
 - Parallel sessions only in separate worktrees (`claude -w <name>`).
-- File ownership: Leonie `queries.py`, `geometry.py`; Jennifer `tools.py`, `agent.py`, `directions.py`, `queries_routing.py`. Do not edit the other person's files without asking in chat.
-- One query function per question kind, signature stays stable.
-- Use `labelled_questions(kind)` from `tests/conftest.py` to test a kind against train/dev answers (see `tests/test_errand.py`).
+- Shared files (`CLAUDE.md`, `docs/STATUS.md`, `pyproject.toml`): only after `git pull`, keep changes small.
+- At the end of a session: update `docs/STATUS.md`, push, note open points.
 - Only one person uploads submissions, agree in chat first.
 
 ## Rules
