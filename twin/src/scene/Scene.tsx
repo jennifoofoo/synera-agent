@@ -127,6 +127,10 @@ export function Scene() {
   // Adaptive quality: the PerformanceMonitor steps this down when frames drop (pixel ratio, AO quality).
   const [quality, setQuality] = useState(2);
   const dpr = worker ? [1, 1.5][Math.min(quality, 1)] : [1, 1.5, 2][quality];
+  // Test hook (tests/e2e/test_twin_ghost.py): step the quality like the PerformanceMonitor does.
+  useEffect(() => {
+    (window as unknown as { __twinSetQuality: (q: number) => void }).__twinSetQuality = (q) => setQuality(Math.max(0, Math.min(2, q)));
+  }, []);
 
   return (
     <Canvas
