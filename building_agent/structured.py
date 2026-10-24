@@ -9,7 +9,9 @@ from starter_agent.building_map import BuildingMap
 
 
 def route_entry(bm: BuildingMap) -> dict | None:
-    """The most recent route as data: ordered space ids (the nodes), length, constraints."""
+    """The most recent route as data: ordered space ids (the nodes), length, constraints.
+
+    None when the last route request found no route (routing.route clears `last_route` on failure)."""
     route = bm.last_route
     if route is None:
         return None
@@ -65,5 +67,6 @@ def structured_entry(question_id: str, kind: str, bm: BuildingMap, reply: str) -
     elif kind == "count":
         entry["count"] = reply_number(reply)
     elif kind in {"route", "route_step_free", "route_with_closure", "tour"}:
-        entry["route"] = route_entry(bm)
+        entry["route"] = route_entry(bm)  # None after a failed route: the answer is "there is no route"
+        entry["reachable"] = entry["route"] is not None
     return entry

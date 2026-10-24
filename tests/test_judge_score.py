@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from building_agent import routing
+from building_agent import judge_score, routing
 from building_agent.judge_score import FULL_MARKS, ROUTE_KINDS, score_route
 from building_agent.structured import route_entry
 from starter_agent.building_map import MapError
@@ -21,9 +21,8 @@ START, END = "swiss-3355-F1-S003", "swiss-3355-F2-S020"
 SEED = 7
 SAMPLE = 150
 PER_BUILDING = 6
-# Seeds 1..11 give 98.7 to 100 percent (tours through busy stop spaces are the weak spot of routing.route), so
-# the guard sits at 98 percent like tests/test_routing.py.
-MIN_SHARE_FULL_MARKS = 0.98
+# routing.route runs on the kit model that computed the labels, so every labelled question gets full marks.
+MIN_SHARE_FULL_MARKS = 1.0
 
 
 def route_question(**answer) -> dict:
@@ -161,3 +160,25 @@ def test_agreement_on_labelled_questions():
     )
     assert valid == 1.0
     assert share >= MIN_SHARE_FULL_MARKS
+
+
+def test_recomputed_best_matches_the_label():
+    """The judge's own best length (used when a question has no label) agrees with the labelled optimum."""
+    checked = 0
+    for directory, question in load_sample():
+        answer = question["answer"]
+        if answer.get("reachable") is False or answer.get("legs") is None and question["kind"] == "tour":
+            continue
+        bm = load_map(directory)
+        closed = {answer["closed_element_id"]} if answer.get("closed_element_id") else set()
+        model = judge_score._model(bm, closed, question["kind"] == "route_step_free")
+        stops = answer["stops"] if question["kind"] == "tour" else [answer["from_space_id"], answer["to_space_id"]]
+        best = judge_score.best_length(model, stops)
+        assert best == pytest.approx(answer["optimal_length_m"], rel=0.001, abs=0.02), question["id"]
+        checked += 1
+    assert checked >= 50
+
+
+def test_route_through_the_outside_is_invalid():
+    path = best_entry()["space_path"]
+    assert not score_route(load_map(SMALL), entry([path[0], "outside", *path[1:]]), route_question()).valid
