@@ -157,7 +157,8 @@ function Review() {
     const item = model?.spaceById.get(id);
     return item?.ref ?? item?.name ?? id;
   };
-  const scaleNote = preview.scales?.map((item) => item.note).join(" · ");
+  const notes = [...new Set(preview.scales?.map((item) => item.note))];
+  const scaleNote = notes.length > 1 ? preview.scales?.map((item) => `floor ${item.level}: ${item.note}`).join(" · ") : notes[0];
 
   return (
     <div className="nb-bar nb-review" role="region" aria-label="Draft building">

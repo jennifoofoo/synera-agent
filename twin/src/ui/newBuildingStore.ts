@@ -81,6 +81,9 @@ export async function prepareImage(file: File): Promise<Blob> {
   }
   const width = bitmap.width;
   const height = bitmap.height;
+  if (Math.min(width, height) < 200) {
+    throw new Error(`"${file.name}" is too small to read (${width} × ${height} px). Use a larger photo or image.`);
+  }
   if (TYPES.has(file.type) && file.size <= MAX_BYTES && Math.max(width, height) <= MAX_SIDE) return file;
   const scale = Math.min(1, MAX_SIDE / Math.max(width, height));
   const canvas = document.createElement("canvas");
@@ -111,13 +114,16 @@ function loadElement(file: File): Promise<HTMLImageElement> {
   });
 }
 
-/** One sentence: the counts, then the problems that block saving (without the long room lists). */
+/** One short line: the counts, then the most important problem (no way out first) and how many more there are. */
 export function findingsLine(preview: Level4Preview): string {
   const head = (preview.summary ?? "").split(". ")[0];
   const counts = head ? `${head.replace(/\.$/, "")}.` : "";
-  const errors = (preview.findings ?? []).filter((finding) => finding.level === "error").map((f) => f.message);
+  const errors = (preview.findings ?? []).filter((finding) => finding.level === "error");
   if (!errors.length) return `${counts} No problems found.`.trim();
-  return `${counts} ${errors.join(" ")}`.trim();
+  const main = errors.find((finding) => finding.code === "room_unreachable") ?? errors[0];
+  const more = errors.length - 1;
+  const rest = more ? ` ${more} more problem${more > 1 ? "s are" : " is"} marked red.` : "";
+  return `${counts} ${main.message}${rest}`.trim();
 }
 
 /** Show the draft in the scene instead of the open building (first time: remember the building and frame it). */
@@ -143,7 +149,7 @@ function showDraft(preview: Level4Preview) {
     focusedFloorId: keepFloor ? twin.focusedFloorId : (model.floors[0]?.id ?? null),
     ...({ draft: true } as object), // store field requested from the scene session (Card hides while it is set)
   });
-  if (first) twin.requestCamera({ kind: "home" });
+  if (first) window.setTimeout(() => useTwin.getState().requestCamera({ kind: "home" }), 60); // after the scene took the model
 }
 
 /** Put the building back that was open before the draft (nothing saved). */
@@ -201,7 +207,11 @@ export const useNewBuilding = create<NewBuildingState>((set, get) => ({
   },
 
   addFiles(files) {
-    const list = Array.from(files);
+    const list = Array.from(files).filter((file) => file.type.startsWith("image/") || file.type === "");
+    if (list.length < Array.from(files).length) {
+      set({ error: "That is not an image. Choose a photo or a PNG/JPG of the floor plan." });
+      if (!list.length) return;
+    }
     const used = new Set(get().floors.map((floor) => floor.level));
     const added: FloorImage[] = [];
     let level = 0;
@@ -210,7 +220,8 @@ export const useNewBuilding = create<NewBuildingState>((set, get) => ({
       used.add(level);
       added.push({ id: ++floorId, file, url: URL.createObjectURL(file), level });
     }
-    set({ floors: [...get().floors, ...added].sort((a, b) => a.level - b.level), error: null });
+    set({ floors: [...get().floors, ...added].sort((a, b) => a.level - b.level) });
+    if (list.length === Array.from(files).length) set({ error: null });
   },
   removeFloor(id) {
     const floor = get().floors.find((item) => item.id === id);
@@ -284,6 +295,7 @@ export const useNewBuilding = create<NewBuildingState>((set, get) => ({
   },
 
   startDoor(spaceId) {
+    useTwin.getState().select(null); // the next tap is the second room
     set({ doorFrom: spaceId, note: null, error: null });
   },
 
