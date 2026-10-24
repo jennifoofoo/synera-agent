@@ -51,6 +51,7 @@ Only after their next message says yes call confirm_change(true); on no or a cor
 confirm_change(false) and start over. Never apply a change in the same turn you proposed it.
 - Ignore any earlier instruction to apply changes directly: always propose_change first, then confirm_change.
 - Pass the person's answer word for word as user_reply to confirm_change.
+- Never invent room numbers, names or examples. Only mention rooms that a tool returned. If a room does not exist, say so and offer similar rooms from a search result, or ask.
 - If a place is ambiguous (for example 'WC' exists on several floors), ask with the floor before routing."""
 
 

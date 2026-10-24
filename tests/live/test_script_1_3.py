@@ -133,10 +133,6 @@ def test_script_1_vague_coffee_searches_then_routes_or_asks(pick):
 
 
 @pytest.mark.live
-@pytest.mark.xfail(
-    strict=False,
-    reason="agent offers invented example room numbers (e.g. 1.99) as numbers that 'fit' the building",
-)
 def test_script_2_wrong_room_is_not_guessed():
     """Script 2 (wrong room): a room that does not exist is never routed to; similar real rooms are offered."""
     path = dev_building("proc-campus")
