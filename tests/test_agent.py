@@ -43,3 +43,16 @@ def test_answer_is_cached_and_retries_transient_errors(tmp_path, monkeypatch):
     second = agent_module.answer(Path(building_dir), question["question"])
     assert first == second == "ok\nAnswer: 1"
     assert len(calls) == 2  # one failed try, one success; the second answer() came from the cache
+
+
+def test_session_works_on_the_given_map_and_keeps_the_conversation():
+    from building_agent.agent import Session
+
+    building_dir, _ = labelled_questions("errand")[0]
+    bm = load_map(building_dir)
+    session = Session(bm, Path("agent_output") / "test", client=object())
+    assert session.map is bm
+    assert any(tool.name == "give_directions" for tool in session.tools)
+    session.guide.begin_turn()
+    session.guide.begin_turn()
+    assert session.guide.turn == 2  # state lives on the session, not per question

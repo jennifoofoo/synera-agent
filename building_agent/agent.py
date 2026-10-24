@@ -67,6 +67,14 @@ class Agent(StarterAgent):
         return super().ask(user_text)
 
 
+class Session(Agent):
+    """One conversation on an existing BuildingMap (the 2D page's), so edits and routes show up there."""
+
+    def __init__(self, building_map: BuildingMap, output_directory: Path = OUTPUT_DIRECTORY, client=None) -> None:
+        output_directory.mkdir(parents=True, exist_ok=True)
+        super().__init__(building_map, output_directory, client)
+
+
 def cache_key(building_directory: Path, question_text: str) -> str:
     """Changes whenever the prompt or any kind description changes, so stale answers are never reused."""
     version = CALCULATION_RULES + CONVERSATION_RULES + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)

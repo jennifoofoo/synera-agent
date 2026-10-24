@@ -3,8 +3,8 @@
 One-line switch: BACKEND below.
 - "starter": starter_agent.BuildingAgent bound to the SAME BuildingMap the page draws. It keeps the
   conversation, and its closures, new doors and routes show up on the map right away.
-- "building_agent": our agent's answer(building_dir, question). Today it is stateless (fresh map per
-  question), so follow-ups lose context and its changes don't reach the map.
+- "building_agent": building_agent.agent.Session bound to the SAME BuildingMap the page draws: it keeps the
+  conversation (next/again, confirm cards) and its changes show up on the map.
 - "auto": building_agent if it imports and answers, otherwise starter.
 """
 
@@ -43,6 +43,7 @@ class ChatAdapter:
         self.building_dir = building_dir
         self.map = building_map
         self.starter = None
+        self.session = None
 
     def ask(self, text: str) -> dict:
         if not chat_available():
@@ -61,9 +62,11 @@ class ChatAdapter:
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
     def ask_building_agent(self, text: str) -> str:
-        from building_agent.agent import answer
+        from building_agent.agent import Session
 
-        return answer(self.building_dir, text)
+        if self.session is None:
+            self.session = Session(self.map)
+        return self.session.ask(text)
 
     def ask_starter(self, text: str) -> str:
         if self.starter is None:
