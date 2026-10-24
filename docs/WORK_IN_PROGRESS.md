@@ -36,6 +36,14 @@ Für Leonie und ihren Agenten: damit niemand dieselbe Datei doppelt anfasst. Cod
 | `feat/twin-walk-wired` | Anbindung: Schalter "Walk with me" im Begleit-Sheet, Punkt "estimated", Ansage am Etappenende, Warten an Treppe/Aufzug | Begleit-Sheet (`Walk.tsx`), Marker |
 In `main` seit 01:00: Raumfarben, Geisterbild-Fix (Puffer der Nachbearbeitung bei Auflösungswechsel), Leonies Wake Word und Ein-Etagen-Ansicht.
 
+## 3D-Look (Leonie, 25.10. nachts): Diagnose und Richtung von Jennifers Sitzung
+Feedback von Aksha: die 3D-Ansicht wirkt billig. Ursache zum Teil unsere Vorgabe "Blueprint minimal, flach" (für 2D richtig, für 3D zu karg):
+- alle Möbel und Maschinen gleiche graue Quader, Wände dunkel und voll hoch (verdecken die Räume), flaches Licht ohne echte Schatten, Boden nur Raster ohne Plattendicke.
+Richtung wie bei Archilogic, Smplrspace, MapsIndoors 3D ("Architekturmodell" / Puppenhaus):
+- helle Wände, auf etwa 1,2 bis 1,5 m gekappt, dünne dunkle Oberkante; weiches Sonnenlicht mit Schatten und Umgebungslicht (HDRI); Bodenplatten mit Dicke und den blassen Raumfarben.
+- Möbel als einfache, erkennbare Formen nach Typ (Tisch, Stuhl, Regal, Schrank, Maschine, Drucker, Sofa, Bett), Rest als abgerundeter Block, als Instanzen gezeichnet (größtes Gebäude osm-way27917482 hat etwa 5000 Assets).
+- Achtung: Das Geisterbild kam aus der Nachbearbeitung (N8AO-Puffer nach Auflösungswechsel, Fix in `scene/Effects.tsx`); `tests/e2e/test_twin_ghost.py` muss grün bleiben.
+
 ## Beschlossene Regeln (für alle Agenten)
 1. **Was wann sichtbar ist:** "Alles zeigen, aber leise." Formen (Möbel, Maschinen) ab etwa 3 bis 4 px Bildschirmgröße auf jeder Zoomstufe. Text und Symbole nach Leonies Stufen in `mapZoom.ts` (weit: Zonen und POIs; mittel: alle Raumnamen; nah: Maschinennamen). Bei Route und Begleiten werden Formen blasser und die Landmarken der Wegbeschreibung kräftiger und beschriftet.
 2. **Etagen in 3D:** keine halbdurchsichtigen Etagen. Aktive Etage voll, darüber nichts, darunter nur Umriss.
