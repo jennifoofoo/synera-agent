@@ -4,7 +4,7 @@ Moves the phone's dot along the known route without GPS. It counts steps from th
 
 Honesty rule (same as `docs/specs/auto-pace.md`): every position this module exposes is an estimate. Each one has `estimated: true`. The UI and the agent say "about", "estimated" or "should be near". They never say "you are at" and never claim we see where the person is. The dot gets a halo, not a pin.
 
-Status: this is a standalone module with tests and a dev demo. **It is not wired into `ui/Walk.tsx` or `store.ts` yet.**
+Status: wired into the step guide. The glue is `src/walkWithMe.ts` (store `useWalkMotion`), the switch sits in the guide sheet (`ui/Walk.tsx`), the estimated dot is `scene/HerePin.tsx` (`HereDot`). The module itself is unchanged.
 
 ## Files
 | File | What |
@@ -47,15 +47,18 @@ Legs: `legsFromRoute` cuts the route at every `floor_change`. Those legs end wit
 
 `northOffsetDeg` is the compass bearing of the model's +y axis. It is 0 when the data's north is real north. A rotated building needs the real value, otherwise the turnaround check must be off (`headingCheck: false`).
 
-## How the UI should wire it (later step, Walk.tsx / store.ts)
-1. Switch "Walk with me" (default off), shown during a route. On tap: `const s = await requestMotionPermission()`. Call it directly in the handler and do not await anything before it. Show the result: `needs-https` means "open the https link", `denied` means "motion access is off in Settings", `unsupported` means "this device has no motion sensor".
-2. `walk.start(state.route)`. Subscribe before that.
-3. `position`: move the blue dot to `p.point` on `p.floorId`, with a halo, labelled "estimated". Show `about N m left`. Do **not** send it to the server as `here`. It is not a position fact.
-4. `legEnded` with `end === "connector"`: guidance says the next step ("Take Stairs 1 up"). If `guide` is active, send "next" as usual. After the person confirms (tap "Next" or says "next" / "I'm upstairs"), call `walk.next()`.
-5. `arrived`: say "You should be about there" and let the person confirm. Never say "you have arrived".
-6. "I'm here" click or drag, or a spoken position (`state.position` changes during the walk): `walk.resetTo({ point, floorId }, { calibrate: true })`.
-7. `offRoute`: show a quiet hint ("Looks like you turned around?"). Do not reroute automatically.
-8. End route, switch off or building swap: `walk.stop()`.
+## How it is wired (`src/walkWithMe.ts`)
+1. Switch "Walk with me" in the guide sheet, next to "All N steps". Default off, remembered per viewer in `localStorage` (`twin.walkWithMe`, try/catch). The tap calls `requestMotionPermission()` first, inside the gesture. The status shows for 4 s in plain words: "on", "off", "needs https", "motion permission denied", "not supported here".
+2. While the switch is on and the guide runs (`walkStep !== null`, route ok), one module instance follows `state.route`. Listeners are attached before `start()`. Switched on mid-walk, the estimate starts at the current step.
+3. `position`: `useWalkMotion.estimate` only. `HereDot` draws it as the blue dot with a soft ring (radius grows with 10 % of the metres since the last confirmation, at least 1.5 m) and a small "estimated" label. It is never written to `state.position`, never sent as `here`, never put into a request.
+4. Steps follow the estimate: the route's step lines are mapped onto the route metres (`buildPlan`: each floor stretch is shared out over its "Walk about N m" lines in proportion to N). When the estimate passes the end of a line, the guide moves on like the Next button, and the existing speech says the new line. It only moves forward by itself.
+5. `legEnded` at stairs or a lift: the guide shows the "Take/Use …" line and waits ("Waiting here. Tap Next once you are through."). Next, "next" by voice or "Hey Wanda, next" moves the step past the ride, and that calls `walk.next()`.
+6. `arrived`: "You should be about there." (shown, and spoken when voice is on). While the switch is on, the step line "You have arrived at X" becomes "X should be about here", and hands-free "how far" says "About N metres left".
+7. Corrections: "I'm here", dragging the dot, or a position set by voice (any real change of `state.position`) calls `resetTo({ point, floorId }, { calibrate: true })`; the step follows the estimate both ways then. Next/Back by hand move the estimate to the start of that step (no calibration).
+8. Distance left in the sheet is the module's `distanceLeftM` ("about N m left") while it runs.
+9. Stops on End route, Done, Esc, building change, a new route, switch off and guide stop.
+10. One driver: `walkWithMeDriving()` is true while the estimate moves the guide. A time-based auto-pace timer (`docs/specs/auto-pace.md`) must not start while it is true. The twin has no such timer yet, so nothing else advances the steps today.
+11. `window.__walkSim(stepsPerSecond)` is installed in every build (not only dev): synthetic steps through the real detector into the running walk, `__walkSim(0)` stops. `window.__walkMotion` is the store, for tests.
 
 ## Limits
 - Drift is about 5 to 10 % of the distance walked (step length varies). Every connector and every "I'm here" resets it, and confirmations recalibrate the step length (factor clamped 0.7 to 1.3).
@@ -68,18 +71,26 @@ Legs: `legsFromRoute` cuts the route at every `floor_change`. Those legs end wit
 ## Tests
 `npm run test` (vitest) covers synthetic traces (2 Hz walking with noise, slow and fast, standing still = 0 steps, shake bursts ≤ 2), the matcher (advance, stop at connector, pass, arrival, reset, turnaround, calibration) and a real dev route from `/api/route` (fixture in `__fixtures__`). `MOTION_API=http://127.0.0.1:8765 npm run test` also fetches the route live.
 
+Wired UI: `uv run pytest -m e2e tests/e2e/test_walk_with_me.py` (fake chat server, no API key) and `src/walkWithMe.test.ts` (steps follow the estimate).
+
 Dev demo: `uv run python -m web` and `cd twin && npm run dev`, then open `http://localhost:5180/motion-demo.html`. Click "Load route", then "Next" at the first stairs, then `window.__walkSim(2)` in the console (or the Sim buttons). Click the plan for "I'm here".
 
+## Try it
+Desktop, no phone: open the twin, pick a route, "Guide me", switch "Walk with me" on, then `__walkSim(2)` in the console. The dot walks the route, the step moves on, it waits at stairs until Next.
+
+Phone: `scripts/build_twin.sh`, then `scripts/tunnel.sh` (needs `brew install cloudflared`; the link is public while it runs, share it with nobody, Ctrl+C when done). Open the https link on the phone. Motion sensors need https; on plain http the switch says "needs https".
+
 ## 10-minute real-phone test
-1. `scripts/tunnel-twin.sh` (or `scripts/tunnel.sh`) and open the https link on the phone, at `/motion-demo.html` in dev.
+1. `scripts/tunnel.sh` and open the https link on the phone (the app itself; the module-only demo is `/motion-demo.html` with `scripts/tunnel-twin.sh` in dev).
 2. Load a route that is about 30 to 60 m on one floor, plus one with stairs.
-3. Tap "Use phone sensors". On iOS, allow both prompts. The status must turn `active` (if it shows `unsupported` after 3 s, there are no sensor events).
+3. Route, "Guide me", switch "Walk with me" on. On iOS, allow both prompts. The sheet must say "on" ("not supported here" after 3 s means no sensor events).
 4. Stand still for 30 s with the phone in your hand: steps stay 0.
 5. Shake the phone for 3 s: at most 2 steps.
 6. Walk 20 steps at normal pace and count them yourself: the app's count should be within ±2.
 7. Walk a straight corridor of known length: the "m left" should be within 10 %. Note the difference.
-8. At the stairs: the dot stops and the log says `legEnded`. Walk the stairs, then tap Next: the dot is at the start of the next floor.
+8. At the stairs: the dot stops, the sheet shows the stairs line and "Waiting here". Walk the stairs, then tap Next (or say "Hey Wanda, next"): the dot is at the start of the next floor.
 9. Turn around and walk 5 steps back: `offRoute` appears and the dot stops. Turn again and it moves on.
-10. Tap the plan where you really are ("I'm here"): the dot jumps there and the calibration factor changes. Walk on and check that the drift is smaller.
+10. Tap the plan where you really are and press "I'm here" (or drag the dot): the dot jumps there and the step follows. Walk on and check that the drift is smaller.
 11. Phone in a trouser pocket, repeat step 6.
+12. At the end the sheet says "You should be about there.", never "you have arrived". Switch off and back on: it remembers the switch.
 Write down the step count error, distance error, iOS/Android and the browser.
