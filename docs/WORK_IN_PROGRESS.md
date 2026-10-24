@@ -1,56 +1,47 @@
-# Wer arbeitet woran (Stand Samstag 24.10.2026, ca. 22:50)
+# Wer arbeitet woran (Stand Sonntag 25.10.2026, ca. 01:00)
 
-Für Leonie und ihren Agenten: damit niemand dieselbe Datei doppelt anfasst. Code-Freeze ist **Sonntag 13:00**. Alle Agenten hier laufen in Jennifers Sitzung, jeder auf einem **eigenen Branch** in einem eigenen Worktree. Gepusht wird nur auf `jennifoofoo/synera-agent`, **nie** auf das Synera-Kit-Repo.
+Für Leonie und ihren Agenten: damit niemand dieselbe Datei doppelt anfasst. Code-Freeze ist **Sonntag 13:00**. Jennifers Agenten laufen jeder auf einem **eigenen Branch** in einem eigenen Worktree. Gepusht wird nur auf `jennifoofoo/synera-agent`, **nie** auf das Synera-Kit-Repo. **Vor eigener Arbeit immer `git pull`.**
 
-## Was ist in `main` (alles grün: 3394 Tests, Live-Suite 54 von 54)
-Kit 1.1.0 (neue Wegregeln und Labels von Synera), Position und Begleiten (`state.position`, `state.guide`), Auto-Pace (`pace`, `guide_tick`), Sprachregeln (`voice: true`), Campus-Endpunkte (`/api/campus/*`), gzip und Cache, **Leonies `twin/` als einziges Frontend** (alte Seite gelöscht), `scripts/build_twin.sh`, Antwortdatei `answers/team_synera.csv` (145 von 145, im Repo).
-Seite bauen und starten: `scripts/build_twin.sh`, dann `uv run python -m web`. Handy über https: `scripts/tunnel.sh`.
+## Was ist in `main` (geprüft: Live-Suite 60 von 60, `check.sh` grün bis auf Zeittests unter Last, Antwortdatei 145 von 145 unverändert)
+**Server und Agent**
+- Level 4 (Plan zu Gebäude): SVG lesen, Maßstab aus `building.json`, Etagenhöhen und Ausrichtung, Raumtypen aus Möbel-Symbolen, Türbreiten. 83 % auf unserer Nachbildung der Level-4-Fragen.
+- Fluchtplan `find_exit` (schnellster und zweiter Ausgang, nie Aufzug, fester Hinweis "folge den echten Schildern"), nächster Feuerlöscher, Defibrillator, Augendusche. Notfall-Regeln im Prompt **nur bei Notfall-Wörtern** (sonst störten sie normale Rückfragen).
+- Route ab genauem Punkt (`state.position.point`, `/api/route` mit `start_point`/`destination_point`).
+- Routenlinie nur gezeichnet: Enden nicht auf Möbeln, in großen Hallen an der Tür, Umwege um Maschinen. Länge und Antworten unverändert.
+- Wegbeschreibung neutral ("go into X" statt "through the door", weil viele Öffnungen offene Passagen sind).
+- Gesprochene Antworten enden immer auf ihrer einen Frage.
 
-## Offene Arbeiten (alle noch nicht in `main`)
+**Frontend `twin/`**
+- Leonies `twin-fixes` (rote Ziel-Nadel, ein blauer Standortpunkt, kollisionsfreie 2D-Etiketten, POI-Symbole, Pinch und Doppeltippen am Handy).
+- Kamera: halten und ziehen verschiebt, rechts ziehen dreht, Zoom zum Mauszeiger, Tastatur (`?` Hilfe), Zoom-Grenzen, kein Strecken bei offenen Sheets, ruhiges Raster statt Flackern.
+- Wand-Lücken an Öffnungen, Türstriche, gestrichelte Zonengrenzen ab 4 m, roter Balken bei gesperrten Türen, Prüfskript `scripts/twin_audit.sh`.
+- Design Blueprint minimal mit Synera-Blau `#004fab`, ruhige Routenlinie.
+- Tipp-Pin, ziehbarer Standortpunkt, Marker verdecken keine Raumnamen.
+- Handy: Raumname beim angetippten Raum, Plan nicht unter der Titelleiste, Etagenleiste im Querformat, Ton-Freischaltung und Wake Lock robuster, 44-px-Tippflächen, Handy-Tests auf `twin/` umgestellt (`scripts/mobile_smoke.sh`).
 
-### Frontend `twin/` (bitte hier nicht parallel an denselben Dateien arbeiten)
-| Branch | Inhalt | Dateien, die er anfasst |
+## Läuft gerade (noch NICHT in `main`, bitte diese Dateien nicht parallel ändern)
+| Branch | Was | Dateien |
 |---|---|---|
-| `fix/twin-controls` | **Fehler 1: Seitenverhältnis.** Bei offenem Sheet oder Panel ist die ganze Karte vertikal gedehnt (runde Marken werden Ovale). Ursache: `setViewOffset` in `CameraRig.tsx` ohne passendes `camera.aspect`. **Fehler 2: Flackern.** Der unendliche Boden-Raster wird bei flachem Winkel zu Moiré (Striche und Punkte), das flackert beim Drehen. Fix in `Scene.tsx` (`<Grid>`, `<fog>`). **Steuerung:** Tastatur (WASD, Pfeile, Q/E, R/F, Shift, Home, 1 bis 9 für Etagen, `?` Hilfe), Maus und Trackpad (Zoom zum Mauszeiger, Mittelklick und Shift-Ziehen verschieben, Doppelklick fliegt zum Raum), weniger Dämpfung, Zoom-Grenzen (kein graues Nichts), Campus-Kamera angleichen | `scene/CameraRig.tsx`, `scene/Scene.tsx` (Grid, Fog), `campus/CampusSite3D.tsx` (Kamera), Eingabe |
-| `fix/twin-openings` | **Offene Passagen** (`opening`, keine Tür, zum Beispiel 14,6 m zwischen den Hallenzonen H-A4 und H-A3) als **Lücke in der Wand** zeichnen, 2D und 3D. Dazu der **blasse Geisterblock** (Safari, nah an den Büros), und ein wiederholbares Prüfskript "gezeichnet gegen Daten" (`scripts/twin_audit.sh`, Bericht in `docs/twin-audit/REPORT.md`) | Wand- und Bodengeometrie unter `scene/` (nicht Kamera) |
-| `design/blueprint-minimal` | **Stil**: nüchtern, Blueprint/Industrie, nicht zu krass: Radien 4 bis 6 px statt Pillen, Haarlinien statt Schatten, Papierweiß, Graphit, **eine** Signalfarbe (Orange), flache Raumetiketten, ein Token-Block (`tokens.css`), `twin/DESIGN.md`. **Nur Stil, keine Logik** | CSS-Dateien, Farb-Konstanten der Szene |
-| `feat/twin-here-ui` | **Tipp-Pin** (Marker am genau angetippten Punkt, Punkt in der Karte), **blauen "You are here"-Punkt ziehen** (Standort korrigieren, Maus und Touch), veralteten Stub `ui/Position.tsx` bereinigen. Der Chip "You are here", die Etappenkarte (Back, Next, Stop) und die Marker **gibt es schon** | `scene/FloorMesh.tsx`, `scene/Markers.tsx`, `ui/Card.tsx`, `ui/HereChip.tsx`, `store.ts` (nur ein kleines Flag `dragLock`) |
+| `feat/twin-ux-calm` | UX gegen kognitive Last (`docs/ux-cognitive-load.md`): **zuerst** Möbel nach Pixelgröße (siehe unten), dann "End route" (ein Knopf), Mikrofon beim Begleiten sichtbar, Etagenleiste an einem festen Platz, ein Griff pro Sheet, kompakte Routenkarte, keine Koordinaten, POI-Symbole als kleine weiße Quadrate, klare Symbole statt "⇕"/"⌂", Eingabe am Handy angedockt, Knöpfe mit Text ("Ask", "Talk"), Legende, Vorschlags-Chips | `ui/` (Karte, Walk, Hilfe), `scene/Labels.tsx`, `scene/mapZoom.ts`, `scene/poiIcons.*`, `ui/FloorRail.tsx` |
+| `feat/twin-room-colours` | Raumfarben nach Gruppen (`docs/specs/room-colours.md`): blass Sand (Küche), Aqua (Sanitär), Violett (Treppe, Aufzug), Salbei (Meeting), in Fabriken blass gelbe Gehwege, Sicherheit nur als Symbol in Normfarben, Rest neutral grau; Möbel und Wände heller | `model/palette.ts`, `styles/tokens.css`, `DESIGN.md` |
+| `fix/twin-ghost` | **Geisterbild** (verschwommene große Kopie oben rechts, sobald die Raumkarte aufgeht) und neue **Etagen-Regel**: aktive Etage voll, darüber nichts, darunter nur dünner Umriss, Kamera gleitet beim Etagenwechsel, Route über Etagen gestapelt. Dazu Querformat mit rechter Seitenleiste | `scene/CameraRig.tsx`, `scene/Scene.tsx`, `scene/FloorMesh.tsx` (Sichtbarkeit) |
 
-**Update 23:30: Zwischenstand aller vier Branches ist in `main`** (Kamera/Raster, Wand-Lücken, Design Synera-Blau #004fab, Tipp-Pin; dazu List-Knopf-Fix). Die Agenten arbeiten weiter (halten und ziehen, Zeichenregeln für Türen und Passagen, Marker überdecken keine Namen) und kommen als weitere Merges. Bitte vor eigener Arbeit an `twin/` `git pull`.
+**Leonie selbst:** Wake Word "Hey Wanda" (Spec `docs/specs/voice-handsfree.md` Teil B). Bitte vorher pullen, `voice.ts` wurde unten (Ton-Freischaltung, Wake Lock) vom Handy-Fix geändert.
 
-**Vorher:** Zwischenstand gepusht, noch NICHT fertig. Die vier Branches oben liegen auf GitHub, damit du siehst, was wir wie ändern (`git fetch`, dann z.B. `git diff origin/main...origin/fix/twin-controls -- twin/`). Die Agenten arbeiten noch daran und pushen nach. Bitte nichts davon selbst mergen.
+## Beschlossene Regeln (für alle Agenten)
+1. **Was wann sichtbar ist:** "Alles zeigen, aber leise." Formen (Möbel, Maschinen) ab etwa 3 bis 4 px Bildschirmgröße auf jeder Zoomstufe. Text und Symbole nach Leonies Stufen in `mapZoom.ts` (weit: Zonen und POIs; mittel: alle Raumnamen; nah: Maschinennamen). Bei Route und Begleiten werden Formen blasser und die Landmarken der Wegbeschreibung kräftiger und beschriftet.
+2. **Etagen in 3D:** keine halbdurchsichtigen Etagen. Aktive Etage voll, darüber nichts, darunter nur Umriss.
+3. **Farben:** Synera-Blau nur für Route, Auswahl, Hauptknöpfe. Ziel-Nadel rot (Leonie, Karten-Konvention). Raumfarben sehr blass, nur für gesuchte Ziele, nie Farbe ohne Symbol.
+4. **Fokus Industrie:** Synera-Kunden sind Automobil, Luftfahrt, Maschinenbau. Fabrik zuerst prüfen, dann Büro, dann Wohnen.
 
-**So mergen wir, damit deine Arbeit gewinnt:**
-1. Du pushst deinen aktuellen `twin/`-Stand nach `main` (oder sagst, welcher Branch es ist).
-2. Wir bauen jeden Branch einzeln auf deinem Stand neu auf, in der Reihenfolge unten. Bei Konflikten gewinnt dein Code, unser Fix wird darauf angepasst.
-3. Vor jedem Merge: Seite bauen, Screenshots Handy und Desktop, kurz zusammen anschauen.
-4. Design (`design/blueprint-minimal`) nur nach deinem Okay, weil er am meisten in deinem CSS ändert.
-
-Zuständigkeit gegen Konflikte: Kamera und Raster = `fix/twin-controls`. Wände, Öffnungen, Geisterblock = `fix/twin-openings`. Farben, Radien, Schatten = `design/blueprint-minimal`. Antippen, Pin, Standortpunkt = `feat/twin-here-ui`. Leonies eigene Arbeit am Rest (Handy-Layout, Wake-Wort "Hey Wanda", Auto-Pace-Timer) bleibt bei ihr, siehe `docs/LEONIE_TODO.md`. **Wer `feat/twin` weiterentwickelt, bitte vorher `origin/main` holen.**
-
-### Server und Agent
-| Branch | Inhalt |
-|---|---|
-| `feat/route-from-point` | Route **ab genauem Punkt** im Raum (nicht ab Raumanker): `/api/route` mit `start_point` und `destination_point`, Agent nutzt den Punkt aus `state.position.point` automatisch. Ohne Punkt byte-gleich wie heute |
-| `feat/query-tools-wired` | vier Abfragewerkzeuge (`list_rooms`, `floor_summary`, `list_doors`, `room_size`), `door_effect` (Länge vor und nach einer neuen Tür), Hauptausgang-Regel. Live-Suite 51 von 54 (Streuung der Modellformulierung), wird vor dem Merge geklärt |
-| `feat/exit-tools` | `find_exit` (schnellster und zweiter Ausgang vom Standort, Aufzüge nie, stets der Satz "Kürzester Weg im Plan. Kein Fluchtwegplan: folge den echten Schildern"), nächster Feuerlöscher, Defibrillator, Augendusche, Alter des Standorts |
-
-### Level 4 (Plan zu Gebäude)
-Aufeinander aufbauend: `feat/level4-svg-first` (SVG neben dem Plan lesen, Maßstab aus `building.json`, `find_space`-Regel) → `feat/level4-align-types` (Stockwerkshöhen, Etagen ausrichten über Aufzüge) → `feat/level4-furniture` (Raumtypen und Geräte aus den Möbel-Symbolen, 69 % statt 33 % auf unserer Nachbildung) → `feat/level4-door-widths` (Schätzung der Türbreiten). Dazu Abgabe-Texte auf `docs/submission-final`.
-
-## Reihenfolge der Merges nach `main` (macht Jennifers Sitzung, jeweils mit Prüfung)
-1. Kamera und Flackern (`fix/twin-controls`), 2. Wand-Lücken und Audit (`fix/twin-openings`), 3. Design, 4. Tipp-Pin und Ziehen, 5. Route ab Punkt, 6. Level 4 (in der Kette), 7. Werkzeuge und Fluchtplan (nach Live-Prüfung), 8. Abgabe-Texte zuletzt.
-Regel aus `CLAUDE.md`: Alles, was Prompt, Werkzeuge, Position, Sprache oder Chat berührt, geht erst nach grüner **Live-Suite** (`uv run --env-file .env pytest -m live -q`) und grünem `scripts/check.sh` in `main`.
-
-## Was an der Oberfläche gerade bekannt falsch ist (Belege: Screenshots von Jennifer, Messungen)
-- Marken und Karte **vertikal gestreckt** bei offenem Sheet (Seitenverhältnis), siehe `fix/twin-controls`.
-- **Flackern** beim Drehen: Boden-Raster bei flachem Winkel, siehe `fix/twin-controls`.
-- **Route läuft scheinbar durch eine Wand** an offenen Passagen (die Daten haben dort wirklich eine Öffnung), siehe `fix/twin-openings`.
-- **Geisterblock** (blasse große Kopie rechts oben) in Safari bei Nahansicht, wird nachgestellt.
-- Mausrad-Zoom kann in eine **graue leere Fläche** laufen, siehe `fix/twin-controls`.
-- Optik wirkt **generisch** (Pillen, große Radien), siehe `design/blueprint-minimal`.
+## Noch offen danach
+- Leerer erster Schritt "Start in …" in der Wegbeschreibung (Jennifer, Server).
+- Bewegung mitlaufen lassen (Schritte zählen plus Kompass, Schalter "Walk with me"): Idee, noch nicht entschieden.
+- `feat/query-tools-wired` (vier Abfragewerkzeuge, 51 von 54 live): noch nicht gemergt.
+- Echter Gerätetest auf dem iPhone über `scripts/tunnel.sh` (Anleitung `twin/IPHONE-CHECK.md`).
+- Abgabe-Texte (`docs/submission-final`), Tag `known-good` kurz vor dem Freeze.
 
 ## Hinweise
-- API-Schlüssel stehen nur in `.env`, nie im Repo oder Chat. Die Anthropic-Grenze war heute Abend einmal erreicht und ist wieder angehoben.
-- Die Handy-Prüftests unter `tests/e2e/` prüfen noch die **alte** Seite und werden auf `twin/` umgestellt, sobald Leonies Stand stabil ist.
-- Wenn ihr etwas an einer der oben genannten Dateien ändern wollt: kurz in den Chat schreiben, dann stimmen wir den Branch ab.
+- Seite bauen und starten: `scripts/build_twin.sh`, dann `uv run python -m web`. Handy über https: `scripts/tunnel.sh`.
+- API-Schlüssel nur in `.env`.
+- Regel aus `CLAUDE.md`: Alles, was Prompt, Werkzeuge, Position, Sprache oder Chat berührt, geht erst nach grüner Live-Suite und grünem `scripts/check.sh` in `main`.

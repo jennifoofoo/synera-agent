@@ -24,6 +24,12 @@ Für kurze Routen zu viel Text: Satz, Liste, Schlusssatz, "less"-Knopf und Fußz
 3. Text und Symbole nach Leonies Zoomstufen (`twin/src/scene/mapZoom.ts`): weit = Zonennamen, Eingang, Aufzug, Treppe, WC; mittel = alle Raumnamen; nah = Maschinennamen.
 4. Die Aufgabe hebt hervor statt auszublenden: bei Route und Begleiten werden Formen noch blasser, die Landmarken der Wegbeschreibung kräftiger und beschriftet.
 
+## Etagen in 3D (Jennifer und Leonie, 25.10. nachts)
+Keine halbdurchsichtigen Etagen mehr, sie überlagern sich und verwirren.
+1. Aktive Etage voll, Etagen darüber gar nicht, Etagen darunter höchstens als dünner Umriss.
+2. Zusammenhang über Bewegung: beim Etagenwechsel gleitet die Kamera kurz hoch oder runter.
+3. Route über mehrere Etagen: nur die betroffenen Etagen gestapelt mit Abstand, Treppe oder Aufzug als senkrechte Linie.
+
 ## Gefundene Kleinigkeiten (für den UX-Durchgang)
 - Desktop 2D, Routenkarte offen: ein zweiter Griff (▬) liegt unten mitten auf dem "Guide me"-Knopf (Screenshot Jennifer 23:40). Nur ein Griff pro Sheet.
 
