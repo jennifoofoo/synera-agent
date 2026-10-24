@@ -209,6 +209,13 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // (campus overlay, phone rotation) is framed again once the real size is known.
   }, [request.nonce, floorMode, camera, viewport.width, viewport.height]);
 
+  // Test hooks (read only use): the store, the controls and a frame counter, for the Playwright measurements.
+  useEffect(() => {
+    const w = window as unknown as Record<string, unknown>;
+    w.__twinStore = useTwin;
+    w.__twinCamera = camera;
+  }, [camera]);
+
   useEffect(() => {
     controlsRef.current = controls.current;
     return () => {
@@ -269,6 +276,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const direction = new THREE.Vector2();
   const target = new THREE.Vector3();
   useFrame(() => {
+    const w = window as unknown as { __twinFrames?: number };
+    w.__twinFrames = (w.__twinFrames ?? 0) + 1;
     const c = controls.current;
     if (c && flat && focusedFloorId) {
       const floor = model.floorById.get(focusedFloorId);
