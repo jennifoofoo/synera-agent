@@ -309,3 +309,17 @@ def test_load_map_shares_the_walks_between_maps():
     assert routing.route(second, start, end).length_m == expected
     second.closed.add(next(iter(second.openings)))  # edits of one map never leak into the other
     assert not first.closed
+
+
+def test_distances_from_matches_the_shortest_leg():
+    bm = load_map(sorted(Path("data/dev").glob("proc-factory-dev-*"))[0])
+    rg = routing.routing_graph(bm, False)
+    spaces = [space_id for space_id in bm.spaces if space_id in rg.graph]
+    start, targets = spaces[0], spaces[1:40]
+    found = routing.distances_from(bm, rg, start, targets)
+    for target in targets:
+        leg = routing.shortest_leg(bm, rg, start, target)
+        assert (target in found) == (leg is not None)
+        if leg is not None:
+            assert found[target] == pytest.approx(leg[0])
+    assert routing.distances_from(bm, rg, "not-a-space", targets) == {}

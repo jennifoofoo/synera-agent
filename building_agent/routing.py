@@ -84,6 +84,14 @@ def shortest_leg(bm: BuildingMap, rg: RoutingGraph, start: str, end: str) -> tup
         return None
 
 
+def distances_from(bm: BuildingMap, rg: RoutingGraph, start: str, targets: list[str]) -> dict[str, float]:
+    """Route length from one space to each reachable target space in one pass (same rule as shortest_leg)."""
+    if start not in rg.graph:
+        return {}
+    reached = nx.single_source_dijkstra_path_length(rg.graph, start, weight="weight")
+    return {target: reached[target] for target in targets if target in reached}
+
+
 def leg_portals(bm: BuildingMap, step_free: bool, stops: list[str]) -> list[list[tuple]] | None:
     """For drawing: per leg the doors crossed as ("o", opening id, space) pairs (from and into) and the stair or lift
     rides as ("c", connector id, space) pairs, in walking order. Same graph and search as `route`; None if no route."""
