@@ -515,6 +515,7 @@ def route_geometry(
         path[-1] = ("x", destination_point, stops[-1])
     path = trim_big_room_ends(bm, path)
     drawing = route_draw.draw_index(bm)  # once per line: its signature check walks every asset
+    path = with_door_approaches(bm, path, drawing)
     segments: list[dict] = []
     floor_changes: list[dict] = []
     current: dict | None = None
@@ -526,6 +527,8 @@ def route_geometry(
             return opening["floor_id"], rounded(opening["position"])
         if kind == "x":
             return bm.spaces[space_id]["floor_id"], rounded(element)
+        if kind == "p":  # a door's approach point: element is (opening id, point)
+            return bm.spaces[space_id]["floor_id"], rounded(element[1])
         if space_id == OUTSIDE or space_id not in bm.spaces:
             return None
         return bm.spaces[space_id]["floor_id"], rounded(route_draw.drawn_anchor(bm, space_id, drawing))
@@ -581,11 +584,45 @@ def route_geometry(
             add_point(node, "outside")  # from one entrance to another, outside the building
         else:
             same_room = previous[2] == node[2] and node[2] in bm.spaces
-            add_point(node, room=node[2] if same_room else None)
+            door, approach = (previous, node) if node[0] == "p" else (node, previous)
+            # a door and its own approach point: straight along the wall normal, no detour
+            to_door = door[0] == "o" and approach[0] == "p" and approach[1][0] == door[1]
+            add_point(node, room=node[2] if same_room and not to_door else None)
     for change in floor_changes:
         going_up = bm.floors[change["to_floor"]]["level"] > bm.floors[change["from_floor"]]["level"]
         change["direction"] = "up" if going_up else "down"
     return {"segments": segments, "floor_changes": floor_changes}
+
+
+def with_door_approaches(bm: BuildingMap, path: list[tuple], drawing) -> list[tuple]:
+    """Drawing only: round every door the line crosses, an approach point ("p", point, room) on each side
+    (route_draw.door_approach), so the line runs through the doorway along the wall normal instead of turning
+    on the door centre and cutting the jambs. None before a line that starts at the door or after one that ends
+    there, none for wide openings."""
+
+    def crosses(first: tuple | None, second: tuple | None) -> bool:
+        return (
+            first is not None
+            and second is not None
+            and first[0] == second[0] == "o"
+            and first[1] == second[1]
+            and first[2] != second[2]
+        )
+
+    out: list[tuple] = []
+    for position, node in enumerate(path):
+        preceding = path[position - 1] if position > 0 else None
+        following = path[position + 1] if position + 1 < len(path) else None
+        if position > 0 and crosses(node, following):
+            approach = route_draw.door_approach(bm, node[1], node[2], drawing)
+            if approach is not None:
+                out.append(("p", (node[1], approach), node[2]))
+        out.append(node)
+        if position < len(path) - 1 and crosses(preceding, node):
+            approach = route_draw.door_approach(bm, node[1], node[2], drawing)
+            if approach is not None:
+                out.append(("p", (node[1], approach), node[2]))
+    return out
 
 
 def trim_big_room_ends(bm: BuildingMap, path: list[tuple]) -> list[tuple]:
