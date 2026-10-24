@@ -84,6 +84,11 @@ The page uses the same tools as the chat agent (`building_agent/level4/tools.py`
 Uploads: PNG/JPG only (magic bytes and Pillow), at most 10 MB, stored as `agent_output/uploads/plan-<random>.png|jpg`; the browser only sends upload ids, never paths. Saved buildings: `agent_output/buildings/<id>/building.json` (key `user/<id>`).
 Offline demo without API calls: `uv run python -m web --fake-plans data/dev/proc-campus-dev-000` reads every uploaded image as that building's floor (with a printed scale bar and one door missing, so a red finding shows).
 
+## Speech pacing
+
+`web/speech.py` shortens a reply for speaking and adds pauses (`<break time="0.8s" />` after the headline sentence and between steps or list items, 1.2 s before a closing question). Room numbers, zone codes (`H-A1` becomes "H A one"), floor labels and decimals are spelled in one place, in English or German. Tags in a reply are stripped, so only our own pauses reach ElevenLabs.
+Speaking speed: `ELEVENLABS_SPEED` in `.env` (default 0.85, clamped to 0.7..1.2, invalid values use the default). Pause lengths are the `PAUSE_*` constants in `web/speech.py`.
+
 ## Files
 
 | File | What |
