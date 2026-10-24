@@ -13,7 +13,7 @@ import "./Planner.css";
 
 const IMPACT = "impact";
 const IMPACT_COLOUR = "#f43f5e";
-const IMPACT_QUESTION = "What changes for routes now? At most three short sentences, name the rooms hit hardest.";
+const IMPACT_QUESTION = "What changes for routes now, with the closures as they are? At most three short sentences; name only rooms that are worse off now.";
 const THING_CATEGORIES = new Set(["machine", "equipment"]);
 
 interface Row {
