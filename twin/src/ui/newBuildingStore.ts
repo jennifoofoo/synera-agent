@@ -147,7 +147,7 @@ function showDraft(preview: Level4Preview) {
     popover: null,
     highlights: red.length ? { draft: { ids: red, colour: COLOURS.danger } } : {},
     focusedFloorId: keepFloor ? twin.focusedFloorId : (model.floors[0]?.id ?? null),
-    ...({ draft: true } as object), // store field requested from the scene session (Card hides while it is set)
+    draft: true, // Card hides while it is set
   });
   if (first) window.setTimeout(() => useTwin.getState().requestCamera({ kind: "home" }), 60); // after the scene took the model
 }
@@ -155,10 +155,10 @@ function showDraft(preview: Level4Preview) {
 /** Put the building back that was open before the draft (nothing saved). */
 function hideDraft(restore: boolean) {
   if (snapshot && restore) {
-    useTwin.setState({ ...snapshot, selection: null, popover: null, highlights: {}, ...({ draft: false } as object) });
+    useTwin.setState({ ...snapshot, selection: null, popover: null, highlights: {}, draft: false });
     useTwin.getState().requestCamera({ kind: "home" });
   } else if (snapshot) {
-    useTwin.setState({ ...({ draft: false } as object) });
+    useTwin.setState({ draft: false });
   }
   snapshot = null;
   shownView = null;
@@ -376,7 +376,7 @@ useTwin.subscribe((twin, before) => {
   const nb = useNewBuilding.getState();
   snapshot = null;
   shownView = null;
-  useTwin.setState({ ...({ draft: false } as object) });
+  useTwin.setState({ draft: false });
   if (nb.step === "review" || nb.step === "card") useNewBuilding.setState({ step: "closed", doorFrom: null, card: null });
 });
 
