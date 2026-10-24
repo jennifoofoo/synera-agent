@@ -8,7 +8,6 @@ import { ChangesPill } from "./ui/ChangesPill";
 import { FloorRail } from "./ui/FloorRail";
 import { NewBuilding } from "./ui/NewBuilding";
 import { Omnibox } from "./ui/Omnibox";
-import { Position } from "./ui/Position";
 import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
@@ -42,7 +41,6 @@ export function App() {
       <ChangesPill />
       <Planner />
       <Phone />
-      <Position />
       <div className="dock">
         <CampusCard />
         <Card />
