@@ -10,6 +10,7 @@ import type { BuildingModel } from "../model/model";
 import { HERE, useTwin, walkLines, type Place } from "../store";
 import { PlaceInput } from "./Autocomplete";
 import { walkMinutes } from "./Walk";
+import { AvoidsClosed } from "./AvoidsClosed";
 import "./Directions.css";
 
 export function placeName(model: BuildingModel, place: Place | null): string {
@@ -162,6 +163,7 @@ export function DirectionsSummary({ model }: { model: BuildingModel }) {
           <span className={f.stepFree ? "ok" : "warn"}>{f.stepFree ? "step-free" : "has stairs"}</span>
         </span>
       </div>
+      <AvoidsClosed model={model} route={route} />
       <div className="card-actions">
         <button className="primary" onClick={start} title="Step-by-step directions">
           Guide me

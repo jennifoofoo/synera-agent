@@ -83,6 +83,9 @@
 .route-sentence strong { font-weight: 600; }
 .route-sentence .ok { color: var(--ok); }
 .route-sentence .warn { color: var(--warn); }
+/* "Avoids closed Lift 1": one quiet line; the closed red only on its small prohibition dash */
+.route-avoids { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.route-avoids::before { content: ""; width: 10px; height: 2px; background: var(--danger); transform: rotate(45deg); flex: none; }
 .card button.link.route-steps-toggle { margin-top: 8px; }
 .worker .card button.link.route-steps-toggle { min-height: 44px; min-width: 64px; margin-top: 2px; text-align: left; }
 .route-steps { margin: 6px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.45; color: var(--ink-2); max-height: 30vh; overflow: auto; }

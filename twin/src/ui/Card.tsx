@@ -16,6 +16,7 @@ import { HereChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
 import { readable } from "../walkInfo";
+import { AvoidsClosed } from "./AvoidsClosed";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -396,6 +397,7 @@ function RouteCard({ model, route, details, note }: { model: BuildingModel; rout
           <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
         </span>
       </div>
+      <AvoidsClosed model={model} route={route} />
       {note && <div className="card-note">{note}</div>}
       <div className="card-actions">
         <button className="primary" disabled={busy} onClick={() => void ask("guide me")}>
