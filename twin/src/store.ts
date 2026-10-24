@@ -602,11 +602,18 @@ async function routeDirections(): Promise<void> {
 }
 
 /** The steps to walk: the route's own (deterministic, from /api/route), else one line to the destination. */
+/** The route's step lines without the opening "Start in X on Ground floor." (it says nothing to do; the walk begins
+ * with the first real move). */
+export function walkLines(steps: string[] | undefined): string[] {
+  return (steps ?? []).filter((line, index, all) => !(index === 0 && all.length > 1 && /^Start (in|at) /.test(line)));
+}
+
 export function walkSteps(): string[] {
   const { state, model } = useTwin.getState();
   const route = state?.route;
   if (!route?.ok) return [];
-  if (route.steps?.length) return route.steps;
+  const steps = walkLines(route.steps);
+  if (steps.length) return steps;
   const name = route.destination ? model?.spaceById.get(route.destination)?.name || route.destination : "the destination";
   return [`Go to ${name}.`];
 }
