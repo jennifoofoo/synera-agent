@@ -40,7 +40,8 @@ Replies must end with exactly one `Answer:` line (the scorer reads only that).
 
 ## Teamwork (two people, each with her own Claude session)
 - Before working on a task: claim it in `docs/STATUS.md` (name, status, branch), commit and push first.
-- One branch per task (`feat/q-<kind>`), `git pull --rebase` before push, small merges to `main`, `uv run pytest` green before merging.
+- One branch per task (`feat/q-<kind>`), `git pull --rebase` before push, small merges to `main`, `scripts/check.sh` green before merging.
+- Changes to shared code (`tools.py`, `agent.py`, `registry.py`, `geometry.py`, `CLAUDE.md`): before merging, let a fresh review agent (no prior context) read the diff against the spec. Own kind files only need `scripts/check.sh`.
 - Parallel sessions only in separate worktrees (`claude -w <name>`).
 - Shared files (`CLAUDE.md`, `docs/STATUS.md`, `pyproject.toml`): only after `git pull`, keep changes small.
 - At the end of a session: update `docs/STATUS.md`, push, note open points.
