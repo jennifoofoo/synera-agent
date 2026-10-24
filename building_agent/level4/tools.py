@@ -42,6 +42,7 @@ from building_agent.level4.extract import (
     extract_floor,
 )
 from building_agent.level4.floor_height import guess_floor_height
+from building_agent.level4.furniture import attach_plan_assets, plan_furniture
 from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.plan_files import adopt_vision, compose_names, find_building_json, svg_extraction, svg_title
 from building_agent.level4.scale_source import (
@@ -559,6 +560,7 @@ def _rebuild(draft: Level4Draft) -> None:
                 apply_fix(building, fix, _to_metres(draft, building))
             except ToolError as error:
                 notes.append(f"An earlier fix ({fix[0]}) no longer applies: {error}")
+        attach_plan_assets(building, inputs)  # furniture hook 2/2: items read from the plan's furniture glyphs
         converted.items = _relinked(building, converted.items)
         checked = validate(building, _trusted_scale(draft))
     except ConvertError as error:
@@ -699,6 +701,9 @@ def make_level4_tools(
             raise ToolError(str(error)) from error
         if scale is None:
             raise ToolError(ASK_SCALE)
+        if origin == "svg":  # furniture hook 1/2: room types and items from the plan's furniture glyphs
+            extraction, furniture_note = plan_furniture(extraction, checked, uploads_root, scale, level)
+            draft.marker_notes += [furniture_note] if furniture_note else []
         previous = draft.floors.get(level)
         scanned = any(note in seg_warnings for note in (SCAN_NOTE, NOISE_NOTE))
         added = sum(warning.startswith("room_added_from_image") for warning in seg_warnings)
