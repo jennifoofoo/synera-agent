@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talk to Your Building</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo" aria-hidden="true">◧</span> Talk to Your Building</div>
+  <label class="building-pick">
+    <span class="sr">Building</span>
+    <select id="building-select" aria-label="Building"></select>
+  </label>
+  <div id="building-meta" class="building-meta"></div>
+</header>
+
+<main class="layout">
+  <section class="map-pane" aria-label="Floor plan">
+    <div id="floor-tabs" class="floor-tabs" role="tablist" aria-label="Floors"></div>
+    <div id="route-bar" class="route-bar" hidden></div>
+    <svg id="map" class="map" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan"></svg>
+    <div id="popover" class="popover" hidden></div>
+    <div id="mode-banner" class="mode-banner" hidden></div>
+    <div class="map-controls">
+      <button id="zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+      <button id="zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+      <button id="zoom-fit" title="Fit floor" aria-label="Fit floor">⤢</button>
+    </div>
+    <details class="legend" open>
+      <summary>Legend</summary>
+      <ul>
+        <li><i class="sw sw-start"></i>Start</li>
+        <li><i class="sw sw-end"></i>Destination</li>
+        <li><i class="sw sw-route"></i>Route</li>
+        <li><i class="sw sw-lift"></i>Lift</li>
+        <li><i class="sw sw-stair"></i>Stairs</li>
+        <li><i class="sw sw-door"></i>Door</li>
+        <li><i class="sw sw-step"></i>Door with step</li>
+        <li><i class="sw sw-entrance"></i>Entrance</li>
+        <li><i class="sw sw-closed"></i>Closed</li>
+        <li><i class="sw sw-added"></i>New door</li>
+      </ul>
+    </details>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </section>
+
+  <aside class="side">
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="chat" role="tab">Chat</button>
+      <button class="tab" data-tab="route" role="tab">Route</button>
+      <button class="tab" data-tab="find" role="tab">Find</button>
+      <button class="tab" data-tab="changes" role="tab">Changes <span id="changes-count" class="count" hidden></span></button>
+    </nav>
+
+    <div class="panel active" data-panel="chat">
+      <div id="chat-log" class="chat-log" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" autocomplete="off" placeholder="e.g. How do I get from the entrance to the lab without stairs?">
+        <button type="submit">Send</button>
+      </form>
+      <div id="chat-note" class="note"></div>
+    </div>
+
+    <div class="panel" data-panel="route">
+      <form id="route-form" class="route-form">
+        <label>From <input id="route-from" list="space-names" autocomplete="off" placeholder="Click a room or type"></label>
+        <div id="via-list"></div>
+        <label>To <input id="route-to" list="space-names" autocomplete="off" placeholder="Click a room or type"></label>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="route-stepfree"> Step-free</label>
+          <button type="button" id="add-via" class="link">+ stop</button>
+          <button type="button" id="swap" class="link">⇅ swap</button>
+        </div>
+        <div class="row">
+          <button type="submit">Show route</button>
+          <button type="button" id="route-clear" class="secondary">Clear</button>
+        </div>
+      </form>
+      <div id="route-result"></div>
+      <p class="hint">Tip: tap a room on the plan to set it as start or destination.</p>
+    </div>
+
+    <div class="panel" data-panel="find">
+      <input id="find-input" type="search" autocomplete="off" placeholder="Room, number or thing (e.g. printer, 2.03, toilet)">
+      <div id="find-results" class="find-results"></div>
+    </div>
+
+    <div class="panel" data-panel="changes">
+      <h3>Stairs and lifts</h3>
+      <div id="connector-list" class="connector-list"></div>
+      <h3>Closed</h3>
+      <div id="closed-list"></div>
+      <h3>New doors</h3>
+      <div id="door-list"></div>
+      <p class="hint">Tap a door, room, stair or lift on the plan to close it, or a room to add a door to its neighbour.</p>
+      <button id="reset" class="secondary">Reset building</button>
+    </div>
+  </aside>
+</main>
+<datalist id="space-names"></datalist>
+<script src="app.js"></script>
+</body>
+</html>
