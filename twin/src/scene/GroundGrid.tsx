@@ -1,12 +1,12 @@
 import { useMemo } from "react";
 import * as THREE from "three";
+import { COLOURS } from "../model/palette";
 
 interface Props {
   centre: [number, number, number];
-  /** Radius (m) where the grid has faded out completely, measured from the centre. */
+  /** Radius (m) of the ground disc: the gradient reaches the outer paper tone there, the dots are gone long before. */
   radius: number;
   cell?: number;
-  section?: number;
 }
 
 const vertex = /* glsl */ `
@@ -18,46 +18,43 @@ const vertex = /* glsl */ `
   }
 `;
 
-// Anti-aliased lines that fade out by themselves once a cell gets smaller than a few pixels. That is what removes
-// the moire (thousands of dashes and dots) the infinite shader grid produced at shallow camera angles.
+// A calm ground: a soft radial gradient (lighter under the building), a faint contact shadow blob around it, and a
+// dot lattice at the cell corners that fades out by pixel footprint (no moire at shallow angles) and by distance.
+// No lines: the building is the only thing with edges.
 const fragment = /* glsl */ `
   varying vec2 vXZ;
   uniform vec2 uCentre;
   uniform float uRadius;
   uniform float uCell;
-  uniform float uSection;
-  uniform vec3 uCellColour;
-  uniform vec3 uSectionColour;
-
-  float gridLine(vec2 p, float size, out float footprint) {
-    vec2 r = p / size;
-    vec2 d = max(fwidth(r), vec2(1e-5));
-    vec2 g = abs(fract(r - 0.5) - 0.5) / d;
-    footprint = max(d.x, d.y);
-    return 1.0 - min(min(g.x, g.y), 1.0);
-  }
+  uniform float uShadow0;
+  uniform float uShadow1;
+  uniform vec3 uInner;
+  uniform vec3 uOuter;
+  uniform vec3 uDot;
 
   void main() {
-    float fc;
-    float fs;
-    float cell = gridLine(vXZ, uCell, fc) * (1.0 - smoothstep(0.12, 0.3, fc));
-    float section = gridLine(vXZ, uSection, fs) * (1.0 - smoothstep(0.12, 0.3, fs));
-    float radial = 1.0 - smoothstep(uRadius * 0.35, uRadius, distance(vXZ, uCentre));
-    float a = max(cell * 0.45, section * 0.7) * radial;
-    if (a < 0.003) discard;
-    vec3 colour = mix(uCellColour, uSectionColour, step(cell * 0.45, section * 0.7));
-    gl_FragColor = vec4(colour, a);
+    float d = distance(vXZ, uCentre);
+    vec3 colour = mix(uInner, uOuter, smoothstep(0.0, uRadius, d));
+    float shadow = (1.0 - smoothstep(uShadow0, uShadow1, d)) * 0.07;
+    colour *= 1.0 - shadow;
+    vec2 r = vXZ / uCell;
+    vec2 cell = fract(r) - 0.5;
+    float fw = max(fwidth(r.x), 1e-5);
+    float px = length(cell) / fw;
+    float dot = (1.0 - smoothstep(1.2, 2.0, px)) * (1.0 - smoothstep(0.25, 0.45, fw)) * (1.0 - smoothstep(uRadius * 0.3, uRadius * 0.8, d));
+    colour = mix(colour, uDot, dot * 0.35);
+    gl_FragColor = vec4(colour, 1.0);
   }
 `;
 
-/** A finite ground grid around the building: no infinite plane, so nothing far away to alias. */
-export function GroundGrid({ centre, radius, cell = 2, section = 10 }: Props) {
+/** The finite ground around the building: a gradient disc with a faint dot lattice, nothing far away to alias. */
+export function GroundGrid({ centre, radius, cell = 2 }: Props) {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
         vertexShader: vertex,
         fragmentShader: fragment,
-        transparent: true,
+        transparent: false,
         depthWrite: false,
         polygonOffset: true,
         polygonOffsetFactor: -2,
@@ -66,15 +63,19 @@ export function GroundGrid({ centre, radius, cell = 2, section = 10 }: Props) {
           uCentre: { value: new THREE.Vector2() },
           uRadius: { value: 1 },
           uCell: { value: cell },
-          uSection: { value: section },
-          uCellColour: { value: new THREE.Color("#c3d1e2") },
-          uSectionColour: { value: new THREE.Color("#a9bdd5") },
+          uShadow0: { value: 1 },
+          uShadow1: { value: 2 },
+          uInner: { value: new THREE.Color(COLOURS.groundInner) },
+          uOuter: { value: new THREE.Color(COLOURS.groundOuter) },
+          uDot: { value: new THREE.Color(COLOURS.dot) },
         },
       }),
-    [cell, section],
+    [cell],
   );
   material.uniforms.uCentre.value.set(centre[0], centre[2]);
   material.uniforms.uRadius.value = radius;
+  material.uniforms.uShadow0.value = radius * 0.25;
+  material.uniforms.uShadow1.value = radius * 0.5;
   return (
     <mesh position={[centre[0], centre[1] + 0.03, centre[2]]} rotation-x={-Math.PI / 2} material={material} renderOrder={-0.5} frustumCulled={false}>
       <planeGeometry args={[radius * 2, radius * 2]} />
