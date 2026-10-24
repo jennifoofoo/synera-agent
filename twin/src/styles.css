@@ -1,20 +1,6 @@
-/* Base styles (scene owner). Components own their own blocks below their marker; keep additions small. */
-:root {
-  --bg: #edf2f8;
-  --panel: rgba(255, 255, 255, 0.86);
-  --panel-solid: #ffffff;
-  --navy: #14305a; /* the dark-blue accent, only for small UI parts (chips, active states) */
-  --line: rgba(20, 48, 90, 0.16);
-  --text: #10233f;
-  --muted: #5c7190;
-  --accent: #2bb5a0;
-  --gold: #c9962e;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --danger: #f43f5e;
-  --radius: 12px;
-  color-scheme: light;
-}
+/* Base styles (scene owner). Components own their own blocks below their marker; keep additions small.
+   All values come from styles/tokens.css. */
+@import "./styles/tokens.css";
 * { box-sizing: border-box; }
 html, body, #root {
   height: 100%;
