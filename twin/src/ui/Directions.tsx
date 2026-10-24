@@ -139,7 +139,7 @@ export function DirectionsSummary({ model }: { model: BuildingModel }) {
   const startWalk = useTwin((s) => s.startWalk);
   if (!directions.from || !directions.to || !route) return null;
   if (!route.ok) {
-    return <div className="card-note dir-error">{route.error ?? "No route between these two."}</div>;
+    return <div className="card-note dir-error">{route.message ?? route.error ?? "No route between these two."}</div>;
   }
   const f = facts(model, route);
   const start = () => {

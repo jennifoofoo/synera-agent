@@ -432,3 +432,20 @@ def test_a_short_walk_before_a_stair_stays_its_own_line():
         "Walk about 1 m into Stairwell 1.",
         "Take Stairs 1 (stairs) to Floor 2.",
     ]
+
+
+def test_no_route_message_for_the_page_names_closures_without_ids():
+    from pathlib import Path
+
+    from starter_agent.building_map import BuildingMap
+    from web.api import readable_error
+
+    bm = BuildingMap.load(Path("data/dev/proc-factory-dev-012"))
+    text = (
+        "No route from Warehouse zone H-B3 [proc-factory-dev-012-F0-S009] on Ground floor to Kitchen 2.21 "
+        "[proc-factory-dev-012-F2-S021] on Floor 2 with the current closures ['proc-factory-dev-012-V01']. "
+        "There is no way round the outside of the building."
+    )
+    message = readable_error(bm, text)
+    assert "[" not in message and "proc-factory" not in message
+    assert "because of closures: Office staircase" in message

@@ -446,7 +446,28 @@ def current_route(session: Session) -> dict | None:
             request.get("destination_point"),
         )
     except MapError as error:
-        return {"ok": False, "error": str(error), **request}
+        return {"ok": False, "error": str(error), "message": readable_error(session.map, str(error)), **request}
+
+
+def closed_label(bm: BuildingMap, element_id: str) -> str:
+    """A closed element as people say it: 'Lift 1', 'the door between Kitchen 2.21 and Corridor 2.01'."""
+    if element_id in bm.connectors:
+        return bm.connectors[element_id].get("name") or "a lift or stair"
+    if element_id in bm.openings:
+        rooms = [bm.spaces[s]["name"] for s in bm.openings[element_id]["space_ids"] if s in bm.spaces]
+        kind = "entrance" if bm.openings[element_id].get("kind") == "entrance" else "door"
+        return f"the {kind} of {rooms[0]}" if len(rooms) == 1 else f"the {kind} between {' and '.join(rooms)}"
+    return "a closed passage"
+
+
+def readable_error(bm: BuildingMap, text: str) -> str:
+    """The routing message for the page: no ids in brackets, closures named instead of listed as ids."""
+    closures = re.search(r" with the current closures \[(.*?)\]", text)
+    if closures:
+        ids = re.findall(r"'([^']+)'", closures.group(1))
+        named = ", ".join(dict.fromkeys(closed_label(bm, i) for i in ids)) or "the current closures"
+        text = text.replace(closures.group(0), f" because of closures: {named}")
+    return re.sub(r" \[[^\]]*\]", "", text).strip()
 
 
 def compact_steps(steps: list[str]) -> list[str]:
