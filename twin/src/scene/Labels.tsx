@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import * as THREE from "three";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
+import type { Point } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
+import { useTwin } from "../store";
+import { LABEL_LIFT } from "./markerLayout";
+import { LIFT as ROUTE_LIFT } from "./RouteLine";
 
 interface Props {
   floor: FloorModel;
@@ -53,6 +57,30 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const quantised = Math.pow(2, Math.round(Math.log2(Math.max(1e-3, metresPerPixel)) * 2) / 2);
     if (quantised !== scale) setScale(quantised);
   });
+  // Rooms with a marker (you are here, route ends, the guide's next target): their label moves just above the
+  // marker (screen px), so the marker never covers the name. Other labels stay at the room anchor.
+  const state = useTwin((s) => s.state);
+  const marks = useMemo(() => {
+    const out = new Map<string, { point: Point; lift: number; height: number }>();
+    const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
+      const space = spaceId ? model.spaceById.get(spaceId) : undefined;
+      if (!space || space.floor_id !== floor.id || !point) return;
+      const known = out.get(space.id);
+      if (!known || known.lift < lift) out.set(space.id, { point, lift, height });
+    };
+    const route = state?.route;
+    if (route?.ok && route.segments?.length) {
+      const first = route.segments[0];
+      const last = route.segments[route.segments.length - 1];
+      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.end, ROUTE_LIFT);
+      if (last.floor_id === floor.id) put(route.destination, last.points[last.points.length - 1], LABEL_LIFT.end, ROUTE_LIFT);
+    }
+    const guide = state?.guide;
+    if (guide?.active) put(guide.leg.to_space_id, model.spaceById.get(guide.leg.to_space_id)?.anchor, LABEL_LIFT.guide);
+    const here = state?.position;
+    if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
+    return out;
+  }, [state?.route, state?.guide, state?.position, model, floor.id]);
   const labelled = useMemo(() => {
     const named = floor.spaces.filter((space) => space.name && space.type !== "outdoor");
     const connectors = named.filter((space) => model.connectorBySpace.has(space.id));
@@ -64,8 +92,17 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       .slice(0, limit);
     const far = floor.bounds.size / scale < 700; // the whole floor is under ~700 px wide
     const chosen = far ? [...lifts.slice(0, 4), ...rooms.slice(0, 6)] : [...connectors.slice(0, 12), ...rooms];
-    return cullOverlaps(chosen, LABEL_PX * scale * (flat ? 0.9 : 1.1));
-  }, [floor, model, limit, scale, flat]);
+    // Marked rooms always keep their label (they stack above their own markers, so they are never culled);
+    // the other labels keep clear of them.
+    const marked = named.filter((space) => marks.has(space.id));
+    const rest = chosen.filter((space) => !marks.has(space.id));
+    const minDistance = LABEL_PX * scale * (flat ? 0.9 : 1.1);
+    const kept = cullOverlaps(rest, minDistance);
+    return [
+      ...marked,
+      ...kept.filter((space) => marked.every((other) => Math.hypot(other.anchor[0] - space.anchor[0], other.anchor[1] - space.anchor[1]) >= minDistance)),
+    ];
+  }, [floor, model, limit, scale, flat, marks]);
   // 2D: stairs, lifts, toilets and entrances as small round icons like a street map's points of interest.
   const pois = useMemo(() => {
     if (!flat) return [];
@@ -86,11 +123,27 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   }, [flat, floor, model, labelled, scale]);
   return (
     <group position-y={y + 0.5}>
-      {labelled.map((space) => (
-        <Html key={space.id} position={[space.anchor[0], 0, -space.anchor[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-          <div className={`label ${flat ? "label-plan" : ""} ${model.connectorBySpace.has(space.id) ? "label-connector" : ""}`}>{space.name}</div>
-        </Html>
-      ))}
+      {labelled.map((space) => {
+        const mark = marks.get(space.id);
+        const where = mark?.point ?? space.anchor;
+        return (
+          <Html
+            key={space.id}
+            position={[where[0], mark ? mark.height - 0.5 : 0, -where[1]]} // at the marker's own height
+            center
+            zIndexRange={[2, 0]}
+            style={{ pointerEvents: "none" }}
+          >
+            <div
+              className={`label label-halo ${flat ? "label-plan" : ""} ${model.connectorBySpace.has(space.id) ? "label-connector" : ""}`}
+              data-label-space={space.id}
+              style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
+            >
+              {space.name}
+            </div>
+          </Html>
+        );
+      })}
       {pois.map((poi) => (
         <Html key={`poi-${poi.id}`} position={[poi.point[0], 0, -poi.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
           <div className="poi" title={poi.title}>{poi.glyph === "exit" ? EXIT_ICON : poi.glyph}</div>
