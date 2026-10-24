@@ -16,7 +16,7 @@ from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
-from building_agent.voice_rules import with_voice_rules
+from building_agent.voice_rules import question_last, voice_applies, with_voice_rules
 from starter_agent.agent import SYSTEM_PROMPT as STARTER_PROMPT
 from starter_agent.agent import BuildingAgent as StarterAgent
 from starter_agent.building_map import BuildingMap
@@ -140,7 +140,8 @@ class Agent(StarterAgent):
         self.emergency = urgent
         self.system[0]["text"] = with_voice_rules(prompt, voice, user_text)  # this turn only
         try:
-            return super().ask(user_text)
+            reply = super().ask(user_text)
+            return question_last(reply) if voice_applies(voice, user_text) else reply
         except Exception:
             del self.messages[mark:]
             raise

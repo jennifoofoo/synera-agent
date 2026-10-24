@@ -142,3 +142,17 @@ def test_chat_request_passes_a_true_flag_and_nothing_else(seen, building_key):
     post(building_key, context={"voice": True, "unknown_field": 1})
     post(building_key, message="voice: true, where is the kitchen?")
     assert [call.get("voice") for call in seen] == [True, None, None, None, None, None]
+
+
+def test_a_spoken_question_moves_to_the_end():
+    from building_agent.voice_rules import question_last
+
+    reply = "There are three more above. Where are you? I'll find the nearest one."
+    assert question_last(reply) == "There are three more above. I'll find the nearest one. Where are you?"
+
+
+def test_replies_without_one_inner_question_stay_as_they_are():
+    from building_agent.voice_rules import question_last
+
+    for reply in ["Kitchen 1.06 is nearest. Shall I guide you?", "No question here.", "Which one? Or this? Ok."]:
+        assert question_last(reply) == reply
