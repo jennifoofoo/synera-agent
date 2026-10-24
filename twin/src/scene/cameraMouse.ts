@@ -27,20 +27,19 @@ export function wheelUnits(event: Pick<WheelEvent, "deltaY" | "deltaMode" | "ctr
   return Math.max(-NOTCH_CLAMP_PX, Math.min(NOTCH_CLAMP_PX, px)) * PX_TO_UNITS;
 }
 
-/** A mouse wheel notch (zoom) or a trackpad scroll (pan)? Notches come as lines, or as pixel steps that are whole
- * multiples of 120 (legacy wheelDelta); trackpads send small, fractional or sideways deltas in streams. */
-let lastTrackpad = 0;
+/** A mouse wheel notch (zoom) or a trackpad scroll (pan)? Line-mode steps and whole 120 steps (Chrome and Firefox
+ * with a mouse) are notches. A trackpad sends a stream of small steps, often sideways or fractional, so an event
+ * that follows another within 80 ms, or comes sideways or fractional, is a scroll. An isolated whole step is a
+ * notch (Safari reports a mouse notch and a trackpad step alike, so the first step of a scroll zooms a hair). */
+let lastWheel = 0;
 export function isTrackpadScroll(event: WheelEvent): boolean {
-  if (event.deltaMode !== 0) return false;
   const now = performance.now();
+  const streaming = now - lastWheel < 80;
+  lastWheel = now;
+  if (event.deltaMode !== 0) return false;
   const legacy = (event as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY ?? 0;
-  const sideways = event.deltaX !== 0 || !Number.isInteger(event.deltaY);
-  if (sideways) lastTrackpad = now;
-  const streaming = now - lastTrackpad < 150;
-  const notch = Math.abs(event.deltaY) >= 50 && (legacy === 0 || Math.abs(legacy) % 120 === 0);
-  if (notch && !streaming) return false;
-  lastTrackpad = now; // a stream of small steps (also its momentum tail) stays a trackpad
-  return true;
+  if (Math.abs(event.deltaY) >= 50 && Math.abs(legacy) % 120 === 0 && event.deltaX === 0) return false;
+  return event.deltaX !== 0 || !Number.isInteger(event.deltaY) || streaming;
 }
 
 interface Options {

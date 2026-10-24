@@ -2,9 +2,12 @@
 // between the entrances (walkway on the ground, bridge raised by its level_delta), the route as one glowing line.
 // Tap a building (or its name) = enter it. Own small Canvas, independent of the building scene.
 
-import { Html, Line, OrbitControls } from "@react-three/drei";
+import { CameraControls, Html, Line } from "@react-three/drei";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import CameraControlsImpl from "camera-controls";
+import { useCameraKeys } from "../scene/cameraKeys";
+import { useCameraMouse } from "../scene/cameraMouse";
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { CampusBuilding, CampusLink, CampusView } from "../api/campus";
@@ -143,6 +146,49 @@ function routePoints(view: CampusView, legs: ReturnType<typeof steps>, heights: 
   return out;
 }
 
+interface Frame {
+  centre: THREE.Vector3;
+  target: THREE.Vector3;
+  camera: THREE.Vector3;
+  size: number;
+}
+
+/** The same camera rig as the building view (camera-controls, same damping, mouse, touch and keys), with the site's limits. */
+function CampusRig({ frame }: { frame: Frame }) {
+  const controls = useRef<CameraControlsImpl>(null);
+  useEffect(() => {
+    (window as unknown as Record<string, unknown>).__twinCampusControls = controls; // test hook
+  }, []);
+  const onHome = useCallback(() => {
+    void controls.current?.setLookAt(frame.camera.x, frame.camera.y, frame.camera.z, frame.target.x, frame.target.y, frame.target.z, true);
+  }, [frame]);
+  useEffect(() => {
+    const c = controls.current;
+    if (!c) return;
+    const A = CameraControlsImpl.ACTION;
+    c.minDistance = frame.size * 0.15;
+    c.maxDistance = frame.size * 3;
+    c.minPolarAngle = 0.08;
+    c.maxPolarAngle = Math.PI * 0.47;
+    c.mouseButtons.left = A.NONE; // left and middle drag pan in cameraMouse.ts
+    c.mouseButtons.middle = A.NONE;
+    c.mouseButtons.right = A.ROTATE;
+    c.mouseButtons.wheel = A.DOLLY;
+    c.touches.one = A.NONE;
+    c.touches.two = A.TOUCH_DOLLY_ROTATE;
+    c.smoothTime = 0.13;
+    c.draggingSmoothTime = 0.04;
+    c.dollyToCursor = true;
+    c.infinityDolly = false;
+    const margin = frame.size * 0.5;
+    c.setBoundary(new THREE.Box3(new THREE.Vector3(frame.centre.x - margin, -1, frame.centre.z - margin), new THREE.Vector3(frame.centre.x + margin, frame.size, frame.centre.z + margin)));
+    void c.setLookAt(frame.camera.x, frame.camera.y, frame.camera.z, frame.target.x, frame.target.y, frame.target.z, false);
+  }, [frame]);
+  useCameraMouse({ controls });
+  useCameraKeys({ controls, flat: false, onHome });
+  return <CameraControls ref={controls} makeDefault />;
+}
+
 export function CampusSite3D() {
   const view = useCampus((s) => s.view)!;
   const details = useCampus((s) => s.details);
@@ -212,7 +258,7 @@ export function CampusSite3D() {
           <Line points={line} color="#0d9488" lineWidth={6} transparent depthTest={false} depthWrite={false} renderOrder={11} />
         </>
       )}
-      <OrbitControls makeDefault target={frame.target} maxPolarAngle={Math.PI * 0.47} minDistance={frame.size * 0.15} maxDistance={frame.size * 3} enableDamping={false} />
+      <CampusRig frame={frame} />
     </Canvas>
   );
 }
