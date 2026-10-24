@@ -145,7 +145,7 @@ def test_describe_groups_by_code_with_counts_and_refs():
     assert text.startswith("16 rooms have no way out, doors are probably missing: 0.00, 0.01")
     assert "..." in text and text.count("have no way out") == 1
     assert "The building has no entrance to the outside." in text
-    assert "—" not in text
+    assert chr(0x2014) not in text
 
 
 def test_describe_singular_and_summary(building):
