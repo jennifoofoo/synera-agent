@@ -12,6 +12,7 @@ import anthropic
 from building_agent import routing
 from building_agent.campus_tools import CampusHolder
 from building_agent.guide_tools import GuideState
+from building_agent.query_tools import QUERY_RULES, QUERY_TOOL_NAMES
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
@@ -45,7 +46,8 @@ def overview_with_floor_ids(building_map: BuildingMap) -> dict:
     return overview
 
 
-CONVERSATION_RULES = """
+CONVERSATION_RULES = (
+    """
 
 Talking to a person (no 'Answer:' line asked):
 - Directions: use give_directions and read out only the steps it returns (at most 3). Offer 'weiter' for the \
@@ -73,6 +75,8 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 - Something on the route is out ('the lift is broken'): propose_change close, card, wait for the yes; after confirm_change say walk_update in one sentence (route_unaffected, or rerouted and longer_by_m, or no_route and the alternative) and go on with the step it holds. A time word ('tomorrow', 'from Monday', 'morgen') goes into propose_change when: nothing changes, say the building can only be changed now and offer to do it now or leave it.
 - When the person says what they want to DO or half remembers a device ('I want to weld', 'where can I copy something', 'where do I get coffee', 'someone said there is a laser thing in hall 3'), call find_for_task with their own words before searching by words. Answer in this order: first confirm what exists and where, then correct gently what differs (the corrections field: wrong room or floor, a device type this building does not have and what it has instead), then say what the device is for from its summary and say that this is general knowledge of the type. If needs_choice is true ask the returned question in one short sentence (in a message with 'Answer:' take the most plausible candidate and say which). To explain a device use describe_asset or general knowledge of the type and say it is general. Never state specifications, settings, state, capacity or availability of a unit: that data does not exist here. Never claim a device exists that find_for_task did not return.
 """
+    + QUERY_RULES
+)
 
 
 CAMPUS_RULES = """
@@ -132,6 +136,11 @@ class Agent(StarterAgent):
         self.guide.begin_turn()
         self.guide.last_user_text = user_text
         mark = len(self.messages)
+        chat = "Answer:" not in str(user_text)  # a benchmark message keeps exactly the tools it always had
+        full_tools = self.tools
+        if not chat:
+            self.tools = [tool for tool in full_tools if tool.name not in QUERY_TOOL_NAMES]
+        filtered = self.tools
         self.system[0]["text"] = with_voice_rules(self.system[0]["text"], voice, user_text)  # this turn only
         try:
             return super().ask(user_text)
@@ -140,6 +149,8 @@ class Agent(StarterAgent):
             raise
         finally:
             self.system[0]["text"] = without_voice_rules(self.system[0]["text"])
+            if not chat and self.tools is filtered:
+                self.tools = full_tools
 
 
 class Session(Agent):

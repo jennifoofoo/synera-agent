@@ -20,6 +20,7 @@ from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
 from building_agent.position import no_position_error
 from building_agent.position_tools import distance_annotator, make_position_tools
+from building_agent.query_tools import make_query_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
 from building_agent.task_tools import make_task_tools
@@ -196,6 +197,7 @@ def make_tools(
         *make_impact_tools(bm),
         *guide_tools,
         *make_selection_tools(bm, guide),
+        *make_query_tools(bm),
         *level4_tools,
         *(make_campus_tools(campus, output_directory, guide) if campus else []),
         *kinds,
