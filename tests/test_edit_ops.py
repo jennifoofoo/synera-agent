@@ -536,3 +536,14 @@ def test_sweep_add_asset_with_a_random_anchor_then_undo_restores_the_building():
         assert bm.removed_assets == [edit["id"]]
         assert_in_sync(bm)
     assert placed > 200, (placed, refused)
+
+
+def test_restore_snapshot_keeps_opening_dict_identity():
+    bm = fresh()
+    opening_id = next(iter(bm.openings))
+    live = bm.openings[opening_id]
+    snapshot = edit_ops.take_snapshot(bm, "x")
+    live["width_m"] = 4.0
+    edit_ops.restore_snapshot(bm, snapshot)
+    assert bm.openings[opening_id] is live and live["width_m"] != 4.0
+    assert_in_sync(bm)

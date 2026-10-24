@@ -131,7 +131,7 @@ ASSET_CATALOG: dict[str, dict] = {
 
 
 def normalise_type(text: str) -> str:
-    return "_".join(text.strip().lower().replace("-", " ").split())
+    return "_".join(str(text or "").strip().lower().replace("-", " ").split())
 
 
 def catalog_entry(asset_type: str) -> tuple[str, dict]:

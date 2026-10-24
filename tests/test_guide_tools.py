@@ -462,3 +462,15 @@ def test_directions_go_stale_after_an_undo(tmp_path):
     undo(tools, state)
     with pytest.raises(ToolError, match="No directions|changed"):
         tools["next_steps"]()
+
+
+def test_undo_is_refused_when_the_building_changed_in_another_way(tmp_path):
+    bm, (_start, end) = route_question()
+    tools, state = tools_by_name(bm, tmp_path)
+    state.begin_turn()
+    tools["assume_closed"](element=bm.resolve_space(end))
+    bm.closed.add(next(iter(bm.connectors)))  # a page-side closure that bypasses the undo stack
+    state.begin_turn()
+    with pytest.raises(ToolError, match="changed in another way"):
+        tools["propose_change"](action="undo")
+    assert not state.undo

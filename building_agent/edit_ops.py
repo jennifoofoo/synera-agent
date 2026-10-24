@@ -793,6 +793,7 @@ class Snapshot:
     removed_assets: list
     removed_openings: list
     widened_openings: dict
+    after_signature: tuple | None = None  # building_signature right after the edit this snapshot undoes
 
 
 def take_snapshot(bm: BuildingMap, label: str = "") -> Snapshot:
@@ -809,6 +810,20 @@ def take_snapshot(bm: BuildingMap, label: str = "") -> Snapshot:
     )
 
 
+def _reuse_dicts(current: dict, restored: list) -> list:
+    """Refill the existing dict objects in place, so anything that holds one of them (routing indexes) stays valid."""
+    out = []
+    for item in restored:
+        live = current.get(item["id"])
+        if live is None:
+            out.append(item)
+        else:
+            live.clear()
+            live.update(item)
+            out.append(live)
+    return out
+
+
 def restore_snapshot(bm: BuildingMap, snapshot: Snapshot) -> None:
     """Put the assets, doors and closures back in place; bm.* and bm.data keep sharing the same dict objects.
 
@@ -816,6 +831,8 @@ def restore_snapshot(bm: BuildingMap, snapshot: Snapshot) -> None:
     and assets that no longer exist in removed_assets, so a page can redraw them."""
     before = {asset["id"]: view(asset) for asset in bm.data["assets"]}
     assets, openings = copy.deepcopy(snapshot.assets), copy.deepcopy(snapshot.openings)
+    assets = _reuse_dicts(bm.assets, assets)
+    openings = _reuse_dicts(bm.openings, openings)
     bm.data["assets"][:] = assets
     bm.assets.clear()
     bm.assets.update({asset["id"]: asset for asset in assets})

@@ -137,7 +137,8 @@ def resolve_building_dir(name: str, roots: list[Path] | tuple[Path, ...]) -> Pat
         return None
     for root in roots:
         direct = Path(root) / name
-        if (direct / "building.json").is_file():
+        inside = ".." not in name and direct.resolve().is_relative_to(Path(root).resolve())
+        if inside and (direct / "building.json").is_file():
             return direct
     if re.fullmatch(r"[\w.\- ]+", name) and ".." not in name:
         for root in roots:

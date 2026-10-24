@@ -368,13 +368,15 @@ def make_level4_tools(
         try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
             extraction, seg_warnings = match_to_extraction(extraction, segment_rooms(path))
             draft.marker_notes = seg_warnings[:10]
-        except (OSError, ValueError):
-            pass
+        except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
+            draft.marker_notes = [f"Room outline detection was skipped ({type(error).__name__})."]
         try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
             extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
             draft.marker_notes = (seg_warnings + marker_warnings)[:10]
-        except (OSError, ValueError):
-            pass
+        except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
+            draft.marker_notes = (
+                draft.marker_notes + [f"Door marker detection was skipped ({type(error).__name__})."]
+            )[:10]
         try:
             if known_length_m is not None:
                 scale = scale_from_known_length(extraction, known_length_m, along)
@@ -598,6 +600,8 @@ def make_level4_tools(
         bm_holder.bm = new_map
         state.session = None
         state.pending = None
+        if hasattr(state, "undo"):
+            state.undo.clear()  # the old building's snapshots must never be restored into the new one
         if on_saved is not None:
             on_saved(path)
         accepted = describe(Findings(errors)) if errors else None

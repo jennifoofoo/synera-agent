@@ -301,9 +301,15 @@ def _ring_polygon(ring: list[tuple[int, int]], offset: tuple[int, int], toleranc
     return [[float(x), float(y)] for x, y in list(shape.exterior.coords)[:-1]]
 
 
+MAX_PIXELS = 6_000_000  # about 1.8 GB of working memory per 4 Mpx measured; larger images keep the model polygons
+
+
 def segment_rooms(image_path, simplify_px: float = SIMPLIFY_PX, wall_grow_px: int = WALL_GROW_PX) -> SegmentResult:
     begin = time.perf_counter()
-    rgb = np.asarray(Image.open(image_path).convert("RGB"))
+    with Image.open(image_path) as image:
+        if image.width * image.height > MAX_PIXELS:
+            raise ValueError("The image is too large to segment.")
+        rgb = np.asarray(image.convert("RGB"))
     height, width, _ = rgb.shape
     lab, fills = _classify(rgb)
     comp = _label_runs(lab, 4)

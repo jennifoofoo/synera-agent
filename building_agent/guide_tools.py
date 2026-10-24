@@ -321,6 +321,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             raise ToolError(str(error)) from error
         if target not in bm.closed:
             snapshot = edit_ops.take_snapshot(bm, f"reopen {element_label(bm, target)}")
+            bm.closed.add(target)
+            snapshot.after_signature = building_signature(bm)
             state.undo.append(snapshot)
         bm.closed.add(target)
         state.log.append({"turn": state.turn, "assumed_closed": target})
@@ -402,10 +404,20 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         )
         return as_json(card)
 
+    def check_undo_is_safe(snapshot) -> None:
+        """Undo restores a whole earlier state: refuse if anything else changed since (for example on the page)."""
+        if snapshot.after_signature is not None and snapshot.after_signature != building_signature(bm):
+            state.undo.clear()
+            raise ToolError(
+                "The building was changed in another way since that edit (for example on the plan page), so undoing "
+                "it would also erase those changes. I cleared the undo history. Tell me what to change back."
+            )
+
     def undo_card() -> str:
         if not state.undo:
             raise ToolError("There is nothing to undo.")
         snapshot = state.undo[-1]
+        check_undo_is_safe(snapshot)
         preview = copy.deepcopy(bm)
         edit_ops.restore_snapshot(preview, snapshot)
         card = {
@@ -444,6 +456,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         if pending.action == "undo":
             if not state.undo:
                 raise ToolError("There is nothing to undo.")
+            check_undo_is_safe(state.undo[-1])
             snapshot = state.undo.pop()
             edit_ops.restore_snapshot(bm, snapshot)
             state.session = None
@@ -467,6 +480,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 raise ToolError(str(error)) from error
             edit = bm.last_edit if pending.action in ("move_asset", "add_asset") else None
             snapshot.label = undo_label(bm, pending.action, what, edit)
+            snapshot.after_signature = building_signature(bm)
             state.undo.append(snapshot)
         output_directory.mkdir(parents=True, exist_ok=True)
         bm.save(output_directory / "building_edited.json")
