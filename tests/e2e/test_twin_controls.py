@@ -10,7 +10,7 @@ import pytest
 
 pytest.importorskip("playwright.sync_api", reason="playwright not installed (uv sync --group e2e)")
 
-from tests.e2e.conftest import REPO  # noqa: E402
+from tests.e2e.conftest import REPO
 
 pytestmark = pytest.mark.e2e
 
@@ -57,7 +57,10 @@ def test_left_drag_moves_the_map_with_the_pointer(engine, mode, base_url, playwr
         errors: list[str] = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(base_url)
-        page.wait_for_function("window.__twinStore && window.__twinStore.getState().model && window.__twinControls && window.__twinControls.current", timeout=30000)
+        page.wait_for_function(
+            "window.__twinStore && window.__twinStore.getState().model && window.__twinControls && window.__twinControls.current",
+            timeout=30000,
+        )
         page.evaluate(f"window.__twinStore.getState().setViewMode('{mode}')")
         page.wait_for_timeout(1500)
         page.evaluate("window.__twinStore.getState().requestCamera({ kind: 'home' })")
