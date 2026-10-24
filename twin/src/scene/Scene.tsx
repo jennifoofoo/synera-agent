@@ -54,7 +54,7 @@ function Building({ model }: { model: BuildingModel }) {
         return (
           <group key={floor.id}>
             <FloorMesh floor={floor} model={model} y={floorY(floor.id)} ghost={ghost} visible={visible} />
-            {showThings && <Things floor={floor} y={floorY(floor.id)} state={state} limit={thingsMode === "all" ? ALL_THINGS_LIMIT : NEAR_THINGS_LIMIT} />}
+            {showThings && <Things floor={floor} y={floorY(floor.id)} state={state} limit={thingsMode === "all" ? ALL_THINGS_LIMIT : NEAR_THINGS_LIMIT} flat={flat} />}
             {isFocused && visible && <Labels floor={floor} model={model} y={floorY(floor.id)} limit={flat ? (worker ? 30 : 80) : worker ? 14 : 36} flat={flat} />}
           </group>
         );

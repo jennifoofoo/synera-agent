@@ -111,6 +111,7 @@ button.x:hover { color: var(--text); }
 .app.flat .rail-toggle { margin: 0; }
 .app.flat .rail-floor.active { background: #e8f0fe; color: #1a5fd0; }
 .app.flat .rail-floor .dot { background: #4285f4; }
+.app.worker.flat .pill { left: 10px; right: auto; }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 8px;
   border-radius: 999px; white-space: nowrap; background: var(--navy); border: 1px solid var(--navy); color: #fff;
