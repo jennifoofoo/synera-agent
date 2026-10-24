@@ -181,7 +181,9 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       fitBox(c, box, animate, 1.6, worker ? Math.max(12, size * 0.1) : 3);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request.nonce, floorMode, camera]);
+    // The viewport size is a dependency on purpose: a request made while the canvas was hidden or being resized
+    // (campus overlay, phone rotation) is framed again once the real size is known.
+  }, [request.nonce, floorMode, camera, viewport.width, viewport.height]);
 
   useEffect(() => {
     controlsRef.current = controls.current;
