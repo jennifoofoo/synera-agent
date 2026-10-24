@@ -72,3 +72,68 @@ In plain words:
 - proc-factory-dev-003 has a different problem the kit metric hid: the extraction invented an entrance (outside to F0-S019, and outside to F0-S033) that does not exist in the original. Our router uses `outside` as a free shortcut through it, and 108 of 264 pairs become invalid sequences. Valid pairs are fine. A spurious entrance is worth a validation warning or a check against the real entrances.
 - The Swiss floors and the OSM floor fail because doors were not extracted (door recall 0.35, 0.26, 0.67): the extracted building has no route where the original has one. That is an extraction recall problem, not a geometry one. On osm the pairs that do route often score below 0.99 (wrong detours, probably from differing outlines or doors).
 - Takeaway: use the judge metric for Level 4 route quality. The remaining route risk is spurious or missing doors, not outline differences.
+
+### Door suggestions (2026-10-24, `building_agent/level4/suggest.py`, no API call)
+
+`scripts/eval_suggest.py` proposes doors for rooms with no way out and applies them to a copy. A suggestion counts as real when the original floor has a door between the same two rooms (rooms matched by overlap). "Judge >= 0.99" is the share of room pairs whose route scores at least 0.99 on the original. Reachable is the share of rooms with a way out (validator rule).
+
+**Cached extractions (real vision output, 8 floors)**
+
+| floor | runs | isolated rooms | suggestions | real doors | precision | reachable before | after | judge >= 0.99 before | after |
+|---|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 1 | 0 | 0 | 0 | n/a | 100% | 100% | 100% | 100% |
+| proc-campus-dev-001:0 | 1 | 0 | 0 | 0 | n/a | 100% | 100% | 100% | 100% |
+| proc-factory-dev-003:0 | 1 | 0 | 0 | 0 | n/a | 100% | 100% | 58% | 58% |
+| resplan-439:0 | 1 | 0 | 0 | 0 | n/a | 100% | 100% | 100% | 100% |
+| resplan-1465:0 | 1 | 0 | 0 | 0 | n/a | 100% | 100% | 100% | 100% |
+| swiss-31:0 | 1 | 19 | 7 | 3 | 43% | 24% | 100% | 6% | 6% |
+| swiss-203:0 | 1 | 23 | 14 | 4 | 29% | 18% | 100% | 3% | 6% |
+| osm-way27326387:0 | 1 | 2 | 2 | 1 | 50% | 89% | 100% | 34% | 45% |
+| all | 8 | 44 | 23 | 8 | 35% | 79% | 100% | 63% | 64% |
+
+| source | runs | isolated rooms | suggestions | real doors | precision | reachable before | after | judge >= 0.99 before | after |
+|---|---|---|---|---|---|---|---|---|---|
+| procedural | 3 | 0 | 0 | 0 | n/a | 100% | 100% | 86% | 86% |
+| resplan | 2 | 0 | 0 | 0 | n/a | 100% | 100% | 100% | 100% |
+| swiss | 2 | 42 | 21 | 7 | 33% | 21% | 100% | 5% | 6% |
+| osm | 1 | 2 | 2 | 1 | 50% | 89% | 100% | 34% | 45% |
+| all | 8 | 44 | 23 | 8 | 35% | 79% | 100% | 63% | 64% |
+
+**Artificial extractions (16 real floors x 3 seeds, 50 percent of the doors dropped, entrances kept)**
+
+| floor | runs | isolated rooms | suggestions | real doors | precision | reachable before | after | judge >= 0.99 before | after |
+|---|---|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | 3 | 39 | 39 | 39 | 100% | 54% | 100% | 22% | 99% |
+| proc-campus-dev-001:1 | 3 | 33 | 33 | 33 | 100% | 56% | 100% | 29% | 100% |
+| proc-campus-dev-009:0 | 3 | 47 | 47 | 47 | 100% | 51% | 100% | 23% | 99% |
+| proc-factory-dev-003:0 | 3 | 50 | 48 | 48 | 100% | 65% | 99% | 26% | 64% |
+| proc-factory-dev-004:1 | 3 | 23 | 23 | 23 | 100% | 60% | 100% | 26% | 100% |
+| resplan-439:0 | 3 | 10 | 9 | 7 | 78% | 58% | 100% | 30% | 89% |
+| resplan-15179:0 | 3 | 17 | 14 | 11 | 79% | 53% | 100% | 17% | 90% |
+| resplan-1677:0 | 3 | 18 | 13 | 13 | 100% | 40% | 100% | 14% | 100% |
+| resplan-7336:0 | 3 | 14 | 11 | 10 | 91% | 48% | 100% | 9% | 90% |
+| swiss-31:1 | 3 | 85 | 52 | 24 | 46% | 17% | 97% | 10% | 34% |
+| swiss-2074:0 | 3 | 32 | 21 | 18 | 86% | 37% | 100% | 21% | 65% |
+| swiss-450:1 | 3 | 31 | 21 | 18 | 86% | 48% | 100% | 14% | 46% |
+| swiss-3254:0 | 3 | 45 | 23 | 17 | 74% | 25% | 100% | 14% | 74% |
+| osm-way22744230:0 | 3 | 57 | 47 | 28 | 60% | 57% | 100% | 11% | 28% |
+| osm-way27326387:0 | 3 | 32 | 21 | 10 | 48% | 49% | 100% | 15% | 28% |
+| osm-way360544293:0 | 3 | 53 | 44 | 41 | 93% | 12% | 100% | 0% | 88% |
+| all | 48 | 586 | 466 | 387 | 83% | 46% | 100% | 17% | 75% |
+
+| source | runs | isolated rooms | suggestions | real doors | precision | reachable before | after | judge >= 0.99 before | after |
+|---|---|---|---|---|---|---|---|---|---|
+| procedural | 15 | 192 | 190 | 190 | 100% | 57% | 100% | 25% | 92% |
+| resplan | 12 | 59 | 47 | 41 | 87% | 50% | 100% | 17% | 92% |
+| swiss | 12 | 193 | 117 | 77 | 66% | 32% | 99% | 15% | 55% |
+| osm | 9 | 142 | 112 | 79 | 71% | 39% | 100% | 9% | 48% |
+| all | 48 | 586 | 466 | 387 | 83% | 46% | 100% | 17% | 75% |
+
+In plain words:
+
+- Reachability: after applying the suggestions nearly every room has a way out again (46% to 100% on the artificial floors, 21% to 100% on the cached Swiss floors). That is by construction, it only fails when no neighbour shares a wall of 0.9 m.
+- Precision depends on how regular the plan is: procedural 100%, ResPlan 87%, Swiss 66%, OSM 71% on the artificial floors. On the two real cached Swiss floors only 7 of 21 suggestions are real doors (33%), on the cached OSM floor 1 of 2. Wrong suggestions are often a plausible door into the wrong neighbour, so they are proposals, never silent fixes.
+- Route quality: on the artificial floors the judge share goes from 17% to 75% (procedural 25% to 92%, ResPlan 17% to 92%, Swiss 15% to 55%, OSM 9% to 48%). On the real cached Swiss floors it stays at 5% to 6%: there the routes fail because rooms are missing or merged in the extraction, not only because of doors. Suggesting doors cannot repair that. OSM cached improves 34% to 45%.
+- Fewer suggestions than isolated rooms is expected: one door frees a whole group of rooms behind it.
+- What the data said while tuning (same floors as measured, 4 weights, a plateau and not a peak, so mild optimism): the corridor/hall bonus is essential (without it precision falls from 73% to 48%). A bonus for neighbours that already have many doors (corridor proxy when the room type says nothing) raised precision from 73% to 80% (procedural 92% to 100%). More weight on wall length lowered precision (1.5 per metre: 65%), so it only breaks ties. The stair/lift penalty hardly matters (0 vs 5: 74% vs 73%), kept mild. The wet-room penalty helps ResPlan a little. Two fixes mattered more than weights: the shared wall from `convert.shared_wall` is about 0.5 m too long (buffer overshoot, trimmed by 0.4 m, so the 0.9 m rule means 0.9 m), and rooms nested inside a big OSM polygon have no shared outline, so their longest edge is used (OSM reachable 69% to 100%).
+- Limits: precision is measured against the original doors only, a wrong-but-reasonable door counts as a miss. Only 3 of the 8 cached floors have isolated rooms. Only same-floor doors are suggested, never stairs or entrances (entrances are the other agent's job).
