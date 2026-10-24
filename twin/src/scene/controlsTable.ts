@@ -25,7 +25,7 @@ export const MOUSE_CONTROLS: ControlRow[] = [
   { keys: "Wheel, trackpad pinch", does: "Zoom towards the pointer" },
   { keys: "Two-finger trackpad scroll", does: "Move the map (Alt + scroll zooms instead)" },
   { keys: "Click, double click", does: "Select a room, fly to it (3D) or zoom in (2D)" },
-  { keys: "One finger / two fingers", does: "Move the map / pinch to zoom and twist to rotate (two fingers up or down tilt in 3D)" },
+  { keys: "One finger / two fingers", does: "Move the map / pinch to zoom (2D: around the fingers, moving with them; 3D: twist rotates, up or down tilts)" },
 ];
 
 /** Open state of the help card (a tiny store of its own, so the main store stays untouched). */

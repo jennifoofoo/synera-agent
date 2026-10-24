@@ -142,9 +142,10 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.mouseButtons.middle = A.NONE;
     c.mouseButtons.right = A.ROTATE;
     c.mouseButtons.wheel = flat ? A.ZOOM : A.DOLLY;
-    // One finger pans (cameraMouse.ts); two fingers pinch-zoom and rotate (vertical movement tilts in 3D).
+    // One finger pans (cameraMouse.ts). Two fingers: 3D pinch-dolly, rotate and tilt; 2D pinch-zoom and move around
+    // the midpoint in cameraMouse.ts (camera-controls turned a two-finger move into a rotation of the plan).
     c.touches.one = A.NONE;
-    c.touches.two = flat ? A.TOUCH_ZOOM_ROTATE : A.TOUCH_DOLLY_ROTATE;
+    c.touches.two = flat ? A.NONE : A.TOUCH_DOLLY_ROTATE;
     if (flat) void c.rotateTo(c.azimuthAngle, PLAN_TILT, false);
     // Light damping: camera-controls smooths critically (no overshoot, no drift after release).
     c.smoothTime = 0.13;

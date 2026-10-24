@@ -70,8 +70,14 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
     event.stopPropagation();
     const c = controlsRef.current;
     if (!c) return;
-    void c.moveTo(event.point.x, event.point.y, event.point.z, !reducedMotion);
-    void c.zoom(c.camera.zoom, !reducedMotion); // doubles the zoom
+    // Zoom in 2x towards the clicked point, which stays where it is on screen (map style).
+    const zoom = Math.min(c.maxZoom, c.camera.zoom * 2);
+    const keep = c.camera.zoom / zoom;
+    const target = c.getTarget(new THREE.Vector3());
+    const y = target.y;
+    target.sub(event.point).multiplyScalar(keep).add(event.point).setY(y);
+    void c.moveTo(target.x, target.y, target.z, !reducedMotion);
+    void c.zoomTo(zoom, !reducedMotion);
   };
 
   const group = useRef<THREE.Group>(null);

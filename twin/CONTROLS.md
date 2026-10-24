@@ -30,9 +30,9 @@ smooth, stepped per frame with the frame time, works with key repeat disabled, a
 | Wheel, trackpad pinch | Zoom towards the pointer. One 100 px wheel notch is a 15 percent step |
 | Two-finger trackpad scroll | Move the map. Alt + scroll zooms instead (for a mouse that is taken for a trackpad) |
 | Click | Select a room, only if the pointer moved less than 6 px |
-| Double click | Fly to that room (3D), zoom in (2D) |
+| Double click, double tap | Fly to that room (3D), zoom in 2x at that point (2D) |
 | One finger | Move the map |
-| Two fingers | Pinch to zoom, twist to rotate, up or down to tilt (3D) |
+| Two fingers | 2D: pinch to zoom around the midpoint, the map moves with the fingers, no rotation. 3D: pinch to zoom, twist to rotate, up or down to tilt |
 
 How a wheel event is told apart: line-mode events and pixel steps of 50 px or more that are whole multiples of 120
 (legacy `wheelDeltaY`) are mouse notches and zoom. Small, fractional or sideways steps, and any stream of them, are a
