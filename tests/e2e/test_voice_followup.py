@@ -17,6 +17,8 @@ import pytest
 
 pytest.importorskip("playwright.sync_api", reason="playwright not installed (uv sync --group e2e)")
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
 pytestmark = pytest.mark.e2e
 
 REPLY = "The toilet is down the hall on the left."
@@ -133,8 +135,8 @@ def wait_until(page, predicate, timeout_s: float = 25.0) -> None:
 def wait_mic(page) -> None:
     try:
         page.wait_for_function("() => window.__liveMics() === 1", timeout=15000)
-    except Exception:
-        wait_until(page, lambda: False, 0)
+    except PlaywrightTimeout:
+        wait_until(page, lambda: False, 0)  # fails with the store state in the message
 
 
 def talk_and_say(page, text: str) -> None:
@@ -194,12 +196,15 @@ def test_follow_up_after_spoken_reply_then_silence_closes(twin):
 
 def test_follow_up_setting_off_keeps_mic_closed(twin):
     page, chats = twin
-    page.evaluate("() => { localStorage.setItem('twin.followUp', 'off'); window.__twinStore.setState({ followUp: false }); }")
+    page.evaluate(
+        "() => { localStorage.setItem('twin.followUp', 'off'); window.__twinStore.setState({ followUp: false }); }"
+    )
     talk_and_say(page, "where is the toilet")
     wait_until(page, lambda: REPLY in page.evaluate("() => window.__spoken"))
     page.wait_for_timeout(1500)
     assert not page.evaluate("() => window.__twinStore.getState().followUpOpen")
     assert page.evaluate("() => window.__liveMics()") == 0
+    assert len(chats) == 1
 
 
 NEGATIVES = [
