@@ -226,14 +226,14 @@ export function CampusMap2D() {
 
         {start && (
           <g pointerEvents="none">
-            <circle cx={start[0]} cy={-start[1]} r={9 * px} fill="rgba(66,133,244,0.22)" />
-            <circle cx={start[0]} cy={-start[1]} r={5.5 * px} fill="#4285f4" stroke="#fff" strokeWidth={2 * px} />
+            <circle cx={start[0]} cy={-start[1]} r={9 * px} fill="rgba(0,79,171,0.2)" />
+            <circle cx={start[0]} cy={-start[1]} r={5.5 * px} fill="#004fab" stroke="#fbfaf8" strokeWidth={2 * px} />
           </g>
         )}
         {end && line.length > 1 && (
           <g pointerEvents="none" transform={`translate(${end[0]} ${-end[1]}) scale(${px})`}>
-            <path d="M0 0 C -2 -6 -9 -10 -9 -17 A 9 9 0 1 1 9 -17 C 9 -10 2 -6 0 0 Z" fill="#ea4335" stroke="#b31412" strokeWidth={1} />
-            <circle cx={0} cy={-17} r={3.4} fill="#b31412" />
+            <path d="M0 0 C -2 -6 -9 -10 -9 -17 A 9 9 0 1 1 9 -17 C 9 -10 2 -6 0 0 Z" fill="#004fab" stroke="#002478" strokeWidth={1} />
+            <circle cx={0} cy={-17} r={3.4} fill="#002478" />
           </g>
         )}
 

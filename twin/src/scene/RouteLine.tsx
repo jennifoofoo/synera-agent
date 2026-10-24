@@ -74,7 +74,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
 
   if (points.length < 2) return null;
   const guided = guidePoints.length > 1;
-  const lineColour = flat ? COLOURS.mapBlue : COLOURS.route;
+  const lineColour = COLOURS.route;
   const casingColour = flat ? COLOURS.mapBlueDark : COLOURS.routeGlow;
   return (
     <group>

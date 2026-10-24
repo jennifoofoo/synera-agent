@@ -57,7 +57,7 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
   }, []);
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
   useEffect(() => {
-    materials.edges.color.set(flat ? "#a8a8a3" : COLOURS.edge);
+    materials.edges.color.set(flat ? "#a39e94" : COLOURS.edge);
     materials.edges.opacity = flat ? 1 : 0.85;
     materials.solid.roughness = flat ? 1 : 0.92;
   }, [flat, materials]);

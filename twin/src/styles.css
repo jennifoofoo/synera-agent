@@ -1,27 +1,13 @@
-/* Base styles (scene owner). Components own their own blocks below their marker; keep additions small. */
-:root {
-  --bg: #edf2f8;
-  --panel: rgba(255, 255, 255, 0.86);
-  --panel-solid: #ffffff;
-  --navy: #14305a; /* the dark-blue accent, only for small UI parts (chips, active states) */
-  --line: rgba(20, 48, 90, 0.16);
-  --text: #10233f;
-  --muted: #5c7190;
-  --accent: #2bb5a0;
-  --gold: #c9962e;
-  --ok: #34d399;
-  --warn: #fbbf24;
-  --danger: #f43f5e;
-  --radius: 12px;
-  color-scheme: light;
-}
+/* Base styles (scene owner). Components own their own blocks below their marker; keep additions small.
+   All values come from styles/tokens.css. */
+@import "./styles/tokens.css";
 * { box-sizing: border-box; }
 html, body, #root {
   height: 100%;
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  font: 14px/1.4 var(--font);
   touch-action: manipulation;
   overflow: hidden;
 }
@@ -29,45 +15,52 @@ button, input, select { font: inherit; color: inherit; }
 button {
   cursor: pointer;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 8px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   min-height: 32px;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
-button:hover { background: #ffffff; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-button.active { background: rgba(201, 150, 46, 0.16); border-color: var(--gold); }
-button.danger { border-color: var(--danger); color: #b3123a; }
+button:hover { background: var(--paper-2); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+button.active { background: var(--signal-soft); border-color: var(--signal); }
+button.danger { border-color: var(--danger); color: var(--danger); }
 button:disabled { opacity: 0.45; cursor: default; }
 button.x { width: 28px; min-width: 28px; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 18px; }
-button.x:hover { color: var(--text); }
+button.x:hover { color: var(--text); background: transparent; }
+.tiny-label { font-size: 11px; font-weight: 600; letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--muted); }
 
 .app { position: relative; height: 100%; }
 .app > canvas, .app canvas { display: block; }
 
-/* top left: building name */
+/* top left: building name, a flat label bar */
 .topbar { position: absolute; left: 12px; top: 12px; z-index: 3; }
 .building-name {
   position: relative; display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
-  backdrop-filter: blur(8px); font-weight: 600; cursor: pointer;
+  padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
+  font-weight: 600; cursor: pointer;
 }
 .building-title { max-width: min(46vw, 420px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .building-name select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
-.brand-mark { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, var(--accent), var(--gold)); }
+.brand-mark { width: 8px; height: 8px; border-radius: 1px; background: var(--signal); }
 
-/* left edge: floors */
-.floorrail { position: absolute; left: 12px; top: 64px; z-index: 3; display: flex; flex-direction: column; gap: 3px; }
+/* left edge: floors, one compact segmented control with shared hairlines */
+.floorrail {
+  position: absolute; left: 12px; top: 64px; z-index: 3; display: flex; flex-direction: column; gap: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+}
 .rail-floor, .rail-toggle {
   width: 34px; height: 30px; min-height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-  background: var(--panel); backdrop-filter: blur(8px); position: relative; font-weight: 600; font-size: 13px;
+  background: transparent; border: 0; border-radius: 0; position: relative; font-weight: 600; font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
-.rail-toggle { color: var(--muted); margin-bottom: 4px; }
+.floorrail > button + button { border-top: 1px solid var(--line); }
+.rail-toggle { color: var(--muted); }
 .rail-view { color: var(--text); font-size: 12px; letter-spacing: 0.02em; }
-.rail-toggle:last-child { margin: 4px 0 0; }
-.rail-floor.active { background: var(--navy); border-color: var(--navy); color: #fff; }
-.rail-floor.single { box-shadow: inset 0 0 0 2px var(--gold); }
-.rail-floor .dot { position: absolute; right: 4px; top: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.rail-floor.active, .rail-toggle.active { background: var(--ink); color: var(--surface); }
+.rail-floor.active:hover { background: var(--ink); }
+.rail-floor.single { box-shadow: inset 0 0 0 2px var(--signal); }
+.rail-floor .dot { position: absolute; right: 4px; top: 4px; width: 5px; height: 5px; border-radius: 1px; background: var(--signal); }
 
 /* bottom: card + input */
 .dock {
@@ -76,42 +69,36 @@ button.x:hover { color: var(--text); }
 }
 .pill {
   position: absolute; right: 14px; top: 14px; z-index: 3; display: inline-flex; gap: 8px; align-items: center;
-  padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
-  backdrop-filter: blur(8px); font-size: 13px; color: var(--muted);
+  padding: 3px 4px 3px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
+  font-size: 13px; color: var(--muted);
 }
-.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: 999px; }
+.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: var(--radius-sm); }
 
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(237, 242, 248, 0.6); z-index: 5; pointer-events: none; }
-.overlay.error { color: #b3123a; pointer-events: auto; }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(244, 242, 238, 0.7); z-index: 5; pointer-events: none; }
+.overlay.error { color: var(--danger); pointer-events: auto; }
 
-/* labels and chips inside the scene */
+/* labels and chips inside the scene: flat rectangular tags */
 .label {
-  font-size: 11.5px; font-weight: 500; color: #0e2444; background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(20, 48, 90, 0.45); border-radius: 4px; padding: 1px 5px; white-space: nowrap;
+  font-size: 11.5px; font-weight: 500; color: var(--ink); background: var(--surface); font-variant-numeric: tabular-nums;
+  border: 1px solid var(--hairline-strong); border-radius: 2px; padding: 1px 5px; white-space: nowrap;
 }
-.label-connector { background: rgba(43, 181, 160, 0.22); border-color: rgba(43, 181, 160, 0.6); }
-/* 2D map: dark grey text with a white halo, no box */
+.label-connector { background: var(--paper-2); }
+/* 2D map: graphite text with a paper halo, no box */
 .label.label-plan {
-  background: transparent; border: 0; padding: 0; color: #3c4043; font-size: 12px; font-weight: 500;
-  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff, 0 0 2px #fff;
+  background: transparent; border: 0; padding: 0; color: var(--ink); font-size: 12px; font-weight: 500;
+  text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 2px var(--paper), 0 0 2px var(--paper);
 }
 .poi {
-  width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 1px solid #c4c7c5; color: #5f6368;
+  width: 20px; height: 20px; border-radius: 3px; background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink-2);
   font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
 }
-.poi svg { width: 13px; height: 13px; stroke: #5f6368; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.poi svg { width: 13px; height: 13px; stroke: var(--ink-2); fill: none; stroke-width: 2; stroke-linecap: butt; stroke-linejoin: miter; }
 .recenter {
   position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 3;
-  width: 44px; height: 44px; border-radius: 50%; background: #fff; border: 0; font-size: 20px; color: #3c4043;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); font-size: 20px; color: var(--ink);
 }
-/* 2D: the floor picker is a small white pill at the right edge, like a map app */
-.app.flat .floorrail { left: auto; right: 12px; background: #fff; border-radius: 10px; padding: 3px; gap: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
-.app.flat .rail-floor, .app.flat .rail-toggle { background: #fff; border: 0; backdrop-filter: none; border-radius: 8px; }
-.app.flat .rail-toggle { margin: 0; }
-.app.flat .rail-floor.active { background: #e8f0fe; color: #1a5fd0; }
-.app.flat .rail-floor .dot { background: #4285f4; }
+/* 2D: the floor picker moves to the right edge, same control */
+.app.flat .floorrail { left: auto; right: 12px; }
 .app.worker.flat .pill { left: 10px; right: auto; }
 
 /* Nothing overlaps: the insets (set by the sheets through the store) push the chrome out of the way. */
@@ -124,15 +111,16 @@ button.x:hover { color: var(--text); }
 /* the List button (top right, about 44 px tall) must never cover the floor rail when a sheet pushes the rail up */
 .app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 56px); }
 .chip {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 8px;
-  border-radius: 999px; white-space: nowrap; background: var(--navy); border: 1px solid var(--navy); color: #fff;
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 7px;
+  border-radius: 2px; white-space: nowrap; background: var(--ink); border: 1px solid var(--ink); color: var(--surface);
+  font-variant-numeric: tabular-nums;
 }
-.chip-here { background: #1f6f63; border-color: #1f6f63; }
-.chip-route { background: var(--gold); border-color: var(--gold); color: #1a1200; }
+.chip-here { background: var(--info); border-color: var(--info); }
+.chip-route { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
 .chip-danger { background: var(--danger); border-color: var(--danger); }
-.chip-ok { background: #1f7a57; border-color: #1f7a57; }
-.chip-accent { background: var(--navy); }
-.chip-muted { background: #6b7d94; border-color: #6b7d94; }
+.chip-ok { background: var(--ok); border-color: var(--ok); }
+.chip-accent { background: var(--ink); }
+.chip-muted { background: var(--ink-2); border-color: var(--ink-2); }
 
 /* ===== Omnibox (owner: chat/search session): see src/ui/Omnibox.css ===== */
 
