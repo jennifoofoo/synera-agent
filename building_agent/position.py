@@ -4,7 +4,7 @@ The server alone sets a Position (tools, or the validated click context of the p
 message. Everything here is plain Python on the building map: ranking hits by route length from the position and
 the remembered route with its room sequence. The model only chooses which tool to call and phrases the reply."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from building_agent import routing
 from building_agent.find_tools import matching_assets, parse_query, words_of
@@ -33,17 +33,6 @@ class Position:
             "point": list(self.point) if self.point else None,
             "source": self.source,
         }
-
-
-@dataclass
-class Trail:
-    """The route handed to the person, with its room sequence, so 'next' and 'I'm at the lift' can move along it."""
-
-    spaces: list[str]
-    destination: str
-    step_free: bool
-    via: list[str] = field(default_factory=list)
-    cursor: int = 0  # index in `spaces` of the room the person is believed to be in
 
 
 def make_position(bm: BuildingMap, space_id: str, point=None, source: str = "said", turn: int = 0) -> Position:
@@ -165,11 +154,3 @@ def nearest(
         f"Nearest {label}: {place_label(bm, first['space_id'])}, {far}. Do you mean a different one?"
     )
     return result
-
-
-# ---------- the remembered route ----------
-
-
-def remember_route(state, route, via: list[str] | None = None) -> None:
-    """Called after find_route and give_directions: keep the room sequence for 'next' and 'I'm at the lift'."""
-    state.trail = Trail(list(route.space_path), route.destination_space_id, route.step_free, list(via or []))

@@ -14,15 +14,16 @@ from building_agent import routing
 from building_agent.campus_tools import CampusHolder, make_campus_tools
 from building_agent.find_space import find_space
 from building_agent.find_tools import make_find_tools
-from building_agent.guide_tools import GuideState, make_guide_tools
+from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
-from building_agent.position import NO_POSITION, remember_route
+from building_agent.position import NO_POSITION
 from building_agent.position_tools import distance_annotator, make_position_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
 from building_agent.task_tools import make_task_tools
+from building_agent.walk import remember_route
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 from starter_agent.tools import make_tools as make_starter_tools
@@ -141,7 +142,8 @@ def make_tools(
             raise ToolError(NO_POSITION)
         try:
             result = routing.route(bm, guide.position.space_id if start is None else start, destination, step_free, via)
-            remember_route(guide, result, [bm.resolve_space(stop) for stop in via or []])
+            remember_route(bm, guide, result, [bm.resolve_space(stop) for stop in via or []])
+            guide.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
         assumed = {"start_assumed": bm.describe_space(result.start_space_id)} if start is None else {}

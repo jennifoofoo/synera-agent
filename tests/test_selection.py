@@ -154,7 +154,7 @@ def make_session(building_path) -> api.Session:
 
 def test_state_view_has_no_edit_keys_without_edits(building_path):
     state = api.state_view(make_session(building_path))
-    assert set(state) == {"closed", "added_doors", "route", "position"}
+    assert set(state) == {"closed", "added_doors", "route", "position", "guide"}
 
 
 def test_state_view_add_then_undo_round_trip(building_path):

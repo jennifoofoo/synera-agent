@@ -10,7 +10,7 @@ from pathlib import Path
 
 import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
-from building_agent import position_tools
+from building_agent import guide_tools, position_tools, walk
 from building_agent.registry import load_kinds
 from starter_agent.building_map import BuildingMap
 
@@ -109,7 +109,7 @@ def cache_file(building_directory: Path, user_turns: list[str], model: str) -> P
         agent_module.CALCULATION_RULES
         + agent_module.CONVERSATION_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
-        + Path(position_tools.__file__).read_text(encoding="utf-8")  # tool texts are part of the prompt too
+        + "".join(Path(module.__file__).read_text(encoding="utf-8") for module in (position_tools, walk, guide_tools))
     )
     raw = json.dumps([building_directory.name, user_turns, model, version])
     return LIVE_CACHE / f"{hashlib.sha256(raw.encode()).hexdigest()}.json"

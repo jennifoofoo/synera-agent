@@ -223,6 +223,7 @@ class App:
             elif here.note:
                 result = {**result, "here_note": here.note}
             session.position = chat.position_view()
+            session.guide_info = chat.guide_info()
             saved_path = result.pop("saved_path", None)
             with self.lock:
                 current = self.session(key)

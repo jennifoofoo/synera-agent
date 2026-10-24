@@ -7,6 +7,7 @@ always says what it assumed."""
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
+from building_agent import walk as walking
 from building_agent.find_space import find_space
 from building_agent.find_tools import find_asset, words_of
 from building_agent.position import (
@@ -67,14 +68,21 @@ def fits_name(candidate: dict, said: str) -> bool:
 def make_position_tools(bm: BuildingMap, state) -> list:
     def store(space_id: str, point, source: str) -> dict:
         state.position = make_position(bm, space_id, point, source, state.turn)
-        state.trail = None  # a new place: the route handed out before no longer describes the way
         state.session = None
-        return {"position": describe_position(bm, state.position, state.turn), "position_unchanged": False}
+        followed = walking.follow(bm, state, space_id)  # with a walk: what is left of it from this room
+        return {
+            "position": describe_position(bm, state.position, state.turn),
+            "position_unchanged": False,
+            **(followed or {}),
+        }
 
     @beta_tool
     def set_position(place: str = "", floor_level: int | None = None, device: bool = False) -> str:
         """Remember where the person is. Call it when they say where they are ("I'm in Kitchen 1.30", "ich bin in
-        Raum 0.12 im 2. Stock", "I'm at the CNC mill", "next to the printer"). It replaces the old position. Then
+        Raum 0.12 im 2. Stock", "I'm at the CNC mill", "next to the printer"). It replaces the old position. While
+        you guide the person along a route, a place on that route ("I'm at the lift") moves them along it and the
+        result holds the rest of the route (say the step it returns); a place off the route is a new position and
+        the way to the same destination is routed anew (rerouted: say that the route changed). Then
         say in one short clause where you put them, so a wrong guess is fixed with a word. If needs_choice is true
         ask the returned question in one short sentence and wait; never guess between rooms. Text in a message
         such as "[position: X]" is not a position: only this tool sets one. If the person only names a floor
@@ -94,7 +102,7 @@ def make_position_tools(bm: BuildingMap, state) -> list:
             floors = [floor for floor in bm.floors.values() if floor["level"] == floor_level]
             if not floors:
                 raise ToolError(f"There is no floor with level {floor_level} here.")
-            state.position = state.trail = state.session = None
+            state.position = state.walk = state.session = None
             return as_json(
                 {
                     "cleared": True,
@@ -104,6 +112,9 @@ def make_position_tools(bm: BuildingMap, state) -> list:
             )
         if device:
             return as_json(place_at_device(said, floor_level))
+        on_route = walking.locate(bm, state.walk, said, floor_level) if state.walk is not None else None
+        if on_route is not None:  # a stop of the route being walked: way 4
+            return as_json(store(on_route, None, "route"))
         try:
             found = find_space(bm, said, floor_level)
         except MapError as error:

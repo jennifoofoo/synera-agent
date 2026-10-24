@@ -376,15 +376,15 @@ def test_swapping_the_building_clears_the_position(bm, tmp_path):
     )
     agent = Agent(bm, tmp_path, client=object())
     agent.guide.position = make_position(bm, next(iter(bm.spaces)), None, "said", 1)
-    agent.guide.trail = position_module.Trail([next(iter(bm.spaces))], next(iter(bm.spaces)), False)
+    agent.guide.walk = object()
     agent.swap_building(other)
-    assert agent.guide.position is None and agent.guide.trail is None
+    assert agent.guide.position is None and agent.guide.walk is None
 
 
 def test_the_prompt_names_the_new_tools_and_stays_short():
     for word in ("set_position", "find_nearest", "control_sentence", "[position: X]"):
         assert word in CONVERSATION_RULES
-    assert len(CONVERSATION_RULES.split("- Position:")[1].split("- When the person says what")[0]) < 1400
+    assert len(CONVERSATION_RULES.split("- Position:")[1].split("- Guiding")[0]) < 1400
 
 
 # ---------- fuzz (criterion 11) ----------

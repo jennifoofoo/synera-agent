@@ -29,20 +29,33 @@ def tools_by_name(bm, tmp_path):
     return tools, state
 
 
-def test_directions_come_in_chunks_of_three_with_next_and_repeat(tmp_path):
+def test_a_long_route_is_an_overview_then_one_step_at_a_time(tmp_path):
     bm, (start, end) = route_question()
     tools, _ = tools_by_name(bm, tmp_path)
     first = json.loads(tools["give_directions"](start=start, destination=end))
-    assert len(first["steps"]) <= 3
-    assert json.loads(tools["repeat_steps"]())["steps"] == first["steps"]
-    seen = list(first["steps"])
-    while True:
-        more = json.loads(tools["next_steps"]())
-        if more["done"]:
-            break
-        assert len(more["steps"]) <= 3
-        seen += more["steps"]
-    assert len(seen) == len(first["steps"]) + first["steps_remaining"]
+    if "steps" in first:  # a short route is read out at once
+        assert len(first["steps"]) <= 2 and first["steps_remaining"] == 0
+        return
+    assert first["mode"] == "overview" and 2 <= len(first["landmarks"]) <= 4 and first["offer"]
+    guided = json.loads(tools["walk"](said="yes"))
+    assert guided["step_number"] == 1
+    assert json.loads(tools["repeat_steps"]())["step"] == guided["step"]
+    seen = [guided["step"]]
+    while not guided["arrived"]:
+        guided = json.loads(tools["next_steps"]())
+        seen.append(guided["step"])
+        assert 1 <= guided["step_number"] <= first["steps_total"]
+    assert len(seen) == first["steps_total"]
+
+
+def assert_directions_stale(tools) -> None:
+    """Short directions are refused after a change; a guided walk folds the change in and says so."""
+    try:
+        result = json.loads(tools["next_steps"]())
+    except ToolError as error:
+        assert "No directions|changed" and ("changed" in str(error) or "No directions" in str(error))
+        return
+    assert result.get("no_route") or result.get("rerouted") or result.get("mode"), result
 
 
 def test_next_steps_without_directions_is_a_tool_error(tmp_path):
@@ -142,8 +155,7 @@ def test_directions_and_cards_go_stale_when_the_building_changes(tmp_path):
     state.begin_turn()
     tools["give_directions"](start=start, destination=end)
     bm.set_closed(bm.resolve_space(end), True)  # e.g. the user closes something on the page
-    with pytest.raises(ToolError, match="changed"):
-        tools["next_steps"]()
+    assert_directions_stale(tools)
     tools["propose_change"](action="reopen", element=bm.resolve_space(end))
     bm.set_closed(bm.resolve_space(end), False)  # page edit between card and answer
     state.begin_turn()
@@ -460,8 +472,7 @@ def test_directions_go_stale_after_an_undo(tmp_path):
     state.begin_turn()
     tools["give_directions"](start="H-A1", destination="H-A3")
     undo(tools, state)
-    with pytest.raises(ToolError, match="No directions|changed"):
-        tools["next_steps"]()
+    assert_directions_stale(tools)
 
 
 def test_undo_is_refused_when_the_building_changed_in_another_way(tmp_path):

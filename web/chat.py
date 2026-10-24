@@ -91,14 +91,24 @@ class ChatAdapter:
 
     def apply_here(self, here) -> None:
         """The page's validated click sets the position (source click); the next message is the next turn."""
+        from building_agent import walk as walking
         from building_agent.position import make_position
 
-        guide = self.session.guide
+        guide, bm = self.session.guide, self.session.map
+        guide.session = None
         if here.clear:
-            guide.position = guide.trail = guide.session = None
+            guide.position = guide.walk = None
             return
-        guide.position = make_position(self.session.map, here.space_id, here.point, "click", guide.turn + 1)
-        guide.trail = guide.session = None
+        guide.position = make_position(bm, here.space_id, here.point, "click", guide.turn + 1)
+        walking.follow(bm, guide, here.space_id)  # with a walk: what is left is recomputed from this room
+        guide.position = make_position(bm, here.space_id, here.point, "click", guide.turn + 1)
+
+    def guide_info(self) -> dict | None:
+        """The current leg while guiding (rooms only; the page side draws it), else None."""
+        from building_agent import walk as walking
+
+        walk = getattr(self.session.guide, "walk", None) if self.session is not None else None
+        return walking.guide_info(walk)
 
     def position_view(self) -> dict | None:
         """What state_view shows: {space_id, floor_id, point, source} or None."""
