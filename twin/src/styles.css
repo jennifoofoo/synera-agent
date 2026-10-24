@@ -44,7 +44,7 @@ button.x:hover { color: var(--text); background: transparent; }
 .building-name select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
 .brand-mark { width: 8px; height: 8px; border-radius: 1px; background: var(--signal); }
 
-/* left edge: floors, one compact segmented control with shared hairlines */
+/* floors: one compact segmented control with shared hairlines (laptop: top right, see below) */
 .floorrail {
   position: absolute; left: 12px; top: 64px; z-index: 3; display: flex; flex-direction: column; gap: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
@@ -103,8 +103,11 @@ button.x:hover { color: var(--text); background: transparent; }
   position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 3;
   width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); font-size: 20px; color: var(--ink);
 }
-/* 2D: the floor picker moves to the right edge, same control */
-.app.flat .floorrail { left: auto; right: 12px; }
+/* Phone 2D: the floor picker sits on the right edge (the mobile layout, Phone.css, places it further). */
+.app.worker.flat .floorrail { left: auto; right: 12px; }
+/* Laptop: ONE home for the floor rail in 2D and 3D, top right under the List button. When the List sheet opens it
+   slides left with the sheet's edge (150 ms), never jumps sides. */
+.app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); top: 56px; transition: right var(--t-fast, 150ms ease-out); }
 .app.worker.flat .pill { left: 10px; right: auto; }
 
 /* Nothing overlaps: the insets (set by the sheets through the store) push the chrome out of the way. */
@@ -113,7 +116,10 @@ button.x:hover { color: var(--text); background: transparent; }
 .app.worker.directions-open .floorrail { max-height: calc(var(--vvh, 100dvh) - var(--top-inset, 0px) - var(--dock-h, 90px) - 24px); }
 .app.worker .recenter { bottom: calc(var(--dock-h, 90px) + var(--safe-b, 0px) + 12px); }
 .app.planner .recenter { bottom: calc(var(--bottom-inset, 80px) + 24px); right: calc(var(--right-inset, 0px) + 14px); }
-.app.planner.flat .floorrail { right: calc(var(--right-inset, 0px) + 12px); }
+/* Laptop: the rail has one home, top right under the List button, in 2D and 3D alike. A right side sheet (List)
+   slides it left with the sheet's edge (150 ms), it never switches sides. Phones keep their own place (Phone.css). */
+.app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); transition: right var(--t-fast, 150ms ease-out); }
+@media (prefers-reduced-motion: reduce) { .app.planner .floorrail { transition: none; } }
 /* the List button (top right, about 44 px tall) must never cover the floor rail when a sheet pushes the rail up */
 .app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 56px); }
 .chip {
