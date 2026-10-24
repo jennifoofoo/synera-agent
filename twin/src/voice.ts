@@ -4,8 +4,8 @@
 import { api } from "./api/client";
 import { voiceHint } from "./ui/phoneHints";
 
-type RecognitionResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
-type Recognition = {
+export type RecognitionResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
+export type Recognition = {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
@@ -16,9 +16,9 @@ type Recognition = {
   stop: () => void;
   abort: () => void;
 };
-type RecognitionCtor = new () => Recognition;
+export type RecognitionCtor = new () => Recognition;
 
-function recognitionCtor(): RecognitionCtor | undefined {
+export function recognitionCtor(): RecognitionCtor | undefined {
   if (typeof window === "undefined") return undefined;
   const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
@@ -200,6 +200,41 @@ export async function speak(text: string, serverVoice: boolean): Promise<void> {
   utterance.lang = "en-US";
   utterance.rate = 1;
   window.speechSynthesis.speak(utterance);
+}
+
+// ---- earcon ----
+
+let earconContext: AudioContext | null = null;
+
+/** Create the audio context inside a tap (browsers start it suspended otherwise). */
+export function primeEarcon(): void {
+  try {
+    earconContext ??= new AudioContext();
+    void earconContext.resume();
+  } catch {
+    /* no Web Audio */
+  }
+}
+
+/** A short, soft two-note "I'm listening" chime (Web Audio, no file). */
+export function earcon(): void {
+  const context = earconContext;
+  if (!context) return;
+  void context.resume();
+  const start = context.currentTime + 0.01;
+  [660, 990].forEach((frequency, index) => {
+    const osc = context.createOscillator();
+    const gain = context.createGain();
+    const at = start + index * 0.09;
+    osc.type = "sine";
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(0.08, at + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+    osc.connect(gain).connect(context.destination);
+    osc.start(at);
+    osc.stop(at + 0.18);
+  });
 }
 
 // ===== Phone helpers (owner: mobile session): audio unlock and screen wake lock =====

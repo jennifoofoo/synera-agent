@@ -140,6 +140,16 @@ interface TwinState {
   setWalkStep: (step: number) => void;
   stopWalk: () => void;
 
+  // --- hands-free (owner: hands-free session): wake word "Hey Wanda", see handsFree.ts.
+  handsFree: boolean;
+  /** listening: waiting for the wake word; heard: wake word heard, taking the command; thinking: asking the agent. */
+  handsFreeStatus: "listening" | "heard" | "thinking";
+  /** What was heard after the wake word (interim), for the status line. */
+  handsFreeHeard: string;
+  /** Why hands-free switched itself off (no mic permission, unsupported browser); null otherwise. */
+  handsFreeNotice: string | null;
+  setHandsFree: (on: boolean) => void;
+
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
   applyState: (state: BuildingState) => void;
@@ -225,6 +235,10 @@ export const useTwin = create<TwinState>((set, get) => ({
   campusRoute: false,
   directions: null,
   walkStep: null,
+  handsFree: false,
+  handsFreeStatus: "listening",
+  handsFreeHeard: "",
+  handsFreeNotice: null,
 
   async loadBuildings() {
     try {
@@ -395,6 +409,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   stopWalk() {
     set({ walkStep: null });
+  },
+  setHandsFree(handsFree) {
+    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null });
   },
 
   async route(start, destination, stepFree = false) {
