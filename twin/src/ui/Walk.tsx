@@ -6,13 +6,11 @@
 import { useEffect, useState } from "react";
 import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
+import { metresLeft, readable, walkMinutes } from "../walkInfo";
 import { PhoneSheet } from "./PhoneSheet";
 import "./Walk.css";
 
-/** Walking time in whole minutes (1.2 m/s indoors, at least 1). */
-export function walkMinutes(lengthM: number): number {
-  return Math.max(1, Math.round(lengthM / 72));
-}
+export { walkMinutes };
 
 type Change = { direction: "up" | "down" }[] | undefined;
 
@@ -70,11 +68,7 @@ export function Walk() {
   const steps = walkSteps().map(readable);
   const last = step >= steps.length - 1;
   // What is left from the current step on: the metres named in the remaining step lines, scaled to the route length.
-  const metresIn = (line: string) => [...line.matchAll(/(\d+(?:\.\d+)?)\s*m\b/g)].reduce((sum, m) => sum + Number(m[1]), 0);
-  const allMetres = steps.reduce((sum, line) => sum + metresIn(line), 0);
-  const leftMetres = steps.slice(step).reduce((sum, line) => sum + metresIn(line), 0);
-  const length =
-    route.length_m === undefined ? null : Math.round(allMetres > 0 ? (route.length_m * leftMetres) / allMetres : route.length_m * (1 - step / steps.length));
+  const length = metresLeft(steps, step, route.length_m);
   const minutes = length !== null ? walkMinutes(length) : null;
   const end = () => {
     stopWalk();
@@ -125,9 +119,4 @@ export function Walk() {
       </section>
     </PhoneSheet>
   );
-}
-
-/** The server's step lines name rooms as "Office 0.46 [building-F0-S046]"; the id in brackets is not for people. */
-function readable(line: string): string {
-  return line.replace(/\s*\[[^\]]*\]/g, "");
 }
