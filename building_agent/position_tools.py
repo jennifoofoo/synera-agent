@@ -17,6 +17,7 @@ from building_agent.position import (
     make_position,
     nearest,
     no_position_error,
+    position_note,
 )
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -176,7 +177,12 @@ def make_position_tools(bm: BuildingMap, state) -> list:
         if state.position is None:
             raise ToolError(no_position_error(state))
         try:
-            return as_json(nearest(bm, state.position, what, floor_level, exclude, step_free))
+            return as_json(
+                {
+                    **nearest(bm, state.position, what, floor_level, exclude, step_free),
+                    **position_note(bm, state.position),
+                }
+            )
         except MapError as error:
             raise ToolError(str(error)) from error
 

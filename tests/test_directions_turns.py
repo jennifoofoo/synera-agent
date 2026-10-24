@@ -122,7 +122,7 @@ def test_turn_word_thresholds():
 def test_left_turn_with_landmark_exact_words():
     bm = synthetic_building()
     steps = turn_directions(bm, route(bm, "A", "D"))
-    assert steps[0] == "Leave Room A through the door into Corridor 0.01."
+    assert steps[0] == "Leave Room A and go into Corridor 0.01."
     assert steps[1] == "Turn left at the coffee machine into Room C."
     assert steps[2] == "Go straight on into Room D."
     assert steps[3].startswith("You have arrived at Room D")
@@ -131,8 +131,8 @@ def test_left_turn_with_landmark_exact_words():
 def test_right_turn_exact_words():
     bm = synthetic_building()
     steps = turn_directions(bm, route(bm, "C", "A"))
-    assert steps[0].startswith("Leave Room C through the door")
-    assert steps[0] == "Leave Room C through the door by the coffee machine into Corridor 0.01."
+    assert steps[0].startswith("Leave Room C by")
+    assert steps[0] == "Leave Room C by the coffee machine and go into Corridor 0.01."
     assert steps[1] == "Turn right into Room A."
 
 

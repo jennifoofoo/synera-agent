@@ -26,7 +26,6 @@ export const COLOURS = {
   mapBlueDark: "#002478", // 2D route casing
   mapRed: "#1d2430", // 2D destination pin (graphite; the name is historic)
   destination: "#ea4335", // route destination marker: map-app red, used for nothing else
-  destinationDark: "#a50e0e", // its centre dot
   accent: "#004fab",
   gold: "#004fab",
   stairs: "#8a8372", // stairs shafts, muted taupe

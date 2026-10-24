@@ -13,14 +13,30 @@ Lengths, space paths and directions come from the kit's own functions on that gr
 `BuildingMap.route` agree to the centimetre (tests/test_routing.py checks this on random pairs)."""
 
 import itertools
+import math
 import weakref
 from pathlib import Path
 
 import networkx as nx
+from shapely.geometry import Point
+from shapely.ops import nearest_points
 
-from starter_agent.building_map import DOOR_PREFIX, BuildingMap, MapError, RouteResult
+from starter_agent.building_map import (
+    COVER_TOLERANCE_M,
+    DOOR_PREFIX,
+    LENGTH_DECIMALS,
+    WALL_CLEARANCE_M,
+    BuildingMap,
+    MapError,
+    RouteResult,
+    door_landing,
+    outline,
+    walking_lengths,
+)
 
 MAX_CACHED_GRAPHS = 6
+POINT_INSIDE_M = 1e-6  # a point this close to the polygon counts as inside
+MAX_SNAP_M = 1.0  # a point further outside its room than this is rejected instead of moved in
 
 # building path -> walking lengths of the unchanged building, computed once per process (see load_map)
 _WALKS: dict[Path, dict] = {}
@@ -92,18 +108,126 @@ def distances_from(bm: BuildingMap, rg: RoutingGraph, start: str, targets: list[
     return {target: reached[target] for target in targets if target in reached}
 
 
-def leg_portals(bm: BuildingMap, step_free: bool, stops: list[str]) -> list[list[tuple]] | None:
+def check_point(bm: BuildingMap, space_id: str, point, floor_id: str | None = None) -> tuple[float, float]:
+    """A point in model metres inside the polygon of `space_id`: as given when inside, moved to the nearest point
+    inside when it is at most MAX_SNAP_M outside, else a MapError that says so."""
+    try:
+        x, y = (float(value) for value in point)
+    except (TypeError, ValueError) as error:
+        raise MapError("The start or end point must be two numbers [x, y] in metres.") from error
+    if not (math.isfinite(x) and math.isfinite(y)):
+        raise MapError("The start or end point must be two finite numbers in metres.")
+    space = bm.spaces[space_id]
+    if floor_id is not None and floor_id != space["floor_id"]:
+        raise MapError(f"The point is given for another floor than {bm.describe_space(space_id)}.")
+    polygon = outline(space["polygon"])
+    here = Point(x, y)
+    if polygon.buffer(POINT_INSIDE_M).covers(here):
+        return x, y
+    snapped = nearest_points(polygon, here)[0]
+    outside = here.distance(snapped)
+    if outside > MAX_SNAP_M:
+        raise MapError(f"The point ({x:.1f}, {y:.1f}) is {outside:.1f} m outside {bm.describe_space(space_id)}.")
+    return snapped.x, snapped.y
+
+
+def room_walks(bm: BuildingMap, rg: RoutingGraph, space_id: str, point: tuple[float, float]) -> dict:
+    """Walks inside one room from an exact point, the way BuildingMap.space_walks does it for the anchor: a
+    visibility graph 15 cm off the walls, doors landing 30 cm inside. A point inside the wall clearance first
+    steps to the nearest walkable spot. Returns {anchor: metres, doors: {door node: metres}}."""
+    polygon = outline(bm.spaces[space_id]["polygon"])
+    walkable = polygon.buffer(-WALL_CLEARANCE_M)
+    if walkable.is_empty or walkable.geom_type != "Polygon":
+        walkable = polygon
+    entry, step_in = point, 0.0
+    if not walkable.buffer(COVER_TOLERANCE_M).covers(Point(point)):
+        nearest = nearest_points(walkable, Point(point))[0]
+        entry, step_in = (nearest.x, nearest.y), math.dist(point, (nearest.x, nearest.y))
+    doors = [node for node in rg.members[space_id] if node.startswith(DOOR_PREFIX)]
+    landings = []
+    for node in doors:
+        door = bm.openings[node.removeprefix(DOOR_PREFIX)]["position"]
+        landings.append((door_landing(polygon, (door[0], door[1])), (door[0], door[1])))
+    lengths = walking_lengths(polygon, [entry, bm.anchor(space_id), *[landing for landing, _ in landings]])
+    return {
+        "anchor": lengths[(0, 1)] + step_in,
+        "doors": {
+            node: lengths[(0, 2 + index)] + step_in + math.dist(landing, door)
+            for index, (node, (landing, door)) in enumerate(zip(doors, landings, strict=True))
+        },
+    }
+
+
+def rewire_room(bm: BuildingMap, rg: RoutingGraph, graph: nx.MultiGraph, space_id: str, point) -> None:
+    """On a COPY of the graph: the room's node stands for the exact point. Its door edges get the walk from the
+    point, its stair and lift edges pay the walk from the point to the anchor where those stops sit."""
+    walks = room_walks(bm, rg, space_id, point)
+    for neighbour in list(graph.neighbors(space_id)):
+        for key, edge in list(graph[space_id][neighbour].items()):
+            if "via" in edge:
+                edge["weight"] = round(edge["weight"] + walks["anchor"], LENGTH_DECIMALS)
+            elif neighbour in walks["doors"]:
+                graph.remove_edge(space_id, neighbour, key)
+    for node, length in walks["doors"].items():
+        graph.add_edge(space_id, node, weight=round(length, LENGTH_DECIMALS), space=space_id)
+
+
+def same_room_walk(bm: BuildingMap, space_id: str, first, second) -> float:
+    """In-room walk between two exact points of one room (None stands for the anchor)."""
+    ends = [first or bm.anchor(space_id), second or bm.anchor(space_id)]
+    if ends[0] == ends[1]:
+        return 0.0
+    return round(walking_lengths(outline(bm.spaces[space_id]["polygon"]), ends)[(0, 1)], LENGTH_DECIMALS)
+
+
+def leg_search(
+    bm: BuildingMap, rg: RoutingGraph, first: str, last: str, start_point=None, end_point=None
+) -> tuple[float, list[str], nx.MultiGraph] | None:
+    """One leg as (length, node path, graph the path was found in). Without points this is shortest_leg on the
+    cached graph. With a point the search runs on a copy (the cached graph is never changed)."""
+    if start_point is None and end_point is None:
+        found = shortest_leg(bm, rg, first, last)
+        return None if found is None else (found[0], found[1], rg.graph)
+    if first not in rg.graph or last not in rg.graph:
+        return None
+    if first == last:
+        return same_room_walk(bm, first, start_point, end_point), [first], rg.graph
+    graph = rg.graph.copy()
+    if start_point is not None:
+        rewire_room(bm, rg, graph, first, start_point)
+    if end_point is not None:
+        rewire_room(bm, rg, graph, last, end_point)
+    try:
+        length, nodes = nx.single_source_dijkstra(graph, first, last, weight="weight")
+    except nx.NetworkXNoPath:
+        return None
+    return length, nodes, graph
+
+
+def leg_portals(
+    bm: BuildingMap, step_free: bool, stops: list[str], start_point=None, destination_point=None
+) -> list[list[tuple]] | None:
     """For drawing: per leg the doors crossed as ("o", opening id, space) pairs (from and into) and the stair or lift
-    rides as ("c", connector id, space) pairs, in walking order. Same graph and search as `route`; None if no route."""
+    rides as ("c", connector id, space) pairs, in walking order. Same graph and search as `route`, including exact
+    start and destination points (already checked); None if no route."""
     rg = routing_graph(bm, step_free)
     legs: list[list[tuple]] = []
-    for leg_start, leg_end in itertools.pairwise(stops):
-        found = shortest_leg(bm, rg, leg_start, leg_end)
+    last_index = len(stops) - 2
+    for index, (leg_start, leg_end) in enumerate(itertools.pairwise(stops)):
+        found = leg_search(
+            bm,
+            rg,
+            leg_start,
+            leg_end,
+            start_point if index == 0 else None,
+            destination_point if index == last_index else None,
+        )
         if found is None:
             return None
+        graph = found[2]
         portals: list[tuple] = []
         for previous, current in itertools.pairwise(found[1]):
-            edge = bm.cheapest(rg.graph, previous, current)
+            edge = bm.cheapest(graph, previous, current)
             if "via" in edge:
                 portals += [("c", edge["via"], previous), ("c", edge["via"], current)]
             elif current.startswith(DOOR_PREFIX):
@@ -126,32 +250,77 @@ def unreachable(bm: BuildingMap, leg_start: str, leg_end: str, step_free: bool) 
 
 
 def route(
-    bm: BuildingMap, start: str, destination: str, step_free: bool = False, via: list[str] | None = None
+    bm: BuildingMap,
+    start: str,
+    destination: str,
+    step_free: bool = False,
+    via: list[str] | None = None,
+    start_point=None,
+    start_floor: str | None = None,
+    destination_point=None,
 ) -> RouteResult:
     """Shortest walk start -> via... -> destination, one leg per pair of stops. Sets bm.last_route.
 
+    start_point / destination_point (model metres) make the in-room leg run from the exact point (to the exact
+    point) instead of the room's anchor: same visibility graph, 15 cm wall clearance and door landing as the kit's
+    space walks, on a copy of the cached graph. A point slightly outside its room is moved in, a point far outside
+    raises MapError. space_path and the direction lines stay room based; last_route_points start (end) at the point.
+    Without points the result is the same as before.
+
     Raises MapError with a 'No route' message if any leg has no route; bm.last_route is then None."""
     stops = [bm.resolve_space(start), *[bm.resolve_space(stop) for stop in via or []], bm.resolve_space(destination)]
+    if start_point is not None:
+        start_point = check_point(bm, stops[0], start_point, start_floor)
+    if destination_point is not None:
+        destination_point = check_point(bm, stops[-1], destination_point)
     rg = routing_graph(bm, step_free)
     nodes: list[str] = []
     length = 0.0
-    for leg_start, leg_end in itertools.pairwise(stops):
-        found = shortest_leg(bm, rg, leg_start, leg_end)
+    graph = rg.graph  # the graph that holds the exact points, if any: the direction text reads its edge lengths
+    last_index = len(stops) - 2
+    for index, (leg_start, leg_end) in enumerate(itertools.pairwise(stops)):
+        found = leg_search(
+            bm,
+            rg,
+            leg_start,
+            leg_end,
+            start_point if index == 0 else None,
+            destination_point if index == last_index else None,
+        )
         if found is None:
             bm.last_route = None
             bm.last_route_points = []
             raise unreachable(bm, leg_start, leg_end, step_free)
         length += found[0]
         nodes += found[1] if not nodes else found[1][1:]
+        if found[2] is not rg.graph and graph is rg.graph:
+            graph = found[2]
+    same_room = len(nodes) == 1
     result = RouteResult(
         start_space_id=stops[0],
         destination_space_id=stops[-1],
         length_m=round(length, 2),
-        space_path=bm.spaces_passed(rg.graph, nodes),
-        steps=bm.directions(rg.graph, nodes),
+        space_path=bm.spaces_passed(graph, nodes),
+        steps=same_room_steps(bm, nodes[0], length) if same_room and length else bm.directions(graph, nodes),
         step_free=step_free,
         closed=sorted(bm.closed),
     )
     bm.last_route = result
-    bm.last_route_points = [bm.node_point(node) for node in nodes]
+    points = [bm.node_point(node) for node in nodes]
+    if same_room and (start_point or destination_point):
+        floor_id, anchor = points[0]
+        points = [(floor_id, start_point or anchor), (floor_id, destination_point or anchor)]
+    else:
+        if start_point is not None:
+            points[0] = (points[0][0], start_point)
+        if destination_point is not None:
+            points[-1] = (points[-1][0], destination_point)
+    bm.last_route_points = points
     return result
+
+
+def same_room_steps(bm: BuildingMap, space_id: str, length: float) -> list[str]:
+    return [
+        f"Start in {bm.describe_space(space_id)}.",
+        f"Walk about {length:.0f} m. You have arrived at {bm.describe_space(space_id)}.",
+    ]

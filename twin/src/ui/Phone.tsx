@@ -48,6 +48,9 @@ function useDockHeight(worker: boolean) {
       root.style.setProperty("--dock-h", `${Math.round(box.height)}px`);
       const beside = box.left > window.innerWidth * 0.3; // landscape: dock on the right, plan uses the left
       setBottomInset(beside ? 0 : covered);
+      // Landscape: the dock covers the right column. rightInset would frame the plan left of it, but CameraRig's
+      // view offset (setViewOffset x = 0) currently moves the content right, under the dock, for a rightInset, so it
+      // is not set here until the camera owner fixes that.
     };
     const observer = new ResizeObserver(measure);
     observer.observe(dock);
@@ -59,6 +62,31 @@ function useDockHeight(worker: boolean) {
   }, [worker, setBottomInset]);
 }
 
+/** The header row (name, Search) covers the top of the plan, so the camera must frame below it: topInset is at
+ * least the header's bottom edge. A bigger value (the directions sheet) wins; when that sheet closes and resets
+ * topInset to 0, this puts the header back. */
+function useHeaderInset(worker: boolean, ready: boolean) {
+  const topInset = useTwin((s) => s.topInset);
+  const setTopInset = useTwin((s) => s.setTopInset);
+  useEffect(() => {
+    if (!worker || !ready) return;
+    const measure = () => {
+      let edge = 0;
+      for (const element of document.querySelectorAll<HTMLElement>(".worker .topbar, .phone-search")) {
+        const box = element.getBoundingClientRect();
+        if (box.height > 0 && box.top < window.innerHeight / 3) edge = Math.max(edge, box.bottom);
+      }
+      if (!edge) return;
+      const bottom = Math.round(edge + 6);
+      if (useTwin.getState().topInset < bottom) setTopInset(bottom);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [worker, ready, topInset, setTopInset]);
+  useEffect(() => () => setTopInset(0), [worker, setTopInset]);
+}
+
 export function Phone() {
   const worker = useTwin((s) => s.profile === "worker");
   const walking = useTwin((s) => s.walkStep !== null);
@@ -67,6 +95,7 @@ export function Phone() {
 
   useVisualViewport();
   useDockHeight(worker);
+  useHeaderInset(worker, !!model);
   useEffect(() => {
     if (audioUnlockInstalled) return;
     audioUnlockInstalled = true;

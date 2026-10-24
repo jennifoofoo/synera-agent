@@ -44,6 +44,10 @@ CODES: dict[str, tuple[str, str]] = {
     "room_unreachable": ("error", "{n} room{s} {have} no way out, doors are probably missing."),
     "low_connectivity": ("warning", "{n} room{s} {have} no door in the plan, a door is probably missing."),
     "area_implausible": ("warning", "{n} room{s} {have} an unlikely size (not 2 to 300 m2)."),
+    "door_widths_estimated": (
+        "warning",
+        "The plan shows no door widths, so they are estimated from the kind of opening and the rooms next to it.",
+    ),
     "door_width_implausible": ("warning", "{n} door{s} {have} an unlikely width (not 0.7 to 2.5 m)."),
     "connector_missing_stop": ("error", "{n} stair{s} or lift{s} {have} no stop room on every floor they pass."),
     "connector_single_floor": ("warning", "{n} stair{s} or lift{s} could not be matched to a room on another floor."),
@@ -61,6 +65,20 @@ CODES: dict[str, tuple[str, str]] = {
     "connector_aligned_by_centre": (
         "warning",
         "{n} stair or lift pair{s} {is} matched after centring the floors on each other, please check.",
+    ),
+    "floor_height_assumed": (
+        "warning",
+        (
+            "The storey height is not in the plan files, so a default for this kind of building was assumed (it sets "
+            "the length of stairs and lifts). Tell me the real height if you know it."
+        ),
+    ),
+    "floor_not_aligned": (
+        "warning",
+        (
+            "{n} floor{s} could not be lined up with the floor below by their stairs and lifts, "
+            "so distances between floors may be off."
+        ),
     ),
     "floor_empty": ("warning", "{n} floor{s} without any room."),
 }

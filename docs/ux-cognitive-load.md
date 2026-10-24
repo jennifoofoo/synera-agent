@@ -17,6 +17,13 @@ Synera (Bhushan Kotnis): UI/UX ist ein Bewertungskriterium, gutes UX senkt die k
 ## Routenkarte (Screenshot Jennifer 23:13)
 Für kurze Routen zu viel Text: Satz, Liste, Schlusssatz, "less"-Knopf und Fußzeile. Ziel: eine Zeile ("17 m to Main aisle H-B3 · 2 steps") plus "Guide me", die Schritte erst beim Aufklappen oder per Sprache. Text kommt aus dem Chat, die Karte zeigt ihn nur kompakt. Fehler im Text selbst ("door" bei offener Passage, "You're there" vor dem Losgehen) fixt `fix/route-wording`.
 
+## Was wann sichtbar ist (Regel, mit Jennifer abgestimmt, 24.10. spät)
+"Alles zeigen, aber leise." Kognitive Last kommt von Text und Symbolen, nicht von blassen Formen.
+1. Formen (Möbel, Maschinen) nach Bildschirmgröße: gezeichnet, sobald sie mindestens etwa 3 bis 4 px groß sind, auf jeder Zoomstufe. Von weit sieht man das Muster der Maschinen, Stühle verschwinden von selbst.
+2. Formen immer leise: ein Grau knapp dunkler als der Boden, ohne kräftigen Rand.
+3. Text und Symbole nach Leonies Zoomstufen (`twin/src/scene/mapZoom.ts`): weit = Zonennamen, Eingang, Aufzug, Treppe, WC; mittel = alle Raumnamen; nah = Maschinennamen.
+4. Die Aufgabe hebt hervor statt auszublenden: bei Route und Begleiten werden Formen noch blasser, die Landmarken der Wegbeschreibung kräftiger und beschriftet.
+
 ## Gefundene Kleinigkeiten (für den UX-Durchgang)
 - Desktop 2D, Routenkarte offen: ein zweiter Griff (▬) liegt unten mitten auf dem "Guide me"-Knopf (Screenshot Jennifer 23:40). Nur ein Griff pro Sheet.
 

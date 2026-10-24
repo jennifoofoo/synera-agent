@@ -5,7 +5,7 @@ import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
 import { clusterDisruptions } from "./Markers";
-import { END_RING_PX, HERE_RIM_PX, LABEL_LIFT, START_DOT_PX } from "./markerLayout";
+import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, floorBadgeWidth, type PoiKind } from "./poiIcons";
 
@@ -76,6 +76,24 @@ function segmentHitsBox(p: Point, q: Point, box: Box): boolean {
   return true;
 }
 
+function insidePolygon([x, y]: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Does the box lie on the polygon (a sample point of the box inside it, or a polygon corner inside the box)? */
+function boxOnPolygon(box: Box, polygon: Point[]): boolean {
+  const xs = [box.x0, (box.x0 + box.x1) / 2, box.x1];
+  const ys = [box.y0, (box.y0 + box.y1) / 2, box.y1];
+  if (xs.some((x) => ys.some((y) => insidePolygon([x, y], polygon)))) return true;
+  return polygon.some(([x, y]) => x > box.x0 && x < box.x1 && y > box.y0 && y < box.y1);
+}
+
 function spanOf(polygon: Point[]): [number, number] {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const [x, y] of polygon) {
@@ -135,8 +153,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
   const state = useTwin((s) => s.state);
   const highlights = useTwin((s) => s.highlights);
-  const selectedId = useTwin((s) => (s.selection?.kind === "asset" ? s.selection.id : null));
+  const selectedAssetId = useTwin((s) => (s.selection?.kind === "asset" ? s.selection.id : null));
   const route = state?.route ?? null;
+  // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
+  const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
@@ -148,13 +168,14 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     if (route?.ok && route.segments?.length) {
       const first = route.segments[0];
       const last = route.segments[route.segments.length - 1];
-      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.end, ROUTE_LIFT);
+      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.start, ROUTE_LIFT);
       if (last.floor_id === floor.id) put(route.destination, last.points[last.points.length - 1], LABEL_LIFT.end, ROUTE_LIFT);
     }
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
+    if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
     return out;
-  }, [route, state?.position, model, floor.id]);
+  }, [route, state?.position, model, floor.id, selectedId]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -193,7 +214,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     for (const points of routeOnFloor) {
       if (points.length < 2) continue;
       kept.push(boxOf(points[0], START_DOT_PX + 2, START_DOT_PX + 2));
-      kept.push(boxOf(points[points.length - 1], END_RING_PX + 2, END_RING_PX + 2));
+      const [ex, ey] = px(points[points.length - 1]); // the destination pin stands on its tip
+      kept.push({ x0: ex - PIN_HEAD_PX - 2, y0: ey - PIN_HEIGHT_PX, x1: ex + PIN_HEAD_PX + 2, y1: ey + 2 });
     }
     // 2. Floor changes of the route: one small badge where to go up or down (it replaces that stairs/lift POI).
     const replaced = new Set<string>();
@@ -241,8 +263,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     });
     // 5. Names of the first found things (and the selected one): beside the dot, right / left / above / below, if free.
     const top = new Set(found.slice(0, FOUND_NAMES).map((item) => item.id));
-    const named = dots.filter((dot) => dot.pin.ids.length === 1 && (top.has(dot.pin.id) || dot.pin.id === selectedId));
-    named.sort((a, b) => Number(b.pin.id === selectedId) - Number(a.pin.id === selectedId));
+    const named = dots.filter((dot) => dot.pin.ids.length === 1 && (top.has(dot.pin.id) || dot.pin.id === selectedAssetId));
+    named.sort((a, b) => Number(b.pin.id === selectedAssetId) - Number(a.pin.id === selectedAssetId));
     for (const dot of named) {
       const text = dot.names[0];
       const halfW = (text.length * FOUND_CHAR_PX) / 2;
@@ -261,7 +283,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     // 6. Room names of marked rooms: they keep their name (above their marker) unless a marker above sits there.
     const markedItems = floor.spaces
       .filter((space) => space.name && marks.has(space.id))
-      .sort((a, b) => a.id.localeCompare(b.id))
+      .sort((a, b) => Number(b.id === selectedId) - Number(a.id === selectedId) || a.id.localeCompare(b.id)) // the tapped room first
       .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
     const result: Item[] = [];
     for (const item of markedItems) {
@@ -270,13 +292,16 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       kept.push(box);
       result.push(item);
     }
-    // 7. Points of interest and room names, by priority.
+    // 7. Points of interest and room names, by priority; no other name sits on the tapped room.
+    const selected = selectedId ? model.spaceById.get(selectedId) : undefined;
+    const selectedPx = selected && selected.floor_id === floor.id ? selected.polygon.map(px) : null;
     for (const item of candidates(floor, model, tier, scale, limit)) {
       if (marks.has(item.id) || replaced.has(item.id)) continue;
       const halfW = item.kind === "poi" ? POI_PX / 2 : (item.space.name.length * CHAR_PX) / 2;
       const halfH = item.kind === "poi" ? POI_PX / 2 : LABEL_H_PX / 2;
       const box = boxOf(item.point, halfW, halfH);
       if (kept.some((other) => overlaps(box, other))) continue;
+      if (item.kind === "room" && selectedPx && boxOnPolygon(box, selectedPx)) continue;
       if (item.kind === "room") {
         const clear = { x0: box.x0 - ROUTE_CLEAR_PX, y0: box.y0 - ROUTE_CLEAR_PX, x1: box.x1 + ROUTE_CLEAR_PX, y1: box.y1 + ROUTE_CLEAR_PX };
         if (routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)))) continue;
@@ -285,7 +310,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return { shown: result, pins };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, selectedId, state?.position]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, selectedId, selectedAssetId, state?.position]);
 
   return (
     <group position-y={y + 0.5}>
@@ -308,7 +333,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       ))}
       {shown.map((item) =>
         item.kind === "room" ? (
-          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} />
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             <PoiBadge kind={item.poi} title={item.title} />
@@ -319,7 +344,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   );
 }
 
-function RoomLabel({ item, mark, flat }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean }) {
+function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean }) {
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
@@ -328,7 +353,7 @@ function RoomLabel({ item, mark, flat }: { item: Extract<Item, { kind: "room" }>
       style={{ pointerEvents: "none" }}
     >
       <div
-        className={`label label-halo ${flat ? "label-plan" : ""}`}
+        className={`label label-halo ${flat ? "label-plan" : ""} ${selected ? "label-selected" : ""}`}
         data-label-space={item.space.id}
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
