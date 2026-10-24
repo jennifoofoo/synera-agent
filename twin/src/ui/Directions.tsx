@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
-import { HERE, useTwin, type Place } from "../store";
+import { HERE, useTwin, walkLines, type Place } from "../store";
 import { PlaceInput } from "./Autocomplete";
 import { walkMinutes } from "./Walk";
 import "./Directions.css";
@@ -147,7 +147,7 @@ export function DirectionsSummary({ model }: { model: BuildingModel }) {
     startWalk();
   };
   // The same one line as the route card ("30 m · 1 min · 4 steps · step-free") and the same primary action.
-  const steps = route.steps?.length ?? 0;
+  const steps = walkLines(route.steps).length;
   return (
     <>
       <div className="route-summary" data-testid="route-summary">

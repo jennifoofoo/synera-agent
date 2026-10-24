@@ -9,7 +9,7 @@ import type { Route } from "../api/types";
 import { formatPoint } from "../model/format";
 import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
-import { HERE, useTwin, type Selection } from "../store";
+import { HERE, useTwin, walkLines, type Selection } from "../store";
 import { withoutAnswerLine } from "../voice";
 import "./Card.css";
 import { HereChip } from "./HereChip";
@@ -285,7 +285,7 @@ function routeFacts(model: BuildingModel, route: Route) {
   return {
     length: route.length_m !== undefined ? `${Math.round(route.length_m)} m` : "",
     floors: route.floors?.length ?? 1,
-    steps: route.steps?.length ?? 0,
+    steps: walkLines(route.steps).length,
     stepFree,
     destination: spaceName(model, route.destination),
   };
@@ -353,7 +353,7 @@ function RouteCard({ model, route, details, note }: { model: BuildingModel; rout
   const [open, setOpen] = useState(false);
   useEscape(end);
   const facts = routeFacts(model, route);
-  const steps = (route.steps ?? []).map(readable);
+  const steps = walkLines(route.steps).map(readable);
   return (
     <Sheet className="card-route" label={`Route to ${facts.destination}`} onClose={end}>
       <div className="route-summary" data-testid="route-summary">
