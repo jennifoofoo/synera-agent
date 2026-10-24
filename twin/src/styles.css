@@ -121,6 +121,8 @@ button.x:hover { color: var(--text); }
 .app.worker .recenter { bottom: calc(var(--dock-h, 90px) + var(--safe-b, 0px) + 12px); }
 .app.planner .recenter { bottom: calc(var(--bottom-inset, 80px) + 24px); right: calc(var(--right-inset, 0px) + 14px); }
 .app.planner.flat .floorrail { right: calc(var(--right-inset, 0px) + 12px); }
+/* the List button (top right, about 44 px tall) must never cover the floor rail when a sheet pushes the rail up */
+.app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 56px); }
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 8px;
   border-radius: 999px; white-space: nowrap; background: var(--navy); border: 1px solid var(--navy); color: #fff;
