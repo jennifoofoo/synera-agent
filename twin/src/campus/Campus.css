@@ -1,0 +1,84 @@
+/* ===== Campus (owner: twin-campus session). Site view, campus card, back chip. Map colours like the 2D plan. */
+.campus-site { position: absolute; inset: 0; z-index: 2; background: #f3f1ec; touch-action: none; }
+.campus-site.solid { background: var(--bg); }
+.campus-map { position: absolute; inset: 0; overflow: hidden; cursor: grab; user-select: none; -webkit-user-select: none; }
+.campus-map:active { cursor: grabbing; }
+.campus-map svg { display: block; }
+.campus-3d { position: absolute !important; inset: 0; }
+
+/* buildings: light grey footprints, the route's buildings a touch of blue */
+.campus-building path, .campus-building circle { fill: #e6e3dd; stroke: #cdc8bf; stroke-width: 0.8; cursor: pointer; }
+.campus-building-hit { fill: transparent; cursor: pointer; }
+.campus-label.building { cursor: pointer; }
+.campus-building:hover path { fill: #dedad3; }
+.campus-building.on-route path { fill: #e3ebf8; stroke: #b9c9e4; }
+.campus-building.active path { fill: #d2e3fc; stroke: #8fb1e8; }
+.campus-building.no-map path { cursor: default; }
+.campus-entrance { fill: #fff; stroke: #80868b; stroke-width: 1.2; }
+
+/* links: white paths with a grey casing; closed red; tapped gold */
+.campus-link path { fill: none; stroke-linecap: round; cursor: pointer; }
+.campus-link .hit { stroke: transparent; }
+.campus-link .casing { stroke: #c4c7c5; }
+.campus-link .road { stroke: #fff; }
+.campus-link.bridge .casing { stroke: #9aa7b8; }
+.campus-link.bridge .road { stroke: #eef3fb; }
+.campus-link.closed .casing { stroke: #c5221f; }
+.campus-link.closed .road { stroke: #f6aea9; }
+.campus-link.selected .casing { stroke: var(--gold); }
+
+.campus-route path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.campus-route .casing { stroke: #1a5fd0; }
+.campus-route .line { stroke: #4285f4; }
+.campus-route .active { stroke: #8ab4f8; stroke-dasharray: 0.01 0; }
+
+.campus-label { paint-order: stroke; stroke: #fff; stroke-width: 3px; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.campus-label.building { fill: #3c4043; font-weight: 600; }
+.campus-label .sub { fill: #70757a; font-weight: 500; }
+.campus-label.link { fill: #5f6368; font-weight: 500; }
+.campus-label.link.closed { fill: #c5221f; font-weight: 600; }
+
+.campus-recenter, .campus-view-toggle {
+  position: absolute; right: 12px; z-index: 3; border: 0; background: #fff; color: #3c4043; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+.campus-view-toggle { top: 64px; width: 40px; height: 34px; min-height: 34px; padding: 0; border-radius: 10px; font-weight: 600; font-size: 12px; }
+.campus-recenter { bottom: calc(var(--dock-h, 90px) + 24px); width: 44px; height: 44px; border-radius: 50%; font-size: 20px; }
+
+/* 3D labels */
+.campus-3d-label {
+  font-size: 12.5px; font-weight: 600; color: #0e2444; background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(20, 48, 90, 0.35);
+  border-radius: 999px; padding: 3px 10px; min-height: 0; white-space: nowrap; cursor: pointer;
+}
+.campus-3d-label.on-route { border-color: #0f9f8c; }
+.campus-3d-link { font-size: 11px; color: #3c4b5f; background: rgba(255, 255, 255, 0.75); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.campus-3d-link.closed { color: #b3123a; font-weight: 600; }
+
+/* the site hides the building scene (its HTML labels too; visibility keeps the canvas size) and its controls */
+.app > div:has(+ .campus-site) { visibility: hidden; }
+body.campus-site-open .floorrail, body.campus-site-open .recenter, body.campus-site-open .pill, body.campus-site-open .here-chip { display: none !important; }
+
+/* back to the site, next to the building name */
+.topbar { display: flex; gap: 8px; align-items: center; }
+.campus-back {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--panel);
+  border: 1px solid var(--line); backdrop-filter: blur(8px); font-weight: 600; color: var(--text); min-height: 0;
+}
+.campus-back-name { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app.worker .campus-back { display: none; } /* phones: the header's back arrow goes back to the site */
+
+/* campus card */
+.campus-steps { position: relative; list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.campus-step {
+  min-height: 30px; padding: 4px 10px; border-radius: 999px; font-size: 13px; background: #fff; border: 1px solid var(--line); color: var(--muted);
+}
+.campus-step .n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.campus-step.done { color: var(--muted); background: #f3f6fa; }
+.campus-step.now { background: #e8f0fe; border-color: #8ab4f8; color: #1a5fd0; font-weight: 600; }
+.campus-link-dot { flex: none; width: 10px; height: 10px; border-radius: 3px; background: #c4c7c5; }
+.campus-link-dot.closed { background: var(--danger); }
+.card .campus-closed { color: #b3123a; font-weight: 600; }
+.campus-effect { margin-top: 6px; }
+.campus-link-card.closed { box-shadow: inset 3px 0 0 var(--danger), 0 10px 30px rgba(20, 48, 90, 0.14); }
+/* phones: the legs in one row that scrolls sideways, so the card stays low */
+.app.worker .campus-steps { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -14px; padding-right: 14px; }
+.app.worker .campus-step { white-space: nowrap; }

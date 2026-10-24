@@ -1,0 +1,50 @@
+/* ===== Planner list (owner: planner session). Laptop only; quiet: white glass, colour only for problems. */
+.planner-toggle {
+  position: absolute; right: 14px; top: 14px; z-index: 3; min-height: 30px; padding: 4px 12px;
+  border-radius: 999px; background: var(--panel); backdrop-filter: blur(8px); font-size: 13px; color: var(--text);
+}
+/* the changes pill sits left of the List button */
+.app.planner .pill { right: 76px; }
+
+.planner-sheet {
+  position: absolute; right: 14px; top: 54px; bottom: 150px; width: 300px; z-index: 4;
+  display: flex; flex-direction: column; border-radius: var(--radius); background: var(--panel);
+  border: 1px solid var(--line); backdrop-filter: blur(12px); box-shadow: 0 8px 28px rgba(16, 35, 63, 0.1);
+  overflow: hidden;
+}
+.planner-head { display: flex; gap: 4px; align-items: center; padding: 8px 6px 8px 10px; border-bottom: 1px solid var(--line); }
+.planner-search {
+  flex: 1; min-width: 0; height: 30px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.8); font-size: 13px;
+}
+.planner-body { position: relative; flex: 1; overflow-y: auto; padding: 2px 0 10px; overscroll-behavior: contain; }
+.planner-body section { padding: 6px 0 2px; }
+.planner-body h3 {
+  margin: 4px 12px 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.planner-floor { margin: 8px 12px 2px; font-size: 11.5px; color: var(--muted); }
+.planner-empty { margin: 4px 12px; font-size: 12.5px; color: var(--muted); }
+.planner-line { display: flex; align-items: center; gap: 4px; padding: 0 6px; }
+.planner-row {
+  flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; min-height: 28px; padding: 4px 6px;
+  border: 0; border-radius: 6px; background: transparent; text-align: left;
+}
+.planner-row:hover, .planner-row:focus-visible { background: rgba(20, 48, 90, 0.06); }
+.planner-row:focus-visible { outline: 1px solid var(--gold); outline-offset: -1px; }
+.planner-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.planner-detail { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); text-align: right; }
+.planner-undo { min-height: 24px; padding: 1px 8px; font-size: 12px; border-radius: 999px; color: var(--muted); }
+.planner-undo:hover { color: var(--text); }
+.planner-impact { padding: 6px 12px 2px; }
+.planner-impact > button { min-height: 28px; padding: 3px 12px; font-size: 12.5px; border-radius: 999px; }
+.planner-answer { position: relative; padding: 8px 26px 8px 10px; border-radius: 8px; background: rgba(244, 63, 94, 0.06); border: 1px solid rgba(244, 63, 94, 0.22); }
+.planner-answer p { margin: 0; font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; }
+.planner-answer .x { position: absolute; right: 2px; top: 2px; }
+.planner-row.stacked { flex-direction: column; align-items: flex-start; gap: 0; padding: 5px 6px; }
+.planner-row.stacked .planner-label { white-space: normal; }
+.planner-row.stacked .planner-detail { text-align: left; flex: none; }
+.planner-answer { max-height: 300px; overflow-y: auto; }
+.planner-answer .planner-line { padding: 0; margin: 4px -4px 0; }
+.planner-answer .planner-row.stacked { flex-direction: row; align-items: baseline; gap: 8px; }
+.planner-answer .planner-row.stacked .planner-detail { flex: 1 1 auto; text-align: right; }
+.planner-answer .planner-row .planner-label { color: #b3123a; }

@@ -2,7 +2,6 @@
 API calls), and the renderer (web/static/edits.js plus its hooks) handles each field, also after undo."""
 
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -107,38 +106,3 @@ def test_undo_of_an_added_asset_lists_it_as_removed(app, key, monkeypatch):
 
 def source(name: str) -> str:
     return (STATIC / name).read_text(encoding="utf-8")
-
-
-def test_renderer_handles_each_state_field():
-    edits = source("edits.js")
-    for field in ("added_assets", "moved_assets", "removed_assets", "removed_openings", "widened_openings"):
-        assert field in edits, field
-    assert "width_label" in edits and "→" in edits  # "1.2 → 1.6 m"
-    for kind in ("added", "moved", "removed", "removed-door", "widened"):
-        assert f'kind: "{kind}"' in edits, kind
-
-
-def test_page_wires_the_edits_into_2d_3d_and_changes_list():
-    html, app_js = source("index.html"), source("app.js")
-    assert html.index('src="app.js"') < html.index('src="edits.js"') < html.index('src="view3d.js"')
-    assert 'id="edit-list"' in html
-    assert "window.edits?.apply(state" in app_js  # every state from the server, also after undo and reset
-    for hook in ("assetClass", "glide", "drawEffects", "decorateOpening", "count"):
-        assert f"window.edits?.{hook}(" in app_js, hook
-    view3d, scene3d = source("view3d.js"), source("scene3d.js")
-    assert "window.edits.state.version" in view3d and "scene.setEditMarks(" in view3d
-    assert "setEditMarks(" in scene3d and "editMarkMeshes(" in scene3d
-
-
-def test_motion_respects_reduced_motion():
-    css = source("style.css")
-    reduced = css[css.index("@media (prefers-reduced-motion: reduce)") :]
-    for cls in (".asset-glide", ".asset-ghost", ".asset-fade", ".asset-new-ring"):
-        assert cls in reduced.split("}")[0], cls
-    assert 'matchMedia("(prefers-reduced-motion: reduce)")' in source("edits.js")
-
-
-def test_changes_rows_are_plain_words_with_the_room():
-    edits = source("edits.js")
-    assert re.search(r"Moved \$\{a\.name\} \$\{where\}", edits)
-    assert "names.space(" in edits and "focusPoint(row.floor_id" in edits

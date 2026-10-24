@@ -165,8 +165,11 @@ def test_http_round_trip(app, key):
     thread.start()
     base = f"http://127.0.0.1:{server.server_address[1]}"
     try:
-        with urllib.request.urlopen(f"{base}/") as response:
-            assert b"Talk to Your Building" in response.read()
+        from web.server import STATIC
+
+        if (STATIC / "index.html").is_file():  # the page is the twin's build (cd twin && npm run build)
+            with urllib.request.urlopen(f"{base}/") as response:
+                assert b"Building Twin" in response.read()
         with urllib.request.urlopen(f"{base}/api/building?key={key}") as response:
             assert json.loads(response.read())["key"] == key
         start, end = rooms_on_lift_floors(app, key)

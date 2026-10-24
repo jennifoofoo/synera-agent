@@ -1,0 +1,74 @@
+/* ===== New building (owner: Level 4 session). Uses the base colour tokens only, so it follows the theme. ===== */
+.nb-backdrop {
+  position: absolute; inset: 0; z-index: 20; display: grid; place-items: center;
+  background: rgba(11, 30, 58, 0.35); backdrop-filter: blur(2px);
+}
+.nb-sheet {
+  width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto;
+  display: flex; flex-direction: column; gap: 10px; padding: 16px;
+  background: var(--panel-solid); color: var(--text); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+.nb-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 16px; }
+.nb-hint, .nb-why, .nb-muted { color: var(--muted); margin: 0; font-size: 13px; }
+.nb-why { font-size: 12.5px; }
+.nb-label { font-weight: 600; margin-top: 4px; }
+
+.nb-floor {
+  display: flex; align-items: center; gap: 10px; padding: 6px; border: 1px solid var(--line); border-radius: 10px;
+}
+.nb-floor img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; background: #fff; }
+.nb-floor-level { flex: 1; display: flex; align-items: center; gap: 8px; }
+.nb-floor-level span { color: var(--muted); }
+.nb-floor-level b { min-width: 24px; text-align: center; font-size: 18px; }
+.nb-floor-level button { width: 36px; min-height: 36px; padding: 0; font-size: 18px; }
+.nb-add { min-height: 52px; border-style: dashed; font-weight: 600; }
+
+.nb-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.nb-seg button { flex: 1; min-height: 40px; white-space: nowrap; }
+.nb-seg button.on { background: rgba(227, 180, 90, 0.18); border-color: var(--gold); }
+.nb-length { display: flex; align-items: center; gap: 8px; }
+.nb-length input, .nb-name, .nb-small {
+  border: 1px solid var(--line); border-radius: 8px; background: transparent; padding: 10px 12px; font-size: 16px; min-width: 0;
+}
+.nb-length input { flex: 1; font-size: 20px; }
+.nb-small { width: 80px; padding: 6px 8px; margin: 0 6px; }
+
+.nb-primary { min-height: 48px; font-weight: 600; background: var(--accent-blue, #2f6fbf); border-color: transparent; color: #fff; }
+.nb-primary:hover { background: var(--accent-blue, #2f6fbf); filter: brightness(1.08); }
+.nb-error { margin: 0; color: var(--danger); font-size: 13.5px; }
+.nb-note { margin: 0; font-size: 13px; color: var(--muted); }
+.nb-link { border: 0; background: transparent; padding: 0 2px; min-height: 0; color: var(--muted); text-decoration: underline; }
+
+/* review, progress, card: one calm panel under the building name, so the dock stays free for the chat */
+.nb-bar {
+  position: absolute; z-index: 6; left: 50%; top: 12px; transform: translateX(-50%);
+  width: min(520px, calc(100vw - 24px)); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--panel-solid); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+.nb-reading { flex-direction: row; align-items: center; width: auto; padding: 8px 14px; border-radius: 999px; }
+.nb-spinner {
+  width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--gold);
+  animation: nb-spin 0.9s linear infinite;
+}
+@keyframes nb-spin { to { transform: rotate(360deg); } }
+.nb-findings { margin: 0; }
+.nb-findings.bad::before {
+  content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--danger); margin-right: 7px;
+}
+.nb-step, .nb-room { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.nb-room select { border: 1px solid var(--line); border-radius: 8px; background: transparent; min-height: 32px; padding: 4px 8px; }
+.nb-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.nb-actions .nb-primary { min-height: 40px; padding: 6px 16px; }
+.nb-card p { margin: 0; }
+.nb-anyway { display: flex; gap: 8px; align-items: center; color: var(--danger); font-size: 13.5px; }
+
+/* phone: the sheet comes up from the bottom, the panel sits below the building name */
+@media (max-width: 640px) {
+  .nb-backdrop { place-items: end center; }
+  .nb-sheet { width: 100vw; border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+  .nb-bar { top: 56px; width: calc(100vw - 16px); }
+  .nb-reading { width: auto; }
+  .nb-room button, .nb-room select, .nb-actions button { min-height: 44px; }
+}
