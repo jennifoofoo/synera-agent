@@ -36,7 +36,7 @@ from building_agent.level4.convert import (
 from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
 from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
-from building_agent.level4.segment import match_to_extraction, segment_rooms
+from building_agent.level4.segment import NOISE_NOTE, match_to_extraction, segment_rooms
 from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
 from building_agent.level4.validate import Collector, describe, validate
 from starter_agent.building_map import NEW_DOOR_WIDTH_M, BuildingMap, MapError
@@ -63,6 +63,13 @@ MAX_CANDIDATES = 5
 ENTRANCE_ROOM_TYPES = {"lobby", "hall"}
 ACCEPT = re.compile(r"\b(trotzdem|anyway|nevertheless|dennoch|accept|akzeptiere|mit den problemen)\b", re.IGNORECASE)
 ROOM_TYPE = re.compile(r"^[a-z][a-z0-9_]{1,40}$")
+MOST_FROM_SEGMENTS = 0.5  # share of the rooms that may come from the colour analysis before the reading counts as poor
+MIN_LONG_SIDE_PX = 400  # kit plans are at least 480 px on the long side; smaller images cannot be read well
+ASK_CLEARER = (
+    "Please send a clearer image: a sharp export, or a straight and well lit photo that shows the whole floor. "
+    "If the person wants to go on with this reading anyway, they say 'build it anyway' (or 'trotzdem'); show the "
+    "card first, saving still needs the card and a clear yes in their next message."
+)
 ASK_SCALE = (
     "The plan has no printed scale bar and no known length was given. Ask the person for ONE length they know in "
     "metres (the width of the whole building, the width of one room, or a door width), then call build_from_plan "
@@ -82,6 +89,7 @@ class FloorSource:
     extraction: Extraction
     scale: Scale
     scale_args: dict
+    added_from_segments: int = 0  # rooms that exist only because the colour analysis found them
 
 
 @dataclass
@@ -384,6 +392,33 @@ def counts(building: dict, level: int | None = None) -> dict:
     return {"rooms": len(spaces), "doors": len(openings) - len(entrances), "entrances": len(entrances)}
 
 
+def poor_reasons(draft: "Level4Draft") -> list[str]:
+    """Plain-words reasons why the reading of a floor is too poor to show a card full of repairs (empty = fine)."""
+    reasons = []
+    for level, source in sorted(draft.floors.items()):
+        rooms = len(source.extraction.rooms)
+        prefix = f"floor {level}: " if len(draft.floors) > 1 else ""
+        if rooms and source.added_from_segments / rooms > MOST_FROM_SEGMENTS:
+            reasons.append(
+                f"{prefix}most rooms ({source.added_from_segments} of {rooms}) were not found by reading the image, "
+                "they come from a colour analysis that guessed"
+            )
+        if max(source.extraction.width_px, source.extraction.height_px) < MIN_LONG_SIDE_PX:
+            reasons.append(
+                f"{prefix}the image is only {source.extraction.width_px} x {source.extraction.height_px} pixels, "
+                "too small to read reliably"
+            )
+        if draft.building is not None and rooms >= 2:
+            found = counts(draft.building, level)
+            if found["doors"] + found["entrances"] == 0:
+                reasons.append(f"{prefix}no doors were found at all")
+    return reasons
+
+
+def poor_message(reasons: list[str]) -> str:
+    return "I could not read this plan well: " + "; ".join(reasons) + ". " + ASK_CLEARER
+
+
 def write_atomic(path: Path, text: str) -> None:
     """Write `text` to `path` so that readers see the old file or the whole new one, never a part."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -502,7 +537,8 @@ def make_level4_tools(
             found_segments = segment_rooms(path)
             extraction, seg_warnings = match_to_extraction(extraction, found_segments)
             draft.marker_notes = seg_warnings[:10]
-            extraction = tag_fills(extraction, found_segments)
+            if NOISE_NOTE not in seg_warnings:
+                extraction = tag_fills(extraction, found_segments)
         except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
             draft.marker_notes = [f"Room outline detection was skipped ({type(error).__name__})."]
         try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
@@ -522,7 +558,8 @@ def make_level4_tools(
         if scale is None:
             raise ToolError(ASK_SCALE)
         previous = draft.floors.get(level)
-        draft.floors[level] = FloorSource(extraction, scale, {"known_length_m": known_length_m, "along": along})
+        added = sum(warning.startswith("room_added_from_image") for warning in seg_warnings)
+        draft.floors[level] = FloorSource(extraction, scale, {"known_length_m": known_length_m, "along": along}, added)
         try:
             _rebuild(draft)
         except ToolError:
@@ -543,6 +580,15 @@ def make_level4_tools(
         question = questions(draft.building)
         if question:
             summary["question"] = question
+        poor = poor_reasons(draft)
+        if poor:  # say what is wrong in simple words instead of a card full of repairs
+            summary.pop("problems")
+            summary.pop("question", None)
+            summary["poor_reading"] = poor_message(poor)
+            summary["next"] = (
+                "Draft only, nothing saved. Tell the person in simple words what is wrong (poor_reading) and ask for "
+                "a clearer image. Only if they say 'build it anyway', call preview_draft."
+            )
         if fresh:
             summary["seconds"] = round(result.seconds, 1)
             summary["cost_usd"] = round(result.cost_usd, 4)
@@ -607,7 +653,10 @@ def make_level4_tools(
                 raise ToolError(str(error)) from error
             old = draft.floors[target]
             draft.floors[target] = FloorSource(
-                source.extraction, scale, {"known_length_m": known_length_m, "along": along}
+                source.extraction,
+                scale,
+                {"known_length_m": known_length_m, "along": along},
+                source.added_from_segments,
             )
             try:
                 _rebuild(draft)
@@ -679,12 +728,19 @@ def make_level4_tools(
                     "scale": draft.floors[floor["level"]].scale.note,
                 }
             )
+        poor = poor_reasons(draft)
         card = {
             "I understood": understood,
             "problems found": describe(draft.findings),
-            "can be saved": errors.ok,
+            "can be saved": errors.ok and not poor,
             "status": "nothing saved yet, waiting for the person's yes",
         }
+        if poor:
+            card["poor reading"] = poor_message(poor)
+            card["saving blocked"] = (
+                "The plan was read poorly. Saving needs the person's explicit 'save it anyway' ('trotzdem speichern'); "
+                "a clearer image is the better way."
+            )
         if not errors.ok:
             card["saving blocked"] = (
                 "There are problems that normally block saving. Fix them, or the person must say clearly they want "
@@ -700,7 +756,11 @@ def make_level4_tools(
             card["proposal"] = describe_suggestions(suggestions)
         if draft.notes or draft.marker_notes:
             card["notes"] = draft.notes + draft.marker_notes
-        draft.card_turn, draft.card_version, draft.card_blocked = state.turn, draft.version, not errors.ok
+        draft.card_turn, draft.card_version, draft.card_blocked = (
+            state.turn,
+            draft.version,
+            not (errors.ok and not poor),
+        )
         return as_json(card)
 
     @beta_tool
@@ -737,7 +797,7 @@ def make_level4_tools(
             if not accepting:
                 raise ToolError(
                     "The draft still has problems that block saving: "
-                    + describe(Findings(errors))
+                    + (describe(Findings(errors)) if errors else "the plan was read poorly.")
                     + " Fix them, or call preview_draft and ask whether to save anyway."
                 )
             if any(finding.code == "building_invalid" for finding in errors):
@@ -756,6 +816,9 @@ def make_level4_tools(
         if on_saved is not None:
             on_saved(path)
         accepted = describe(Findings(errors)) if errors else None
+        if poor_reasons(draft):
+            accepted = f"{accepted} " if accepted else ""
+            accepted += "Poor reading accepted: " + "; ".join(poor_reasons(draft)) + "."
         result = {
             "saved": True,
             "path": str(path),

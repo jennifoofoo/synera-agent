@@ -1,6 +1,7 @@
 """Offline tests of the Level 4 conversation tools. The vision call is replaced by an artificial extraction of a
 real dev floor, so no API key and no network are needed."""
 
+import itertools
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ from building_agent.guide_tools import GuideState
 from building_agent.level4 import tools as level4_tools
 from building_agent.level4.extract import ExtractResult
 from building_agent.level4.schema import Extraction
+from building_agent.level4.segment import SegmentResult
 from building_agent.level4.tools import BMHolder, make_level4_tools
 from starter_agent.building_map import BuildingMap
 from tests.level4_helpers import floor_case, load_building
@@ -357,3 +359,98 @@ def test_accept_suggestions_proposes_then_adds_doors_and_invalidates_the_card(ri
         rig.call("fix_draft", action="accept_suggestions")
         rig.call("fix_draft", action="accept_suggestions")
     assert "proposal" not in rig.call("preview_draft")
+
+
+# ---------- poor readings ----------
+
+
+def test_good_reading_has_no_quality_warning(rig):
+    summary = rig.build()
+    assert "poor_reading" not in summary and "problems" in summary
+    assert "poor reading" not in rig.show_card()
+
+
+def test_no_doors_at_all_asks_for_a_clearer_image(tmp_path, monkeypatch):
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.doors = []
+    rig = Rig(tmp_path, monkeypatch, case)
+    summary = rig.build()
+    assert "no doors were found at all" in summary["poor_reading"]
+    assert "clearer image" in summary["poor_reading"] and "build it anyway" in summary["poor_reading"]
+    assert "problems" not in summary
+    assert rig.holder.bm is rig.first_map and not rig.saved
+
+
+def test_low_resolution_image_asks_for_a_clearer_image(tmp_path, monkeypatch):
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.width_px, case.extraction.height_px = 300, 200
+    rig = Rig(tmp_path, monkeypatch, case)
+    assert "300 x 200 pixels" in rig.build()["poor_reading"]
+
+
+def test_most_rooms_from_segments_is_a_poor_reading(tmp_path, monkeypatch):
+    rig = Rig(tmp_path, monkeypatch)
+    rooms = len(rig.case.extraction.rooms)
+    monkeypatch.setattr(level4_tools, "segment_rooms", lambda path: SegmentResult(100, 100, []))
+    monkeypatch.setattr(
+        level4_tools,
+        "match_to_extraction",
+        lambda extraction, segment: (extraction, ["room_added_from_image: segX (beige, 10 px)"] * rooms),
+    )
+    assert f"most rooms ({rooms} of {rooms})" in rig.build()["poor_reading"]
+
+
+def test_few_rooms_from_segments_is_fine(tmp_path, monkeypatch):
+    rig = Rig(tmp_path, monkeypatch)
+    monkeypatch.setattr(level4_tools, "segment_rooms", lambda path: SegmentResult(100, 100, []))
+    monkeypatch.setattr(
+        level4_tools,
+        "match_to_extraction",
+        lambda extraction, segment: (extraction, ["room_added_from_image: segX (beige, 10 px)"]),
+    )
+    assert "poor_reading" not in rig.build()
+
+
+def poor_rig(tmp_path, monkeypatch) -> Rig:
+    case = floor_case(BUILDING, LEVEL)
+    case.extraction.doors = []
+    rig = Rig(tmp_path, monkeypatch, case)
+    rig.build()
+    return rig
+
+
+def test_build_it_anyway_still_needs_card_and_clear_yes(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    with pytest.raises(ToolError, match="No card was shown"):
+        rig.call("save_building", confirmed=True, user_reply="build it anyway", accept_problems=True)
+    card = rig.show_card()
+    assert "poor reading" in card and not card["can be saved"] and "saving blocked" in card
+    with pytest.raises(ToolError, match="block saving"):
+        rig.call("save_building", confirmed=True, user_reply="ja", accept_problems=False)
+    assert not rig.saved
+
+
+def test_poor_reading_saves_after_explicit_anyway(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    rig.show_card()
+    result = rig.call("save_building", confirmed=True, user_reply="yes, save it anyway", accept_problems=True)
+    assert result["saved"] and "Poor reading accepted" in result["accepted_problems"]
+
+
+def test_poor_reading_clears_once_a_door_exists(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    ids = [s["id"] for s in rig.draft.building["spaces"]]
+    for first, second in itertools.combinations(ids, 2):
+        try:
+            rig.call("fix_draft", action="add_door", ref=first, other_ref=second)
+            break
+        except ToolError:
+            continue
+    assert "poor reading" not in rig.show_card()
+
+
+def test_set_scale_keeps_the_poor_reading_facts(tmp_path, monkeypatch):
+    rig = poor_rig(tmp_path, monkeypatch)
+    rig.draft.floors[LEVEL].added_from_segments = len(rig.case.extraction.rooms)
+    rig.call("fix_draft", action="set_scale", known_length_m=rig.width_m * 1.1)
+    assert rig.draft.floors[LEVEL].added_from_segments == len(rig.case.extraction.rooms)

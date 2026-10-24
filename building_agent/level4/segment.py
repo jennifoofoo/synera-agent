@@ -49,6 +49,20 @@ SIMPLIFY_PX = 1.2
 COUNTER_MAX_PX = 40  # fill islands this small (insides of 0, 6, 8, 9) belong to the glyph around them
 COUNTER_MAX_SPAN_PX = 10
 MIN_FILL_SHARE = 0.5  # of non-white pixels that must be flat fills, else this is not a kit-style plan
+OFF_PALETTE_MAX_SHARE = (
+    0.10  # of the image in colours outside the kit palette (kit plans: under 1%), else a scan or photo
+)
+PALETTE_MAX_SHARE = 0.75  # of the image in ONE palette colour (kit plans: up to 61%), else this is not a floor plan
+MIN_IMPLAUSIBLE_REGIONS = 12
+IMPLAUSIBLE_REGION_FACTOR = 3  # more regions than this many times the model's rooms means noise, not rooms
+SCAN_NOTE = (
+    "This image looks like a scan or a photo, so I did not use its colours to redraw the rooms. "
+    "The rooms come from my own reading of the image only and may be less exact."
+)
+NOISE_NOTE = (
+    "The colour analysis found far more areas than I can see rooms, so I did not use it. "
+    "The rooms come from my own reading of the image only and may be less exact."
+)
 
 
 @dataclass
@@ -72,10 +86,11 @@ class SegmentResult:
     regions: list[Region]
     fill_share: float = 1.0  # flat fills / non-white pixels
     seconds: float = 0.0
+    reject_note: str = ""  # plain words, set when the colour analysis must not be trusted on this image
 
     @property
     def usable(self) -> bool:
-        return bool(self.regions) and self.fill_share >= MIN_FILL_SHARE
+        return bool(self.regions) and self.fill_share >= MIN_FILL_SHARE and not self.reject_note
 
 
 def _label_runs(values: np.ndarray, connectivity: int) -> np.ndarray:
@@ -301,6 +316,24 @@ def _ring_polygon(ring: list[tuple[int, int]], offset: tuple[int, int], toleranc
     return [[float(x), float(y)] for x, y in list(shape.exterior.coords)[:-1]]
 
 
+def _looks_like_scan(lab: np.ndarray, palette_size: int) -> bool:
+    """Kit plans use the palette colours only. A scan, photo or tilted sheet has its paper tone (and noise) learned as
+    extra fill colours that cover a large part of the image, or one palette colour that covers almost all of it."""
+    counts = np.bincount(lab[lab >= 0], minlength=palette_size)
+    total = lab.size
+    off_palette = counts[palette_size:].sum() / total
+    return bool(off_palette > OFF_PALETTE_MAX_SHARE or counts.max(initial=0) / total > PALETTE_MAX_SHARE)
+
+
+def check_region_count(segment: SegmentResult, model_rooms: int) -> SegmentResult:
+    """Reject a segmentation with far more regions than the model has rooms (noise, not rooms)."""
+    if segment.reject_note or not model_rooms:
+        return segment
+    if len(segment.regions) > max(MIN_IMPLAUSIBLE_REGIONS, IMPLAUSIBLE_REGION_FACTOR * model_rooms):
+        return replace(segment, reject_note=NOISE_NOTE)
+    return segment
+
+
 MAX_PIXELS = 6_000_000  # about 1.8 GB of working memory per 4 Mpx measured; larger images keep the model polygons
 
 
@@ -312,6 +345,8 @@ def segment_rooms(image_path, simplify_px: float = SIMPLIFY_PX, wall_grow_px: in
         rgb = np.asarray(image.convert("RGB"))
     height, width, _ = rgb.shape
     lab, fills = _classify(rgb)
+    if _looks_like_scan(lab, len(PALETTE)):  # paper tone read as one flat fill: skip the work and the false regions
+        return SegmentResult(width, height, [], 0.0, time.perf_counter() - begin, SCAN_NOTE)
     comp = _label_runs(lab, 4)
     counters = _counters(comp)
     lab = np.where(counters, -1, lab)
@@ -372,6 +407,9 @@ CLAIM_MIN_SHARE = 0.3  # of a model room that must lie in a region to claim it
 def match_to_extraction(extraction: Extraction, segment: SegmentResult) -> tuple[Extraction, list[str]]:
     """Replace the model's rough room polygons by the segmented regions and add rooms the model lost.
     Doors are untouched (they reference room ids, which stay)."""
+    segment = check_region_count(segment, len(extraction.rooms))
+    if segment.reject_note:
+        return extraction, [segment.reject_note]
     if not segment.usable:
         why = "no regions" if not segment.regions else f"only {segment.fill_share:.0%} of the ink is flat fill"
         return extraction, [f"segmentation_skipped: {why}"]
