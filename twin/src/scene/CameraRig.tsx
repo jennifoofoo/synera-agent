@@ -17,9 +17,9 @@ interface Props {
 const HOME_AZIMUTH = -Math.PI / 4;
 
 /** camera-controls' fitToBox snaps the rotation to 90° steps; fitting the bounding sphere keeps the view angle. */
-function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 1.08) {
+function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 1.08, minRadius = 3) {
   const sphere = box.getBoundingSphere(new THREE.Sphere());
-  sphere.radius = Math.max(3, sphere.radius * pad);
+  sphere.radius = Math.max(minRadius, sphere.radius * pad);
   void c.fitToSphere(sphere, animate);
 }
 const HOME_POLAR = Math.PI / 3.6;
@@ -165,7 +165,10 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         }
       }
       if (box.isEmpty()) return;
-      fitBox(c, box, animate, 1.6);
+      // On a phone never fly closer than a room plus its neighbours, and look down enough to see into it.
+      const worker = profile === "worker";
+      if (worker && !flat && c.polarAngle > Math.PI * 0.3) void c.rotateTo(c.azimuthAngle, Math.PI * 0.28, animate);
+      fitBox(c, box, animate, 1.6, worker ? Math.max(12, size * 0.1) : 3);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.nonce, floorMode, camera]);
