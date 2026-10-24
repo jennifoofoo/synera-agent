@@ -9,6 +9,7 @@ from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
 from building_agent.find_space import find_space
+from building_agent.guide_tools import GuideState, make_guide_tools
 from building_agent.registry import Kind, load_kinds
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -43,7 +44,10 @@ def kind_tool(bm: BuildingMap, kind: Kind):
     return beta_tool(run)
 
 
-def make_tools(bm: BuildingMap, output_directory: Path) -> list:
+REPLACED_BY_GUIDE = {"set_closed", "add_door"}  # edits go through propose_change and confirm_change
+
+
+def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None = None) -> list:
     @beta_tool
     def find_space_tool(name: str, floor_level: int | None = None) -> str:
         """Resolve a room id, number or name to its space id. Use this before the calculation tools,
@@ -60,4 +64,6 @@ def make_tools(bm: BuildingMap, output_directory: Path) -> list:
 
     find_space_tool.name = "find_space"
     kinds = [kind_tool(bm, kind) for kind in load_kinds().values()]
-    return [*make_starter_tools(bm, output_directory), find_space_tool, *kinds]
+    starter = [tool for tool in make_starter_tools(bm, output_directory) if tool.name not in REPLACED_BY_GUIDE]
+    guide_tools = make_guide_tools(bm, output_directory, guide or GuideState())
+    return [*starter, find_space_tool, *guide_tools, *kinds]
