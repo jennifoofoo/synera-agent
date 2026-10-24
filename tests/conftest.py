@@ -8,9 +8,13 @@ DATA = Path("data")
 LABELLED_SPLITS = ("train", "dev")
 
 
+WALKS_CACHE: dict[Path, dict] = {}
+
+
 @cache
 def load_map(building_dir: str) -> BuildingMap:
-    return BuildingMap.load(Path(building_dir))
+    """One map per building and process; the walking lengths are computed once per building."""
+    return BuildingMap.load_cached(Path(building_dir), WALKS_CACHE)
 
 
 def labelled_questions(kind: str) -> list[tuple[str, dict]]:

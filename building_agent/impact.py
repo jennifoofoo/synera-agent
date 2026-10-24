@@ -12,7 +12,8 @@ import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
-from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
+from building_agent.entrance_distance import distances_to_exit, way_out
+from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
 MIN_CHANGE_M = 1.0
@@ -164,6 +165,7 @@ def copy_map(bm: BuildingMap) -> BuildingMap:
     clone.__dict__.update(bm.__dict__)
     clone.data = {**bm.data, "openings": list(bm.data["openings"])}
     clone.openings = dict(bm.openings)
+    clone.walks = dict(bm.walks)  # add_door drops entries; the original's cache must not change
     clone.closed = set(bm.closed)
     clone.last_route = None
     clone.located_asset_ids = []
@@ -191,21 +193,16 @@ def describe_change(bm, closed_add, closed_remove, doors_add, doors_remove) -> s
     return " and ".join(parts) if parts else "no change"
 
 
-def distances(graph: nx.MultiGraph) -> dict[str, float]:
-    if OUTSIDE not in graph:
-        return {}
-    return nx.single_source_dijkstra_path_length(graph, OUTSIDE, weight="weight")
+def distances(bm: BuildingMap, graph: nx.MultiGraph) -> dict[str, float]:
+    """Walk to the nearest entrance per node; spaces that cannot reach one are absent."""
+    return distances_to_exit(bm, graph)
 
 
 def first_connector(bm: BuildingMap, graph: nx.MultiGraph, space_id: str) -> str | None:
     """Name of the first lift or staircase on the shortest way out of `space_id`."""
-    try:
-        path = nx.dijkstra_path(graph, space_id, OUTSIDE, weight="weight")
-    except (nx.NetworkXNoPath, nx.NodeNotFound):
-        return None
-    for first, second in itertools.pairwise(path):
+    for first, second in itertools.pairwise(way_out(bm, graph, space_id)):
         edge = min(graph[first][second].values(), key=lambda candidate: candidate["weight"])
-        if edge["via"] in bm.connectors:
+        if edge.get("via") in bm.connectors:
             return bm.connectors[edge["via"]]["name"]
     return None
 
@@ -250,6 +247,7 @@ def analyse(
     doors_remove = [bm.find_element(item) for item in doors_remove]
     validate(bm, closed_add, closed_remove, doors_remove)
 
+    old_any, old_free = build_graph(bm, False), build_graph(bm, True)  # fills bm's walking cache, reused by the copy
     after_map = copy_map(bm)
     after_map.closed |= {*closed_add, *doors_remove}
     after_map.closed -= set(closed_remove)
@@ -261,10 +259,9 @@ def analyse(
         change=describe_change(bm, closed_add, closed_remove, doors_add, doors_remove),
         reopening=bool(closed_remove) and not (closed_add or doors_remove or doors_add),
     )
-    old_any, new_any = build_graph(bm, False), build_graph(after_map, False)
-    old_free, new_free = build_graph(bm, True), build_graph(after_map, True)
-    before_any, after_any = distances(old_any), distances(new_any)
-    before_free, after_free = distances(old_free), distances(new_free)
+    new_any, new_free = build_graph(after_map, False), build_graph(after_map, True)
+    before_any, after_any = distances(bm, old_any), distances(after_map, new_any)
+    before_free, after_free = distances(bm, old_free), distances(after_map, new_free)
 
     for space_id, space in sorted(bm.spaces.items()):
         if space_id in skip:

@@ -3,10 +3,10 @@
 import json
 from pathlib import Path
 
-import networkx as nx
 import pytest
 from anthropic.lib.tools import ToolError
 
+from building_agent.entrance_distance import distances_to_exit
 from building_agent.level4.convert import FloorInput, convert_floors
 from building_agent.level4.schema import ExtractedDoor, ExtractedRoom, Extraction, Scale
 from building_agent.level4.tools import apply_fix
@@ -171,7 +171,7 @@ def test_after_add_entrance_it_saves_without_accepting_problems_and_routes_from_
     result = bare.confirmed_save("ja")
     assert result["saved"] is True and result["entrances"] == 1
     loaded = BuildingMap.load(Path(result["path"]))
-    lengths = nx.single_source_dijkstra_path_length(loaded.graph(step_free=False), OUTSIDE, weight="weight")
+    lengths = distances_to_exit(loaded, loaded.graph(step_free=False))
     assert all(space_id in lengths for space_id in loaded.spaces)
 
 

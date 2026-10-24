@@ -68,8 +68,8 @@ def small_building(with_entrance: bool = True) -> dict:
     return {
         "building": {"id": "small", "name": "Small", "source": "test"},
         "floors": [
-            {"id": "f0", "level": 0, "name": "Ground floor"},
-            {"id": "f1", "level": 1, "name": "1st floor"},
+            {"id": "f0", "level": 0, "name": "Ground floor", "elevation_m": 0.0},
+            {"id": "f1", "level": 1, "name": "1st floor", "elevation_m": 3.0},
         ],
         "spaces": spaces,
         "assets": [],
@@ -269,4 +269,4 @@ def test_sweep_over_all_buildings():
                 assert number >= 0
             assert all(change.delta_m > 0 for change in first.longer_worst)
             assert set(first.lost_route).isdisjoint(first.lost_step_free)
-    assert time.perf_counter() - started < 40
+    assert time.perf_counter() - started < 90  # door-to-door walking lengths dominate

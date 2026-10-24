@@ -1,13 +1,14 @@
 import math
 from collections.abc import Callable
 
-import networkx as nx
 from shapely.geometry import LineString, MultiLineString
 from shapely.ops import linemerge, nearest_points
 
+from building_agent.entrance_distance import distances_to_exit
 from building_agent.geometry import space_polygon
+from building_agent.impact import copy_map
 from building_agent.registry import Kind
-from starter_agent.building_map import ADJACENT_DISTANCE_M, DOOR_PREFIX, OUTSIDE, BuildingMap, MapError
+from starter_agent.building_map import ADJACENT_DISTANCE_M, BuildingMap, MapError
 
 WALL_BUFFER_M = 0.35
 MIN_GAIN_M = 1.0
@@ -81,13 +82,10 @@ def what_if_door_with(
     if bm.spaces[first]["floor_id"] != door_floor_id or bm.spaces[second]["floor_id"] != door_floor_id:
         raise MapError(f"Both spaces must be on {door_floor_id}.")
     position = shared_wall_midpoint(bm, first, second, door_mode)
-    before_graph = bm.graph(step_free=False)
-    after_graph = before_graph.copy()
-    door = DOOR_PREFIX + "what-if"
-    for space_id in (first, second):
-        after_graph.add_edge(space_id, door, weight=math.dist(bm.anchor(space_id), position), via="what-if")
-    before = nx.single_source_dijkstra_path_length(before_graph, OUTSIDE, weight="weight")
-    after = nx.single_source_dijkstra_path_length(after_graph, OUTSIDE, weight="weight")
+    after_map = copy_map(bm)
+    after_map.add_door(first, second, position=position)
+    before = distances_to_exit(bm, bm.graph(step_free=False))
+    after = distances_to_exit(after_map, after_map.graph(step_free=False))
     space_ids = sorted(
         space_id
         for space_id, space in bm.spaces.items()
