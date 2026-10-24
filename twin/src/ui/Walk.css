@@ -20,3 +20,10 @@
 .walk-list .walk-num { flex: none; width: 22px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .walk-list button.now .walk-num { color: var(--walk-blue); }
 .phone-sheet.tall { max-height: 75vh; max-height: calc(var(--vvh, 100dvh) * 0.75); }
+.card-walk .walk-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 13px; }
+.card-walk .walk-foot .walk-toggle { margin: 0; }
+.worker .card-walk .walk-foot .walk-toggle { min-height: 44px; }
+.card-walk .walk-motion-note { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); }
+.card-walk .walk-motion-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-2); }
+.card-walk .walk-motion-switch input { width: 18px; height: 18px; margin: 0; accent-color: var(--signal); }
+.worker .card-walk .walk-motion-switch { min-height: 44px; }
