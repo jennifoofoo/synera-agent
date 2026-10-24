@@ -18,6 +18,7 @@ from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import linemerge, nearest_points, unary_union
 
 from building_agent.geometry import repaired
+from building_agent.level4 import door_widths
 from building_agent.level4.schema import DOOR_KINDS, OUTSIDE, ROOM_TYPES, Extraction, Findings, Scale
 from building_agent.level4.segment import SegmentResult
 from building_agent.level4.validate import OUTER_WALL_TOLERANCE_M, Collector, outer_boundary, room_label
@@ -442,6 +443,7 @@ def _convert_floor(
         return outlines[0]
 
     openings: list[dict] = []
+    unmeasured: set[str] = set()  # openings whose width the plan did not give
     for door in extraction.doors or []:
         try:
             ids = [str(room_id) for room_id in door.rooms]
@@ -490,6 +492,9 @@ def _convert_floor(
         if point.distance(Point(position)) > DOOR_MOVED_WARN_M:
             found.add("door_moved", label)
         kind = "entrance" if any(outside) else (door.kind if door.kind in DOOR_KINDS else "door")
+        measured = _finite(door.width_px)
+        if measured is None or measured <= 0:
+            unmeasured.add(f"{floor_id}-O{len(openings) + 1:04d}")
         openings.append(
             {
                 "id": f"{floor_id}-O{len(openings) + 1:04d}",
@@ -502,6 +507,7 @@ def _convert_floor(
                 "synthetic": False,
             }
         )
+    door_widths.apply_estimates(openings, spaces, unmeasured, found.add)
     return spaces, _limit_entrances(openings, len(rooms), found), rooms
 
 
