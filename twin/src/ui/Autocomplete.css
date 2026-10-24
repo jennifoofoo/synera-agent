@@ -1,0 +1,38 @@
+/* ===== Autocomplete (owner: chat/search session). Only the field; the parent styles the frame around it. ===== */
+.ac { position: relative; flex: 1; min-width: 0; display: flex; }
+.ac input {
+  width: 100%; min-width: 0; border: 0; background: transparent; font-size: 16px; /* 16px: no iOS zoom */
+  padding: 8px 4px; outline: none; color: var(--text);
+}
+.ac input::placeholder { color: var(--muted); }
+.ac input:focus-visible { outline: none; }
+
+/* the typed text (invisible) followed by the rest of the best match in grey */
+.ac-ghost {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none; white-space: pre; overflow: hidden;
+  display: flex; align-items: center; border: 0;
+}
+.ac-typed { visibility: hidden; }
+.ac-suggest { color: var(--muted); opacity: 0.8; pointer-events: auto; cursor: pointer; overflow: hidden; text-overflow: ellipsis; }
+
+/* laptop only (↓): a short list of matches */
+.ac-list {
+  position: absolute; left: -12px; right: -12px; z-index: 5; list-style: none; margin: 0; padding: 4px;
+  border-radius: var(--radius); background: var(--panel-solid); border: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgba(20, 48, 90, 0.14); max-height: 46vh; overflow: auto;
+}
+.ac-list.ac-above { bottom: calc(100% + 12px); }
+.ac-list.ac-below { top: calc(100% + 8px); }
+.ac-row {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 44px;
+  padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; text-align: left;
+}
+.ac-row:hover { background: transparent; }
+.ac-row.active { background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.ac-title { font-weight: 500; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-sub { color: var(--muted); font-size: 12.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-kind { color: var(--text); opacity: 0.7; }
+
+@media (pointer: coarse) {
+  .ac-row { min-height: 48px; }
+}
