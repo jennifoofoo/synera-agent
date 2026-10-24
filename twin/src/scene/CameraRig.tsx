@@ -123,9 +123,13 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const c = controls.current;
     if (!c) return;
     c.minDistance = Math.max(2, size * 0.04);
-    c.maxDistance = size * 4;
-    c.minZoom = 0.2;
-    c.maxZoom = 60;
+    c.maxDistance = size * 3; // the building never shrinks below about a third of the view
+    // Plan: px per metre that fits the largest floor. The plan never gets smaller than 35 percent of that (it used to
+    // go down to 0.2 px/m: the floor was a few pixels in a blank grey plane).
+    const largest = Math.max(1, ...model.floors.map((floor) => floor.bounds.size));
+    const fit = Math.min(viewport.width, viewport.height) / largest;
+    c.minZoom = fit * 0.35;
+    c.maxZoom = Math.max(60, fit * 12);
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
     c.maxPolarAngle = flat ? PLAN_TILT : Math.PI / 2 - 0.12;
@@ -141,18 +145,18 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // One finger pans (cameraMouse.ts); two fingers pinch-zoom and rotate (vertical movement tilts in 3D).
     c.touches.one = A.NONE;
     c.touches.two = flat ? A.TOUCH_ZOOM_ROTATE : A.TOUCH_DOLLY_ROTATE;
-    if (flat) void c.rotateTo(0, PLAN_TILT, false);
+    if (flat) void c.rotateTo(c.azimuthAngle, PLAN_TILT, false);
     // Light damping: camera-controls smooths critically (no overshoot, no drift after release).
     c.smoothTime = 0.13;
     c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
-    const margin = size * 0.6;
+    const margin = size * 0.25; // the target stays near the building: a drag can not carry it into empty space
     c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, -1, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
     c.boundaryFriction = 0.2;
     invalidate();
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
-  }, [bounds, size, topY, flat, invalidate, camera]);
+  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height]);
 
   // Entering 2D or changing the floor in 2D frames the focused floor.
   useEffect(() => {
