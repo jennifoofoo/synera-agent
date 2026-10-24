@@ -9,7 +9,7 @@ from starter_agent.building_map import BuildingMap, MapError
 from tests.live.harness import Call, Transcript, dev_building, run_script
 
 ROUTING = ("find_route", "give_directions")
-SEARCHING = ("search_building", "find_space")
+SEARCHING = ("search_building", "find_space", "find_for_task")
 COFFEE_WORDS = ("coffee", "kaffee")
 ROOM_NUMBER = re.compile(r"-?\d+\.\d{2}")
 
