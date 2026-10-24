@@ -55,6 +55,7 @@ def test_end_to_end_writes_valid_csv_and_json(building: Path, tmp_path: Path, mo
     assert main([str(building), "--csv", str(out_csv), "--json", str(out_json), "--workers", "2"]) == 0
     assert [r["question_id"] for r in csv.DictReader(out_csv.open(encoding="utf-8"))] == ["S1", "S2"]
     assert json.loads(out_json.read_text())["answers"][1] == {
+        "question_id": "S2",
         "id": "S2",
         "answer": "42",
         "reply": fake_agent(building, ""),
