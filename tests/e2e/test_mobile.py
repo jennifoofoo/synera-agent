@@ -1,10 +1,10 @@
-"""Mobile smoke tests for the twin page (twin/), worker profile: the phone layout, route flow, guide card, chat with
+"""Mobile smoke tests for the twin page (twin/), worker profile: the phone layout, route flow, walk sheet, chat with
 the keyboard, audio unlock, wake lock, landscape and safe areas. Requirements: docs/mobile-audit.md (written for the
 old page, re-checked against twin/) and twin/MOBILE.md.
 
 Pixel 7 (Chromium, 412 px) and iPhone 14 (WebKit, 390 px) with touch on. The chat turn is faked
-(tests/e2e/fake_chat_server.py), so no API key is needed and no real chat message is ever sent. The guided walk is
-injected into the store (the real one needs the model); the keyboard is simulated through a fake visualViewport.
+(tests/e2e/fake_chat_server.py), so no API key is needed and no real chat message is ever sent. "I'm here" and the
+step-by-step walk run on the client; the keyboard is simulated through a fake visualViewport.
 Needs twin/dist (scripts/build_twin.sh). Run: scripts/mobile_smoke.sh
 """
 
@@ -91,6 +91,9 @@ SPIES = """
 """
 
 
+SINGLE_FLOOR = "() => window.__twinStore.getState().model.floors.length <= 1"
+
+
 def box(page, selector: str):
     return page.evaluate(BOX, selector)
 
@@ -135,19 +138,15 @@ def open_route(page) -> tuple[str, str]:
     return here, to
 
 
-def inject_guide(page, here: str, to: str) -> None:
-    page.evaluate(
-        """([a, b]) => { const st = window.__twinStore; st.getState().closeDirections(true);
-           st.setState({ state: { ...st.getState().state, guide: { active: true, step_index: 1, step_count: 4,
-             leg: { from_space_id: a, to_space_id: b, points: [], segments: [] }, target_space_id: b } } }); }""",
-        [here, to],
-    )
-    page.wait_for_timeout(600)
+def start_walk(page) -> None:
+    """Start on the route card: step-by-step directions on the client (Walk.tsx), no agent call."""
+    page.get_by_role("button", name="Start", exact=True).tap()
+    page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
+    page.wait_for_timeout(800)
 
 
-def end_guide(page) -> None:
-    page.evaluate("() => { const st = window.__twinStore; st.setState({ state: { ...st.getState().state, guide: null } }); }")
-    page.wait_for_timeout(300)
+def walk_step(page) -> int | None:
+    return page.evaluate("() => window.__twinStore.getState().walkStep")
 
 
 def overflow(page) -> dict:
@@ -196,7 +195,9 @@ def test_chat_input_font_size(open_page):
 
 @audit("8", "touch-action: manipulation (no double-tap zoom)")
 def test_touch_action_manipulation(open_page):
-    values = open_page().evaluate("() => [document.documentElement, document.body].map((e) => getComputedStyle(e).touchAction)")
+    values = open_page().evaluate(
+        "() => [document.documentElement, document.body].map((e) => getComputedStyle(e).touchAction)"
+    )
     assert any(v in ("manipulation", "none") for v in values), values
 
 
@@ -235,12 +236,16 @@ def test_plan_between_header_and_card(open_page):
     tap_room(page)
     page.evaluate("() => window.__twinStore.getState().requestCamera({ kind: 'home' })")
     page.wait_for_timeout(1500)
-    header = box(page, ".phone-back")
+    header = box(page, ".worker .topbar")
     sheet = box(page, ".phone-sheet")
     assert state(page)["topInset"] >= header["bottom"], "topInset does not cover the header"
     plan = page.evaluate(PROJECT, page.evaluate(FLOOR_CORNERS))
-    assert plan["top"] >= header["bottom"] - 2, f"plan top {plan['top']:.0f} is under the header ({header['bottom']:.0f})"
-    assert plan["bottom"] <= sheet["top"] + 2, f"plan bottom {plan['bottom']:.0f} is under the card ({sheet['top']:.0f})"
+    assert plan["top"] >= header["bottom"] - 2, (
+        f"plan top {plan['top']:.0f} is under the header ({header['bottom']:.0f})"
+    )
+    assert plan["bottom"] <= sheet["top"] + 2, (
+        f"plan bottom {plan['bottom']:.0f} is under the card ({sheet['top']:.0f})"
+    )
 
 
 # ---------- route, directions, guide ----------
@@ -256,41 +261,67 @@ def test_route_flow(open_page):
     assert page.get_by_role("button", name="Start", exact=True).is_visible()
     route = page.evaluate(PROJECT, page.evaluate(ROUTE_POINTS))
     middle = (route["top"] + route["bottom"]) / 2
-    assert top["bottom"] - 2 <= middle <= sheet["top"] + 2, f"route centre {middle:.0f} not between {top['bottom']:.0f} and {sheet['top']:.0f}"
+    assert top["bottom"] - 2 <= middle <= sheet["top"] + 2, (
+        f"route centre {middle:.0f} not between {top['bottom']:.0f} and {sheet['top']:.0f}"
+    )
     rail = box(page, ".floorrail")
-    assert rail and rail["top"] >= top["bottom"] and rail["height"] >= 44, f"floor rail {rail} under or squeezed by the directions sheet"
+    floors = page.evaluate("() => window.__twinStore.getState().model.floors.length")
+    if floors > 1:
+        assert rail and rail["top"] >= top["bottom"] and rail["height"] >= 44, (
+            f"floor rail {rail} under or squeezed by the directions sheet"
+        )
+    else:
+        assert rail is None, f"one floor: the rail should be hidden, not an empty box {rail}"
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
     page.get_by_role("button", name="Close directions").tap()
     page.wait_for_timeout(500)
     assert not state(page)["directions"]
-    assert state(page)["topInset"] >= box(page, ".phone-back")["bottom"], "topInset not back to the header after closing"
+    assert state(page)["topInset"] >= box(page, ".worker .topbar")["bottom"], (
+        "topInset not back to the header after closing"
+    )
 
 
-@audit("route", "guide card: Back/Next/Stop reachable, 44 px, inside the screen")
-def test_guide_card(open_page):
-    page = open_page()
-    here, to = open_route(page)
-    inject_guide(page, here, to)
-    page.locator(".phone-sheet").tap()  # peek -> open
-    page.wait_for_timeout(400)
+@audit("route", "walk sheet: Back/Next/End reachable, 44 px; Next moves; route visible above it")
+@pytest.mark.parametrize("landscape", [False, True], ids=["portrait", "landscape"])
+def test_walk_sheet(open_page, landscape):
+    page = open_page(landscape=landscape)
+    open_route(page)
+    start_walk(page)
     height = page.viewport_size["height"]
-    for name in ("Back", "Next", "Stop"):
-        button = page.locator(".card-guide .card-actions button", has_text=name)
-        b = button.bounding_box()
-        assert b and b["height"] >= 44 and b["y"] + b["height"] <= height, f"{name}: {b}"
+    buttons = page.locator(".card-walk .card-actions button")
+    assert buttons.count() >= 2
+    for i in range(buttons.count()):
+        b = buttons.nth(i).bounding_box()
+        assert b and b["height"] >= 44 and b["y"] + b["height"] <= height, f"step button {i}: {b}"
+    end = page.get_by_role("button", name="End directions").bounding_box()
+    assert end and end["y"] >= 0 and end["y"] + end["height"] <= height, end
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
+    sheet = box(page, ".phone-sheet")
+    header = box(page, ".worker .topbar")
+    route = page.evaluate(PROJECT, page.evaluate(ROUTE_POINTS))
+    if not landscape:  # landscape: the sheet is beside the plan (see the rightInset note in Phone.tsx)
+        middle = (route["top"] + route["bottom"]) / 2
+        assert header["bottom"] - 2 <= middle <= sheet["top"] + 2, (
+            f"route centre {middle:.0f} not between {header['bottom']:.0f} and {sheet['top']:.0f}"
+        )
+    if page.locator(".card-walk .card-actions button.primary").is_enabled():
+        page.locator(".card-walk .card-actions button.primary").tap()
+        page.wait_for_timeout(300)
+        assert walk_step(page) in (1, None), walk_step(page)
 
 
 @audit("2", "wake lock while guiding, released after")
 def test_wake_lock_while_guiding(open_page):
     page = open_page(SPIES)
-    here, to = open_route(page)
+    open_route(page)
     before = page.evaluate("() => window.__wake")
-    inject_guide(page, here, to)
+    start_walk(page)
     page.wait_for_timeout(300)
-    assert page.evaluate("() => window.__wake") > before, "no wake lock request while guiding"
-    end_guide(page)
-    assert page.evaluate("() => window.__released") >= 1, "wake lock not released after guiding"
+    assert page.evaluate("() => window.__wake") > before, "no wake lock request while walking"
+    page.get_by_role("button", name="End directions").tap()
+    page.wait_for_timeout(400)
+    assert walk_step(page) is None
+    assert page.evaluate("() => window.__released") >= 1, "wake lock not released after walking"
 
 
 @audit("2", "audio unlocked on the first tap, retried when refused")
@@ -330,7 +361,7 @@ def test_chat_keyboard(open_page, landscape):
     assert field and field["bottom"] <= visible + 1 and field["top"] >= 0, f"input {field} vs visible height {visible}"
     assert box(page, ".phone-sheet") is None, "the card stays open behind/over the keyboard"
     dock = box(page, ".dock")
-    assert dock["top"] >= box(page, ".phone-back")["bottom"], "the dock reaches under the header"
+    assert dock["top"] >= box(page, ".worker .topbar")["bottom"], "the dock reaches under the header"
     page.evaluate("() => { window.__kb(0); document.activeElement && document.activeElement.blur(); }")
     page.wait_for_timeout(500)
     assert box(page, ".phone-sheet") is not None, "the card does not come back after the keyboard closes"
@@ -345,10 +376,15 @@ def test_chat_keyboard(open_page, landscape):
 def test_landscape_rail(open_page):
     page = open_page(landscape=True)
     tap_room(page)
-    rail, dock, back = box(page, ".floorrail"), box(page, ".dock"), box(page, ".phone-back")
+    rail, dock, back = box(page, ".floorrail"), box(page, ".dock"), box(page, ".worker .topbar")
+    if rail is None:
+        assert page.evaluate(SINGLE_FLOOR), "floor rail missing"
+        return
     assert rail["left"] < page.viewport_size["width"] / 3, f"rail not on the left: {rail}"
     assert not overlaps(rail, dock) and not overlaps(rail, back), (rail, dock, back)
-    clipped = page.evaluate("() => { const r = document.querySelector('.floorrail'); return r.scrollHeight - r.clientHeight; }")
+    clipped = page.evaluate(
+        "() => { const r = document.querySelector('.floorrail'); return r.scrollHeight - r.clientHeight; }"
+    )
     assert clipped <= 1 or rail["height"] >= 2 * 44, f"rail squeezed: {rail}"
     pill = box(page, ".pill")
     assert pill is None or not overlaps(rail, pill), (rail, pill)
@@ -364,20 +400,26 @@ def test_safe_areas(open_page, landscape):
         "(i) => { const a = document.querySelector('.app'); for (const [k, v] of Object.entries(i)) a.style.setProperty('--safe-' + k, v + 'px'); }",
         insets,
     )
-    here, to = open_route(page)
+    open_route(page)
     width, height = page.viewport_size["width"], page.viewport_size["height"]
-    checks = [".phone-back", ".phone-search", ".floorrail", ".dock", ".dir-fields", ".directions .x", ".pill"]
+    checks = [".worker .topbar", ".phone-search", ".floorrail", ".dock .omnibox", ".dir-fields", ".directions .x"]
     for selector in checks:
         b = box(page, selector)
+        if b is None and selector == ".floorrail" and page.evaluate(SINGLE_FLOOR):
+            continue
         assert b, f"{selector} missing"
         assert b["left"] >= insets["l"] and b["right"] <= width - insets["r"], f"{selector} under the side notch: {b}"
         assert b["top"] >= insets["t"] or selector == ".directions", f"{selector} under the top notch: {b}"
         assert b["bottom"] <= height - insets["b"], f"{selector} under the home bar: {b}"
     page.get_by_role("button", name="Close directions").tap()
     page.wait_for_timeout(400)
-    for selector in (".phone-back", ".floorrail"):
+    for selector in (".worker .topbar", ".floorrail"):
         b = box(page, selector)
-        assert b and b["left"] >= insets["l"] and b["top"] >= insets["t"] and b["right"] <= width - insets["r"], f"{selector}: {b}"
+        if b is None and selector == ".floorrail" and page.evaluate(SINGLE_FLOOR):
+            continue
+        assert b and b["left"] >= insets["l"] and b["top"] >= insets["t"] and b["right"] <= width - insets["r"], (
+            f"{selector}: {b}"
+        )
 
 
 @audit("5", "touch targets at least 44 px (load, room card)")

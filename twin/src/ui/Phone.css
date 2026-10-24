@@ -47,6 +47,8 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
   max-height: calc(var(--vvh, 100dvh) - var(--rail-top, calc(var(--head-y) + 56px)) - var(--dock-h, 90px) - 16px);
 }
 .worker .floorrail::-webkit-scrollbar { display: none; }
+/* one-floor building: the rail has no buttons left on the phone, so no empty 2 px box either */
+.worker .floorrail:empty { display: none; }
 .worker .rail-floor, .worker .rail-toggle { width: 44px; height: 44px; min-height: 44px; flex: none; font-size: 15px; }
 
 /* bottom, like a maps app: the sheet sits flush on the screen edge (its padding clears the home indicator), the

@@ -152,7 +152,7 @@ def open_page(device, base_url):
         if wait_plan:
             page.wait_for_function(
                 "() => !!(window.__twinScene && window.__twinStore && window.__twinStore.getState().model"
-                " && window.__twinCamera && document.querySelector('.phone-back'))",
+                " && window.__twinCamera && document.querySelector('.worker .topbar'))",
                 timeout=20000,
             )
             page.wait_for_timeout(1500)  # the camera flies to the floor first
