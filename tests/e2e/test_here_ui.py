@@ -303,6 +303,9 @@ def test_labels_clear_of_markers(page, server):
             "end": page.evaluate(MARKER_BOX, ["route-end", 9.5]),
             "start": page.evaluate(MARKER_BOX, ["route-start", 7]),
         }
+        # The "You are here" badge was dropped for one blue dot (twin-fixes): check it only where it still exists.
+        if boxes["badge"] is None:
+            del boxes["badge"]
         assert all(boxes.values()), boxes
         for room in (start, end):
             label = page.evaluate(BOX_OF, f'[data-label-space="{room["id"]}"]')
