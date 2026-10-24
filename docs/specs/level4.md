@@ -1,6 +1,6 @@
 # Spec: Level 4, Gebäude aus Grundrissen bauen
 
-Status: ENTWURF, wartet auf Bestätigung von Jennifer (und Leonie für die Web-Teile).
+Status: bestätigt (Jennifer, 2026-10-24). Web-Teile (Schritt 5) sind Leonies Aufgabe und warten auf ihre Zusage.
 Grundlage: `docs/specs/level4-spike.md` (Messungen), `docs/specs/phase-2.md` Block D.
 
 ## Ziel
@@ -42,6 +42,18 @@ Scans oder Fotos von echten Architektenplänen, Handaufmaß, Capture per Handy, 
 4. **Sicherheit**: Speichern nur nach Karte und klarem Ja. Hochgeladene Dateien nur PNG und JPG bis 10 MB, Pfad nur im festen Ordner `agent_output/uploads/`, keine Pfadübergabe vom Browser, Key bleibt auf dem Server.
 5. **Kosten und Zeit**: Pro Etage höchstens 60 Sekunden und 10 Cent, Kosten werden im Eval ausgegeben.
 6. **Der Rest bleibt grün**: `scripts/check.sh` ohne Key, bestehende Tests unverändert.
+
+## Schrittplan (jeder Schritt hat eigene Tests, ein Agent pro Schritt, Review vor dem Merge)
+Verträge zwischen den Schritten: `building_agent/level4/schema.py` (Extraction, Scale, Finding, Findings, Tool-Schema).
+
+| Schritt | Inhalt | Tests und Robustheit | Abhängt von |
+|---|---|---|---|
+| 1a Extraktion | `level4/extract.py`: Vision-Aufruf per Tool-Use (`EXTRACTION_TOOL`), Retry, Größenlimit, Kosten und Zeit zurückgeben | Offline mit gefälschtem Client: gültige Antwort, ungültige Antwort, fehlende Felder, API-Fehler, zu großes Bild, falscher Dateityp. Live-Messung nur über `scripts/eval_level4.py` | schema |
+| 1b Konvertierung und Prüfung | `level4/convert.py` (Pixel zu Metern, y drehen, Türen auf die gemeinsame Wand projizieren, Treppen und Aufzüge als Connectors) und `level4/validate.py` (Findings) | **Round-Trip ohne API**: aus echten Dev-Gebäuden eine künstliche Extraktion erzeugen (bekannter Maßstab, Rauschen), konvertieren, gegen das Original messen. Fuzz: Selbstschnitt, doppelte Räume, Türen ohne Wand, fehlender Eingang, Raum ohne Weg, Maßstab 0 oder negativ. Kein Absturz, nur Findings | schema |
+| 2 Gespräch | `level4/tools.py`: `build_from_plan`, `fix_building` (Tür, Raumtyp, Maßstab), `save_building` mit Karte und klarem Ja; Einbindung in `tools.py` und Prompt | Offline-Tests mit gefälschter Extraktion; Live-Skripte (Hauptfall, Gegner: Ja ohne Karte, Maßstab fehlt, kaputtes Bild, Themenwechsel) | 1a, 1b |
+| 3 Eval | `scripts/eval_level4.py`: Pipeline auf Dev-Etagen (procedural, ResPlan, Swiss), Metriken und Kosten, Ergebnis in `docs/eval-log.md` | Kosten-Obergrenze, Wiederholung gecacht | 1a, 1b |
+| 4 Review und Merge | Frischer Review-Agent pro Schritt, `scripts/check.sh` grün | | je Schritt |
+| 5 Web (Leonie) | Upload, Vorschau, Maßstab-Eingabe, Speichern | Tests wie `tests/test_web.py`, Upload-Grenzen | 2 |
 
 ## Phasen (jede für sich lieferbar)
 - **Phase 1 (Demo-Schnitt, ca. 8 bis 10 h):** Eine Etage, Maßstab per Frage, Extraktion mit Structured Output, Konvertierung, Validierung, Eval-Skript, Gespräch ohne Web (per Pfad im Chat).
