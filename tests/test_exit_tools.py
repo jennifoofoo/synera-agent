@@ -183,7 +183,7 @@ def test_no_position_asks_one_short_question_and_does_not_guess():
 
 def test_position_and_named_place_give_routes():
     bm = load_map(BUILDINGS[0])
-    start = rooms(bm)[0]
+    start = next(room for room in rooms(bm) if compute_exits(bm, room)["status"] == "ok")
     tool, _ = tool_for(bm, make_position(bm, start))
     here = json.loads(tool())
     assert here["status"] in STATUSES and here["disclaimer"] == DISCLAIMER_EN and "position_note" not in here
