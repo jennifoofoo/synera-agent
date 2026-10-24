@@ -22,7 +22,7 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | Aufgabe | Wer | Status | Branch |
 |---|---|---|---|
 | Leitplanken: check.sh, ruff, Hooks | Jennifer | gemergt | chore/guardrails |
-| tools.py (aus Registry), find_space, agent.py, Baseline-Lauf | Jennifer | in Arbeit | feat/agent-tools |
+| tools.py (aus Registry), find_space, agent.py (Baseline-Lauf offen: braucht API-Key) | Jennifer | Test grün | feat/agent-tools |
 | Test "Text zu Parametern" | Jennifer | offen | |
 | Interaction: 6 Skripte, Verständniskarte, Landmarken (directions.py) | Jennifer | offen | |
 | 2D-Web-Seite (Chat + Etagenplan mit Route) | Leonie | in Arbeit | feat/web-2d |
