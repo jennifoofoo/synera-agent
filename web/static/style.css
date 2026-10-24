@@ -209,10 +209,25 @@ ol.steps li.floor-change { font-weight: 600; }
 .route-bar .replay:hover { border-color: var(--accent); }
 @keyframes breathe { 0%, 100% { transform: scale(.75); } 50% { transform: scale(1.15); } }
 @keyframes flow { to { stroke-dashoffset: -16; } }
+@keyframes ghost-out { from { opacity: .7; } to { opacity: 0; } }
+@keyframes fade-out { from { opacity: .9; } to { opacity: 0; } }
+@keyframes glide-in { from { transform: translate(var(--dx), var(--dy)); } to { transform: translate(0, 0); } }
+@keyframes pop-in { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes ring-out { 0% { transform: scale(.5); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+.asset.edit-new { fill: #059669; opacity: .95; stroke: #fff; stroke-width: 1; vector-effect: non-scaling-stroke; transform-box: fill-box; transform-origin: center; animation: pop-in .5s ease-out; }
+.asset.edit-moved { opacity: .95; stroke: #2563eb; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.asset-glide { animation: glide-in .9s ease-in-out; }
+.asset-ghost { fill: none; stroke: #6b7280; stroke-width: 1.5; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; pointer-events: none; animation: ghost-out 3s ease-in forwards; }
+.asset-fade { animation: fade-out 1.2s ease-in forwards; }
+.asset-new-ring { fill: none; stroke: #059669; stroke-width: 2.5; vector-effect: non-scaling-stroke; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: ring-out 1.4s ease-out 2; }
+.width-label { fill: #92400e; font-weight: 700; text-anchor: middle; paint-order: stroke; stroke: #fff; stroke-width: .15; pointer-events: none; }
+.item.edit-added { border-left: 3px solid #059669; } .item.edit-moved { border-left: 3px solid #2563eb; }
+.item.edit-removed, .item.edit-removed-door { border-left: 3px solid #dc2626; } .item.edit-widened { border-left: 3px solid #d97706; }
+#edit-list .item { cursor: pointer; }
 @keyframes ping { 0% { transform: scale(.6); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .route-flow, .opening .ring, .pulse, .anim-head .halo, .mic.listening::after { animation: none; }
+  .asset-glide, .asset-ghost, .asset-fade, .asset-new-ring, .asset.edit-new, .route-flow, .opening .ring, .pulse, .anim-head .halo, .mic.listening::after { animation: none; }
   .map { transition: none; }
 }
 

@@ -19,6 +19,7 @@ Then open http://127.0.0.1:8765. Options: `--data DIR` (any folder with `*/build
 - Every closure or new door recomputes the current route and says what changed ("37.8 m longer, now via Lift 1" or "no route any more").
 - Find tab: rooms and things by words; hits pulse on the plan.
 - Changes tab: close/reopen every stair and lift, list of closures and new doors, reset.
+- Things and doors the agent changed (`state.added_assets`, `moved_assets`, `removed_assets`, `removed_openings`, `widened_openings`; `static/edits.js`): the page's picture is always the loaded building plus this state, so undo and reset need no special case. 2D: added things are green with a ring, a moved thing glides from its old place (dashed ghost for a few seconds), a removed one fades, removed doors vanish, a widened door shows "1.2 → 1.6 m". All motion stops under `prefers-reduced-motion`. 3D: floors rebuild on a change; new things have a green halo, old places of moved/removed things a grey/red ghost. The Changes tab lists them in plain words with the room; tap one to focus it on the plan. Routes redraw with every state, the server already recomputes them against the edits.
 - Chat tab: posts to `/api/chat`, see below.
 
 ## 3D view
@@ -91,9 +92,9 @@ Offline demo without API calls: `uv run python -m web --fake-plans data/dev/proc
 | `api.py` | Pure functions over `BuildingMap`: building view, route geometry, closures, doors |
 | `chat.py` | Chat adapter, one-line switch `BACKEND` |
 | `level4_api.py` | Upload, background build, preview, fixes, card and save for new buildings from floor plans |
-| `static/` | `index.html`, `app.js`, `style.css`, `voice.js`, `plan.js` (new building flow), `view3d.js` + `scene3d.js` (3D view), `vendor/three/` |
+| `static/` | `index.html`, `app.js`, `edits.js` (agent edits to things and doors), `style.css`, `voice.js`, `plan.js` (new building flow), `view3d.js` + `scene3d.js` (3D view), `vendor/three/` |
 
-Tests: `tests/test_web.py`, `tests/test_web_level4.py`, `tests/test_web_view3d.py` (no API calls).
+Tests: `tests/test_web.py`, `tests/test_web_edits.py`, `tests/test_web_level4.py`, `tests/test_web_view3d.py` (no API calls).
 
 ## Chat backend
 

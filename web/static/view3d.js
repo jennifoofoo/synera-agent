@@ -294,13 +294,25 @@ function sync() {
     seen.routeKey = "";
     view.focusFloor = a.floorId;
     seen.floorId = a.floorId;
+    seen.edits = window.edits?.state.version;
     scene.setBuilding(a.building, view.focusFloor);
+    scene.setEditMarks(window.edits?.marks());
     scene.setLayout({ mode: view.floorMode, focus: view.focusFloor, things: view.things });
     scene.fit(true);
     renderTools();
     pushHighlights();
     const pending = view.pending.splice(0);
     pending.forEach((action) => action());
+  }
+  if (window.edits && seen.edits !== window.edits.state.version) {
+    // The agent moved, added or removed things or doors: rebuild the floors from the new picture, camera stays.
+    seen.edits = window.edits.state.version;
+    seen.state = null;
+    scene.setBuilding(a.building, view.focusFloor);
+    scene.setEditMarks(window.edits.marks());
+    scene.setLayout({ mode: view.floorMode, focus: view.focusFloor, things: view.things });
+    seen.routeKey = "";
+    pushHighlights();
   }
   if (a.state !== seen.state || a.suspect !== seen.suspect) {
     seen.state = a.state;
