@@ -76,6 +76,19 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
   const bodyRef = useRef<HTMLDivElement>(null);
   useEffect(() => searchRef.current?.focus(), []);
 
+  // The camera frames fly-tos left of the sheet (store.setRightInset from the scene session, 2bf0284).
+  useEffect(() => {
+    const setRightInset = (px: number) => (useTwin.getState() as { setRightInset?: (px: number) => void }).setRightInset?.(px);
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const observer = new ResizeObserver(() => setRightInset(Math.round(window.innerWidth - sheet.getBoundingClientRect().left)));
+    observer.observe(sheet);
+    return () => {
+      observer.disconnect();
+      setRightInset(0);
+    };
+  }, []);
+
   const changes = useChangeRows(model, state);
   const rooms = useMemo(() => roomRows(model), [model]);
   const things = useMemo(() => thingRows(model), [model]);
