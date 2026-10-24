@@ -1,22 +1,15 @@
 // Directions, like a maps app: a compact From/To panel at the top (phone: top sheet; laptop: small panel top left)
 // and the route summary with "Start" in the bottom card. "Route" on the room card opens it. From is "Your location"
 // when the position is known, else empty and focused ("Choose start"). Both set = the route is computed at once.
-// Owner: the Card/Position session. The fields complete inline (one grey ghost match, no list), like the Omnibox.
+// Owner: the Card/Position session. The fields are the Omnibox's PlaceInput (one grey ghost match, no list).
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import Fuse from "fuse.js";
 import type { Route } from "../api/types";
-import { floorLabel, type BuildingModel } from "../model/model";
-import { prettyType } from "../model/palette";
+import type { BuildingModel } from "../model/model";
 import { HERE, useTwin, type Place } from "../store";
+import { PlaceInput } from "./Autocomplete";
 import "./Directions.css";
-
-interface Option {
-  id: Place;
-  title: string;
-  subtitle: string;
-}
 
 export function placeName(model: BuildingModel, place: Place | null): string {
   if (!place) return "";
@@ -24,68 +17,17 @@ export function placeName(model: BuildingModel, place: Place | null): string {
   return model.spaceById.get(place)?.name || model.connectorBySpace.get(place)?.name || place;
 }
 
-/** Rooms and stairs/lifts (named spaces) the fields can complete to, plus "Your location" when it is known. */
-function useOptions(model: BuildingModel): { options: Option[]; fuse: Fuse<Option> } {
-  const hasPosition = useTwin((s) => !!s.state?.position);
-  return useMemo(() => {
-    const options: Option[] = model.building.spaces
-      .filter((space) => space.name)
-      .map((space) => {
-        const floor = model.floorById.get(space.floor_id);
-        return { id: space.id, title: space.name, subtitle: `${prettyType(space.room_type)} · ${floor ? floorLabel(floor) : ""}` };
-      });
-    if (hasPosition) options.unshift({ id: HERE, title: "Your location", subtitle: "" });
-    return { options, fuse: new Fuse(options, { keys: ["title"], threshold: 0.3, ignoreLocation: true }) };
-  }, [model, hasPosition]);
-}
-
-function complete(options: Option[], fuse: Fuse<Option>, text: string): Option | null {
-  const query = text.trim().toLowerCase();
-  if (!query) return null;
-  let best: Option | null = null;
-  for (const option of options) {
-    if (option.title.toLowerCase().startsWith(query) && (!best || option.title.length < best.title.length)) best = option;
-  }
-  return best ?? fuse.search(query, { limit: 1 })[0]?.item ?? null;
-}
-
 function PlaceField({ model, field, value, placeholder }: { model: BuildingModel; field: "from" | "to"; value: Place | null; placeholder: string }) {
   const editing = useTwin((s) => s.directions?.editing === field);
   const editDirections = useTwin((s) => s.editDirections);
   const setFrom = useTwin((s) => s.setDirectionsFrom);
   const setTo = useTwin((s) => s.setDirectionsTo);
-  const { options, fuse } = useOptions(model);
-  const [text, setText] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  const match = complete(options, fuse, text);
-  const prefix = !!match && match.title.toLowerCase().startsWith(text.trim().toLowerCase());
-
-  useEffect(() => {
-    if (editing) {
-      setText("");
-      input.current?.focus();
-    }
-  }, [editing]);
-
-  const pick = (place: Place | null) => {
-    setText("");
-    if (field === "from") setFrom(place);
-    else setTo(place);
-  };
-  const onKey = (event: KeyboardEvent<HTMLInputElement>) => {
-    if ((event.key === "Enter" || event.key === "Tab" || event.key === "ArrowRight") && match) {
-      event.preventDefault();
-      pick(match.id);
-    } else if (event.key === "Escape") {
-      event.stopPropagation();
-      editDirections(null);
-    }
-  };
-
+  const hasHere = useTwin((s) => !!s.state?.position);
   const dot = <span className={`dir-dot ${field}`} aria-hidden />;
+  const label = field === "from" ? "From" : "To";
   if (!editing) {
     return (
-      <button className={`dir-field ${value ? "" : "empty"}`} onClick={() => editDirections(field)} aria-label={`${field === "from" ? "From" : "To"}: ${placeName(model, value) || placeholder}`}>
+      <button className={`dir-field ${value ? "" : "empty"}`} onClick={() => editDirections(field)} aria-label={`${label}: ${placeName(model, value) || placeholder}`}>
         {dot}
         <span className="dir-value">{placeName(model, value) || placeholder}</span>
       </button>
@@ -94,34 +36,18 @@ function PlaceField({ model, field, value, placeholder }: { model: BuildingModel
   return (
     <div className="dir-field editing">
       {dot}
-      <div className="dir-input">
-        <div className="dir-ghost" aria-hidden>
-          <span className="dir-typed">{text}</span>
-          {match && (prefix ? <span>{match.title.slice(text.trim().length)}</span> : <span> → {match.title}</span>)}
-        </div>
-        <input
-          ref={input}
-          value={text}
-          placeholder={placeholder}
-          aria-label={field === "from" ? "From" : "To"}
-          enterKeyHint="go"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={onKey}
-        />
-      </div>
-      {match ? (
-        <button className="dir-accept" onClick={() => pick(match.id)} aria-label={`Use ${match.title}`}>
-          ↵
+      <PlaceInput
+        placeholder={value ? placeName(model, value) : placeholder}
+        autoFocus
+        includeHere={hasHere}
+        ariaLabel={label}
+        onPick={(place) => (field === "from" ? setFrom(place) : setTo(place))}
+        onCancel={() => editDirections(null)}
+      />
+      {value && (
+        <button className="dir-accept" onClick={() => editDirections(null)} aria-label="Keep">
+          ✓
         </button>
-      ) : (
-        value && (
-          <button className="dir-accept" onClick={() => editDirections(null)} aria-label="Keep">
-            ✓
-          </button>
-        )
       )}
     </div>
   );

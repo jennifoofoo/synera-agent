@@ -304,7 +304,8 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ hereArmed });
   },
   openDirections(to) {
-    const from = get().state?.position ? HERE : null;
+    // "Your location" when known here, or (campus) maybe in another building: routeDirections checks the campus.
+    const from = get().state?.position || get().campusHook ? HERE : null;
     set({ directions: { from, to, stepFree: false, editing: from ? null : "from" }, selection: null, popover: null });
     void routeDirections();
   },
@@ -451,6 +452,14 @@ async function routeDirections(): Promise<void> {
   const start = resolve(directions.from);
   const destination = resolve(directions.to);
   const run = ++directionsRun;
+  const campus = useTwin.getState().campusHook;
+  if (directions.from === HERE && !start && destination && campus) {
+    // "Your location" is not in this building: the campus routes across buildings (its card shows the legs).
+    if (await campus.routeHere(destination)) return;
+    const now = useTwin.getState().directions;
+    if (run === directionsRun && now) useTwin.setState({ directions: { ...now, from: null, editing: "from" } });
+    return;
+  }
   if (!start || !destination || start === destination) {
     if (state?.route) useTwin.setState({ state: (await api.clearRoute(buildingKey)).state });
     return;
