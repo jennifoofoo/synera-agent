@@ -1,4 +1,4 @@
-// The look ("Blueprint minimal"): warm paper, flat graphite greys for the building, one signal colour (orange) for
+// The look ("Blueprint minimal"): warm paper, flat graphite greys for the building, one signal colour (Synera blue) for
 // the route, selection and primary actions. State colours (green / red) only for exceptions. Values marked "token"
 // mirror src/styles/tokens.css; change both together.
 
@@ -21,23 +21,23 @@ export const COLOURS = {
   ground: "#eae7e1", // token --paper-2
   background: "#f4f2ee", // token --paper
   plan: "#f4f2ee", // 2D map background, token --paper
-  signal: "#c8460f", // token --signal
-  mapBlue: "#c8460f", // 2D route line (the signal colour; the name is historic)
-  mapBlueDark: "#8f3209", // 2D route casing
+  signal: "#004fab", // token --signal
+  mapBlue: "#004fab", // 2D route line (the signal colour; the name is historic)
+  mapBlueDark: "#002478", // 2D route casing
   mapRed: "#1d2430", // 2D destination pin (graphite; the name is historic)
-  accent: "#c8460f",
-  gold: "#c8460f",
-  stairs: "#b7791f", // stairs shafts, muted amber
+  accent: "#004fab",
+  gold: "#004fab",
+  stairs: "#8a8372", // stairs shafts, muted taupe
   accentBlue: "#7a6a9a", // lift shafts, muted violet
   thing: "#b3b6ba",
   machine: "#8c929a",
   ok: "#2f7d5b", // token --ok
-  warn: "#9a6a12", // token --warn
+  warn: "#4a5260", // token --warn
   danger: "#b3382c", // token --danger
-  route: "#c8460f",
+  route: "#004fab",
   routeGlow: "#ffffff",
-  selection: "#c8460f",
-  here: "#3a5f8a", // token --info
+  selection: "#004fab",
+  here: "#004fab", // token --info
   added: "#2f7d5b",
   removed: "#8a8f96",
 };

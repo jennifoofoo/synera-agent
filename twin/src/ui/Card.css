@@ -15,7 +15,7 @@
 .card-actions { display: flex; gap: 8px; margin-top: 10px; }
 .card-actions button { flex: 1; }
 .card button.primary { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); font-weight: 600; }
-.card button.primary:hover { background: var(--signal); filter: brightness(0.94); }
+.card button.primary:hover { background: var(--signal-dark); border-color: var(--signal-dark); }
 .card button.quiet { flex: 0 0 auto; border-color: transparent; background: transparent; color: var(--muted); }
 .card button.quiet:hover { background: transparent; color: var(--text); }
 .card button.link {

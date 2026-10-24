@@ -35,7 +35,7 @@
 .nb-small { width: 80px; padding: 6px 8px; margin: 0 6px; }
 
 .nb-primary { min-height: 48px; font-weight: 600; background: var(--signal); border-color: var(--signal); color: var(--signal-ink); }
-.nb-primary:hover { background: var(--signal); filter: brightness(0.94); }
+.nb-primary:hover { background: var(--signal-dark); border-color: var(--signal-dark); }
 .nb-error { margin: 0; color: var(--danger); font-size: 13.5px; }
 .nb-note { margin: 0; font-size: 13px; color: var(--muted); }
 .nb-link { border: 0; background: transparent; padding: 0 2px; min-height: 0; color: var(--muted); text-decoration: underline; }

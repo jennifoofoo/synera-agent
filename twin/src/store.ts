@@ -437,7 +437,7 @@ export const useTwin = create<TwinState>((set, get) => ({
       }
       if (reply.located?.length) {
         const ids = reply.located.map((entry) => entry.asset_id);
-        get().setHighlight("found", { ids, colour: "#c8460f" });
+        get().setHighlight("found", { ids, colour: "#004fab" });
         get().flyTo(ids[0]);
       }
       return reply;

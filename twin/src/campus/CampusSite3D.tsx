@@ -46,7 +46,7 @@ function BuildingBlock({ building, detail, onRoute, active }: { building: Campus
     event.stopPropagation();
     void enterBuilding(building.id);
   };
-  const colour = active ? "#c9ab97" : onRoute ? "#d6c4b7" : "#cfccc4";
+  const colour = active ? "#9db6dc" : onRoute ? "#d3e0f4" : "#cfccc4";
   return (
     <group>
       {floors.map(({ floor, slab, lines }, index) => (

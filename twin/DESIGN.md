@@ -5,7 +5,7 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 ## Principles
 - Edges instead of shadows: 1 px hairline borders, one soft shadow (`--shadow-float`) for floating sheets, no blur, no gradients.
 - Small square shapes: radii 4 to 6 px, no pills, icon buttons are 4 px squares.
-- One signal colour (orange) for the route, primary buttons and selection. Green and red only for state (step-free, closed).
+- One signal colour (Synera blue) for the route, primary buttons and selection. Green and red only for state (step-free, closed).
 - Buildings are flat greys, room types differ by lightness, not hue.
 - Motion is 150 ms ease-out, no springs.
 
@@ -18,14 +18,15 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 | `--ink` | #1d2430 | text, active floor, chips |
 | `--ink-2` | #5a626d | secondary text (5.9:1 on surface) |
 | `--hairline` | rgba(29,36,48,.2) | borders |
-| `--signal` | #c8460f | route, primary button, selection (white on it 4.8:1) |
-| `--ok` / `--danger` / `--warn` / `--info` | #2f7d5b / #b3382c / #9a6a12 / #3a5f8a | state only; info = "you are here" |
+| `--signal` | #004fab | route, primary button, selection (white on it 8.3:1) |
+| `--signal-dark` / `--signal-soft` | #002478 / #ebf1ff | hover and pressed, selected fills (use dark text on soft) |
+| `--ok` / `--danger` / `--warn` / `--info` | #2f7d5b / #b3382c / #4a5260 / #004fab | state only; info = "you are here" |
 | `--radius`, `-sm`, `-lg` | 5 / 4 / 6 px | cards and sheets, buttons and inputs, bottom sheets |
 | `--shadow-float` | 0 4px 14px rgba(29,36,48,.1) | floating sheets only |
 | `--t-fast` | 150ms ease-out | transitions |
 | `--label-tracking` | 0.08em | tiny uppercase section labels only |
 
-Scene only (palette.ts): stairs shafts #b7791f (muted amber), lift shafts #7a6a9a (muted violet), wall edges #2b323d, route casing #8f3209.
+Scene only (palette.ts): stairs shafts #8a8372 (muted taupe), lift shafts #7a6a9a (muted violet), wall edges #2b323d, route casing #002478.
 
 ## Typography
 System sans (Inter if installed). Tabular numerals on floor numbers, route facts, labels and chips. Uppercase tracking only on tiny section labels (`.tiny-label`, planner headings).
