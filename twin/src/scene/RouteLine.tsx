@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Line } from "@react-three/drei";
+import { Billboard, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import type { Line2 } from "three-stdlib";
 import type { Route, RouteSegment } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
-import { END_RING_PX, START_DOT_PX, ScreenSized } from "./markerLayout";
+import { useTwin } from "../store";
+import { PIN_HEAD_PX, PIN_HEAD_Y_PX, START_DOT_PX, ScreenSized } from "./markerLayout";
 
-/** Height of the route line above the floor (m); Labels.tsx anchors a route end's label at the same height. */
-export const LIFT = 0.4;
+/** Height of the route line above the floor (m): just above it, drawn without depth test so it never flickers
+ * with the floor. Labels.tsx anchors a route end's label at the same height. */
+export const LIFT = 0.15;
 const DRAW_IN_S = 1.4;
+/** Route line width on screen (px), 2D and 3D, and its white casing on each side. */
+const LINE_PX = 5;
+const LINE_PX_3D = 4.5;
+const CASING_PX = 1.5;
 
 interface Props {
   route: Route | null;
@@ -71,6 +77,7 @@ function slice(points: THREE.Vector3[], lengths: number[], s0: number, s1: numbe
  * that the current leg covers is emphasised on the same line and the rest is paler. */
 export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, reducedMotion, flat = false }: Props) {
   void model;
+  const here = useTwin((s) => s.state?.position ?? null);
   const points = useMemo(() => (route?.ok && route.segments ? toPoints(route.segments, floorY, onlyFloor) : []), [route, floorY, onlyFloor]);
   const lengths = useMemo(() => {
     const cumulative = [0];
@@ -106,20 +113,27 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
 
   if (points.length < 2) return null;
   const guided = !!legPoints;
-  const lineColour = flat ? COLOURS.mapBlue : COLOURS.route;
-  // 2D: the map blue on a white casing. 3D: the route colour on a translucent glow casing.
-  const casingColour = flat ? "#ffffff" : COLOURS.routeGlow;
-  const casingWidth = flat ? 9 : 6;
-  const lineWidth = flat ? 5.5 : 3.5;
+  // One signal blue in both views, on a thin white casing (1.5 px each side) for contrast on the grey floors.
+  // Widths are screen px (Line2), so the line keeps its width at any zoom.
+  const lineColour = COLOURS.signal;
+  const lineWidth = flat ? LINE_PX : LINE_PX_3D;
+  const casingWidth = lineWidth + 2 * CASING_PX;
+  // "You are here" stands at the start: that dot is the start, no second marker on it.
+  const first = route?.segments?.[0];
+  const hereAtStart =
+    !!here &&
+    !!first &&
+    here.floor_id === first.floor_id &&
+    (here.space_id === route?.start || (!!here.point && Math.hypot(here.point[0] - first.points[0][0], here.point[1] - first.points[0][1]) < 3));
   return (
     <group>
       <Line
         ref={casing}
         points={points}
-        color={casingColour}
+        color={COLOURS.routeGlow}
         lineWidth={casingWidth}
-        transparent={!flat}
-        opacity={flat ? 1 : 0.5}
+        transparent={guided}
+        opacity={guided ? 0.6 : 1}
         dashed
         dashSize={total}
         gapSize={total}
@@ -133,46 +147,84 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         color={lineColour}
         lineWidth={lineWidth}
         transparent
-        opacity={guided ? 0.6 : 1}
+        opacity={guided ? 0.35 : 1}
         dashed
         dashSize={total}
         gapSize={total}
         depthTest={false}
         renderOrder={21}
       />
-      {legPoints && <Line points={legPoints} color={lineColour} lineWidth={lineWidth} depthTest={false} renderOrder={22} />}
-      {/* ends: constant size on screen, a small dot at the start and a ring at the destination (the room label
-          moves above them, see Labels.tsx), never a filled blob on the text */}
+      {legPoints && (
+        <>
+          <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} depthTest={false} renderOrder={22} />
+          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} depthTest={false} renderOrder={23} />
+        </>
+      )}
+      {/* ends: constant size on screen. The start is a paper dot with a blue ring (or nothing when "You are here"
+          stands there), the destination a slim pin on its tip. The room labels move above them (Labels.tsx). */}
       <group position={points[0]} name="route-start">
-        <ScreenSized>
-          <EndDisc radius={START_DOT_PX + 2} colour="#ffffff" />
-          <EndDisc radius={START_DOT_PX} colour={lineColour} />
-        </ScreenSized>
+        {!hereAtStart && (
+          <ScreenSized>
+            <EndDisc radius={START_DOT_PX} colour={lineColour} order={24} />
+            <EndDisc radius={START_DOT_PX - 2} colour={COLOURS.routeGlow} order={25} />
+          </ScreenSized>
+        )}
       </group>
       <group position={points[points.length - 1]} name="route-end">
-        <ScreenSized>
-          <EndDisc radius={END_RING_PX + 1.5} colour="#ffffff" />
-          <EndRing radius={END_RING_PX} width={3} colour={flat ? COLOURS.mapRed : lineColour} />
-        </ScreenSized>
+        <DestinationPin colour={lineColour} />
       </group>
     </group>
   );
 }
 
-function EndDisc({ radius, colour }: { radius: number; colour: string }) {
+function EndDisc({ radius, colour, order }: { radius: number; colour: string; order: number }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} renderOrder={23}>
+    <mesh rotation-x={-Math.PI / 2} renderOrder={order}>
       <circleGeometry args={[radius, 32]} />
       <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-function EndRing({ radius, width, colour }: { radius: number; width: number; colour: string }) {
+/** Outline of a pin standing on its tip at (0, 0): a circle of `radius` around (0, `headY`) and the two tangents
+ * from the tip to it (px). */
+function pinShape(radius: number, headY: number, tipY = 0): THREE.Shape {
+  const d = headY - tipY;
+  const phi = Math.acos(Math.min(1, radius / d)); // angle between "down" and a tangent point, seen from the centre
+  const start = -Math.PI / 2 + phi;
+  const shape = new THREE.Shape();
+  shape.moveTo(0, tipY);
+  shape.lineTo(radius * Math.cos(start), headY + radius * Math.sin(start));
+  shape.absarc(0, headY, radius, start, start + 2 * Math.PI - 2 * phi, false);
+  shape.lineTo(0, tipY);
+  return shape;
+}
+
+/** The destination: a slim signal-blue pin with a white core on a thin white casing, always upright on screen and
+ * at a constant size; its tip marks the spot (on the floor in 3D, on the plan in 2D). */
+function DestinationPin({ colour }: { colour: string }) {
+  const shapes = useMemo(
+    () => ({
+      casing: new THREE.ShapeGeometry(pinShape(PIN_HEAD_PX + CASING_PX, PIN_HEAD_Y_PX, -CASING_PX * 1.6), 24),
+      body: new THREE.ShapeGeometry(pinShape(PIN_HEAD_PX, PIN_HEAD_Y_PX), 24),
+      core: new THREE.CircleGeometry(PIN_HEAD_PX * 0.42, 24).translate(0, PIN_HEAD_Y_PX, 0),
+    }),
+    [],
+  );
+  useEffect(() => () => Object.values(shapes).forEach((geometry) => geometry.dispose()), [shapes]);
   return (
-    <mesh rotation-x={-Math.PI / 2} renderOrder={24}>
-      <ringGeometry args={[radius - width, radius, 32]} />
-      <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
-    </mesh>
+    <Billboard>
+      <ScreenSized uniform>
+        <mesh geometry={shapes.casing} renderOrder={26}>
+          <meshBasicMaterial color={COLOURS.routeGlow} depthTest={false} />
+        </mesh>
+        <mesh geometry={shapes.body} renderOrder={27}>
+          <meshBasicMaterial color={colour} depthTest={false} />
+        </mesh>
+        <mesh geometry={shapes.core} renderOrder={28}>
+          <meshBasicMaterial color={COLOURS.routeGlow} depthTest={false} />
+        </mesh>
+      </ScreenSized>
+    </Billboard>
   );
 }

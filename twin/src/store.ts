@@ -401,24 +401,24 @@ export const useTwin = create<TwinState>((set, get) => ({
     const key = get().buildingKey;
     if (!key) return;
     const result = await api.route(key, start, destination, stepFree);
-    set({ state: result.state });
+    set({ state: withPendingHere(result.state) });
     if (result.route.ok && result.route.floors?.length) set({ focusedFloorId: result.route.floors[0] });
   },
   async clearRoute() {
     if (get().campusHook?.clearRoute()) return;
     const key = get().buildingKey;
     if (!key) return;
-    set({ state: (await api.clearRoute(key)).state });
+    set({ state: withPendingHere((await api.clearRoute(key)).state) });
   },
   async setClosed(element, closed) {
     const key = get().buildingKey;
     if (!key) return;
-    set({ state: (await api.close(key, element, closed)).state });
+    set({ state: withPendingHere((await api.close(key, element, closed)).state) });
   },
   async addDoor(first, second) {
     const key = get().buildingKey;
     if (!key) return;
-    set({ state: (await api.addDoor(key, first, second)).state });
+    set({ state: withPendingHere((await api.addDoor(key, first, second)).state) });
   },
   async reset() {
     const key = get().buildingKey;
@@ -506,6 +506,13 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 }));
 
+/** "I'm here" is local until the next chat message (pendingHere): a state from another endpoint (route, close,
+ * door) does not know it yet, so the position on screen is kept instead of being wiped (mobile session). */
+function withPendingHere(next: BuildingState): BuildingState {
+  const { pendingHere, state } = useTwin.getState();
+  return pendingHere && !next.position && state?.position ? { ...next, position: state.position } : next;
+}
+
 // --- directions (owner: card session): compute the route for the open From/To, newest request wins.
 let directionsRun = 0;
 async function routeDirections(): Promise<void> {
@@ -524,12 +531,12 @@ async function routeDirections(): Promise<void> {
     return;
   }
   if (!start || !destination || start === destination) {
-    if (state?.route) useTwin.setState({ state: (await api.clearRoute(buildingKey)).state });
+    if (state?.route) useTwin.setState({ state: withPendingHere((await api.clearRoute(buildingKey)).state) });
     return;
   }
   const result = await api.route(buildingKey, start, destination, directions.stepFree);
   if (run !== directionsRun || !useTwin.getState().directions) return; // a newer pick or a close won
-  useTwin.setState({ state: result.state, replyShown: false });
+  useTwin.setState({ state: withPendingHere(result.state), replyShown: false });
   if (result.route.ok && result.route.floors?.length) useTwin.setState({ focusedFloorId: result.route.floors[0] });
 }
 
