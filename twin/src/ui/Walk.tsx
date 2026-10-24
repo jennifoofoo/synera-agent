@@ -28,9 +28,8 @@ export function Walk() {
   }, [walking]);
 
   if (step === null || !model || !route?.ok) return null;
-  const steps = walkSteps();
+  const steps = walkSteps().map(readable);
   const last = step >= steps.length - 1;
-  const destination = route.destination ? model.spaceById.get(route.destination)?.name || route.destination : "";
   const length = route.length_m !== undefined ? Math.round(route.length_m) : null;
   const minutes = length !== null ? Math.max(1, Math.round(length / WALK_M_PER_MIN)) : null;
   const end = () => {
@@ -44,10 +43,7 @@ export function Walk() {
         <div className="card-head">
           <span className="card-kicker">
             Step {step + 1} of {steps.length}
-            <span className="card-muted">
-              {length !== null && ` · ${length} m · ${minutes} min`}
-              {destination && ` · to ${destination}`}
-            </span>
+            {length !== null && <span className="card-muted"> · {length} m · {minutes} min</span>}
           </span>
           <button className="x" onClick={end} aria-label="End directions">
             ×
@@ -84,4 +80,9 @@ export function Walk() {
       </section>
     </PhoneSheet>
   );
+}
+
+/** The server's step lines name rooms as "Office 0.46 [building-F0-S046]"; the id in brackets is not for people. */
+function readable(line: string): string {
+  return line.replace(/\s*\[[^\]]*\]/g, "");
 }
