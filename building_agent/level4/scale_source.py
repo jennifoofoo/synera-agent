@@ -179,6 +179,42 @@ def find_scale(data: object, level: int | None = None) -> ScaleHit | None:
     return best[1] if best else None
 
 
+ELEVATION_KEYS = {"elevation_m", "elevation", "elevation_metres", "elevation_meters"}
+HEIGHT_KEYS = {"height_m", "floor_height_m", "floor_height", "height_metres", "height_meters"}
+MIN_HEIGHT_M, MAX_HEIGHT_M = 2.0, 12.0
+
+
+def find_floor_heights(data: object) -> dict[int, tuple[float | None, float | None]]:
+    """{level: (elevation_m, height_m)} from the floors of a building.json (either may be None). Floors are the dicts
+    that carry a level and at least one height or elevation field, found anywhere up to MAX_DEPTH (so under `floors`,
+    `building.floors` or `plan.floors` alike). A height outside 2..12 m is skipped."""
+    found: dict[int, tuple[float | None, float | None]] = {}
+    stack = [(data, 0)]
+    while stack:
+        value, depth = stack.pop(0)
+        if depth > MAX_DEPTH:
+            continue
+        if isinstance(value, dict):
+            stack += [(item, depth + 1) for item in value.values() if isinstance(item, dict | list)]
+        elif isinstance(value, list):
+            stack += [(item, depth + 1) for item in value[:200] if isinstance(item, dict | list)]
+        level = _floor_of(None, value) if isinstance(value, dict) else None
+        if level is None:
+            continue
+        elevation = height = None
+        for key, item in value.items():
+            parsed = _number(item)
+            if parsed is None:
+                continue
+            if _normal(key) in ELEVATION_KEYS and abs(parsed[0]) <= 1000:
+                elevation = parsed[0]
+            elif _normal(key) in HEIGHT_KEYS and MIN_HEIGHT_M <= parsed[0] <= MAX_HEIGHT_M:
+                height = parsed[0]
+        if elevation is not None or height is not None:
+            found.setdefault(level, (elevation, height))
+    return found
+
+
 def _x_extent(polygons: list) -> float | None:
     xs = [
         float(point[0])

@@ -634,7 +634,7 @@ All numbers in "Swiss stair doors and SVG check" above and in the sections befor
 
 **SVG path (svg + building.json scale, no vision), 20 dev buildings**
 
-20 of 20 buildings built, 164 scored questions, 78 correct (score 48%). Not built: none.
+20 of 20 buildings built, 164 scored questions, 106 correct (score 65%). Not built: none.
 
 | Kind | Questions | Resolved | Correct | Correct of resolved | Unresolved share |
 |---|---|---|---|---|---|
@@ -643,22 +643,22 @@ All numbers in "Swiss stair doors and SVG check" above and in the sections befor
 | floor_area_total | 17 | 4 | 3 | 75% | 76% |
 | largest_room | 9 | 3 | 2 | 67% | 67% |
 | locate | 46 | not scored (needs the furniture list) | | | |
-| room_stacked | 9 | 7 | 0 | 0% | 22% |
-| route | 60 | 58 | 37 | 64% | 3% |
-| route_step_free | 20 | 18 | 11 | 61% | 10% |
+| room_stacked | 9 | 7 | 3 | 43% | 22% |
+| route | 60 | 58 | 49 | 84% | 3% |
+| route_step_free | 20 | 18 | 16 | 89% | 10% |
 | route_with_closure | 14 | not scored (names a lift by element id) | | | |
 | shared_walls_count | 8 | 8 | 8 | 100% | 0% |
 | step_free_reachable_count | 1 | not scored (names a lift by element id) | | | |
-| straight_line_3d | 10 | 9 | 6 | 67% | 10% |
-| tour | 20 | 19 | 9 | 47% | 5% |
+| straight_line_3d | 10 | 9 | 8 | 89% | 10% |
+| tour | 20 | 19 | 15 | 79% | 5% |
 | what_if_door | 2 | 2 | 2 | 100% | 0% |
 | wide_delivery_count | 9 | 9 | 0 | 0% | 0% |
-| **all scored kinds** | 164 | 137 | 78 | 57% | 16% |
+| **all scored kinds** | 164 | 137 | 106 | 77% | 16% |
 
 | Source | Buildings | Questions | Resolved | Correct | Score | Unresolved share |
 |---|---|---|---|---|---|---|
-| osm | 4 | 46 | 38 | 25 | 54% | 17% |
-| proc | 6 | 51 | 42 | 11 | 22% | 18% |
+| osm | 4 | 46 | 38 | 28 | 61% | 17% |
+| proc | 6 | 51 | 42 | 36 | 71% | 18% |
 | resplan | 5 | 35 | 32 | 29 | 83% | 9% |
 | swiss | 5 | 32 | 25 | 13 | 41% | 22% |
 
@@ -673,30 +673,13 @@ Weakest buildings:
 
 | Building | Source | Floors | Built rooms | Questions | Correct | Unresolved |
 |---|---|---|---|---|---|---|
-| proc-campus-dev-006 | proc | 4 | 85 | 8 | 0% | 1 |
 | swiss-2211 | swiss | 5 | 199 | 7 | 14% | 2 |
 | swiss-2325 | swiss | 6 | 106 | 6 | 17% | 2 |
-| proc-campus-dev-009 | proc | 6 | 207 | 9 | 22% | 2 |
-| proc-campus-dev-000 | proc | 5 | 152 | 9 | 22% | 2 |
-| proc-campus-dev-002 | proc | 4 | 89 | 8 | 25% | 1 |
-| proc-campus-dev-013 | proc | 3 | 63 | 8 | 25% | 1 |
-| proc-campus-dev-001 | proc | 4 | 97 | 9 | 33% | 2 |
+| swiss-1689 | swiss | 5 | 362 | 6 | 50% | 1 |
+| osm-way360544293 | osm | 3 | 46 | 8 | 50% | 0 |
+| swiss-31 | swiss | 4 | 132 | 6 | 50% | 1 |
+| osm-way22744230 | osm | 8 | 325 | 12 | 58% | 1 |
+| osm-way27917482 | osm | 5 | 1623 | 14 | 64% | 4 |
+| proc-campus-dev-009 | proc | 6 | 207 | 9 | 67% | 2 |
 
-Comparison (same questions, other reading or other lookup):
-
-| Reading | Buildings | Questions | Resolved | Correct | Score | Unresolved share | Found from the full name in one call |
-|---|---|---|---|---|---|---|---|
-| svg path, all floors | 20 | 164 | 137 | 78 | 48% | 16% | 83% |
-| svg path, all floors, find_space without number fallback | 20 | 164 | 137 | 78 | 48% | 16% | 1% |
-| floor 0 only, svg (no names, no types) | 8 | 19 | 18 | 12 | 63% | 5% | 88% |
-| floor 0 only, svg plus cached vision reading | 8 | 19 | 18 | 12 | 63% | 5% | 88% |
-| floor 0 only, cached vision reading of the plain png (old path) | 8 | 19 | 17 | 3 | 16% | 11% | 82% |
-
-How to read this (2026-10-24, no API calls; `scripts/level4_questions_eval.py --n 20 --compare-fallback --compare-vision`, written by hand below the generated tables, a rerun replaces the section):
-- What is asked: every labelled question of 20 dev buildings (5 swiss, 4 osm, 6 proc, 5 resplan, 15 of them multi-floor) on the building that `build_from_plan` made from `floor_<n>.png` + `floor_<n>.svg`, scale from a `building.json` with the true pixels per metre of each floor (so the scale is not what is measured). Not scored: locate, count, errand (need the furniture list, a plan has none), route_with_closure and step_free_reachable_count (name a lift by element id).
-- Overall 78 of 164 scored questions (48%). Single-floor ResPlan 83%, osm 54%, swiss 41%, proc 22%. The same-floor questions are mostly exact (shared_walls_count 8 of 8, what_if_door 2 of 2, same-floor routes to the centimetre or within about 3%). What fails is everything that needs a metre across floors: routes and tours between floors are 3 to 8% off the label, straight_line_3d between floors, room_stacked 0 of 7 (the floors of a plan upload have no shared frame: each png is cropped to its own floor, so the built building places the floors by the stair and lift centres only).
-- wide_delivery_count 0 of 9: the svg marks a door by a point, there is no door width, so every built door is 0.9 m wide.
-- Names: the printed room number is in the svg for about 80% of the rooms (comment plus glyph position, no wrong number on the 11 floors of 6 buildings checked); 277 of the 376 unnumbered Swiss rooms get their number from the kit's numbering order (no wrong one). Unresolved (a room of the question that cannot be found in the built building even by its number alone) is 16% of the scored questions: the small rooms the plan does not number (osm 214 of 2055 rooms, swiss 99 of 1606 after inference) and the type questions (largest_room, floor_area_total: 26 questions, 76% unresolved), because nothing in the png or svg says "kitchen" and the vision model (cached extractions of the plain png) returns generic_room for every room, so the built building has no kitchens, bedrooms or offices.
-- The name gap and its fix: a built room is called "Room 1.30" (or "Kitchen 1.30" when a type is known), the question says "Kitchen 1.30 (apartment 8)". With the old find_space only 1% of the questions found their rooms from the full name in one call (the agent would have to retry with the number). `find_space` now falls back to the printed number when no name matches exactly (words with a digit other than a bare integer, never text with brackets, colons or equals signs, only when exactly one room has that number): 83% in one call, 0 changes to the unresolved share (the number-only retry already found them). No change on kit buildings, where the exact name matches first.
-- svg against the old vision path, floor 0 of the 8 buildings with a cached extraction: 63% against 16%. A cached vision reading adds nothing on top of the svg (the model gave only stair or hall types).
-- Weak spots to know on Sunday: (1) room types (kitchen, bedroom, office) exist only if the model reads them from the numbered png, which our measurements never did; a type question on a built building is unanswerable otherwise. (2) Floor frames for multi-floor uploads. (3) Door widths.
+Level 4 questions, change log of this section: before (branch feat/level4-svg-first) 48% (osm 54, proc 22, resplan 83, swiss 41). With storey heights (building.json, else family default 3.5 factory / 3.8 campus / 3.0 other, measured on the 280 kit buildings) 63% (proc 71). With floor alignment by stair and lift overlap (translation only, room_stacked allowed on a building whose floors were lined up) 65% (osm 61, proc 71, resplan 83, swiss 41). room_stacked 0 of 7 to 3 of 7. Swiss floors carry no stairs or lifts in the svg, so they are not aligned (card says so) and score as before. Room types are not in the plan images (numbers only), so they are left to the furniture reading.

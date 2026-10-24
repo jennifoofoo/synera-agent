@@ -62,6 +62,20 @@ CODES: dict[str, tuple[str, str]] = {
         "warning",
         "{n} stair or lift pair{s} {is} matched after centring the floors on each other, please check.",
     ),
+    "floor_height_assumed": (
+        "warning",
+        (
+            "The storey height is not in the plan files, so a default for this kind of building was assumed (it sets "
+            "the length of stairs and lifts). Tell me the real height if you know it."
+        ),
+    ),
+    "floor_not_aligned": (
+        "warning",
+        (
+            "{n} floor{s} could not be lined up with the floor below by their stairs and lifts, "
+            "so distances between floors may be off."
+        ),
+    ),
     "floor_empty": ("warning", "{n} floor{s} without any room."),
 }
 

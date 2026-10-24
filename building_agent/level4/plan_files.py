@@ -77,6 +77,21 @@ def svg_extraction(image: Path, uploads_root: Path) -> tuple[Extraction | None, 
     return extraction, "", inferred
 
 
+_TITLE = re.compile(r"<!-- ([^>\n]{1,80}?) \u2014 [^>\n]*-->")
+
+
+def svg_title(image: Path, uploads_root: Path) -> str:
+    """The building name printed above the plan (the comment `<!-- Name \u2014 Floor 1 -->` of the svg), else ''."""
+    svg = find_sibling(image, uploads_root, ".svg")
+    if svg is None:
+        return ""
+    try:
+        match = _TITLE.search(svg.read_text(encoding="utf-8")[-200000:])
+    except (OSError, UnicodeDecodeError):
+        return ""
+    return match.group(1).strip() if match else ""
+
+
 def _shape(room) -> Polygon | None:
     try:
         shape = Polygon(room.polygon_px)
