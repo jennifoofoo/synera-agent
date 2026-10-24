@@ -39,6 +39,13 @@ How a wheel event is told apart: line-mode events and pixel steps of 50 px or mo
 trackpad scroll and pan. Safari pinch (`gesturechange`) and Chrome pinch (ctrl + wheel) zoom. The page never scrolls
 or zooms while the pointer is over the canvas.
 
+## Map symbols
+
+The help card (`?`, `H`, or the `?` button under the floor rail on the laptop) also explains the 2D map symbols,
+from `POI_LEGEND` in `scene/poiIcons.tsx`: entrance / exit, lift, stairs, toilets, not step-free (a step or
+threshold), coffee machine, printer, fire extinguisher, first aid / defibrillator, and the grey shapes (machines,
+racks, furniture; darker and named when the directions use them as a landmark). When each appears: `scene/mapZoom.ts`.
+
 ## Where it lives
 
 - `scene/cameraMouse.ts`: pan (grab), wheel and gestures, drag never clicks, double click hook.

@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { KEY_CONTROLS, MOUSE_CONTROLS, useKeyHelp } from "../scene/controlsTable";
+import { PoiBadge, POI_LEGEND } from "../scene/poiIcons";
 import "./KeyHelp.css";
 
-/** Small keyboard and mouse help card (? or H). Closes with Esc or any other key. Laptop and tablet only. */
+/** Small help card (? or H, or the ? button under the floor rail): controls and the map symbols. Closes with Esc or
+ * any other key. Laptop and tablet only. */
 export function KeyHelp() {
   const open = useKeyHelp((s) => s.open);
   const setOpen = useKeyHelp((s) => s.setOpen);
@@ -39,6 +41,19 @@ export function KeyHelp() {
           ))}
         </tbody>
       </table>
+      <h2 className="keyhelp-symbols">Map symbols</h2>
+      <ul className="keyhelp-legend">
+        {POI_LEGEND.map((row) => (
+          <li key={row.kind}>
+            <PoiBadge kind={row.kind} title={row.label} />
+            <span>{row.label}</span>
+          </li>
+        ))}
+        <li>
+          <span className="keyhelp-shape" aria-hidden />
+          <span>Machine, rack or furniture (darker and named: a landmark of your route)</span>
+        </li>
+      </ul>
       <p>Press any key to close</p>
     </div>
   );
