@@ -2,6 +2,7 @@
 
   uv run --env-file .env python scripts/eval_level4.py                       # 8 default floors, cached, max $2
   uv run --env-file .env python scripts/eval_level4.py --floors resplan-439,swiss-31:1 --max-dollars 0.5
+  uv run python scripts/eval_level4.py --markers   # cached floors, model alone vs model + marker detection
 
 The raw extraction of each image is cached under agent_output/level4_cache, so a repeat run costs nothing.
 The scale is the true width of the floor (as in the spike), so this measures extraction quality, not the scale.
@@ -21,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from building_agent.level4 import extract as extract_module
 from building_agent.level4.convert import FloorInput, convert_floors_with_findings, scale_from_known_length
 from building_agent.level4.extract import DEFAULT_MODEL, ExtractError, ExtractResult, extract_floor
+from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import ExtractedDoor, ExtractedRoom, Extraction
 from building_agent.level4.validate import validate
 from tests.level4_helpers import DATA_DEV, floor_case, measure
@@ -106,8 +108,12 @@ def best_offset(case, converted: dict) -> tuple[float, float]:
     return max(scored, key=lambda item: item[0])[1]
 
 
-def evaluate_floor(building_id: str, level: int, result: ExtractResult) -> dict:
+def evaluate_floor(building_id: str, level: int, result: ExtractResult, use_markers: bool = False) -> dict:
     case = floor_case(building_id, level)
+    if use_markers:
+        found = detect_markers(DATA_DEV / building_id / f"floor_{level}_plain.png")
+        merged, _ = merge_markers(result.extraction, found)
+        result = dataclasses.replace(result, extraction=merged)
     xs = [x for s in case.truth["spaces"] for x, _ in s["polygon"]]
     scale = scale_from_known_length(result.extraction, max(xs) - min(xs))
     converted, convert_findings = convert_floors_with_findings(
@@ -227,11 +233,31 @@ def render_judge(rows: list[dict]) -> list[str]:
     return lines
 
 
-def write_log(lines: list[str], model: str) -> None:
+def render_markers(plain: list[dict], marked: list[dict]) -> list[str]:
+    """Side by side: the model alone vs the model plus deterministic marker detection (same cached extraction)."""
+    lines = [
+        (
+            "| Floor | Door recall (model) | Door recall (+markers) | Pairs >= 0.99 (model) | Pairs >= 0.99 (+markers) "
+            "| Invalid (model) | Invalid (+markers) | No route (model) | No route (+markers) | Pairs |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for a, b in zip(plain, marked):
+        lines.append(
+            f"| {a['floor']} | {a['door_recall']:.2f} | {b['door_recall']:.2f} | {a['judge_full']:.0%} "
+            f"| {b['judge_full']:.0%} | {a['judge_invalid']} | {b['judge_invalid']} | {a['judge_no_route']} "
+            f"| {b['judge_no_route']} | {a['judge_pairs']} |"
+        )
+    return [*lines, ""]
+
+
+def write_log(lines: list[str], model: str, title: str | None = None) -> None:
     EVAL_LOG.parent.mkdir(exist_ok=True)
     text = EVAL_LOG.read_text(encoding="utf-8") if EVAL_LOG.exists() else "# Eval log\n"
     block = (
-        f"\n### Run {datetime.date.today().isoformat()} ({model}, prompt {PROMPT_HASH})\n\n" + "\n".join(lines) + "\n"
+        f"\n### {title or 'Run'} {datetime.date.today().isoformat()} ({model}, prompt {PROMPT_HASH})\n\n"
+        + "\n".join(lines)
+        + "\n"
     )
     if HEADING not in text.splitlines():
         text = text.rstrip("\n") + f"\n\n{HEADING}\n" + block
@@ -247,9 +273,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="eval_level4")
     parser.add_argument("--floors", default=None, help="comma list of building[:level], default 8 dev floors")
     parser.add_argument("--max-dollars", type=float, default=2.0, help="stop before a live call above this total")
+    parser.add_argument("--markers", action="store_true", help="also apply merge_markers before convert and compare")
     parser.add_argument("--no-log", action="store_true", help="do not write docs/eval-log.md")
     arguments = parser.parse_args()
     rows: list[dict] = []
+    marked_rows: list[dict] = []
     spent = 0.0
     for building_id, level in parse_floors(arguments.floors):
         path = cache_file(building_id, level)
@@ -272,6 +300,8 @@ def main() -> None:
             source = "live"
         row = evaluate_floor(building_id, level, result)
         rows.append(row)
+        if arguments.markers:
+            marked_rows.append(evaluate_floor(building_id, level, result, use_markers=True))
         print(
             f"[level4] {row['floor']:28s} {source:6s} recall {row['recall']:.2f} prec {row['precision']:.2f} "
             f"doors {row['door_recall']:.2f} area {row['area_err']:.1%} route {row['route_err']:.1%} "
@@ -281,10 +311,15 @@ def main() -> None:
     if not rows:
         print("[level4] nothing evaluated")
         return
-    lines = render(rows, sum(r["cost"] for r in rows))
+    if arguments.markers:
+        lines = render_markers(rows, marked_rows)
+        title = "Marker detection"
+    else:
+        lines = render(rows, sum(r["cost"] for r in rows))
+        title = None
     print("\n" + "\n".join(lines))
     if not arguments.no_log:
-        write_log(lines, DEFAULT_MODEL)
+        write_log(lines, DEFAULT_MODEL, title)
         print(f"\n[level4] appended to {EVAL_LOG}")
 
 
