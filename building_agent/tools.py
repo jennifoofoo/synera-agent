@@ -12,13 +12,14 @@ from anthropic.lib.tools import ToolError
 
 from building_agent import routing
 from building_agent.campus_tools import CampusHolder, make_campus_tools
+from building_agent.exit_tools import make_exit_tools
 from building_agent.find_space import find_space
 from building_agent.find_tools import make_find_tools
 from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
 from building_agent.level4.tools import BMHolder, make_level4_tools
-from building_agent.position import no_position_error
+from building_agent.position import no_position_error, position_note
 from building_agent.position_tools import distance_annotator, make_position_tools
 from building_agent.registry import Kind, load_kinds
 from building_agent.selection_tools import make_selection_tools
@@ -154,7 +155,11 @@ def make_tools(
             guide.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
-        assumed = {"start_assumed": bm.describe_space(result.start_space_id)} if start is None else {}
+        assumed = (
+            {"start_assumed": bm.describe_space(result.start_space_id), **position_note(bm, guide.position)}
+            if start is None
+            else {}
+        )
         return as_json({**asdict(result), **assumed})
 
     @beta_tool
@@ -192,6 +197,7 @@ def make_tools(
         find_space_tool,
         *make_find_tools(bm, annotate),
         *make_position_tools(bm, guide),
+        *make_exit_tools(bm, guide),
         *make_task_tools(bm, annotate),
         *make_impact_tools(bm),
         *guide_tools,

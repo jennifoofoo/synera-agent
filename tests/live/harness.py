@@ -11,7 +11,7 @@ from pathlib import Path
 
 import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
-from building_agent import guide_tools, pace_guide, position_tools, walk
+from building_agent import exit_tools, guide_tools, pace_guide, position_tools, walk
 from building_agent.registry import load_kinds
 from building_agent.voice_rules import VOICE_RULES
 from starter_agent.building_map import BuildingMap
@@ -117,7 +117,10 @@ def cache_file(
         agent_module.CALCULATION_RULES
         + agent_module.CONVERSATION_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
-        + "".join(Path(module.__file__).read_text(encoding="utf-8") for module in (position_tools, walk, guide_tools))
+        + "".join(
+            Path(module.__file__).read_text(encoding="utf-8")
+            for module in (position_tools, walk, guide_tools, exit_tools)
+        )
     )
     raw = json.dumps([building_directory.name, user_turns, model, version] + ([VOICE_RULES] if voice else []))
     if pace != "off":  # pace runs get their own key (and one that follows the wiring); other keys stay as they were
