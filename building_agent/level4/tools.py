@@ -37,7 +37,8 @@ from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, Ex
 from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.segment import match_to_extraction, segment_rooms
-from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
+from building_agent.level4.stair_doors import describe_stair_doors, suggest_stairs_then_generic
+from building_agent.level4.suggest import apply_suggestions, describe_suggestions
 from building_agent.level4.validate import Collector, describe, validate
 from starter_agent.building_map import NEW_DOOR_WIDTH_M, BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -204,7 +205,8 @@ def apply_fix(building: dict, fix: tuple, to_metres=None) -> str:
     """Apply one deterministic fix to `building` in place and return what was done. Raises ToolError."""
     action = fix[0]
     if action == "accept_suggestions":
-        suggestions = suggest_doors(building)
+        stairs, rest = suggest_stairs_then_generic(building)
+        suggestions = stairs + rest
         if not suggestions:
             raise ToolError("There are no door suggestions for this draft.")
         updated = apply_suggestions(building, suggestions)
@@ -695,9 +697,10 @@ def make_level4_tools(
         question = questions(building)
         if question:
             card["question"] = question
-        suggestions = suggest_doors(building)
-        if suggestions:
-            card["proposal"] = describe_suggestions(suggestions)
+        stairs, rest = suggest_stairs_then_generic(building)
+        proposal = " ".join(t for t in (describe_stair_doors(stairs), describe_suggestions(rest)) if t)
+        if proposal:
+            card["proposal"] = proposal
         if draft.notes or draft.marker_notes:
             card["notes"] = draft.notes + draft.marker_notes
         draft.card_turn, draft.card_version, draft.card_blocked = state.turn, draft.version, not errors.ok

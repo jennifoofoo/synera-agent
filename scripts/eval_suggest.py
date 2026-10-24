@@ -16,8 +16,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from building_agent.level4 import stair_doors as stair_module
 from building_agent.level4 import suggest as suggest_module
 from building_agent.level4.convert import FloorInput, convert_floors_with_findings
+from building_agent.level4.stair_doors import is_stair_hall, suggest_stair_doors
 from building_agent.level4.suggest import apply_suggestions, suggest_doors
 from building_agent.level4.validate import validate
 from scripts.eval_level4 import DEFAULT_FLOORS, best_offset, cache_file, load_cached, parse_floors
@@ -61,10 +63,10 @@ def drop_doors(case, seed: int):
     return dataclasses.replace(case, extraction=dataclasses.replace(case.extraction, doors=kept))
 
 
-def run(case, converted: dict, name: str, source: str) -> dict:
+def run(case, converted: dict, name: str, source: str, suggester=suggest_doors) -> dict:
     matched = match_rooms(case, converted)
     truth_pairs = {frozenset(o["space_ids"]) for o in case.truth["openings"]}
-    suggestions = suggest_doors(converted)
+    suggestions = suggester(converted)
     fixed = apply_suggestions(converted, suggestions)
     real = sum(
         s.first in matched and s.second in matched and frozenset((matched[s.first], matched[s.second])) in truth_pairs
@@ -147,14 +149,107 @@ def table(rows: list[dict], group_by: str) -> list[str]:
     return lines
 
 
+def stair_then_generic(building: dict) -> list:
+    first = suggest_stair_doors(building)
+    return first + suggest_doors(apply_suggestions(building, first))
+
+
+SUGGESTERS = {"generic": suggest_doors, "stair": suggest_stair_doors, "stair then generic": stair_then_generic}
+
+
+def drop_stair_doors(case):
+    """The Swiss pattern: every door that touches a stair or lift space is missing (entrances stay)."""
+    stairs = {f"r{i}" for i, space in enumerate(case.truth["spaces"]) if is_stair_hall(space)}
+    kept = [d for d in case.extraction.doors if OUTSIDE in d.rooms or not stairs & set(d.rooms)]
+    dropped = len(case.extraction.doors) - len(kept)
+    return dataclasses.replace(case, extraction=dataclasses.replace(case.extraction, doors=kept), dropped_doors=dropped)
+
+
+def stair_cached_rows(floors: list[tuple[str, int]]) -> list[dict]:
+    """Cached model extractions after segmentation and markers, as in eval_level4 --segment --markers."""
+    from building_agent.level4.convert import scale_from_known_length
+    from building_agent.level4.markers import detect_markers, merge_markers
+    from scripts.eval_level4 import apply_segment
+    from tests.level4_helpers import DATA_DEV
+
+    rows = []
+    for building_id, level in floors:
+        result = load_cached(cache_file(building_id, level))
+        if result is None:
+            continue
+        result = apply_segment(result, building_id, level)
+        merged, _ = merge_markers(
+            result.extraction, detect_markers(DATA_DEV / building_id / f"floor_{level}_plain.png")
+        )
+        case = floor_case(building_id, level)
+        xs = [x for s in case.truth["spaces"] for x, _ in s["polygon"]]
+        scale = scale_from_known_length(merged, max(xs) - min(xs))
+        converted, _ = convert_floors_with_findings([FloorInput(level, merged, scale)], building_id, building_id)
+        case = dataclasses.replace(case, extraction=merged, scale=scale)
+        case = dataclasses.replace(case, offset=best_offset(case, converted))
+        for variant, suggester in SUGGESTERS.items():
+            rows.append(
+                {
+                    **run(case, converted, f"{building_id}:{level}", source_of(building_id), suggester),
+                    "variant": variant,
+                }
+            )
+    return rows
+
+
+def stair_drop_rows(split: str) -> list[dict]:
+    """Every Swiss floor of a split (dev or train) with the stair doors dropped."""
+    import tests.level4_helpers as helpers
+
+    helpers.DATA_DEV = Path("data") / split
+    rows = []
+    try:
+        for directory in sorted(helpers.DATA_DEV.glob("swiss-*")):
+            for floor in helpers.load_building(directory.name)["floors"]:
+                case = drop_stair_doors(floor_case(directory.name, floor["level"]))
+                if not case.dropped_doors:
+                    continue
+                converted, _ = convert_floors_with_findings(
+                    [FloorInput(floor["level"], case.extraction, case.scale)], directory.name, directory.name
+                )
+                for variant, suggester in SUGGESTERS.items():
+                    row = run(case, converted, f"{directory.name}:{floor['level']}", split, suggester)
+                    rows.append({**row, "variant": variant, "dropped": case.dropped_doors})
+    finally:
+        helpers.DATA_DEV = Path("data/dev")
+    return rows
+
+
+def stairs_report(arguments) -> None:
+    cached = stair_cached_rows(parse_floors(",".join(DEFAULT_FLOORS)))
+    print("Cached extractions after segment + markers\n")
+    for variant in SUGGESTERS:
+        rows = [r for r in cached if r["variant"] == variant]
+        if arguments.summary:
+            continue
+        print(f"{variant}\n" + "\n".join(table(rows, "floor")) + "\n")
+    for split in ("dev", "train"):
+        rows = stair_drop_rows(split)
+        print(f"\nSwiss {split} floors, stair doors dropped ({len({r['floor'] for r in rows})} floors)\n")
+        for variant in SUGGESTERS:
+            part = [r for r in rows if r["variant"] == variant]
+            dropped, real = sum(r["dropped"] for r in part), sum(r["real"] for r in part)
+            print(f"{variant}\n" + "\n".join(table(part, "source")))
+            print(f"dropped stair doors {dropped}, restored {real} ({real / dropped:.0%} recall)\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="eval_suggest")
+    parser.add_argument("--stairs", action="store_true", help="compare the stair hall rule on cached and Swiss floors")
     parser.add_argument("--set", action="append", default=[], help="override a score weight, e.g. HUB_BONUS=2")
     parser.add_argument("--summary", action="store_true", help="only the per-source tables")
     arguments = parser.parse_args()
     for item in arguments.set:
         key, value = item.split("=")
-        setattr(suggest_module, key, float(value))
+        setattr(stair_module if hasattr(stair_module, key) else suggest_module, key, float(value))
+    if arguments.stairs:
+        stairs_report(arguments)
+        return
     cached = cached_rows(parse_floors(",".join(DEFAULT_FLOORS)))
     artificial = artificial_rows()
     print("Cached extractions (real vision output)\n")
