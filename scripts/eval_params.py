@@ -1,6 +1,6 @@
 """Can a cheap LLM read the tool parameters out of the question text?
 
-uv run --env-file .env python scripts/eval_params.py --per-kind 5
+uv run --env-file .env python scripts/eval_params.py --per-kind 5   (or --all --max-calls 600)
 One forced tool call per question, nothing is executed. Responses are cached in agent_output/params_cache/."""
 
 import argparse
@@ -15,7 +15,7 @@ import anthropic
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from building_agent.agent import overview_with_floor_ids
-from building_agent.params_eval import compare_params
+from building_agent.params_eval import compare_params, estimate_cost, group_mismatches
 from building_agent.registry import load_kinds
 from building_agent.tools import kind_tool
 from starter_agent.building_map import BuildingMap
@@ -46,15 +46,18 @@ def ask_model(client: anthropic.Anthropic, bm: BuildingMap, tools: list[dict], t
         messages=[{"role": "user", "content": text}],
     )
     call = next((block for block in message.content if block.type == "tool_use"), None)
-    return {"tool": call.name if call else None, "input": call.input if call else {}}
+    usage = {"input_tokens": message.usage.input_tokens, "output_tokens": message.usage.output_tokens}
+    return {"tool": call.name if call else None, "input": call.input if call else {}, "usage": usage}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--per-kind", type=int, default=5)
+    parser.add_argument("--per-kind", default="5", help="questions per kind, or 'all'")
+    parser.add_argument("--all", action="store_true", help="same as --per-kind all")
     parser.add_argument("--max-calls", type=int, default=60)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
+    per_kind = None if args.all or args.per_kind == "all" else int(args.per_kind)
 
     kinds = load_kinds()
     tools = [kind_tool(None, kind).to_dict() for kind in kinds.values()]
@@ -63,10 +66,15 @@ def main() -> int:
     maps: dict[str, BuildingMap] = {}
     calls = 0
     stopped = None
+    run_tokens = [0, 0]
+    all_tokens = [0, 0]
+    total_questions = 0
+    all_mismatches = []
+    bm_for = {}
 
     for name in kinds:
         questions = labelled_questions(name)
-        sample = random.Random(args.seed).sample(questions, min(args.per_kind, len(questions)))
+        sample = questions if per_kind is None else random.Random(args.seed).sample(questions, min(per_kind, len(questions)))
         tool_ok = params_ok = done = 0
         mismatches = []
         for building, question in sample:
@@ -85,7 +93,14 @@ def main() -> int:
                     stopped = f"API error: {type(error).__name__}: {str(error)[:200]}"
                     break
                 path.write_text(json.dumps(response))
+                run_tokens[0] += response["usage"]["input_tokens"]
+                run_tokens[1] += response["usage"]["output_tokens"]
+            usage = response.get("usage")
+            if usage:
+                all_tokens[0] += usage["input_tokens"]
+                all_tokens[1] += usage["output_tokens"]
             done += 1
+            bm_for[question["id"]] = bm
             if response["tool"] == name:
                 tool_ok += 1
                 diff = compare_params(bm, question["inputs"], response["input"])
@@ -93,12 +108,23 @@ def main() -> int:
                 mismatches += [(question["id"], key, exp, got) for key, exp, got in diff]
             else:
                 mismatches.append((question["id"], "TOOL", name, response["tool"]))
+        total_questions += done
+        all_mismatches += [(name, *m) for m in mismatches]
         print(f"{name:20} n={done}  tool correct {tool_ok}/{done}  all params correct {params_ok}/{done}")
         for question_id, key, expected, got in mismatches:
             print(f"    {question_id}  {key}: expected {expected!r}, got {got!r}")
         if stopped:
             break
+    print(f"\nQuestions evaluated: {total_questions}")
+    groups = group_mismatches(bm_for, all_mismatches)
+    print(f"\nMismatch patterns ({len(all_mismatches)} total):")
+    for label, items in groups.items():
+        print(f"  {len(items):4}  {label}")
+        for kind, question_id, key, expected, got in items[:2]:
+            print(f"          e.g. {kind} {question_id} {key}: expected {expected!r}, got {got!r}")
     print(f"\nAPI calls this run: {calls} (cache: {CACHE})")
+    print(f"Tokens this run: {run_tokens[0]} in / {run_tokens[1]} out, est. ${estimate_cost(*run_tokens):.4f}")
+    print(f"Tokens incl. cached responses: {all_tokens[0]} in / {all_tokens[1]} out, est. ${estimate_cost(*all_tokens):.4f} ({MODEL})")
     if stopped:
         print(f"STOPPED: {stopped}")
         return 1
