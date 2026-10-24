@@ -1,0 +1,809 @@
+{
+ "building_id": "swiss-203",
+ "floor_index": 0,
+ "model": "claude-sonnet-5-5",
+ "image": "data/dev/swiss-203/floor_0_plain.png",
+ "image_size_px": [
+  402,
+  652
+ ],
+ "seconds": 13.4,
+ "input_tokens": 996,
+ "output_tokens": 2130,
+ "stop_reason": "end_turn",
+ "raw_text": "{\"scale\":{\"bar_px\":null,\"bar_m\":null},\"rooms\":[{\"id\":\"r1\",\"ref\":\"0.04\",\"name\":null,\"type\":\"room\",\"room_type\":\"living room\",\"polygon_px\":[[44,97],[121,74],[151,181],[84,193]]},{\"id\":\"r2\",\"ref\":\"0.03\",\"name\":null,\"type\":\"room\",\"room_type\":\"bedroom\",\"polygon_px\":[[121,74],[181,56],[195,102],[133,120]]},{\"id\":\"r3\",\"ref\":\"0.02\",\"name\":null,\"type\":\"room\",\"room_type\":\"bathroom\",\"polygon_px\":[[161,112],[199,103],[204,132],[168,141]]},{\"id\":\"r4\",\"ref\":\"0.08\",\"name\":null,\"type\":\"room\",\"room_type\":\"kitchen\",\"polygon_px\":[[146,148],[208,134],[214,170],[155,182]]},{\"id\":\"r5\",\"ref\":\"0.07\",\"name\":null,\"type\":\"room\",\"room_type\":\"bedroom\",\"polygon_px\":[[84,193],[134,181],[139,208],[91,223]]},{\"id\":\"r6\",\"ref\":\"0.01\",\"name\":null,\"type\":\"room\",\"room_type\":\"balcony\",\"polygon_px\":[[38,160],[62,174],[88,204],[80,233],[60,215]]},{\"id\":\"r7\",\"ref\":\"0.29\",\"name\":null,\"type\":\"room\",\"room_type\":\"corridor\",\"polygon_px\":[[94,213],[143,210],[148,233],[100,252]]},{\"id\":\"r8\",\"ref\":\"0.26\",\"name\":null,\"type\":\"room\",\"room_type\":\"living room\",\"polygon_px\":[[100,252],[148,233],[196,320],[121,358],[92,262]]},{\"id\":\"r9\",\"ref\":\"0.28\",\"name\":null,\"type\":\"room\",\"room_type\":\"balcony\",\"polygon_px\":[[58,232],[86,226],[97,254],[83,303],[66,285]]},{\"id\":\"r10\",\"ref\":\"0.25\",\"name\":null,\"type\":\"room\",\"room_type\":\"bedroom\",\"polygon_px\":[[165,220],[227,206],[236,238],[172,254]]},{\"id\":\"r11\",\"ref\":\"0.32\",\"name\":null,\"type\":\"room\",\"room_type\":\"bathroom\",\"polygon_px\":[[201,246],[240,241],[244,270],[206,277]]},{\"id\":\"r12\",\"ref\":\"0.27\",\"name\":null,\"type\":\"room\",\"room_type\":\"kitchen\",\"polygon_px\":[[185,274],[244,270],[259,319],[198,335]]},{\"id\":\"r13\",\"ref\":\"0.23\",\"name\":null,\"type\":\"room\",\"room_type\":\"living room\",\"polygon_px\":[[150,352],[227,331],[257,445],[185,452]]},{\"id\":\"r14\",\"ref\":\"0.18\",\"name\":null,\"type\":\"room\",\"room_type\":\"bedroom\",\"polygon_px\":[[227,331],[290,313],[300,360],[240,376]]},{\"id\":\"r15\",\"ref\":\"0.24\",\"name\":null,\"type\":\"room\",\"room_type\":\"bathroom\",\"polygon_px\":[[268,364],[305,360],[309,388],[273,396]]},{\"id\":\"r16\",\"ref\":\"0.17\",\"name\":null,\"type\":\"room\",\"room_type\":\"kitchen\",\"polygon_px\":[[250,400],[312,390],[320,426],[258,441]]},{\"id\":\"r17\",\"ref\":\"0.20\",\"name\":null,\"type\":\"room\",\"room_type\":\"bedroom\",\"polygon_px\":[[191,449],[240,438],[246,466],[198,480]]},{\"id\":\"r18\",\"ref\":\"0.21\",\"name\":null,\"type\":\"room\",\"room_type\":\"balcony\",\"polygon_px\":[[140,426],[163,417],[194,490],[170,486]]},{\"id\":\"r19\",\"ref\":\"0.13\",\"name\":null,\"type\":\"room\",\"room_type\":\"corridor\",\"polygon_px\":[[199,481],[247,468],[252,490],[206,508]]},{\"id\":\"r20\",\"ref\":\"0.09\",\"name\":null,\"type\":\"room\",\"room_type\":\"living room\",\"polygon_px\":[[206,508],[273,488],[302,590],[227,614],[198,515]]},{\"id\":\"r21\",\"ref\":\"0.14\",\"name\":null,\"type\":\"room\",\"room_type\":\"balcony\",\"polygon_px\":[[162,490],[190,485],[204,538],[179,561]]},{\"id\":\"r22\",\"ref\":\"0.12\",\"name\":null,\"type\":\"room\",\"room_type\":\"bedroom\",\"polygon_px\":[[273,479],[333,462],[342,498],[281,514]]},{\"id\":\"r23\",\"ref\":\"0.15\",\"name\":null,\"type\":\"room\",\"room_type\":\"bathroom\",\"polygon_px\":[[308,503],[345,498],[350,526],[314,533]]},{\"id\":\"r24\",\"ref\":\"0.16\",\"name\":null,\"type\":\"room\",\"room_type\":\"kitchen\",\"polygon_px\":[[318,531],[352,527],[364,572],[300,592]]}],\"doors\":[{\"rooms\":[\"r1\",\"r6\"],\"kind\":\"door\",\"position_px\":[65,176],\"width_px\":8},{\"rooms\":[\"r1\",\"r5\"],\"kind\":\"door\",\"position_px\":[134,186],\"width_px\":8},{\"rooms\":[\"r5\",\"outside\"],\"kind\":\"entrance\",\"position_px\":[151,188],\"width_px\":14},{\"rooms\":[\"r7\",\"outside\"],\"kind\":\"entrance\",\"position_px\":[160,223],\"width_px\":14},{\"rooms\":[\"r7\",\"r8\"],\"kind\":\"door\",\"position_px\":[148,234],\"width_px\":8},{\"rooms\":[\"r8\",\"r9\"],\"kind\":\"door\",\"position_px\":[96,279],\"width_px\":8},{\"rooms\":[\"r8\",\"r10\"],\"kind\":\"door\",\"position_px\":[172,251],\"width_px\":8},{\"rooms\":[\"r13\",\"r18\"],\"kind\":\"door\",\"position_px\":[255,373],\"width_px\":8},{\"rooms\":[\"r13\",\"r18\"],\"kind\":\"door\",\"position_px\":[250,413],\"width_px\":8},{\"rooms\":[\"r13\",\"r18\"],\"kind\":\"door\",\"position_px\":[171,433],\"width_px\":8},{\"rooms\":[\"r17\",\"outside\"],\"kind\":\"entrance\",\"position_px\":[256,446],\"width_px\":14},{\"rooms\":[\"r19\",\"outside\"],\"kind\":\"entrance\",\"position_px\":[267,480],\"width_px\":14},{\"rooms\":[\"r20\",\"r13\"],\"kind\":\"door\",\"position_px\":[240,443],\"width_px\":8},{\"rooms\":[\"r20\",\"r21\"],\"kind\":\"door\",\"position_px\":[202,537],\"width_px\":8}]}",
+ "extraction": {
+  "scale": {
+   "bar_px": null,
+   "bar_m": null
+  },
+  "rooms": [
+   {
+    "id": "r1",
+    "ref": "0.04",
+    "name": null,
+    "type": "room",
+    "room_type": "living room",
+    "polygon_px": [
+     [
+      44,
+      97
+     ],
+     [
+      121,
+      74
+     ],
+     [
+      151,
+      181
+     ],
+     [
+      84,
+      193
+     ]
+    ]
+   },
+   {
+    "id": "r2",
+    "ref": "0.03",
+    "name": null,
+    "type": "room",
+    "room_type": "bedroom",
+    "polygon_px": [
+     [
+      121,
+      74
+     ],
+     [
+      181,
+      56
+     ],
+     [
+      195,
+      102
+     ],
+     [
+      133,
+      120
+     ]
+    ]
+   },
+   {
+    "id": "r3",
+    "ref": "0.02",
+    "name": null,
+    "type": "room",
+    "room_type": "bathroom",
+    "polygon_px": [
+     [
+      161,
+      112
+     ],
+     [
+      199,
+      103
+     ],
+     [
+      204,
+      132
+     ],
+     [
+      168,
+      141
+     ]
+    ]
+   },
+   {
+    "id": "r4",
+    "ref": "0.08",
+    "name": null,
+    "type": "room",
+    "room_type": "kitchen",
+    "polygon_px": [
+     [
+      146,
+      148
+     ],
+     [
+      208,
+      134
+     ],
+     [
+      214,
+      170
+     ],
+     [
+      155,
+      182
+     ]
+    ]
+   },
+   {
+    "id": "r5",
+    "ref": "0.07",
+    "name": null,
+    "type": "room",
+    "room_type": "bedroom",
+    "polygon_px": [
+     [
+      84,
+      193
+     ],
+     [
+      134,
+      181
+     ],
+     [
+      139,
+      208
+     ],
+     [
+      91,
+      223
+     ]
+    ]
+   },
+   {
+    "id": "r6",
+    "ref": "0.01",
+    "name": null,
+    "type": "room",
+    "room_type": "balcony",
+    "polygon_px": [
+     [
+      38,
+      160
+     ],
+     [
+      62,
+      174
+     ],
+     [
+      88,
+      204
+     ],
+     [
+      80,
+      233
+     ],
+     [
+      60,
+      215
+     ]
+    ]
+   },
+   {
+    "id": "r7",
+    "ref": "0.29",
+    "name": null,
+    "type": "room",
+    "room_type": "corridor",
+    "polygon_px": [
+     [
+      94,
+      213
+     ],
+     [
+      143,
+      210
+     ],
+     [
+      148,
+      233
+     ],
+     [
+      100,
+      252
+     ]
+    ]
+   },
+   {
+    "id": "r8",
+    "ref": "0.26",
+    "name": null,
+    "type": "room",
+    "room_type": "living room",
+    "polygon_px": [
+     [
+      100,
+      252
+     ],
+     [
+      148,
+      233
+     ],
+     [
+      196,
+      320
+     ],
+     [
+      121,
+      358
+     ],
+     [
+      92,
+      262
+     ]
+    ]
+   },
+   {
+    "id": "r9",
+    "ref": "0.28",
+    "name": null,
+    "type": "room",
+    "room_type": "balcony",
+    "polygon_px": [
+     [
+      58,
+      232
+     ],
+     [
+      86,
+      226
+     ],
+     [
+      97,
+      254
+     ],
+     [
+      83,
+      303
+     ],
+     [
+      66,
+      285
+     ]
+    ]
+   },
+   {
+    "id": "r10",
+    "ref": "0.25",
+    "name": null,
+    "type": "room",
+    "room_type": "bedroom",
+    "polygon_px": [
+     [
+      165,
+      220
+     ],
+     [
+      227,
+      206
+     ],
+     [
+      236,
+      238
+     ],
+     [
+      172,
+      254
+     ]
+    ]
+   },
+   {
+    "id": "r11",
+    "ref": "0.32",
+    "name": null,
+    "type": "room",
+    "room_type": "bathroom",
+    "polygon_px": [
+     [
+      201,
+      246
+     ],
+     [
+      240,
+      241
+     ],
+     [
+      244,
+      270
+     ],
+     [
+      206,
+      277
+     ]
+    ]
+   },
+   {
+    "id": "r12",
+    "ref": "0.27",
+    "name": null,
+    "type": "room",
+    "room_type": "kitchen",
+    "polygon_px": [
+     [
+      185,
+      274
+     ],
+     [
+      244,
+      270
+     ],
+     [
+      259,
+      319
+     ],
+     [
+      198,
+      335
+     ]
+    ]
+   },
+   {
+    "id": "r13",
+    "ref": "0.23",
+    "name": null,
+    "type": "room",
+    "room_type": "living room",
+    "polygon_px": [
+     [
+      150,
+      352
+     ],
+     [
+      227,
+      331
+     ],
+     [
+      257,
+      445
+     ],
+     [
+      185,
+      452
+     ]
+    ]
+   },
+   {
+    "id": "r14",
+    "ref": "0.18",
+    "name": null,
+    "type": "room",
+    "room_type": "bedroom",
+    "polygon_px": [
+     [
+      227,
+      331
+     ],
+     [
+      290,
+      313
+     ],
+     [
+      300,
+      360
+     ],
+     [
+      240,
+      376
+     ]
+    ]
+   },
+   {
+    "id": "r15",
+    "ref": "0.24",
+    "name": null,
+    "type": "room",
+    "room_type": "bathroom",
+    "polygon_px": [
+     [
+      268,
+      364
+     ],
+     [
+      305,
+      360
+     ],
+     [
+      309,
+      388
+     ],
+     [
+      273,
+      396
+     ]
+    ]
+   },
+   {
+    "id": "r16",
+    "ref": "0.17",
+    "name": null,
+    "type": "room",
+    "room_type": "kitchen",
+    "polygon_px": [
+     [
+      250,
+      400
+     ],
+     [
+      312,
+      390
+     ],
+     [
+      320,
+      426
+     ],
+     [
+      258,
+      441
+     ]
+    ]
+   },
+   {
+    "id": "r17",
+    "ref": "0.20",
+    "name": null,
+    "type": "room",
+    "room_type": "bedroom",
+    "polygon_px": [
+     [
+      191,
+      449
+     ],
+     [
+      240,
+      438
+     ],
+     [
+      246,
+      466
+     ],
+     [
+      198,
+      480
+     ]
+    ]
+   },
+   {
+    "id": "r18",
+    "ref": "0.21",
+    "name": null,
+    "type": "room",
+    "room_type": "balcony",
+    "polygon_px": [
+     [
+      140,
+      426
+     ],
+     [
+      163,
+      417
+     ],
+     [
+      194,
+      490
+     ],
+     [
+      170,
+      486
+     ]
+    ]
+   },
+   {
+    "id": "r19",
+    "ref": "0.13",
+    "name": null,
+    "type": "room",
+    "room_type": "corridor",
+    "polygon_px": [
+     [
+      199,
+      481
+     ],
+     [
+      247,
+      468
+     ],
+     [
+      252,
+      490
+     ],
+     [
+      206,
+      508
+     ]
+    ]
+   },
+   {
+    "id": "r20",
+    "ref": "0.09",
+    "name": null,
+    "type": "room",
+    "room_type": "living room",
+    "polygon_px": [
+     [
+      206,
+      508
+     ],
+     [
+      273,
+      488
+     ],
+     [
+      302,
+      590
+     ],
+     [
+      227,
+      614
+     ],
+     [
+      198,
+      515
+     ]
+    ]
+   },
+   {
+    "id": "r21",
+    "ref": "0.14",
+    "name": null,
+    "type": "room",
+    "room_type": "balcony",
+    "polygon_px": [
+     [
+      162,
+      490
+     ],
+     [
+      190,
+      485
+     ],
+     [
+      204,
+      538
+     ],
+     [
+      179,
+      561
+     ]
+    ]
+   },
+   {
+    "id": "r22",
+    "ref": "0.12",
+    "name": null,
+    "type": "room",
+    "room_type": "bedroom",
+    "polygon_px": [
+     [
+      273,
+      479
+     ],
+     [
+      333,
+      462
+     ],
+     [
+      342,
+      498
+     ],
+     [
+      281,
+      514
+     ]
+    ]
+   },
+   {
+    "id": "r23",
+    "ref": "0.15",
+    "name": null,
+    "type": "room",
+    "room_type": "bathroom",
+    "polygon_px": [
+     [
+      308,
+      503
+     ],
+     [
+      345,
+      498
+     ],
+     [
+      350,
+      526
+     ],
+     [
+      314,
+      533
+     ]
+    ]
+   },
+   {
+    "id": "r24",
+    "ref": "0.16",
+    "name": null,
+    "type": "room",
+    "room_type": "kitchen",
+    "polygon_px": [
+     [
+      318,
+      531
+     ],
+     [
+      352,
+      527
+     ],
+     [
+      364,
+      572
+     ],
+     [
+      300,
+      592
+     ]
+    ]
+   }
+  ],
+  "doors": [
+   {
+    "rooms": [
+     "r1",
+     "r6"
+    ],
+    "kind": "door",
+    "position_px": [
+     65,
+     176
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r1",
+     "r5"
+    ],
+    "kind": "door",
+    "position_px": [
+     134,
+     186
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r5",
+     "outside"
+    ],
+    "kind": "entrance",
+    "position_px": [
+     151,
+     188
+    ],
+    "width_px": 14
+   },
+   {
+    "rooms": [
+     "r7",
+     "outside"
+    ],
+    "kind": "entrance",
+    "position_px": [
+     160,
+     223
+    ],
+    "width_px": 14
+   },
+   {
+    "rooms": [
+     "r7",
+     "r8"
+    ],
+    "kind": "door",
+    "position_px": [
+     148,
+     234
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r8",
+     "r9"
+    ],
+    "kind": "door",
+    "position_px": [
+     96,
+     279
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r8",
+     "r10"
+    ],
+    "kind": "door",
+    "position_px": [
+     172,
+     251
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r13",
+     "r18"
+    ],
+    "kind": "door",
+    "position_px": [
+     255,
+     373
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r13",
+     "r18"
+    ],
+    "kind": "door",
+    "position_px": [
+     250,
+     413
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r13",
+     "r18"
+    ],
+    "kind": "door",
+    "position_px": [
+     171,
+     433
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r17",
+     "outside"
+    ],
+    "kind": "entrance",
+    "position_px": [
+     256,
+     446
+    ],
+    "width_px": 14
+   },
+   {
+    "rooms": [
+     "r19",
+     "outside"
+    ],
+    "kind": "entrance",
+    "position_px": [
+     267,
+     480
+    ],
+    "width_px": 14
+   },
+   {
+    "rooms": [
+     "r20",
+     "r13"
+    ],
+    "kind": "door",
+    "position_px": [
+     240,
+     443
+    ],
+    "width_px": 8
+   },
+   {
+    "rooms": [
+     "r20",
+     "r21"
+    ],
+    "kind": "door",
+    "position_px": [
+     202,
+     537
+    ],
+    "width_px": 8
+   }
+  ]
+ }
+}

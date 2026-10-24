@@ -1,0 +1,1078 @@
+[
+ {
+  "building": "proc-campus-dev-000",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 28,
+   "found": 28,
+   "matched": 28,
+   "recall": 1.0,
+   "precision": 1.0,
+   "area_err_median": 0.006,
+   "area_err_worst": 0.015
+  },
+  "doors": {
+   "true_internal": 27,
+   "found_internal": 27,
+   "correct_pairs": 27,
+   "recall": 1.0,
+   "precision": 1.0,
+   "entrances_true": 2,
+   "entrances_found": 2,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S009",
+      "S019"
+     ],
+     "original_m": 34.38,
+     "generated_m": 34.45,
+     "rel_err": 0.002
+    },
+    {
+     "pair": [
+      "S010",
+      "S019"
+     ],
+     "original_m": 34.98,
+     "generated_m": 35.09,
+     "rel_err": 0.003
+    },
+    {
+     "pair": [
+      "S001",
+      "S022"
+     ],
+     "original_m": 14.73,
+     "generated_m": 14.79,
+     "rel_err": 0.004
+    },
+    {
+     "pair": [
+      "S006",
+      "S014"
+     ],
+     "original_m": 46.14,
+     "generated_m": 46.24,
+     "rel_err": 0.002
+    },
+    {
+     "pair": [
+      "S013",
+      "S017"
+     ],
+     "original_m": 56.39,
+     "generated_m": 56.58,
+     "rel_err": 0.003
+    }
+   ],
+   "no_route": 0,
+   "rel_err_median": 0.003,
+   "rel_err_worst": 0.004
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "proc-campus-dev-000_f0_run1",
+  "seconds": 13.2,
+  "tokens": [
+   1017,
+   2885
+  ]
+ },
+ {
+  "building": "proc-campus-dev-000",
+  "scale_mode": "door",
+  "scale_error_rel": 0.555,
+  "rooms": {
+   "true": 28,
+   "found": 28,
+   "matched": 3,
+   "recall": 0.11,
+   "precision": 0.11,
+   "area_err_median": 2.852,
+   "area_err_worst": 2.852
+  },
+  "doors": {
+   "true_internal": 27,
+   "found_internal": 27,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 2,
+   "entrances_found": 2,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S003",
+      "S015"
+     ],
+     "original_m": 59.79,
+     "generated_m": 63.77,
+     "rel_err": 0.067
+    },
+    {
+     "pair": [
+      "S005",
+      "S015"
+     ],
+     "original_m": 52.46,
+     "generated_m": 56.37,
+     "rel_err": 0.075
+    },
+    {
+     "pair": [
+      "S003",
+      "S005"
+     ],
+     "original_m": 55.8,
+     "generated_m": 22.08,
+     "rel_err": 0.604
+    }
+   ],
+   "no_route": 0,
+   "rel_err_median": 0.075,
+   "rel_err_worst": 0.604
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "proc-campus-dev-000_f0_run1",
+  "seconds": 13.2,
+  "tokens": [
+   1017,
+   2885
+  ]
+ },
+ {
+  "building": "proc-campus-dev-001",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 22,
+   "found": 22,
+   "matched": 22,
+   "recall": 1.0,
+   "precision": 1.0,
+   "area_err_median": 0.008,
+   "area_err_worst": 0.019
+  },
+  "doors": {
+   "true_internal": 21,
+   "found_internal": 21,
+   "correct_pairs": 21,
+   "recall": 1.0,
+   "precision": 1.0,
+   "entrances_true": 2,
+   "entrances_found": 2,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S017",
+      "S018"
+     ],
+     "original_m": 16.34,
+     "generated_m": 16.32,
+     "rel_err": 0.001
+    },
+    {
+     "pair": [
+      "S006",
+      "S010"
+     ],
+     "original_m": 25.18,
+     "generated_m": 25.14,
+     "rel_err": 0.002
+    },
+    {
+     "pair": [
+      "S013",
+      "S022"
+     ],
+     "original_m": 53.12,
+     "generated_m": 53.12,
+     "rel_err": 0.0
+    },
+    {
+     "pair": [
+      "S019",
+      "S022"
+     ],
+     "original_m": 41.5,
+     "generated_m": 41.52,
+     "rel_err": 0.0
+    },
+    {
+     "pair": [
+      "S006",
+      "S019"
+     ],
+     "original_m": 26.31,
+     "generated_m": 26.29,
+     "rel_err": 0.001
+    }
+   ],
+   "no_route": 0,
+   "rel_err_median": 0.001,
+   "rel_err_worst": 0.002
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "proc-campus-dev-001_f0_run1",
+  "seconds": 11.3,
+  "tokens": [
+   955,
+   2281
+  ]
+ },
+ {
+  "building": "proc-campus-dev-001",
+  "scale_mode": "door",
+  "scale_error_rel": 0.558,
+  "rooms": {
+   "true": 22,
+   "found": 22,
+   "matched": 6,
+   "recall": 0.27,
+   "precision": 0.27,
+   "area_err_median": 2.261,
+   "area_err_worst": 15.604
+  },
+  "doors": {
+   "true_internal": 21,
+   "found_internal": 21,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 2,
+   "entrances_found": 2,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S010",
+      "S019"
+     ],
+     "original_m": 31.11,
+     "generated_m": 7.59,
+     "rel_err": 0.756
+    },
+    {
+     "pair": [
+      "S006",
+      "S010"
+     ],
+     "original_m": 25.18,
+     "generated_m": 34.83,
+     "rel_err": 0.383
+    },
+    {
+     "pair": [
+      "S010",
+      "S012"
+     ],
+     "original_m": 37.77,
+     "generated_m": 17.86,
+     "rel_err": 0.527
+    },
+    {
+     "pair": [
+      "S012",
+      "S019"
+     ],
+     "original_m": 38.9,
+     "generated_m": 10.27,
+     "rel_err": 0.736
+    },
+    {
+     "pair": [
+      "S004",
+      "S006"
+     ],
+     "original_m": 27.66,
+     "generated_m": 61.56,
+     "rel_err": 1.226
+    }
+   ],
+   "no_route": 0,
+   "rel_err_median": 0.736,
+   "rel_err_worst": 1.226
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "proc-campus-dev-001_f0_run1",
+  "seconds": 11.3,
+  "tokens": [
+   955,
+   2281
+  ]
+ },
+ {
+  "building": "resplan-1465",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 10,
+   "found": 10,
+   "matched": 10,
+   "recall": 1.0,
+   "precision": 1.0,
+   "area_err_median": 0.018,
+   "area_err_worst": 0.043
+  },
+  "doors": {
+   "true_internal": 9,
+   "found_internal": 9,
+   "correct_pairs": 9,
+   "recall": 1.0,
+   "precision": 1.0,
+   "entrances_true": 1,
+   "entrances_found": 1,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S004",
+      "S005"
+     ],
+     "original_m": 27.68,
+     "generated_m": 31.02,
+     "rel_err": 0.121
+    },
+    {
+     "pair": [
+      "S004",
+      "S007"
+     ],
+     "original_m": 22.78,
+     "generated_m": 27.16,
+     "rel_err": 0.192
+    },
+    {
+     "pair": [
+      "S001",
+      "S004"
+     ],
+     "original_m": 14.47,
+     "generated_m": 17.04,
+     "rel_err": 0.178
+    },
+    {
+     "pair": [
+      "S002",
+      "S010"
+     ],
+     "original_m": 14.94,
+     "generated_m": 12.7,
+     "rel_err": 0.15
+    },
+    {
+     "pair": [
+      "S005",
+      "S008"
+     ],
+     "original_m": 26.04,
+     "generated_m": 31.55,
+     "rel_err": 0.212
+    }
+   ],
+   "no_route": 0,
+   "rel_err_median": 0.178,
+   "rel_err_worst": 0.212
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "resplan-1465_f0_run1",
+  "seconds": 6.3,
+  "tokens": [
+   942,
+   1142
+  ]
+ },
+ {
+  "building": "resplan-1465",
+  "scale_mode": "door",
+  "scale_error_rel": 0.609,
+  "rooms": {
+   "true": 10,
+   "found": 10,
+   "matched": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "area_err_median": null,
+   "area_err_worst": null
+  },
+  "doors": {
+   "true_internal": 9,
+   "found_internal": 9,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 1,
+   "entrances_found": 1,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [],
+   "no_route": 0,
+   "rel_err_median": null,
+   "rel_err_worst": null
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "resplan-1465_f0_run1",
+  "seconds": 6.3,
+  "tokens": [
+   942,
+   1142
+  ]
+ },
+ {
+  "building": "resplan-439",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 8,
+   "found": 8,
+   "matched": 8,
+   "recall": 1.0,
+   "precision": 1.0,
+   "area_err_median": 0.005,
+   "area_err_worst": 0.019
+  },
+  "doors": {
+   "true_internal": 7,
+   "found_internal": 7,
+   "correct_pairs": 7,
+   "recall": 1.0,
+   "precision": 1.0,
+   "entrances_true": 1,
+   "entrances_found": 1,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S007",
+      "S008"
+     ],
+     "original_m": 16.6,
+     "generated_m": 16.67,
+     "rel_err": 0.004
+    },
+    {
+     "pair": [
+      "S002",
+      "S008"
+     ],
+     "original_m": 13.24,
+     "generated_m": 13.27,
+     "rel_err": 0.002
+    },
+    {
+     "pair": [
+      "S005",
+      "S008"
+     ],
+     "original_m": 11.9,
+     "generated_m": 11.92,
+     "rel_err": 0.002
+    },
+    {
+     "pair": [
+      "S003",
+      "S004"
+     ],
+     "original_m": 3.56,
+     "generated_m": 3.57,
+     "rel_err": 0.003
+    },
+    {
+     "pair": [
+      "S001",
+      "S003"
+     ],
+     "original_m": 8.54,
+     "generated_m": 8.56,
+     "rel_err": 0.002
+    }
+   ],
+   "no_route": 0,
+   "rel_err_median": 0.002,
+   "rel_err_worst": 0.004
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "resplan-439_f0_run1",
+  "seconds": 5.7,
+  "tokens": [
+   942,
+   967
+  ]
+ },
+ {
+  "building": "resplan-439",
+  "scale_mode": "door",
+  "scale_error_rel": 1.906,
+  "rooms": {
+   "true": 8,
+   "found": 8,
+   "matched": 1,
+   "recall": 0.12,
+   "precision": 0.12,
+   "area_err_median": 14.202,
+   "area_err_worst": 14.202
+  },
+  "doors": {
+   "true_internal": 7,
+   "found_internal": 7,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 1,
+   "entrances_found": 1,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [],
+   "no_route": 0,
+   "rel_err_median": null,
+   "rel_err_worst": null
+  },
+  "validation": {
+   "components": 1,
+   "rooms_not_connected_to_outside": 0
+  },
+  "run": "resplan-439_f0_run1",
+  "seconds": 5.7,
+  "tokens": [
+   942,
+   967
+  ]
+ },
+ {
+  "building": "swiss-203",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 36,
+   "found": 24,
+   "matched": 24,
+   "recall": 0.67,
+   "precision": 1.0,
+   "area_err_median": 0.082,
+   "area_err_worst": 0.177
+  },
+  "doors": {
+   "true_internal": 34,
+   "found_internal": 8,
+   "correct_pairs": 7,
+   "recall": 0.21,
+   "precision": 0.88,
+   "entrances_true": 4,
+   "entrances_found": 4,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S015",
+      "S032"
+     ],
+     "original_m": 28.4,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S017",
+      "S025"
+     ],
+     "original_m": 27.17,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S001",
+      "S028"
+     ],
+     "original_m": 25.08,
+     "generated_m": 27.67,
+     "rel_err": 0.103
+    },
+    {
+     "pair": [
+      "S009",
+      "S023"
+     ],
+     "original_m": 13.81,
+     "generated_m": 12.02,
+     "rel_err": 0.13
+    },
+    {
+     "pair": [
+      "S025",
+      "S026"
+     ],
+     "original_m": 7.12,
+     "generated_m": 6.27,
+     "rel_err": 0.119
+    }
+   ],
+   "no_route": 2,
+   "rel_err_median": 0.119,
+   "rel_err_worst": 0.13
+  },
+  "validation": {
+   "components": 13,
+   "rooms_not_connected_to_outside": 15
+  },
+  "run": "swiss-203_f0_run1",
+  "seconds": 13.4,
+  "tokens": [
+   996,
+   2130
+  ]
+ },
+ {
+  "building": "swiss-203",
+  "scale_mode": "door",
+  "scale_error_rel": 0.556,
+  "rooms": {
+   "true": 36,
+   "found": 24,
+   "matched": 3,
+   "recall": 0.08,
+   "precision": 0.12,
+   "area_err_median": 8.899,
+   "area_err_worst": 16.499
+  },
+  "doors": {
+   "true_internal": 34,
+   "found_internal": 8,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 4,
+   "entrances_found": 4,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S002",
+      "S034"
+     ],
+     "original_m": 13.94,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S019",
+      "S034"
+     ],
+     "original_m": 10.6,
+     "generated_m": 35.89,
+     "rel_err": 2.386
+    },
+    {
+     "pair": [
+      "S002",
+      "S019"
+     ],
+     "original_m": 23.61,
+     "generated_m": null,
+     "rel_err": null
+    }
+   ],
+   "no_route": 2,
+   "rel_err_median": 2.386,
+   "rel_err_worst": 2.386
+  },
+  "validation": {
+   "components": 13,
+   "rooms_not_connected_to_outside": 15
+  },
+  "run": "swiss-203_f0_run1",
+  "seconds": 13.4,
+  "tokens": [
+   996,
+   2130
+  ]
+ },
+ {
+  "building": "swiss-31",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 30,
+   "found": 25,
+   "matched": 25,
+   "recall": 0.83,
+   "precision": 1.0,
+   "area_err_median": 0.12,
+   "area_err_worst": 0.423
+  },
+  "doors": {
+   "true_internal": 27,
+   "found_internal": 12,
+   "correct_pairs": 10,
+   "recall": 0.37,
+   "precision": 0.83,
+   "entrances_true": 4,
+   "entrances_found": 4,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S012",
+      "S015"
+     ],
+     "original_m": 24.4,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S013",
+      "S020"
+     ],
+     "original_m": 13.02,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S001",
+      "S024"
+     ],
+     "original_m": 16.45,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S007",
+      "S012"
+     ],
+     "original_m": 10.2,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S017",
+      "S025"
+     ],
+     "original_m": 20.95,
+     "generated_m": null,
+     "rel_err": null
+    }
+   ],
+   "no_route": 5,
+   "rel_err_median": null,
+   "rel_err_worst": null
+  },
+  "validation": {
+   "components": 10,
+   "rooms_not_connected_to_outside": 16
+  },
+  "run": "swiss-31_f0_run1",
+  "seconds": 13.5,
+  "tokens": [
+   972,
+   2258
+  ]
+ },
+ {
+  "building": "swiss-31",
+  "scale_mode": "door",
+  "scale_error_rel": 0.56,
+  "rooms": {
+   "true": 30,
+   "found": 25,
+   "matched": 9,
+   "recall": 0.3,
+   "precision": 0.36,
+   "area_err_median": 3.982,
+   "area_err_worst": 15.391
+  },
+  "doors": {
+   "true_internal": 27,
+   "found_internal": 12,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 4,
+   "entrances_found": 4,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S012",
+      "S027"
+     ],
+     "original_m": 13.83,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S017",
+      "S018"
+     ],
+     "original_m": 5.87,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S003",
+      "S012"
+     ],
+     "original_m": 17.31,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S010",
+      "S017"
+     ],
+     "original_m": 19.57,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S018",
+      "S030"
+     ],
+     "original_m": 13.58,
+     "generated_m": null,
+     "rel_err": null
+    }
+   ],
+   "no_route": 5,
+   "rel_err_median": null,
+   "rel_err_worst": null
+  },
+  "validation": {
+   "components": 10,
+   "rooms_not_connected_to_outside": 16
+  },
+  "run": "swiss-31_f0_run1",
+  "seconds": 13.5,
+  "tokens": [
+   972,
+   2258
+  ]
+ },
+ {
+  "building": "swiss-31",
+  "scale_mode": "true_width",
+  "scale_error_rel": 0.0,
+  "rooms": {
+   "true": 30,
+   "found": 26,
+   "matched": 26,
+   "recall": 0.87,
+   "precision": 1.0,
+   "area_err_median": 0.07,
+   "area_err_worst": 1.268
+  },
+  "doors": {
+   "true_internal": 27,
+   "found_internal": 21,
+   "correct_pairs": 15,
+   "recall": 0.56,
+   "precision": 0.71,
+   "entrances_true": 4,
+   "entrances_found": 4,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S011",
+      "S020"
+     ],
+     "original_m": 18.26,
+     "generated_m": 19.35,
+     "rel_err": 0.06
+    },
+    {
+     "pair": [
+      "S012",
+      "S024"
+     ],
+     "original_m": 20.85,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S001",
+      "S024"
+     ],
+     "original_m": 16.45,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S006",
+      "S026"
+     ],
+     "original_m": 6.65,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S016",
+      "S019"
+     ],
+     "original_m": 12.47,
+     "generated_m": 11.48,
+     "rel_err": 0.079
+    }
+   ],
+   "no_route": 3,
+   "rel_err_median": 0.07,
+   "rel_err_worst": 0.079
+  },
+  "validation": {
+   "components": 3,
+   "rooms_not_connected_to_outside": 10
+  },
+  "run": "swiss-31_f0_run2v2",
+  "seconds": 17.2,
+  "tokens": [
+   1135,
+   2871
+  ]
+ },
+ {
+  "building": "swiss-31",
+  "scale_mode": "door",
+  "scale_error_rel": 0.56,
+  "rooms": {
+   "true": 30,
+   "found": 26,
+   "matched": 8,
+   "recall": 0.27,
+   "precision": 0.31,
+   "area_err_median": 2.099,
+   "area_err_worst": 12.475
+  },
+  "doors": {
+   "true_internal": 27,
+   "found_internal": 21,
+   "correct_pairs": 0,
+   "recall": 0.0,
+   "precision": 0.0,
+   "entrances_true": 4,
+   "entrances_found": 4,
+   "dropped_by_converter": 0
+  },
+  "routes": {
+   "pairs": [
+    {
+     "pair": [
+      "S022",
+      "S027"
+     ],
+     "original_m": 10.25,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S004",
+      "S027"
+     ],
+     "original_m": 9.67,
+     "generated_m": 16.96,
+     "rel_err": 0.754
+    },
+    {
+     "pair": [
+      "S017",
+      "S027"
+     ],
+     "original_m": 7.95,
+     "generated_m": null,
+     "rel_err": null
+    },
+    {
+     "pair": [
+      "S010",
+      "S012"
+     ],
+     "original_m": 11.55,
+     "generated_m": 7.74,
+     "rel_err": 0.33
+    },
+    {
+     "pair": [
+      "S003",
+      "S010"
+     ],
+     "original_m": 16.89,
+     "generated_m": null,
+     "rel_err": null
+    }
+   ],
+   "no_route": 3,
+   "rel_err_median": 0.542,
+   "rel_err_worst": 0.754
+  },
+  "validation": {
+   "components": 3,
+   "rooms_not_connected_to_outside": 10
+  },
+  "run": "swiss-31_f0_run2v2",
+  "seconds": 17.2,
+  "tokens": [
+   1135,
+   2871
+  ]
+ }
+]
