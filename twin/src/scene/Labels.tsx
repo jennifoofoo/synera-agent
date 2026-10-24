@@ -4,7 +4,7 @@ import type { Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
-import { LABEL_LIFT } from "./markerLayout";
+import { LABEL_LIFT, guideNextPoint } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { PoiBadge, POI_PX, type PoiKind } from "./poiIcons";
 
@@ -153,11 +153,12 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     if (route?.ok && route.segments?.length) {
       const first = route.segments[0];
       const last = route.segments[route.segments.length - 1];
-      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.end, ROUTE_LIFT);
+      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.start, ROUTE_LIFT);
       if (last.floor_id === floor.id) put(route.destination, last.points[last.points.length - 1], LABEL_LIFT.end, ROUTE_LIFT);
     }
     const guide = state?.guide;
-    if (guide?.active) put(guide.leg.to_space_id, model.spaceById.get(guide.leg.to_space_id)?.anchor, LABEL_LIFT.guide);
+    const next = guide?.active && guide.leg.to_space_id !== route?.destination ? model.spaceById.get(guide.leg.to_space_id) : undefined;
+    if (guide && next) put(next.id, guideNextPoint(guide, next), LABEL_LIFT.guide);
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
     if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);

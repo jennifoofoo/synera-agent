@@ -22,9 +22,13 @@
     1px 1px 0 var(--halo), -1px -1px 0 var(--halo), 1px -1px 0 var(--halo), -1px 1px 0 var(--halo),
     0 0 2px var(--halo), 0 0 3px var(--halo);
 }
-/* "Next: ..." chip of the guide sits above its ring */
+/* "Next: ..." chip of the guide sits above its ring: quiet (paper with blue text), the route stays the loudest */
 .chip.guide-next {
   font-size: 11px;
   padding: 1px 7px;
   line-height: 15px;
+  background: var(--surface, #fff);
+  border-color: var(--signal-soft, #ebf1ff);
+  color: var(--signal-dark, #002478);
+  box-shadow: 0 1px 3px rgba(29, 36, 48, 0.16);
 }

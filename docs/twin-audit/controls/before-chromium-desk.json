@@ -1,0 +1,56 @@
+{
+ "tag": "before-chromium-desk",
+ "errors": [],
+ "routeOk": true,
+ "restDiff": 0,
+ "dragJumpMax": 0.0459,
+ "dragJumpMean": 0.0436,
+ "dragJumps": [
+  0.0402,
+  0.0399,
+  0.0407,
+  0.0417,
+  0.0421,
+  0.043,
+  0.044,
+  0.0439,
+  0.0446,
+  0.0442,
+  0.045,
+  0.0447,
+  0.0442,
+  0.0443,
+  0.044,
+  0.0447,
+  0.0446,
+  0.0441,
+  0.044,
+  0.0434,
+  0.0434,
+  0.0443,
+  0.0453,
+  0.0459
+ ],
+ "dragFps": 2,
+ "motionFps": 3,
+ "restFps": 4,
+ "notchRatio": 1.292,
+ "afterIn": {
+  "d": 3.42,
+  "view": "3d",
+  "ortho": false
+ },
+ "afterOut": {
+  "d": 342,
+  "view": "3d",
+  "ortho": false
+ },
+ "cam": {
+  "x": -193.83,
+  "y": 223.83,
+  "z": 149.68,
+  "zoom": 1,
+  "ortho": false
+ },
+ "dpr": 2
+}

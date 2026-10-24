@@ -12,7 +12,7 @@ import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
-import { BADGE_GAP_PX, END_RING_PX, ScreenSized } from "./markerLayout";
+import { BADGE_GAP_PX, END_RING_PX, ScreenSized, guideNextPoint } from "./markerLayout";
 import { assetSize } from "./Things";
 
 interface Props {
@@ -155,15 +155,18 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           );
         })}
 
-      {/* guide: destination of the current leg */}
+      {/* guide: only the end of the current leg, small and on the route line (the destination pin covers the
+          last leg, so no second marker there) */}
       {guide?.active &&
+        guide.leg.to_space_id !== state?.route?.destination &&
         (() => {
           const target = model.spaceById.get(guide.leg.to_space_id);
           if (!target || !shown(target.floor_id)) return null;
           return (
-            <group position={at(target.floor_id, target.anchor)} name="guide-next">
+            <group position={at(target.floor_id, guideNextPoint(guide, target))} name="guide-next">
               <ScreenSized>
-                <Ring radius={END_RING_PX} colour={COLOURS.route} width={3} through order={30} />
+                <Disc radius={END_RING_PX} colour={COLOURS.routeGlow} opacity={1} through y={0.1} order={30} />
+                <Ring radius={END_RING_PX} colour={COLOURS.route} width={2} through y={0.12} order={31} />
               </ScreenSized>
               <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
                 <div className="chip chip-route guide-next" style={{ transform: `translateY(calc(-50% - ${END_RING_PX + BADGE_GAP_PX}px))` }}>

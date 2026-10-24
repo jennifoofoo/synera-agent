@@ -18,6 +18,7 @@ export function CampusSite() {
   const site = mode === "site" && !!view?.loaded;
 
   useEffect(() => {
+    (window as unknown as Record<string, unknown>).__twinCampus = useCampus; // test hook
     void loadList();
   }, [loadList]);
   useEffect(() => {

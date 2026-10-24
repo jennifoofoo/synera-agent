@@ -1,10 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { CameraControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
 import type { BuildingModel } from "../model/model";
 import { useTwin } from "../store";
+import { useCameraKeys } from "./cameraKeys";
+import { useCameraMouse } from "./cameraMouse";
 import { controlsRef, cutawayUniforms } from "./FloorMesh";
 
 interface Props {
@@ -24,6 +26,16 @@ function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 
   void c.fitToSphere(sphere, animate);
 }
 const HOME_POLAR = Math.PI / 3.6;
+
+function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 /** Smooth camera with limits: never below the floor, never away from the building, a sensible distance, and
  * fly-to for rooms, things, floors and points. Reduced motion: the camera jumps. */
@@ -47,6 +59,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const size = bounds.size;
   const camera = useThree((s) => s.camera);
   const viewport = useThree((s) => s.size);
+  // The campus site covers this canvas (hidden): it must not react to input then.
+  const inUseNow = useCallback(() => !document.body.classList.contains("campus-site-open"), []);
 
   // The visible area is the window [bottom .. bottom + h] of a taller/wider virtual frame. The frustum must be built
   // for the aspect (and, orthographic, the extents) of that FULL frame, otherwise the crop scales x and y
@@ -109,31 +123,40 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const c = controls.current;
     if (!c) return;
     c.minDistance = Math.max(2, size * 0.04);
-    c.maxDistance = size * 4;
-    c.minZoom = 0.2;
-    c.maxZoom = 60;
+    c.maxDistance = size * 3; // the building never shrinks below about a third of the view
+    // Plan: px per metre that fits the largest floor. The plan never gets smaller than 35 percent of that (it used to
+    // go down to 0.2 px/m: the floor was a few pixels in a blank grey plane).
+    const largest = Math.max(1, ...model.floors.map((floor) => floor.bounds.size));
+    const fit = Math.min(viewport.width, viewport.height) / largest;
+    c.minZoom = fit * 0.35;
+    c.maxZoom = Math.max(60, fit * 12);
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
     c.maxPolarAngle = flat ? PLAN_TILT : Math.PI / 2 - 0.12;
-    c.minAzimuthAngle = flat ? 0 : -Infinity;
-    c.maxAzimuthAngle = flat ? 0 : Infinity;
+    // The plan may be rotated (right drag, two fingers) but never tilted; Home turns it back north up.
+    c.minAzimuthAngle = -Infinity;
+    c.maxAzimuthAngle = Infinity;
     const A = CameraControlsImpl.ACTION;
-    c.mouseButtons.left = flat ? A.TRUCK : A.ROTATE;
-    c.mouseButtons.right = A.TRUCK;
+    // Left drag and middle drag pan (grab the map) in cameraMouse.ts; Ctrl or Alt + left, and right drag, rotate.
+    c.mouseButtons.left = A.NONE;
+    c.mouseButtons.middle = A.NONE;
+    c.mouseButtons.right = A.ROTATE;
     c.mouseButtons.wheel = flat ? A.ZOOM : A.DOLLY;
-    c.touches.one = flat ? A.TOUCH_TRUCK : A.TOUCH_ROTATE;
-    c.touches.two = flat ? A.TOUCH_ZOOM_TRUCK : A.TOUCH_DOLLY_TRUCK;
-    if (flat) void c.rotateTo(0, PLAN_TILT, false);
-    c.smoothTime = 0.32;
-    c.draggingSmoothTime = 0.08;
+    // One finger pans (cameraMouse.ts); two fingers pinch-zoom and rotate (vertical movement tilts in 3D).
+    c.touches.one = A.NONE;
+    c.touches.two = flat ? A.TOUCH_ZOOM_ROTATE : A.TOUCH_DOLLY_ROTATE;
+    if (flat) void c.rotateTo(c.azimuthAngle, PLAN_TILT, false);
+    // Light damping: camera-controls smooths critically (no overshoot, no drift after release).
+    c.smoothTime = 0.13;
+    c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
-    const margin = size * 0.6;
+    const margin = size * 0.25; // the target stays near the building: a drag can not carry it into empty space
     c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, -1, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
     c.boundaryFriction = 0.2;
     invalidate();
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
-  }, [bounds, size, topY, flat, invalidate, camera]);
+  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height]);
 
   // Entering 2D or changing the floor in 2D frames the focused floor.
   useEffect(() => {
@@ -162,6 +185,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         const floor = model.floorById.get(focusedFloorId ?? "") ?? model.floors[0];
         const y = floorY(floor.id);
         box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+        void c.rotateTo(0, PLAN_TILT, animate);
         fitBox(c, box, animate, 0.9);
         return;
       }
@@ -245,54 +269,65 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     };
   });
 
-  // Keyboard: arrows pan (Shift + arrows orbit in 3D), + / - zoom, Home = home view. Ignored while typing.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
-      const c = controls.current;
-      if (!c || event.metaKey || event.ctrlKey || event.altKey) return;
-      const animate = !reducedMotion;
-      const step = Math.max(1, c.distance * 0.08);
-      const handled = () => {
-        event.preventDefault();
-        invalidate();
-      };
-      switch (event.key) {
-        case "ArrowLeft":
-          if (event.shiftKey && !flat) void c.rotate(-0.15, 0, animate);
-          else void c.truck(-step, 0, animate);
-          return handled();
-        case "ArrowRight":
-          if (event.shiftKey && !flat) void c.rotate(0.15, 0, animate);
-          else void c.truck(step, 0, animate);
-          return handled();
-        case "ArrowUp":
-          if (event.shiftKey && !flat) void c.rotate(0, -0.1, animate);
-          else void c.truck(0, -step, animate);
-          return handled();
-        case "ArrowDown":
-          if (event.shiftKey && !flat) void c.rotate(0, 0.1, animate);
-          else void c.truck(0, step, animate);
-          return handled();
-        case "+":
-        case "=":
-          if (flat) void c.zoom(c.camera.zoom * 0.5, animate);
-          else void c.dolly(c.distance * 0.25, animate);
-          return handled();
-        case "-":
-        case "_":
-          if (flat) void c.zoom(-c.camera.zoom * 0.33, animate);
-          else void c.dolly(-c.distance * 0.33, animate);
-          return handled();
-        case "Home":
-          useTwin.getState().requestCamera({ kind: "home" });
-          return handled();
+  // Keyboard (table in controlsTable.ts): held keys move the camera per frame (cameraKeys.ts); here the host's keys.
+  const onKey = useCallback(
+    (event: KeyboardEvent) => {
+      const store = useTwin.getState();
+      const key = event.key;
+      if (key === "t" || key === "T") {
+        store.setViewMode(flat ? "3d" : "2d");
+        return true;
       }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [flat, reducedMotion, invalidate]);
+      const floors = model.floors;
+      let floor = null as (typeof floors)[number] | null;
+      if (/^[1-9]$/.test(key)) floor = floors.find((f) => f.level === Number(key)) ?? null;
+      else if (key === "g" || key === "G") floor = floors.find((f) => f.level === 0) ?? null;
+      else return false;
+      if (floor && floor.id !== store.focusedFloorId) {
+        store.focusFloor(floor.id);
+        if (store.floorMode === "exploded") store.requestCamera({ kind: "floor", floorId: floor.id });
+      }
+      return true;
+    },
+    [flat, model],
+  );
+  const onHome = useCallback(() => useTwin.getState().requestCamera({ kind: "home" }), []);
+  useCameraKeys({ controls, flat, active: inUseNow, onHome, onKey });
+
+
+  // Double click on a room or the floor in 3D flies to that room (2D keeps the floor mesh's zoom-in handler).
+  const scene = useThree((s) => s.scene);
+  const gl = useThree((s) => s.gl);
+  const raycaster = useThree((s) => s.raycaster);
+  const onDoubleClick = useCallback(
+    (event: MouseEvent) => {
+      if (flat) return;
+      const rect = gl.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      camera.updateMatrixWorld();
+      raycaster.setFromCamera(ndc, camera);
+      const targets: THREE.Object3D[] = [];
+      scene.traverse((object) => {
+        if (object.userData?.floorId && !object.userData.ghost && (object as THREE.Mesh).isMesh) {
+          let visible = true;
+          for (let o: THREE.Object3D | null = object; o; o = o.parent) visible = visible && o.visible;
+          if (visible) targets.push(object);
+        }
+      });
+      const hit = raycaster.intersectObjects(targets, false)[0];
+      if (!hit) return;
+      const floorId = hit.object.userData.floorId as string;
+      const floor = model.floorById.get(floorId);
+      if (!floor) return;
+      const x = hit.point.x;
+      const y = -hit.point.z;
+      const space = floor.spaces.find((candidate) => pointInPolygon(x, y, candidate.polygon));
+      if (space) useTwin.getState().flyTo(space.id);
+      else useTwin.getState().requestCamera({ kind: "point", floorId, point: [x, y], radius: 8 });
+    },
+    [flat, gl, camera, raycaster, scene, model],
+  );
+  useCameraMouse({ controls, onDoubleClick, active: inUseNow });
 
   // Cutaway: outer walls facing the camera are lowered. In 2D, note when the view was panned away from the floor.
   const direction = new THREE.Vector2();
