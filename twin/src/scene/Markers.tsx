@@ -279,7 +279,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             if (!space) return null;
             return (
               <group position-y={floorY(space.floor_id)}>
-                <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.35} outline />
+                <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.12} outline />
               </group>
             );
           }
