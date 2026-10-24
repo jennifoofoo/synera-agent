@@ -34,9 +34,9 @@ WAITING = {
 SAY_WAIT = {"en": "Say wait if you need a moment.", "de": "Sag warte, wenn du einen Moment brauchst."}
 THERE = {"en": "You're there. That was the last step.", "de": "Du bist da. Das war der letzte Schritt."}
 TAKES = {"en": "That's {duration}.", "de": "Das sind {duration}."}
-GERMAN = re.compile(
-    r"[äöüß]|\b(ja|nein|bitte|danke|ich|bin|wie|wo|ist|der|die|das|und|nicht|weiter|warte|los|bereit|nochmal|"
-    r"jetzt|klar|gerne|gern|zum|zur|nach|kurz|moment)\b",
+GERMAN = re.compile(  # umlauts and words that do not exist in English; never "bin", "die", "wo", "moment", "nach"
+    r"[äöüß]|\b(ja|nein|bitte|danke|ich|nicht|weiter|warte|bereit|nochmal|zurück|zurueck|schritt|jetzt|gerne|"
+    r"klar|kurz|mal|los|wo ist|wo geht|wie weit|und|oder|aber)\b",
     re.IGNORECASE,
 )
 YES_WORDS = {
@@ -62,6 +62,7 @@ class GuidePace(PaceState):
 
     walk_ref: object = None
     awaiting: bool = False
+    lang: str = "en"  # language of the last real message
 
 
 def normalize_mode(value) -> str:
@@ -96,6 +97,13 @@ def without_tick_keys(context):
 
 def is_german(text: str) -> bool:
     return bool(GERMAN.search(text or ""))
+
+
+def language_of(text: str, previous: str = "en") -> str:
+    """'de' only for clear German; a very short ambiguous phrase ('wait') keeps the language of the last message."""
+    if is_german(text):
+        return "de"
+    return previous if len(str(text).split()) <= 1 else "en"
 
 
 def pace_of(guide) -> GuidePace | None:
@@ -217,11 +225,12 @@ def tick_turn(agent, pace: GuidePace, step: int | None, lang: str, voice: bool) 
 def user_turn(agent, text: str, pace: GuidePace, voice: bool) -> str:
     """A real message of the person while pace is on."""
     guide, bm = agent.guide, agent.map
-    lang = "de" if is_german(text) else "en"
+    lang = pace.lang = language_of(text, pace.lang)
     was_paused, was_awaiting = pace.paused, pace.awaiting
     pace.on_user_message()
     pace.awaiting = False
-    intent = parse_pace_intent(text) if guided(guide) else None
+    card_open = guide.pending is not None  # the next message may answer the card: pass everything through
+    intent = parse_pace_intent(text) if guided(guide) and not card_open else None
     send = text
     if intent == "wait":
         pace.pause()
@@ -232,7 +241,7 @@ def user_turn(agent, text: str, pace: GuidePace, voice: bool) -> str:
         pace.resume()
         if was_paused or was_awaiting:
             send = "next"
-    elif was_awaiting and guided(guide) and parse_yes(text):
+    elif was_awaiting and guided(guide) and not card_open and parse_yes(text):
         send = "next"
     before = (guide.walk, guide.walk.index if guide.walk is not None else None)
     reply = ask_model(agent, send, voice, True)
@@ -262,5 +271,5 @@ def run_turn(
         return ask_model(agent, text, voice, False)
     pace = state_of(agent.guide, mode)
     if is_tick:
-        return tick_turn(agent, pace, tick_step, "de" if is_german(agent.guide.last_user_text) else "en", voice)
+        return tick_turn(agent, pace, tick_step, pace.lang, voice)
     return user_turn(agent, text, pace, voice)

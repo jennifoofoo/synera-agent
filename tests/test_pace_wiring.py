@@ -5,6 +5,7 @@ tools the real model would call, so the guide state, the walk and the timer are 
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -451,3 +452,74 @@ def test_web_tick_with_a_selection_in_the_context_keeps_the_selection(monkeypatc
         {"building": key, "message": "here", "context": {"space_id": room["id"], "guide_tick": True}, "pace": "ask"},
     )
     assert seen[-1]["selection"].space_id == room["id"] and seen[-1]["tick"] is True
+
+
+# ---------- review fixes ----------
+
+
+@pytest.mark.parametrize(
+    "phrase", ["one moment", "wait a moment", "where is the bin", "the die casting room", "moment"]
+)
+def test_english_phrases_are_not_german(guided, phrase):
+    assert not pace_guide.is_german(phrase)
+    reply = run(guided, phrase, "ask")
+    assert "lass dir Zeit" not in reply and "Bereit" not in reply and pace_guide.language_of(phrase) == "en"
+
+
+def test_english_wait_gets_an_english_reply_and_english_tick_in_say_mode(guided, model):
+    assert run(guided, "one moment", "say") == "Okay, take your time. Say go when you're ready."
+    run(guided, "go", "say")
+    run(guided, "where is the bin", "say")
+    before = len(model.texts)
+    reply = run(guided, "", "say", True)
+    assert len(model.texts) == before and reply.endswith("Say wait if you need a moment.")
+
+
+@pytest.mark.parametrize("phrase", ["warte", "bitte weiter", "ich bin da", "wo ist die Küche", "nochmal", "jetzt"])
+def test_german_phrases_are_german(phrase):
+    assert pace_guide.is_german(phrase)
+
+
+def test_a_one_word_phrase_keeps_the_language_of_the_last_message(guided):
+    run(guided, "ja bitte", "ask")
+    assert "Zeit" in run(guided, "moment", "ask")
+
+
+def test_switching_pace_off_resets_the_mode_for_state_view(guided, monkeypatch):
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    adapter = adapter_for(guided)
+    adapter.ensure_session = lambda: guided
+    adapter.ask("repeat", pace="say")
+    assert guided.guide.pace.mode == "say"
+    adapter.ask("repeat")  # no pace field means off
+    assert guided.guide.pace.mode == "off"
+    assert adapter.guide_info()["pace"] == "off"
+
+
+def test_wait_while_a_card_is_pending_goes_to_the_model_and_the_card_stays_valid(guided, model):
+    settled(guided)
+    guided.guide.pending = SimpleNamespace(turn=guided.guide.turn)
+    before = len(model.texts)
+    assert run(guided, "wait", "ask").startswith("model:") and len(model.texts) == before + 1
+    assert not guided.guide.pace.paused
+    run(guided, "go", "ask")
+    run(guided, "yes", "ask")
+    assert model.texts[-2:] == ["go", "yes"]  # nothing rewritten to next, so a yes still answers the card
+
+
+def test_wait_without_a_card_still_pauses(guided):
+    guided.guide.pending = None
+    run(guided, "wait", "ask")
+    assert guided.guide.pace.paused
+
+
+def test_a_tick_without_a_key_or_on_the_starter_backend_is_ignored(monkeypatch):
+    adapter = ChatAdapter(Path("x"), None)
+    monkeypatch.setattr("web.chat.chat_available", lambda: False)
+    assert adapter.ask("", tick=True) == {"reply": "", "backend": None, "tick_ignored": True}
+    assert adapter.ask("hi", tick=True)["error"] == "no_api_key"
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.backend_name", lambda: "starter")
+    monkeypatch.setattr(ChatAdapter, "ask_starter", lambda self, text: f"starter: {text}")
+    assert adapter.ask("", tick=True) == {"reply": "", "backend": "starter", "tick_ignored": True}
+    assert adapter.ask("hi", tick=True) == {"reply": "starter: hi", "backend": "starter"}

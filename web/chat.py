@@ -67,6 +67,8 @@ class ChatAdapter:
         pace: 'off' | 'ask' | 'say', the page's auto-pace switch. tick: context.guide_tick was a real true (the
         message is empty then); tick_step: the step its timer was started for. See building_agent/pace_guide.py."""
         if not chat_available():
+            if tick and not text.strip():  # a timer tick has nothing to say without a key
+                return {"reply": "", "backend": None, "tick_ignored": True}
             return {"reply": NO_KEY_MESSAGE, "backend": None, "error": "no_api_key"}
         backend = backend_name()
         try:
@@ -77,7 +79,7 @@ class ChatAdapter:
                     result = {"reply": reply, "backend": backend}
                     if tick and not reply:
                         result["tick_ignored"] = True  # no guide, forged, stale or a repeat: nothing to say
-                elif tick:
+                elif tick and not text.strip():
                     result = {"reply": "", "backend": backend, "tick_ignored": True}
                 else:
                     result = {"reply": self.ask_starter(text), "backend": backend}
@@ -103,6 +105,9 @@ class ChatAdapter:
         self.session.guide.selection = selection
         try:
             if pace == "off":
+                switched = pace_guide.pace_of(self.session.guide)
+                if switched is not None:  # the page switched pace off: state_view must say so
+                    switched.mode = "off"
                 return self.session.ask(text, **({"voice": True} if voice else {}))
             return pace_guide.run_turn(self.session, text, pace, False, None, voice)
         finally:
