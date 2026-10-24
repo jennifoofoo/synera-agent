@@ -5,7 +5,8 @@ import CameraControlsImpl from "camera-controls";
 
 // Input model (like a map):
 //  - left button or one finger: grab the map and pan (the point under the pointer stays under the pointer, no damping)
-//  - right button, or Ctrl/Alt + left: rotate (3D: also tilt). Two fingers: pinch zoom + rotate (+ tilt in 3D)
+//  - right button, or Ctrl/Alt + left: rotate (3D: also tilt). Two fingers: pinch zoom + rotate + tilt in 3D;
+//    on the 2D plan pinch zoom around the midpoint and move with it, no rotation
 //  - middle button: pan. Wheel and pinch: zoom to the pointer. Two-finger trackpad scroll: pan.
 // camera-controls does rotate, touch and the animated moves; panning, the wheel and gestures are done here.
 
@@ -40,6 +41,16 @@ export function isTrackpadScroll(event: WheelEvent): boolean {
   const legacy = (event as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY ?? 0;
   if (Math.abs(event.deltaY) >= 50 && Math.abs(legacy) % 120 === 0 && event.deltaX === 0) return false;
   return event.deltaX !== 0 || !Number.isInteger(event.deltaY) || streaming;
+}
+
+/** Two fingers on the 2D plan: zoom by the finger spread around their midpoint, and move with the midpoint. */
+interface Pinch {
+  snap: THREE.OrthographicCamera;
+  plane: THREE.Plane;
+  p0: THREE.Vector3;
+  target0: THREE.Vector3;
+  zoom0: number;
+  spread0: number;
 }
 
 interface Options {
@@ -77,6 +88,9 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
     let lastY = 0;
     let touches = 0;
     let pan: Pan | null = null;
+    let pinch: Pinch | null = null;
+    const fingers = new Map<number, [number, number]>();
+    const scratch = new THREE.OrthographicCamera();
     let restoreLeft: CameraControlsImpl["mouseButtons"]["left"] | null = null;
     let down: [number, number] = [0, 0];
     const usable = () => !(active && !active());
@@ -142,13 +156,32 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       el.style.cursor = "grab";
     };
 
+    const midpoint = (): [number, number, number] => {
+      const [a, b] = [...fingers.values()];
+      return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, Math.hypot(a[0] - b[0], a[1] - b[1])];
+    };
+    const startPinch = (c: CameraControlsImpl) => {
+      pinch = null;
+      if (!(c.camera as THREE.OrthographicCamera).isOrthographicCamera || fingers.size !== 2 || !c.enabled) return;
+      const [x, y, spread] = midpoint();
+      const target0 = c.getTarget(new THREE.Vector3());
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -target0.y);
+      const snap = (c.camera as THREE.OrthographicCamera).clone();
+      snap.updateMatrixWorld(true);
+      const p0 = new THREE.Vector3();
+      if (spread < 8 || !ground(snap, x, y, plane, p0)) return;
+      pinch = { snap, plane, p0, target0, zoom0: snap.zoom, spread0: spread };
+    };
+
     const onPointerDown = (event: PointerEvent) => {
       lastX = event.clientX;
       lastY = event.clientY;
       down = [event.clientX, event.clientY];
       if (event.pointerType === "touch") {
         touches++;
-        if (touches > 1) stopPan(); // two fingers belong to the controls (pinch, rotate)
+        fingers.set(event.pointerId, [event.clientX, event.clientY]);
+        if (touches > 1) stopPan(); // two fingers: pinch on the 2D plan (below), the controls in 3D
+        if (touches === 2 && controls.current && usable()) startPinch(controls.current);
       }
       const c = controls.current;
       if (!c || !usable() || !event.isPrimary) return;
@@ -160,19 +193,40 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       }
       const wantsPan = (mouse && (event.button === 0 || event.button === 1)) || (!mouse && touches === 1);
       if (!wantsPan || !c.enabled) return;
+      startPan(c, event.pointerId, event.clientX, event.clientY);
+    };
+
+    const startPan = (c: CameraControlsImpl, pointerId: number, clientX: number, clientY: number) => {
       c.getTarget(v);
       const target0 = v.clone();
       const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -target0.y);
       const snap = c.camera.clone();
       snap.updateMatrixWorld(true);
       const p0 = new THREE.Vector3();
-      if (!ground(snap, event.clientX, event.clientY, plane, p0)) return;
-      pan = { pointerId: event.pointerId, start: [event.clientX, event.clientY], snap, p0, target0, plane, moved: false };
+      if (!ground(snap, clientX, clientY, plane, p0)) return;
+      pan = { pointerId, start: [clientX, clientY], snap, p0, target0, plane, moved: false };
     };
 
     const onPointerMove = (event: PointerEvent) => {
       lastX = event.clientX;
       lastY = event.clientY;
+      if (fingers.has(event.pointerId)) fingers.set(event.pointerId, [event.clientX, event.clientY]);
+      if (pinch && fingers.has(event.pointerId) && fingers.size === 2) {
+        const c = controls.current;
+        if (!c || !c.enabled) return void (pinch = null);
+        // Exact: the ground point under the midpoint at the start stays under the midpoint at the new zoom.
+        const [x, y, spread] = midpoint();
+        const zoom = THREE.MathUtils.clamp((pinch.zoom0 * spread) / pinch.spread0, c.minZoom, c.maxZoom);
+        scratch.copy(pinch.snap);
+        scratch.zoom = zoom;
+        scratch.updateProjectionMatrix();
+        scratch.updateMatrixWorld(true);
+        if (!ground(scratch, x, y, pinch.plane, hit)) return;
+        void c.zoomTo(zoom, false);
+        void c.moveTo(pinch.target0.x + (pinch.p0.x - hit.x), pinch.target0.y, pinch.target0.z + (pinch.p0.z - hit.z), false);
+        invalidate();
+        return;
+      }
       if (!pan || event.pointerId !== pan.pointerId) return;
       const c = controls.current;
       // Another handler took the press (the draggable "you are here" dot disables the controls): back off.
@@ -191,6 +245,12 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (event.pointerType === "touch") touches = Math.max(0, touches - 1);
       if (pan && event.pointerId === pan.pointerId) stopPan();
       const c = controls.current;
+      if (fingers.delete(event.pointerId) && pinch) {
+        pinch = null;
+        // One finger left after a pinch: it goes on moving the map from where it is.
+        const rest = [...fingers.entries()][0];
+        if (c && rest && touches === 1 && usable()) startPan(c, rest[0], rest[1][0], rest[1][1]);
+      }
       if (c && restoreLeft !== null && event.pointerType === "mouse") {
         c.mouseButtons.left = restoreLeft;
         restoreLeft = null;
