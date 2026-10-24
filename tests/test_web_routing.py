@@ -12,7 +12,7 @@ from building_agent import routing
 from building_agent.guide_tools import GuideState, make_guide_tools
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
 from tests.conftest import DATA, LABELLED_SPLITS
-from web import api
+from web import api, route_draw
 
 ROUTE_KINDS = ("route", "route_step_free", "route_with_closure", "tour")
 PER_SOURCE_AND_KIND = 3
@@ -71,12 +71,23 @@ def test_page_route_has_the_agents_space_path(building_dir, kind, answer, tmp_pa
 
 
 def assert_line_follows_the_doors(bm, page: dict) -> None:
-    """Starts and ends at the room anchors, every door on the way is a point of the line, floor changes join up."""
+    """Starts and ends at the room anchors (moved off furniture) or, for big halls, at their door; every door on
+    the way is a point of the line, floor changes join up."""
     points = [(segment["floor_id"], tuple(point)) for segment in page["segments"] for point in segment["points"]]
     start, end = page["space_path"][0], page["space_path"][-1]
-    assert points[0] == (bm.spaces[start]["floor_id"], tuple(api.rounded(bm.anchor(start))))
+
+    def room_end(space_id: str) -> set:
+        floor_id = bm.spaces[space_id]["floor_id"]
+        doors = {
+            (o["floor_id"], tuple(api.rounded(o["position"])))
+            for o in bm.openings.values()
+            if space_id in o["space_ids"]
+        }
+        return {(floor_id, tuple(api.rounded(route_draw.drawn_anchor(bm, space_id)))), *doors}
+
+    assert points[0] in room_end(start)
     if start != end:
-        assert points[-1] == (bm.spaces[end]["floor_id"], tuple(api.rounded(bm.anchor(end))))
+        assert points[-1] in room_end(end)
     for first, second in itertools.pairwise(page["space_path"]):
         door = next(
             (o for o in bm.openings.values() if set(o["space_ids"]) == {first, second} and o["id"] not in bm.closed),

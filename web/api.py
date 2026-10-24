@@ -12,6 +12,7 @@ from shapely.geometry import Polygon
 
 from building_agent import routing
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
+from web import route_draw
 
 COORD_DIGITS = 2
 KEPT_ROUTE_REQUESTS = 8
@@ -502,12 +503,18 @@ def route_geometry(
     The people model walks door to door: the line starts at the start room's anchor, runs through every door
     (and connector stop, which sits at its room's anchor), touches the anchor of each via stop, and ends at the
     destination's anchor. Walking outside between two entrances is its own dashed segment. An exact start (end)
-    point replaces the first (last) anchor vertex, so the line begins where the person stands."""
+    point replaces the first (last) anchor vertex, so the line begins where the person stands.
+
+    Drawing only (web/route_draw.py): a room anchor that sits on an asset moves to the nearest free point, and
+    the line ends (and starts) at the door of a big hall or zone instead of crossing it to its anchor (never at an
+    exact point)."""
     path: list[tuple] = [("x", start_point, stops[0]) if start_point else ("a", None, stops[0])]
     for stop, nodes in zip(stops[1:], legs, strict=True):
         path += [*nodes, ("a", None, stop)]
     if destination_point:
         path[-1] = ("x", destination_point, stops[-1])
+    path = trim_big_room_ends(bm, path)
+    drawing = route_draw.draw_index(bm)  # once per line: its signature check walks every asset
     segments: list[dict] = []
     floor_changes: list[dict] = []
     current: dict | None = None
@@ -521,7 +528,7 @@ def route_geometry(
             return bm.spaces[space_id]["floor_id"], rounded(element)
         if space_id == OUTSIDE or space_id not in bm.spaces:
             return None
-        return bm.spaces[space_id]["floor_id"], rounded(bm.anchor(space_id))
+        return bm.spaces[space_id]["floor_id"], rounded(route_draw.drawn_anchor(bm, space_id, drawing))
 
     def add_point(node: tuple, kind: str = "walk") -> None:
         nonlocal current
@@ -548,7 +555,7 @@ def route_geometry(
                 # Riding on past a floor: one change F0 -> F4, no stub drawn on the floors in between.
                 if current is not None and len(current["points"]) == 1:
                     segments.remove(current)
-                last.update(to_floor=to_floor, to_point=rounded(bm.anchor(node[2])))
+                last.update(to_floor=to_floor, to_point=rounded(route_draw.drawn_anchor(bm, node[2], drawing)))
             else:
                 floor_changes.append(
                     {
@@ -557,8 +564,8 @@ def route_geometry(
                         "name": connector["name"],
                         "from_floor": from_floor,
                         "to_floor": to_floor,
-                        "from_point": rounded(bm.anchor(previous[2])),
-                        "to_point": rounded(bm.anchor(node[2])),
+                        "from_point": rounded(route_draw.drawn_anchor(bm, previous[2], drawing)),
+                        "to_point": rounded(route_draw.drawn_anchor(bm, node[2], drawing)),
                     }
                 )
             current = None
@@ -571,6 +578,25 @@ def route_geometry(
         going_up = bm.floors[change["to_floor"]]["level"] > bm.floors[change["from_floor"]]["level"]
         change["direction"] = "up" if going_up else "down"
     return {"segments": segments, "floor_changes": floor_changes}
+
+
+def trim_big_room_ends(bm: BuildingMap, path: list[tuple]) -> list[tuple]:
+    """Drop the anchor at either end of the line when that room is a big hall or zone and the line leaves or
+    enters it by a door; the end then sits on the door. The destination wins: if trimming both ends would leave
+    no line, only the destination end is trimmed."""
+
+    def trimmable(end: tuple, door: tuple) -> bool:
+        return end[0] == "a" and door[0] == "o" and door[2] == end[2] and route_draw.ends_at_door(bm, end[2])
+
+    def drawn_points(nodes: list[tuple]) -> int:
+        return len({tuple(bm.openings[n[1]]["position"][:2]) if n[0] == "o" else (n[0], n[2]) for n in nodes})
+
+    if len(path) < 3:
+        return path
+    trimmed = path[:-1] if trimmable(path[-1], path[-2]) else path
+    if trimmable(trimmed[0], trimmed[1]) and drawn_points(trimmed[1:]) >= 2:
+        trimmed = trimmed[1:]
+    return trimmed if drawn_points(trimmed) >= 2 else path
 
 
 # ---------- changes ----------
