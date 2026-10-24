@@ -212,7 +212,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   topInset: 0,
   draft: false,
   offCentre: false,
-  floorMode: "stacked",
+  floorMode: "single", // only the chosen floor: a ghosted floor above read as a shadow copy
   focusedFloorId: null,
   thingsMode: "near",
   cutaway: true,
