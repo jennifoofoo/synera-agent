@@ -13,7 +13,12 @@ import "./Directions.css";
 
 export function placeName(model: BuildingModel, place: Place | null): string {
   if (!place) return "";
-  if (place === HERE) return "Your location";
+  if (place === HERE) {
+    // Campus: "here" may be in another building (only when this building has no position of its own).
+    const { state, campusHook } = useTwin.getState();
+    const building = state?.position ? null : campusHook?.hereName();
+    return building ? `Your location (${building})` : "Your location";
+  }
   return model.spaceById.get(place)?.name || model.connectorBySpace.get(place)?.name || place;
 }
 
@@ -22,7 +27,7 @@ function PlaceField({ model, field, value, placeholder }: { model: BuildingModel
   const editDirections = useTwin((s) => s.editDirections);
   const setFrom = useTwin((s) => s.setDirectionsFrom);
   const setTo = useTwin((s) => s.setDirectionsTo);
-  const hasHere = useTwin((s) => !!s.state?.position);
+  const hasHere = useTwin((s) => !!s.state?.position || !!s.campusHook?.hereName());
   const dot = <span className={`dir-dot ${field}`} aria-hidden />;
   const label = field === "from" ? "From" : "To";
   if (!editing) {

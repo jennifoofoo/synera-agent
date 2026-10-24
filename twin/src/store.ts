@@ -313,8 +313,8 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ hereArmed });
   },
   openDirections(to) {
-    // "Your location" when known here, or (campus) maybe in another building: routeDirections checks the campus.
-    const from = get().state?.position || get().campusHook ? HERE : null;
+    // "Your location" when known: here, or (campus) in another building, then routeDirections routes across.
+    const from = get().state?.position || get().campusHook?.hereName() ? HERE : null;
     set({ directions: { from, to, stepFree: false, editing: from ? null : "from" }, selection: null, popover: null });
     void routeDirections();
   },
