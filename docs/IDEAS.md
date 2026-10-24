@@ -367,3 +367,22 @@ Standort (gesagt, geklickt, am Gerät), Klick-Auswahl mit Validierung auf dem Se
 - **Bildlesen irrt sich:** Größen und Typen sind Schätzungen. Darum nur Vorschläge mit Karte und Ja, wie überall sonst.
 - **Datenmenge:** Fotos sind groß, Handy-Upload über schlechtes Netz in der Halle. Verkleinern vor dem Hochladen.
 - Wertung: Die Sonntagsfragen prüfen das vermutlich nicht. Gut für Creativity, Demo ("Capture on site" und "Make things move" aus den Level-5-Ideen) und für den Pitch.
+
+## 11. Positionierung und Story für den Servicetechniker (Leonie, 25.10.2026)
+Status: Grundlage für Pitch, Video und Technik-Text.
+
+### Unsere Lücke (Satz für den Pitch)
+Fast niemand verbindet **Gespräch, Gebäudegeometrie und Wegführung**. Die Wartungssoftware weiß *was*, die Ortung weiß *wo ungefähr*, aber keiner sagt dir freihändig: "Links an der Presse vorbei, das Ersatzteil liegt auf dem Weg im Lager H-C2."
+
+### Schmerzpunkte im Alltag (von Leonie ausgewählt)
+- Suchen kostet Zeit: Teile, Werkzeug, Maschine, Kollegen, Dokumente.
+- Wissen steckt in Köpfen: der erfahrene Kollege geht in Rente.
+- Dokumentation passiert nachträglich und schlecht.
+
+### Prüfrunde planen (Favorit für die Demo)
+"Ich muss heute alle 14 Feuerlöscher in Halle A prüfen." Wanda rechnet die kürzeste Runde (Tour wie `errand`), lotst Station für Station und schaltet mit "Hey Wanda, erledigt" weiter. Baut auf Geräte-Suche, Touren und der freihändigen Führung auf.
+
+### Kleine Features aus den Schmerzpunkten (nicht Overkill)
+- Suchen: "Hey Wanda, ich brauch noch X" baut den nächsten X als Zwischenstopp in die laufende Route (`via`).
+- Wissen: Ortsnotizen per Sprache ("Hey Wanda, merk dir hier: ..."), beim nächsten Vorbeilotsen vorgelesen.
+- Dokumentation: "Hey Wanda, fertig" erzeugt ein Einsatzprotokoll (Ziel, Zeit, Meter, Sperrungen, Notizen), ohne LLM.
