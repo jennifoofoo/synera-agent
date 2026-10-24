@@ -273,7 +273,7 @@ def test_hands_free_control_shown_once(twin):
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") <= 1
 
     # After something was said, the hint does not come back.
-    assert page.evaluate("(t) => window.__say(t)", "hey wanda next")
+    assert page.evaluate("(t) => window.__say(t)", "hey wanda repeat")
     page.wait_for_timeout(1500)
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") == 0 or "Hey Wanda" not in page.inner_text(".hf-status")
     assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
