@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
@@ -69,6 +69,10 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
   };
 
   const group = useRef<THREE.Group>(null);
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    invalidate(); // frameloop="demand": draw the floor as soon as its geometry is mounted or swapped
+  }, [built, ghost, visible, flat, invalidate]);
   useFrame(() => {
     if (group.current) group.current.position.y = y; // no React re-render for the exploded animation
   });

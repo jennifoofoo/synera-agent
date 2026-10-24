@@ -92,15 +92,19 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const y = floorY(floor.id);
     const box = new THREE.Box3(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
     fitBox(c, box, !reducedMotion, 0.9);
+    invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flat, focusedFloorId, camera]);
 
-  // Requests from the store.
+  // Requests from the store. Under frameloop="demand" a camera transition needs a first frame to start, so
+  // every request ends with invalidate() (the transition then keeps requesting frames through the controls).
   useEffect(() => {
     const c = controls.current;
     if (!c || !request.nonce) return;
     const animate = !reducedMotion;
     const box = new THREE.Box3();
+    const kick = () => setTimeout(invalidate, 0);
+    kick();
     if (request.kind === "home") {
       if (flat) {
         const floor = model.floorById.get(focusedFloorId ?? "") ?? model.floors[0];

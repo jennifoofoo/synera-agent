@@ -104,6 +104,16 @@ function Stats() {
       buildMs: Object.fromEntries([...buildTimes].map(([id, ms]) => [id, Math.round(ms)])),
     });
   }, [gl, scene]);
+  const invalidate = useThree((s) => s.invalidate);
+  const model = useTwin((s) => s.model);
+  const viewMode = useTwin((s) => s.viewMode);
+  const state = useTwin((s) => s.state);
+  useEffect(() => {
+    // frameloop="demand": anything that changes what is drawn asks for a frame (and one more after layout).
+    invalidate();
+    const timer = setTimeout(invalidate, 50);
+    return () => clearTimeout(timer);
+  }, [model, viewMode, state, invalidate]);
   useFrame(() => {
     const w = window as unknown as { __twinFirstFrame?: number };
     if (w.__twinFirstFrame === undefined && gl.info.render.triangles > 100) w.__twinFirstFrame = Math.round(performance.now());
