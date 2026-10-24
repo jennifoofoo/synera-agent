@@ -393,3 +393,31 @@ OSM findings the person would also see (known extraction limits): 9 of 20 rooms 
 - The single-floor numbers do not carry over to buildings: with 100% rooms and doors on both floors the person still gets a building without stairs, which can only be saved with "save anyway", and every cross-floor question fails. With the stairs typed right the same pipeline gives 100% cross-floor routes (proc, 292 pairs, step-free included), so the gap is the typing and the repair path, not routing.
 - Next steps in this order: (1) when 2 or more floors have no connector, ask on the card which rooms are the stairs and lifts, and make `set_room_type` with a stair or lift type set `type` and relink (test: two-floor draft, `fix_draft`, then `vertical_connectors` is not empty, currently red); (2) say "no stairs or lifts found between the floors" instead of "doors missing", and do not count upper floors as "no way out" before connectors exist; (3) let the prompt and the linker also use name and ref hints ("stair", "lift", "Treppe", "Aufzug"); (4) decide how stair halls with stairs and a lift on one space are represented; (5) relax the unlikely-size check when the person gave the length themselves.
 - Reproduce (cached, no API cost): `uv run python scripts/level4_live_test.py a --building proc-campus-dev-000` (also `swiss-1785`, `osm-way360544293`), `b --building resplan-439`, `c --building proc-campus-dev-000 --mode invert`. A changed image or prompt costs about 0.01 to 0.03 USD per floor and needs the key via `uv run --env-file`.
+
+#### After connector fixes (2026-10-24, same cached extractions, no API call)
+
+Code: `building_agent/level4/convert.py` (`detect_connector`, `relink_connectors`, `tag_fills`), `validate.py`, `tools.py` (`fix_draft` `link_floors`, questions), one optional field `ExtractedRoom.fill`. Reproduce: the same three `level4_live_test.py a` commands (cached). New tests: `tests/test_level4_connectors.py` (36, offline; the three cached-real tests skip when `agent_output/level4_cache` is missing).
+
+What the cached model answers contain (this decided the design): stairs and lifts have no name at all, only numbers like 0.04 (the plain image prints only numbers). In the proc plan stairs are orange and lifts purple (the kit palette; orange or purple is present on all 45 proc dev floors, on 17 of the 18 osm floors that have stairs or lifts and on the one resplan floor with stairs, and on no floor without them; checked per image, not per room). So the fill colour of the region (segmentation) is the only hint for proc. Swiss and OSM halls are grey like any corridor and carry no hint at all, so nothing is detected there and the person is asked.
+
+| Building | Connectors created (before / after) / original | Cross-floor pairs at full marks (before / after) | Step-free pairs at full marks (before / after) | Card (after) |
+|---|---|---|---|---|
+| proc-campus-dev-000 | 0 / 6 of 6 | 0 of 292 / 292 of 292 | 0 of 292 / 292 of 292 | no blocking problem, a warning lists the 12 rooms taken as stairs or lift by colour, plain "yes, save it" saves |
+| swiss-1785, as built | 0 / 0 of 3 | 0 of 350 / 0 of 350 | 0 of 225 / 0 of 225 | "I found 2 floors but no stairs or lifts between them. Which rooms are the stairs and lifts?" plus a question listing candidate halls (floor 0: 0.35, 0.34, 0.10, ...), 15 rooms without a way out (was 69 counted globally) |
+| swiss-1785, after the person answers with `link_floors` (0.35/1.34 stairs, 0.35/1.34 lift, 0.35/1.35 stairs) | 3 of 3 | 350 of 350 | 225 of 225 | length ratio to the kit route 0.99 (max 1.01) |
+| osm-way360544293 | 0 / 0 of 8 | 0 of 96 / 0 of 96 | 0 of 90 / 0 of 90 | no crash, "no stairs or lifts between them" error plus question, no wrong links; "unusual size for the length you gave" is now a warning, saving is still blocked by the 17 overlapping rooms and other known OSM errors |
+
+- proc is the measured upper bound, reached without any oracle: 6 of 6 connectors with the right kinds, 292 of 292 pairs at full marks, 292 of 292 step-free over the lift, our length 0.95 (0.98) of the kit `route` length, step-free 0.98 (0.99).
+- The swiss as-built row stays at 0 because the extraction has nothing to detect. With artificial extractions of the true swiss floors that name the halls ("Stair hall 0.35", test `test_swiss_stair_hall_links_stairs_and_asks_for_the_lift`) the stairs link and a `lift_not_found` question is asked: a hall space is never turned into a lift that nobody named. The row with `link_floors` shows the repair path works for hall numbers that differ per floor. The script's `connectors_recovered` reads 1 of 3 there only because the three original connectors share two stop rooms, the routes are all at full marks.
+- Stale in the JSON: `oracle_types` of swiss (retyping by ref cannot express stairs and lift on one hall).
+
+Defects of the list above:
+
+| # | Status |
+|---|---|
+| 1 No connectors on two-floor builds | Fixed where the plan carries a hint (proc: colour or name). Not fixable from the image alone for swiss and osm halls; the person is asked and answers with `set_room_type` or `link_floors`. |
+| 2 `set_room_type` stairwell/lift is a silent no-op | Fixed: sets `type` and relinks, the reply says how many connectors exist. Taking the type back (office) unlinks. |
+| 3 Card blames missing doors | Fixed: `no_vertical_connectors` replaces per-room "no way out" for upper floors, reachability is computed per floor when no connector exists. Saving such a draft needs "save it anyway". |
+| 4 Stair halls with different numbers per floor | Partly: overlap (of the smaller room, 30 percent), then centred floors (warning `connector_aligned_by_centre`), then one stair or lift per floor (warning `connector_linked_by_order`). A hall that holds stairs and lift is linked twice via `link_floors`, or automatically only when its name says both. Nothing is detected without a hint. |
+| 5 Size check blocks large real buildings | Fixed for a length the person gave (warning `scale_unusual_known`); the error stays for a printed scale bar and for a door width used as ruler. |
+| 6 Floor frames not aligned | Handled for stair and lift matching only (centre of all rooms, warned). Not tested on a real cropped pair (osm has no detectable lifts). |

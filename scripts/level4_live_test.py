@@ -324,6 +324,7 @@ def run_a(building_id: str, scratch: Path) -> dict:
     }
     out["as_built"] = evaluate_building(building_id, loaded)
     out["fix_attempt"] = fix_attempt(scratch / "fix", building_id)
+    out["link_attempt"] = link_attempt(scratch / "link", building_id)
     out["oracle_types"] = oracle_types(scratch / "oracle", building_id)
     return out
 
@@ -412,6 +413,41 @@ def fix_attempt(scratch: Path, building_id: str) -> dict:
         "fix_answers": answers[:3],
         "connectors_after_fixes": len(rig.draft.building["vertical_connectors"]),
         "problems_after_fixes": rig.call("preview_draft")["problems found"],
+    }
+
+
+def link_attempt(scratch: Path, building_id: str) -> dict:
+    """What the person can do when the hall numbers differ per floor: fix_draft link_floors for every true connector."""
+    rig = rebuilt_from_cache(scratch, building_id)
+    original = BuildingMap(load_building(building_id))
+    levels = {f["id"]: f["level"] for f in original.data["floors"]}
+    answers = []
+    for c in original.connectors.values():
+        stops = {levels[original.spaces[s]["floor_id"]]: original.spaces[s] for s in c["space_ids"]}
+        if 0 not in stops or 1 not in stops:
+            continue
+        ref0, ref1 = (stops[0].get("ref") or stops[0]["name"]), (stops[1].get("ref") or stops[1]["name"])
+        try:
+            answers.append(
+                rig.call(
+                    "fix_draft",
+                    action="link_floors",
+                    ref=ref0,
+                    other_ref=ref1,
+                    kind=c["kind"],
+                    level=0,
+                    other_level=1,
+                )["done"]
+            )
+        except Exception as error:  # noqa: BLE001
+            answers.append(f"error: {error}")
+    rig.turn()
+    card = rig.call("preview_draft")
+    return {
+        "answers": answers,
+        "connectors_after": len(rig.draft.building["vertical_connectors"]),
+        "question": card.get("question"),
+        "evaluated": evaluate_building(building_id, BuildingMap(rig.draft.building)),
     }
 
 

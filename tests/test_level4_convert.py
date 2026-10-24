@@ -252,6 +252,13 @@ def test_lift_connector_is_step_free_and_unmatched_stairs_stay_rooms_with_a_warn
     building, findings = convert_floors_with_findings(
         [stair_floor(0, "0.09", kind="lift"), stair_floor(1, "1.09", kind="lift", at=900)], "T", "t1"
     )
+    assert len(building["vertical_connectors"]) == 1  # one lift on each floor: linked by order, with a warning
+    assert "connector_linked_by_order" in codes(findings)
+    first = stair_floor(0, "0.09", kind="lift")
+    extra = ExtractedRoom("t", rect(600, 0, 700, 100), ref="0.10", type="lift")
+    first.extraction.rooms.append(extra)
+    first.extraction.doors.append(ExtractedDoor(("c", "t"), [600, 50]))
+    building, findings = convert_floors_with_findings([first, stair_floor(1, "1.09", kind="lift", at=900)], "T", "t1")
     assert not building["vertical_connectors"]
     assert "connector_single_floor" in codes(findings)
     linked, _ = convert_floors_with_findings(

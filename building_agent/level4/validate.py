@@ -46,6 +46,20 @@ CODES: dict[str, tuple[str, str]] = {
     "connector_missing_stop": ("error", "{n} stair{s} or lift{s} {have} no stop room on every floor they pass."),
     "connector_single_floor": ("warning", "{n} stair{s} or lift{s} could not be matched to a room on another floor."),
     "scale_implausible": ("error", "The building would be an unlikely size, the scale is probably wrong."),
+    "scale_unusual_known": ("warning", "The building is an unusual size for the length you gave, please check it."),
+    "no_vertical_connectors": (
+        "error",
+        "I found more than one floor but no stairs or lifts between them. Which rooms are the stairs and lifts?",
+    ),
+    "connector_typed_by_hint": ("warning", "{n} room{s} {is} taken as stairs or lift because of the name or colour."),
+    "connector_linked_by_order": (
+        "warning",
+        "{n} stair or lift pair{s} on neighbouring floors {is} linked because each floor has only one.",
+    ),
+    "connector_aligned_by_centre": (
+        "warning",
+        "{n} stair or lift pair{s} {is} matched after centring the floors on each other, please check.",
+    ),
     "floor_empty": ("warning", "{n} floor{s} without any room."),
 }
 
@@ -196,6 +210,9 @@ def _check_reachability(building: dict, found: Collector) -> None:
     if not building["spaces"]:
         return
     graph = bm.graph(step_free=False)
+    if len(building["floors"]) > 1 and not building["vertical_connectors"]:
+        _check_floors_alone(building, graph, found)
+        return
     components = list(nx.connected_components(graph))
     if has_entrance and OUTSIDE in graph:
         reference = next(component for component in components if OUTSIDE in component)
@@ -204,6 +221,27 @@ def _check_reachability(building: dict, found: Collector) -> None:
     for space in building["spaces"]:
         if space["id"] not in reference:
             found.add("room_unreachable", room_label(space))
+
+
+def _check_floors_alone(building: dict, graph, found: Collector) -> None:
+    """Without stairs or lifts every floor is checked on its own: rooms must reach an entrance (the outside), or, on a
+    floor without one, the biggest group of rooms of that floor, so missing connectors are not reported as doors."""
+    components = list(nx.connected_components(graph))
+    group_of = {node: index for index, component in enumerate(components) for node in component}
+    outside = group_of.get(OUTSIDE)
+    for floor in building["floors"]:
+        spaces = [space for space in building["spaces"] if space["floor_id"] == floor["id"]]
+        has_exit = any(OUTSIDE in o["space_ids"] for o in building["openings"] if o.get("floor_id") == floor["id"])
+        if has_exit and outside is not None:
+            reference = outside
+        else:
+            sizes: dict[int, int] = defaultdict(int)
+            for space in spaces:
+                sizes[group_of[space["id"]]] += 1
+            reference = max(sizes, key=sizes.__getitem__) if sizes else None
+        for space in spaces:
+            if group_of[space["id"]] != reference:
+                found.add("room_unreachable", room_label(space))
 
 
 def _check_connectors(building: dict, found: Collector) -> None:
@@ -221,18 +259,19 @@ def _check_connectors(building: dict, found: Collector) -> None:
             found.add("connector_missing_stop", connector.get("name") or connector["id"])
 
 
-def _check_scale(polygons: dict[str, Polygon], found: Collector) -> None:
+def _check_scale(polygons: dict[str, Polygon], found: Collector, trusted: bool = False) -> None:
     if not polygons:
         return
     boxes = [polygon.bounds for polygon in polygons.values()]
     width = max(box[2] for box in boxes) - min(box[0] for box in boxes)
     height = max(box[3] for box in boxes) - min(box[1] for box in boxes)
     if not PLAUSIBLE_FOOTPRINT_M[0] <= max(width, height) <= PLAUSIBLE_FOOTPRINT_M[1]:
-        found.add("scale_implausible")
+        found.add("scale_unusual_known" if trusted else "scale_implausible")
 
 
-def validate(building: dict) -> Findings:
-    """Check a building.json dict. Errors block saving, warnings are only shown."""
+def validate(building: dict, trusted_scale: bool = False) -> Findings:
+    """Check a building.json dict. Errors block saving, warnings are only shown.
+    trusted_scale: the person gave a length for the scale, so an unusual building size is only a warning."""
     found = Collector()
     try:
         BuildingMap(building)  # fails early on missing keys
@@ -241,11 +280,16 @@ def validate(building: dict) -> Findings:
         _check_doors(building, polygons, found)
         _check_entrances(building, polygons, found)
         _check_connectors(building, found)
-        _check_scale(polygons, found)
+        _check_scale(polygons, found, trusted_scale)
         _check_reachability(_usable_part(building), found)
+        items = found.findings()
+        floors = len(building["floors"])
+        if floors > 1 and not building["vertical_connectors"]:
+            message = CODES["no_vertical_connectors"][1].replace("more than one floor", f"{floors} floors")
+            items.append(Finding("error", "no_vertical_connectors", message))
     except (KeyError, TypeError, ValueError, IndexError):
         return Findings([Finding("error", "building_invalid", CODES["building_invalid"][1])])
-    return Findings(found.findings())
+    return Findings(items)
 
 
 def describe(findings: Findings, max_items: int = 8) -> str:
