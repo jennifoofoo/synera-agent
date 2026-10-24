@@ -6,8 +6,10 @@ import type { Line2 } from "three-stdlib";
 import type { Route, RouteSegment } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
+import { END_RING_PX, START_DOT_PX, ScreenSized } from "./markerLayout";
 
-const LIFT = 0.4;
+/** Height of the route line above the floor (m); Labels.tsx anchors a route end's label at the same height. */
+export const LIFT = 0.4;
 
 interface Props {
   route: Route | null;
@@ -109,32 +111,38 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         <sphereGeometry args={[0.35, 12, 12]} />
         <meshBasicMaterial color={flat ? "#ffffff" : COLOURS.routeGlow} depthTest={false} transparent opacity={0.95} />
       </mesh>
-      <mesh position={points[0]} renderOrder={23}>
-        <sphereGeometry args={[0.45, 14, 14]} />
-        <meshBasicMaterial color={lineColour} depthTest={false} />
-      </mesh>
-      {flat ? (
-        <group position={points[points.length - 1]} renderOrder={23}>
-          {/* a red pin: ball on a short stem */}
-          <mesh position-y={1.6}>
-            <sphereGeometry args={[0.7, 16, 16]} />
-            <meshBasicMaterial color={COLOURS.mapRed} depthTest={false} />
-          </mesh>
-          <mesh position-y={0.8}>
-            <coneGeometry args={[0.35, 1.4, 12]} />
-            <meshBasicMaterial color={COLOURS.mapRed} depthTest={false} />
-          </mesh>
-          <mesh position-y={1.6}>
-            <sphereGeometry args={[0.25, 10, 10]} />
-            <meshBasicMaterial color="#ffffff" depthTest={false} />
-          </mesh>
-        </group>
-      ) : (
-        <mesh position={points[points.length - 1]} renderOrder={23}>
-          <coneGeometry args={[0.55, 1.1, 4]} />
-          <meshBasicMaterial color={lineColour} depthTest={false} />
-        </mesh>
-      )}
+      {/* ends: constant size on screen, a small dot at the start and a ring at the destination (the room label
+          moves above them, see Labels.tsx), never a filled blob on the text */}
+      <group position={points[0]} name="route-start">
+        <ScreenSized>
+          <EndDisc radius={START_DOT_PX + 2} colour="#ffffff" />
+          <EndDisc radius={START_DOT_PX} colour={lineColour} />
+        </ScreenSized>
+      </group>
+      <group position={points[points.length - 1]} name="route-end">
+        <ScreenSized>
+          <EndDisc radius={END_RING_PX + 1.5} colour="#ffffff" />
+          <EndRing radius={END_RING_PX} width={3} colour={flat ? COLOURS.mapRed : lineColour} />
+        </ScreenSized>
+      </group>
     </group>
+  );
+}
+
+function EndDisc({ radius, colour }: { radius: number; colour: string }) {
+  return (
+    <mesh rotation-x={-Math.PI / 2} renderOrder={23}>
+      <circleGeometry args={[radius, 32]} />
+      <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
+    </mesh>
+  );
+}
+
+function EndRing({ radius, width, colour }: { radius: number; width: number; colour: string }) {
+  return (
+    <mesh rotation-x={-Math.PI / 2} renderOrder={24}>
+      <ringGeometry args={[radius - width, radius, 32]} />
+      <meshBasicMaterial color={colour} depthTest={false} side={THREE.DoubleSide} />
+    </mesh>
   );
 }

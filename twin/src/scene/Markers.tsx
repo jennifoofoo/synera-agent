@@ -12,6 +12,7 @@ import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
+import { BADGE_GAP_PX, END_RING_PX, ScreenSized } from "./markerLayout";
 import { assetSize } from "./Things";
 
 interface Props {
@@ -72,18 +73,18 @@ export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: {
   return <group ref={group}>{children}</group>;
 }
 
-export function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean }) {
+export function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false, order }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean; order?: number }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 19 : 15}>
+    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={order ?? (through ? 19 : 15)}>
       <ringGeometry args={[Math.max(0.05, radius - width), radius, 48]} />
       <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} depthTest={!through} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-export function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean }) {
+export function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false, order }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean; order?: number }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 18 : 14}>
+    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={order ?? (through ? 18 : 14)}>
       <circleGeometry args={[radius, 48]} />
       <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} depthTest={!through} side={THREE.DoubleSide} />
     </mesh>
@@ -160,9 +161,15 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           const target = model.spaceById.get(guide.leg.to_space_id);
           if (!target || !shown(target.floor_id)) return null;
           return (
-            <group position={at(target.floor_id, target.anchor)}>
-              <Ring radius={1.2} colour={COLOURS.route} width={0.16} />
-              <group position-y={2.2}>{chip(`Next: ${target.name}`, "route")}</group>
+            <group position={at(target.floor_id, target.anchor)} name="guide-next">
+              <ScreenSized>
+                <Ring radius={END_RING_PX} colour={COLOURS.route} width={3} through order={30} />
+              </ScreenSized>
+              <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                <div className="chip chip-route guide-next" style={{ transform: `translateY(calc(-50% - ${END_RING_PX + BADGE_GAP_PX}px))` }}>
+                  Next: {target.name}
+                </div>
+              </Html>
             </group>
           );
         })()}

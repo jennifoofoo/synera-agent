@@ -1,9 +1,8 @@
 /* Labels of the "You are here" dot. Uses the shared tokens; the fallbacks keep it readable without them. */
-.here-dot-labels {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+.chip.here-badge {
+  font-size: 11px;
+  padding: 1px 7px;
+  line-height: 15px;
 }
 .here-drag-hint {
   padding: 3px 9px;
@@ -14,4 +13,18 @@
   font-size: 11px;
   white-space: nowrap;
   box-shadow: 0 1px 4px rgba(20, 48, 90, 0.18);
+}
+/* Room labels: a thin paper-white halo so a route line behind them stays readable. */
+.label.label-halo {
+  --halo: var(--panel-solid, #fff);
+  text-shadow:
+    1px 0 0 var(--halo), -1px 0 0 var(--halo), 0 1px 0 var(--halo), 0 -1px 0 var(--halo),
+    1px 1px 0 var(--halo), -1px -1px 0 var(--halo), 1px -1px 0 var(--halo), -1px 1px 0 var(--halo),
+    0 0 2px var(--halo), 0 0 3px var(--halo);
+}
+/* "Next: ..." chip of the guide sits above its ring */
+.chip.guide-next {
+  font-size: 11px;
+  padding: 1px 7px;
+  line-height: 15px;
 }
