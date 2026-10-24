@@ -53,8 +53,8 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "cnc_lathe": _k(
         "machine",
         "A CNC lathe spins a workpiece while a cutting tool shapes it, for example into shafts and round parts.",
-        "turn, turning, turn a shaft, lathe, cnc lathe, make a round part, drehen, drehmaschine, cnc drehmaschine, "
-        "welle drehen",
+        "turn a shaft, turn a part, turn metal, lathe, cnc lathe, make a round part, drehmaschine, "
+        "cnc drehmaschine, welle drehen, teil drehen",
         TRAINED,
     ),
     "drill_press": _k(
@@ -66,8 +66,8 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "press_brake": _k(
         "machine",
         "A press brake bends sheet metal into angles.",
-        "bend, bending, bend a sheet, bend sheet metal, fold sheet metal, press brake, abkanten, abkantpresse, "
-        "blech biegen, biegen",
+        "bend a sheet, bend sheet metal, bend metal, fold sheet metal, press brake, abkanten, abkantpresse, "
+        "blech biegen, blech abkanten",
         TRAINED,
     ),
     "laser_cutter": _k(
@@ -94,40 +94,40 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "robot_cell": _k(
         "machine",
         "A robot cell is a fenced work area where an industrial robot automates a task such as handling or assembly.",
-        "robot, robotics, automate, automation, robot cell, pick and place, roboter, roboterzelle, automatisieren",
+        "robot, robotics, robot cell, pick and place, industrial robot, roboter, roboterzelle",
         "Never enter the fenced area while the robot is active. Trained staff only.",
     ),
     "conveyor": _k(
         "machine",
         "A conveyor moves goods or parts along a fixed path, for example between work areas.",
-        "conveyor, conveyor belt, move parts, transport goods, belt, foerderband, foerdern, transportband",
+        "conveyor, conveyor belt, move parts, transport goods, foerderband, transportband",
         "Keep hands, hair and clothing away from moving parts.",
     ),
     "curing_oven": _k(
         "machine",
         "A curing oven heats coated or bonded parts so that powder coating, paint or glue hardens.",
-        "cure, curing, bake coating, harden coating, powder coating, curing oven, oven, aushaerten, einbrennen, "
-        "ofen, trocknen",
+        "cure coating, curing oven, bake coating, harden coating, powder coating, oven, aushaerten, einbrennen, "
+        "lack einbrennen, ofen",
         "Very hot surfaces. Trained staff only.",
     ),
     "forklift": _k(
         "machine",
         "A forklift is a vehicle with forks that lifts and moves pallets and heavy goods.",
-        "forklift, fork lift, lift pallets, move pallets, move heavy goods, truck, stapler, gabelstapler, "
+        "forklift, fork lift, lift pallets, move pallets, move heavy goods, stapler, gabelstapler, "
         "paletten transportieren",
         "Licensed drivers only. Pedestrians keep clear of its route.",
     ),
     "coordinate_measuring_machine": _k(
         "machine",
         "A coordinate measuring machine measures the exact dimensions of a part with a touch probe.",
-        "measure a part, measure parts, measurement, precision measurement, check dimensions, quality check, cmm, "
-        "coordinate measuring, messen, vermessen, messmaschine, koordinatenmessgeraet, bauteil messen",
+        "measure a part, measure parts, precision measurement, check dimensions, quality check, cmm, "
+        "coordinate measuring, teil vermessen, messmaschine, koordinatenmessgeraet, bauteil messen",
         "Trained staff only. Handle probes and parts with care.",
     ),
     "hvac_unit": _k(
         "machine",
         "An HVAC unit heats, cools and ventilates the air of a building or area.",
-        "ventilation, air conditioning, heating, cooling, air handling, hvac, climate, lueftung, klimaanlage, "
+        "ventilation, air conditioning, central heating, heating system, cooling system, air cooling, air handling, hvac, climate, lueftung, klimaanlage, "
         "klima, heizung",
         "Technical staff only.",
     ),
@@ -147,7 +147,7 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "welding_station": _k(
         "equipment",
         "A welding station is a work area for joining metal parts by welding.",
-        "weld, welding, join metal, join two parts, join parts, connect metal parts, weld two parts, "
+        "weld, welding, join metal, join two pieces of metal, join two parts, join parts, connect metal parts, weld two parts, "
         "schweissen, schweissplatz, schweissen, metall verbinden",
         "Trained staff only. Wear a welding helmet, gloves and protective clothing, and keep the fume extraction on.",
     ),
@@ -167,8 +167,8 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "forklift_charging_station": _k(
         "equipment",
         "A forklift charging station is where the batteries of electric forklifts are charged.",
-        "charge a forklift, charge forklift, forklift charging, charge battery, forklift battery, "
-        "stapler laden, gabelstapler laden, ladestation",
+        "charge a forklift, charge forklift, forklift charging, charge forklift battery, forklift battery, "
+        "stapler laden, gabelstapler laden, stapler ladestation",
         "Trained staff only. Batteries can release gas and carry high current.",
     ),
     "pallet_jack": _k(
@@ -181,15 +181,15 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "fire_extinguisher": _k(
         "equipment",
         "A fire extinguisher puts out small fires.",
-        "fire extinguisher, extinguish a fire, put out a fire, fire, fire safety, feuerloescher, feuer, brand, "
-        "loeschen",
+        "fire extinguisher, extinguish a fire, put out a fire, fire safety, extinguisher, feuerloescher, "
+        "feuer loeschen",
         "Only fight small fires and keep an escape route behind you.",
     ),
     "defibrillator": _k(
         "equipment",
         "A defibrillator (AED) gives an electric shock to restart the heart in a cardiac emergency.",
-        "defibrillator, defib, aed, cardiac arrest, heart emergency, first aid, emergency, defibrillator holen, "
-        "herzstillstand, erste hilfe, notfall",
+        "defibrillator, defib, aed, cardiac arrest, heart emergency, first aid, defibrillator holen, "
+        "herzstillstand, erste hilfe",
         "Emergency use. Call the emergency number and follow the spoken instructions of the device.",
     ),
     "eyewash_station": _k(
@@ -266,7 +266,7 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "fridge": _k(
         "equipment",
         "A fridge keeps food and drinks cold.",
-        "cool drinks, keep food cold, store food, cold storage, fridge, refrigerator, cool, kuehlschrank, kuehlen, "
+        "cool drinks, keep food cold, store food, cold storage, fridge, refrigerator, kuehlschrank, kuehlen, "
         "essen kuehlen, getraenke kuehlen",
     ),
     "stove": _k(
@@ -323,7 +323,7 @@ ASSET_KNOWLEDGE: dict[str, Knowledge] = {
     "oscilloscope_station": _k(
         "equipment",
         "An oscilloscope station is a work place for measuring and debugging electrical signals.",
-        "oscilloscope, measure a signal, measure signals, debug electronics, test electronics, electronics, "
+        "oscilloscope, measure a signal, measure signals, debug electronics, test electronics, "
         "oszilloskop, signal messen, elektronik testen, elektronik pruefen",
         "Mind the live voltage when probing circuits.",
     ),

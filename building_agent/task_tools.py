@@ -23,6 +23,7 @@ from starter_agent.tools import as_json
 
 MAX_CHARS = 300
 MAX_TOKENS = 40
+MAX_LOCATED = 20
 FUZZY_CUTOFF = 0.8
 NAME_CUTOFF = 0.75
 RELATIVE_CUTOFF = 0.5
@@ -39,6 +40,50 @@ STOP = set(
         "wo wie was ist es gibt kann kannst koennte bitte hier dort mir mich wir hab habe haben",
     )
 )
+WEAK_WORDS = {
+    "turn",
+    "join",
+    "connect",
+    "charge",
+    "laden",
+    "lift",
+    "cool",
+    "press",
+    "brand",
+    "fire",
+    "cut",
+    "heat",
+    "plastic",
+    "metal",
+    "wood",
+    "glass",
+    "stone",
+    "sheet",
+    "part",
+    "material",
+    "work",
+    "make",
+    "put",
+    "get",
+    "move",
+    "handle",
+    "check",
+    "hold",
+    "give",
+    "take",
+    "use",
+    "keep",
+    "fill",
+    "clean",
+    "start",
+    "stop",
+    "bend",
+    "cure",
+    "belt",
+    "truck",
+    "trocknen",
+    "messen",
+}  # everyday words: never a match on their own, only inside a longer phrase
 GENERIC = {"machine", "station", "table", "unit", "room", "maschine", "stand", "type"}
 UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
 REF = re.compile(r"\b[a-z]{1,2}-[a-z]?\d+(?:-[a-z])?\b|\b\d+\.\d+\b")
@@ -46,17 +91,32 @@ ROOM_KINDS = (
     "hall|halle|room|raum|zone|bay|lab|labor|office|buero|workshop|werkstatt|building|gebaeude|area|bereich|"
     "production|produktion|warehouse|lager|kitchen|kueche|canteen|kantine|lobby|corridor|flur"
 )
+GENERIC_KINDS = {
+    "hall",
+    "halle",
+    "room",
+    "raum",
+    "zone",
+    "bay",
+    "building",
+    "gebaeude",
+    "area",
+    "bereich",
+    "production",
+    "produktion",
+    "warehouse",
+    "lager",
+}
 ROOM_HINT = re.compile(
     rf"\b(?:in|im|at|bei|auf|on|inside|near|nahe)\s+(?:the\s+|der\s+|dem\s+|einer\s+|a\s+)?"
-    rf"((?:{ROOM_KINDS})\b(?:\s+[a-z]?\d[\w.\-]*)?)"
+    rf"((?:{ROOM_KINDS})\b(?:\s+(?=[\w.\-]*\d)[\w.\-]+)?)"
 )
 ORDINAL_FLOOR = re.compile(
     r"\b(first|second|third|fourth|1st|2nd|3rd|4th|erste[nrs]?|zweite[nrs]?|dritte[nrs]?|vierte[nrs]?)\s+"
     r"(?:floor|level|stock|etage|og|obergeschoss|stockwerk)\b"
 )
-NUMBER_FLOOR = re.compile(
-    r"\b(?:floor|level|etage|stock|og)\s*(-?\d+)\b|\b(\d+)\.?\s*(?:stock|og|etage|obergeschoss|floor)\b"
-)
+NUMBER_FLOOR = re.compile(r"\b(?:floor|level|og)\s*(-?\d+)\b|\b(\d+)\.?\s*(?:og|obergeschoss)\b")
+AMBIGUOUS_FLOOR = re.compile(r"\b(?:etage|stock|stockwerk)\s*(\d+)\b|\b(\d+)\.?\s*(?:stock|etage|stockwerk)\b")
 GROUND_FLOOR = re.compile(r"\b(?:ground floor|groundfloor|erdgeschoss|eg)\b")
 BASEMENT = re.compile(r"\b(?:basement|cellar|keller|untergeschoss|ug)\b")
 ORDINAL_NUMBERS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4}
@@ -134,6 +194,15 @@ def index() -> Index:
     word_types: dict[str, set] = defaultdict(set)
     fuzzy_types: dict[str, set] = defaultdict(set)
     nostop: dict[tuple, dict] = {}
+    weak_roots = {stem(word) for word in WEAK_WORDS}
+    name_roots = {
+        asset_type: {
+            stem(token) for token in words(asset_type.replace("_", " ") + " " + ASSET_CATALOG[asset_type]["label"])
+        }
+        for asset_type in ASSET_KNOWLEDGE
+    }
+    for key in [key for key in phrases if len(key) == 1 and key[0] in weak_roots]:
+        del phrases[key]
     for key, entry in phrases.items():
         trimmed = tuple(root for token, root in zip(entry["text"].split(), key, strict=True) if token not in STOP)
         if trimmed and trimmed != key:
@@ -141,10 +210,12 @@ def index() -> Index:
             merged["types"] |= entry["types"]
         fuzzy_types[entry["text"]] |= entry["types"]
         for token, root in zip(entry["text"].split(), key, strict=True):
-            if content_word(token) and token not in GENERIC:
-                word_types[root] |= entry["types"]
-                if len(token) >= 4:
-                    fuzzy_types[token] |= entry["types"]
+            if content_word(token) and token not in GENERIC and root not in weak_roots:
+                owners = {kind for kind in entry["types"] if len(token) >= 7 or root in name_roots[kind]}
+                if owners:
+                    word_types[root] |= owners
+                    if len(token) >= 4:
+                        fuzzy_types[token] |= owners
     return Index(phrases, nostop, dict(word_types), dict(fuzzy_types), max(len(key) for key in phrases))
 
 
@@ -204,7 +275,8 @@ def analyse(text: str) -> tuple[list[TypeMatch], list[str]]:
     windows += [(a, a + 2) for a, b in itertools.pairwise(open_positions) if b == a + 1]
     for start, end in windows:
         window = " ".join(tokens[start:end])
-        for found in difflib.get_close_matches(window, list(idx.fuzzy_types), n=3, cutoff=FUZZY_CUTOFF):
+        close = difflib.get_close_matches(window, list(idx.fuzzy_types), n=5, cutoff=fuzzy_cutoff(window))
+        for found in [name for name in close if name[0] == window[0]][:3]:
             ratio = difflib.SequenceMatcher(None, window, found).ratio()
             for asset_type in idx.fuzzy_types[found]:
                 fuzzy_score[asset_type] = max(fuzzy_score[asset_type], 0.5 * ratio * (end - start))
@@ -229,6 +301,10 @@ def analyse(text: str) -> tuple[list[TypeMatch], list[str]]:
     return ranked, unexplained
 
 
+def fuzzy_cutoff(window: str) -> float:
+    return 0.88 if len(window) <= 6 else 0.84 if len(window) <= 8 else FUZZY_CUTOFF
+
+
 def types_for_task(text: str) -> list[TypeMatch]:
     """Device types that fit what the person wants to do, best first. Empty when nothing fits."""
     return analyse(text)[0]
@@ -245,6 +321,12 @@ def parse_hints(text: str) -> tuple[str, list[str], list[tuple[str, set[int]]]]:
     def take_ordinal(match: re.Match) -> str:
         word = match.group(1)
         number = ORDINAL_NUMBERS.get(word) or GERMAN_ORDINALS.get(word.rstrip("nrs"), 1)
+        exact = match.group(0).endswith(("og", "obergeschoss"))
+        floors.append((match.group(0), {number} if exact else {number - 1, number}))
+        return " "
+
+    def take_ambiguous(match: re.Match) -> str:
+        number = int(match.group(1) or match.group(2))
         floors.append((match.group(0), {number - 1, number}))
         return " "
 
@@ -254,11 +336,16 @@ def parse_hints(text: str) -> tuple[str, list[str], list[tuple[str, set[int]]]]:
 
     text = ORDINAL_FLOOR.sub(take_ordinal, text)
     text = NUMBER_FLOOR.sub(take_number, text)
+    text = AMBIGUOUS_FLOOR.sub(take_ambiguous, text)
     for pattern, level in ((GROUND_FLOOR, 0), (BASEMENT, -1)):
         for match in pattern.finditer(text):
             floors.append((match.group(0), {level}))
         text = pattern.sub(" ", text)
-    rooms = [match.group(1) for match in ROOM_HINT.finditer(text)]
+    rooms = [
+        match.group(1)
+        for match in ROOM_HINT.finditer(text)
+        if " " in match.group(1).strip() or match.group(1).strip() not in GENERIC_KINDS
+    ]
     text = ROOM_HINT.sub(" ", text)
     rooms += REF.findall(text)
     return text, rooms, floors
@@ -280,7 +367,9 @@ def resolve_rooms(bm: BuildingMap, said: str) -> list[dict]:
     ]
     if exact:
         return exact
-    wanted = {token for token in re.findall(r"[\w.\-]+", lowered) if token not in {"room", "raum", "area", "bereich"}}
+    tokens = re.findall(r"[\w.\-]+", lowered)
+    ids = {token for token in tokens if any(char.isdigit() for char in token)}
+    wanted = ids or {token for token in tokens if token not in {"room", "raum", "area", "bereich"}}
     if not wanted:
         return []
     short = {re.sub(r"-[a-z]$", "", token) for token in wanted}
@@ -449,7 +538,10 @@ def find_for_task(bm: BuildingMap, task: str, floor_level: int | None = None, ro
         )
     elif floor_level is not None:
         by_type = defaultdict(list, {kind: on_floor(assets) for kind, assets in by_type.items()})
+        gone = [match for match in present if not by_type[match.type]]
         present = [match for match in present if by_type[match.type]]
+        if gone:
+            notes.append(f"No {', '.join(label_of(match.type) for match in gone)} on level {floor_level}.")
 
     candidates = [candidate_entry(bm, match, by_type[match.type]) for match in present]
     resolved = [(said, resolve_rooms(bm, said)) for said in dict.fromkeys(rooms_said)]
@@ -503,9 +595,11 @@ def find_for_task(bm: BuildingMap, task: str, floor_level: int | None = None, ro
         "question": "",
         "corrections": corrections,
     }
-    if not candidates:
-        result["note"], result["building_has"] = no_device_note(bm, raw, matches, absent)
+    if absent:
         result["not_in_building"] = [type_summary(match.type) for match in absent[:3]]
+    if not candidates:
+        bm.located_asset_ids = []
+        result["note"], result["building_has"] = no_device_note(bm, raw, matches, absent)
         return result
 
     preferred = [
@@ -516,28 +610,35 @@ def find_for_task(bm: BuildingMap, task: str, floor_level: int | None = None, ro
     in_scope = [
         group for candidate in close for group in candidate["groups"] if rank(group) == rank(close[0]["groups"][0])
     ]
-    weak = candidates[0]["confidence"] == "weak"
+    weak = candidates[0]["confidence"] != "exact"
+    outranked = bool(absent) and absent[0].score >= top_score
     content = [token for token in words(clean) if content_word(token)]
     name_like = bool(unexplained) and len(content) <= 3 and len(unexplained) / max(1, len(content)) >= 0.34
-    needs_choice = len(close) > 1 or len(in_scope) > 1 or weak or name_like
+    needs_choice = len(close) > 1 or len(in_scope) > 1 or weak or name_like or outranked
     question = ""
     if needs_choice:
         listed = "; ".join(
             f"{group['type'].replace('_', ' ')} in {group['zone']} ({group['floor']})" for group in in_scope[:6]
         )
-        if weak or name_like:
+        if outranked:
+            question = (
+                f"There is no {label_of(absent[0].type)} in this building. The closest that exists: {listed}. "
+                "Is one of these what you mean?"
+            )
+        elif weak or name_like:
             odd = ", ".join(f"'{token}'" for token in unexplained) if unexplained else f"'{raw[:40]}'"
             question = f"{odd} is not an exact name here. Do you mean the {close[0]['label']}? Here: {listed}."
         else:
             question = f"Several places match: {listed}. Which one do you mean?"
-    if absent and present:
-        notes.append("Not in this building: " + ", ".join(label_of(match.type) for match in absent[:3]) + ".")
+    if absent:
+        labels = ", ".join(label_of(match.type) for match in absent[:3])
+        notes.insert(0, f"No {labels} in this building." if outranked else f"Not in this building: {labels}.")
     notes.append(GENERAL_NOTE.replace("this unit's", "any unit's"))
     if not needs_choice:
         located = [item["id"] for group in in_scope for item in group["items"]]
     else:
         located = [item["id"] for candidate in close for group in candidate["groups"] for item in group["items"]]
-    bm.located_asset_ids = located
+    bm.located_asset_ids = located[:MAX_LOCATED] if needs_choice else located
     for candidate in candidates:
         candidate["groups"] = [
             {**group, "items": group["items"][:MAX_ITEMS_PER_GROUP]} for group in candidate["groups"][:MAX_GROUPS]

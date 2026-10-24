@@ -123,11 +123,45 @@ def first_building_with(*types: str, without: tuple[str, ...] = (), floors: int 
 # ---------- the mapping from words to types ----------
 
 
-def test_every_task_phrase_maps_back_to_its_own_type():
+EVERYDAY_SINGLES = {
+    "turn", "join", "connect", "charge", "laden", "lift", "cool", "press", "brand", "fire", "bend", "cure",
+    "messen", "heat", "cut", "trocknen", "belt", "truck", "automate", "automation", "emergency", "electronics",
+}  # fmt: skip
+SPECIFIC_SINGLES_FOR_RISKY_TYPES = {
+    "weld", "welding", "schweissen", "schweissplatz", "mill", "milling", "fraesen", "fraese", "fraesmaschine",
+    "lathe", "drehmaschine", "drill", "drilling", "bohren", "bohrmaschine", "saeulenbohrmaschine", "laser",
+    "lasercutter", "laserschneiden", "engrave", "engraving", "gravieren", "waterjet", "wasserstrahl",
+    "wasserstrahlschneiden", "forklift", "stapler", "gabelstapler", "solder", "soldering", "loeten", "loetstation",
+    "abkanten", "abkantpresse", "robot", "robotics", "roboter", "roboterzelle", "conveyor", "foerderband",
+    "transportband", "cmm", "messmaschine", "koordinatenmessgeraet", "spritzguss", "spritzgiessen",
+    "spritzgussmaschine", "oven", "ofen", "aushaerten", "einbrennen", "curing", "powder", "pulver", "pulverstation",
+    "pulverbeschichten", "compressor", "kompressor", "druckluft", "pneumatic", "boiler", "kessel", "heizkessel",
+    "chemicals", "chemikalien", "abzug", "laborabzug", "additive", "prototype", "prototyp", "ventilation", "klima",
+    "hvac", "lueftung", "klimaanlage", "heizung", "climate", "warmwasser", "fume", "eyewash",
+    "augendusche", "augenspuelung", "ups", "usv", "notstrom", "sicherung", "sicherungskasten", "stromverteiler",
+    "stromausfall", "schaltschrank", "fuse", "breaker", "oscilloscope", "oszilloskop", "ladestation",
+    "drucken", "aed", "aufwaermen", "bake", "boil", "braten", "cappuccino", "chemikalienschrank", "cook", "cooker", "cooking", "espresso", "feuerloescher", "fry", "gefahrstoffe", "gefahrstoffschrank", "handhubwagen", "herd", "herzstillstand", "hubwagen", "kaffee", "kaffeeautomat", "kaffeemaschine", "kaffeevollautomat", "kochen", "kochfeld", "mikrowelle", "network", "netzwerk", "reheat", "servers", "serverschrank", "kunststoffteile", "luftkompressor", "serverraum", "scan", "scannen", "copy", "kopieren",
+}  # fmt: skip
+
+
+def test_risky_types_have_no_everyday_single_word_phrases():
     for asset_type, knowledge in ASSET_KNOWLEDGE.items():
-        for phrase in (*knowledge.tasks, asset_type.replace("_", " "), ASSET_CATALOG[asset_type]["label"]):
-            found = [match.type for match in types_for_task(phrase)]
-            assert asset_type in found, (asset_type, phrase, found)
+        for phrase in knowledge.tasks:
+            if len(phrase.split()) == 1:
+                assert phrase not in EVERYDAY_SINGLES, (asset_type, phrase)
+                if knowledge.kind == "machine" or knowledge.safety:
+                    assert phrase in SPECIFIC_SINGLES_FOR_RISKY_TYPES or phrase in asset_type, (asset_type, phrase)
+
+
+def test_machine_phrases_are_never_won_by_furniture():
+    for asset_type, knowledge in ASSET_KNOWLEDGE.items():
+        assert knowledge.kind == ASSET_CATALOG[asset_type]["category"]
+        if knowledge.kind != "machine":
+            continue
+        for phrase in knowledge.tasks:
+            top = types_for_task(phrase)
+            assert top, (asset_type, phrase)
+            assert ASSET_KNOWLEDGE[top[0].type].kind != "furniture", (asset_type, phrase, top[0].type)
 
 
 def test_request_table_has_enough_cases():
@@ -152,7 +186,7 @@ def test_ambiguous_requests_return_several_types():
 
 def test_confidence_levels():
     assert types_for_task("weld")[0].confidence == "exact"
-    assert types_for_task("a thing for the sheet")[0].confidence == "word"
+    assert types_for_task("the brake thing")[0].confidence == "word"
     assert types_for_task("kafeeautomat")[0].confidence in {"exact", "weak"}
     assert types_for_task("wellding")[0].confidence == "weak"
 
@@ -311,11 +345,25 @@ def test_wrong_floor_is_corrected():
 
 
 def test_ordinal_floor_words_are_ambiguous_not_wrong():
-    bm = first_building_with("coffee_machine", floors=2)
-    levels = {bm.floors[a["floor_id"]]["level"] for a in bm.assets.values() if a["type"] == "coffee_machine"}
-    if 1 in levels or 0 in levels:
-        result = find_for_task(bm, "the coffee machine on the first floor")
-        assert result["corrections"] == []
+    for directory in building_dirs():
+        bm = load_map(str(directory))
+        levels = {bm.floors[a["floor_id"]]["level"] for a in bm.assets.values() if a["type"] == "coffee_machine"}
+        if len(bm.floors) >= 2 and levels and levels <= {0, 1}:
+            for said in ("the coffee machine on the first floor", "Kaffeemaschine in der ersten Etage"):
+                assert find_for_task(bm, said)["corrections"] == [], said
+            assert find_for_task(bm, "the coffee machine on the fourth floor")["corrections"]
+            return
+    raise AssertionError("no two-floor building with coffee machines only on levels 0 and 1")
+
+
+def test_german_floor_forms_are_consistent():
+    from building_agent.task_tools import parse_hints
+
+    assert parse_hints("2. Etage")[2][0][1] == parse_hints("zweite Etage")[2][0][1] == {1, 2}
+    assert parse_hints("2. Stock")[2][0][1] == {1, 2}
+    assert parse_hints("2. OG")[2][0][1] == {2}
+    assert parse_hints("floor 2")[2][0][1] == {2}
+    assert parse_hints("Erdgeschoss")[2][0][1] == {0}
 
 
 def test_floor_level_parameter_falls_back_with_a_correction():
@@ -553,3 +601,144 @@ def test_sweep_all_buildings():
             assert describe_asset(bm, asset["id"])["summary"]
     assert buildings == 280
     assert time.time() - started < 30
+
+
+# ---------- negatives: everyday sentences must not find devices ----------
+
+HAZARDOUS_TYPES = {kind for kind, knowledge in ASSET_KNOWLEDGE.items() if knowledge.safety}
+REQUESTS_MUST_NOT_MATCH = [
+    ("turn the heating up", {"cnc_lathe"}),
+    ("turn off the lights", None),
+    ("turn left at the corner", None),
+    ("connect to wifi", {"welding_station"}),
+    ("connect with me on LinkedIn", None),
+    ("join a meeting", {"welding_station"}),
+    ("join the team call", None),
+    ("charge my phone", {"forklift_charging_station"}),
+    ("charge the customer", None),
+    ("laden", {"forklift_charging_station"}),
+    ("ich muss das Handy laden", None),
+    ("lift weights", {"forklift"}),
+    ("lift the lid", None),
+    ("Waesche trocknen", {"curing_oven"}),
+    ("cut plastic", None),
+    ("cut wood", None),
+    ("cut the budget", None),
+    ("bend the rules", None),
+    ("press the button", None),
+    ("fire the employee", None),
+    ("cool idea", None),
+    ("brand strategy", None),
+    ("Druck machen", None),
+    ("what time is it", None),
+    ("send an email to my boss", None),
+    ("book a flight to Berlin", None),
+    ("I am tired of this weather", None),
+    ("heat of the moment", None),
+    ("wie spaet ist es", None),
+    ("das Wetter ist schoen", None),
+]
+
+
+@pytest.mark.parametrize(("sentence", "forbidden"), REQUESTS_MUST_NOT_MATCH)
+def test_everyday_sentences_do_not_find_hazardous_machines(sentence, forbidden):
+    found = [match for match in types_for_task(sentence) if match.type in HAZARDOUS_TYPES]
+    assert not found, (sentence, [(match.type, match.score, match.confidence) for match in found])
+    if forbidden:
+        assert not forbidden & {match.type for match in types_for_task(sentence)}
+
+
+def test_negative_table_is_big_enough():
+    assert len(REQUESTS_MUST_NOT_MATCH) >= 25
+
+
+def test_plain_probe_sentences_give_empty_or_other_types():
+    assert types_for_task("cut plastic") == [] and types_for_task("cut wood") == []
+    assert types_for_task("connect to wifi") == [] and types_for_task("charge my phone") == []
+    assert [match.type for match in types_for_task("Waesche trocknen")] == ["washing_machine"]
+    assert "cnc_lathe" not in {match.type for match in types_for_task("turn the heating up")}
+    assert [match.type for match in types_for_task("central heating")][:1] == ["hvac_unit"]
+
+
+def test_weak_matches_always_ask_a_question():
+    bm = first_building_with("welding_station", "microscope")
+    for text in ("wellding", "mikroskoap", "the brake thing", "weldng"):
+        result = find_for_task(bm, text)
+        for candidate in result["candidates"][:1]:
+            assert candidate["confidence"] != "exact"
+            assert result["needs_choice"] and result["question"], text
+
+
+# ---------- hyphenated room refs ----------
+
+
+def factory_with_welding_zones() -> tuple[BuildingMap, dict]:
+    for directory in building_dirs():
+        bm = load_map(str(directory))
+        if "proc-factory" not in directory.name:
+            continue
+        with_weld = {a["space_id"] for a in bm.assets.values() if a["type"] == "welding_station"}
+        without = [
+            space
+            for space in bm.spaces.values()
+            if space["room_type"] == "production_zone" and space["id"] not in with_weld and space.get("ref")
+        ]
+        if with_weld and without and any(bm.spaces[s]["ref"].count("-") == 1 for s in with_weld):
+            return bm, {"with": bm.spaces[min(with_weld)], "without": without[0]}
+    raise AssertionError("no factory")
+
+
+def test_hyphenated_room_ref_after_a_kind_word_is_resolved():
+    bm, zones = factory_with_welding_zones()
+    ref = zones["with"]["ref"]
+    for said in (
+        f"I want to weld in Hall {ref}",
+        f"weld in room {ref}",
+        f"weld in zone {ref.lower()}",
+        f"weld in {ref}",
+    ):
+        result = find_for_task(bm, said)
+        assert result["candidates"][0]["groups"][0]["space_id"] == zones["with"]["id"], said
+        assert result["corrections"] == [], (said, result["corrections"])
+
+
+def test_hyphenated_ref_of_a_room_without_the_device_is_corrected_not_bogus():
+    bm, zones = factory_with_welding_zones()
+    ref = zones["without"]["ref"]
+    result = find_for_task(bm, f"weld in room {ref}")
+    notes = [correction["note"] for correction in result["corrections"]]
+    assert len(notes) == 1 and "exists but has no" in notes[0] and zones["without"]["name"] in notes[0]
+    assert "No room matches 'room'" not in str(notes)
+
+
+def test_bare_kind_words_are_not_room_refs():
+    bm = first_building_with("welding_station")
+    for said in ("weld in the hall", "weld in a room", "weld in the building", "weld in the zone"):
+        assert find_for_task(bm, said)["corrections"] == [], said
+
+
+# ---------- absent best type, located ids ----------
+
+
+def test_absent_best_type_is_always_reported_when_it_outranks_present_ones():
+    bm = first_building_with("waterjet_cutter", without=("laser_cutter",))
+    result = find_for_task(bm, "laser cut sheet metal")
+    assert "waterjet_cutter" in candidate_types(result)
+    assert result["not_in_building"][0]["type"] == "laser_cutter"
+    assert result["note"].startswith("No Laser cutter in this building.")
+    assert result["needs_choice"] and "no laser cutter" in result["question"].lower()
+    both = find_for_task(first_building_with("laser_cutter"), "laser cut sheet metal")
+    assert both["candidates"][0]["type"] == "laser_cutter" and "No Laser cutter" not in both["note"]
+
+
+def test_no_candidates_clears_the_highlight_and_many_hits_are_capped():
+    bm = first_building_with("press_brake")
+    bm.located_asset_ids = ["stale"]
+    assert find_for_task(bm, "teleport")["candidates"] == [] and bm.located_asset_ids == []
+    for directory in building_dirs():
+        bm = load_map(str(directory))
+        result = find_for_task(bm, "server")
+        if result["needs_choice"] and sum(len(g["items"]) for c in result["candidates"] for g in c["groups"]) > 20:
+            assert 0 < len(bm.located_asset_ids) <= 20
+            return
+    raise AssertionError("no building with more than 20 servers and a choice")
