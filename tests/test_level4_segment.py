@@ -277,3 +277,28 @@ def test_implausible_region_count_is_rejected(tmp_path):
     assert not check_region_count(result, 0).reject_note  # the model found nothing: the regions are all we have
     same, warnings = match_to_extraction(model, check_region_count(result, 3))
     assert same is model and warnings == [NOISE_NOTE]
+
+
+def bands(tmp_path, rows: list[tuple[int, tuple[int, int, int]]]):
+    """A 100 x 100 image of white with full-width colour bands of the given heights (no ink)."""
+    image = Image.new("RGB", (100, 100), "white")
+    draw = ImageDraw.Draw(image)
+    top = 0
+    for height, colour in rows:
+        draw.rectangle([0, top, 99, top + height - 1], fill=colour)
+        top += height
+    path = tmp_path / "bands.png"
+    image.save(path)
+    return path
+
+
+@pytest.mark.parametrize(("rows", "rejected"), [(10, False), (11, True)])
+def test_off_palette_threshold_is_ten_percent(tmp_path, rows, rejected):
+    result = segment_rooms(bands(tmp_path, [(rows, (230, 230, 230))]))  # 10 rows = exactly 10% of the pixels
+    assert bool(result.reject_note) is rejected
+
+
+@pytest.mark.parametrize(("rows", "rejected"), [(75, False), (76, True)])
+def test_single_palette_colour_threshold_is_seventy_five_percent(tmp_path, rows, rejected):
+    result = segment_rooms(bands(tmp_path, [(rows, (243, 239, 230))]))
+    assert bool(result.reject_note) is rejected

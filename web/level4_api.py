@@ -413,7 +413,9 @@ class PlanStudio:
             raise Level4Error("Still reading the plans.", 409)
         with self.lock:
             self.begin_turn()
-            card = self.call("preview_draft")
+            # pressing "Save building" is the person's own choice to go on with a poorly read plan; saving it still
+            # needs the "Save anyway" tick on the card
+            card = self.call("preview_draft", user_reply="build it anyway")
             return {"card": card, "version": self.draft.version}
 
     def save(self, body: dict) -> dict:
