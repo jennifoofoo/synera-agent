@@ -29,10 +29,9 @@ export function metresLeft(steps: string[], step: number, lengthM: number | unde
 /** Where the walker should be at the start of step `step`: where the step before ended (or the start line). */
 export function placeAt(steps: string[], step: number): string | null {
   const before = readable(steps[Math.max(0, step - 1)] ?? "").replace(/\.$/, "");
-  if (step === 0) {
-    const start = /^Start (?:in|at) (.+)$/i.exec(before);
-    return start ? start[1] : null;
-  }
+  const start = /^Start (?:in|at) (.+)$/i.exec(before);
+  if (start) return start[1];
+  if (step === 0) return null;
   const arrived = /arrived at (.+)$/i.exec(before);
   if (arrived) return arrived[1];
   const into = /\b(?:into|to|at) (.+)$/i.exec(before);
