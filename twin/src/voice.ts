@@ -1,7 +1,8 @@
 // Voice in (Web Speech API, webkitSpeechRecognition on iOS Safari) and out (/api/speak with ElevenLabs, else
-// the browser's own voice). Owner: chat/search session; the phone session may add audio unlock / wake lock here.
+// the browser's own voice). Owner: chat/search session; the phone helpers at the end belong to the mobile session.
 
 import { api } from "./api/client";
+import { voiceHint } from "./ui/phoneHints";
 
 type RecognitionResult = ArrayLike<{ transcript: string }> & { isFinal: boolean };
 type Recognition = {
@@ -23,43 +24,15 @@ function recognitionCtor(): RecognitionCtor | undefined {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition;
 }
 
-const isApple = () => typeof navigator !== "undefined" && /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
-const isIOS = () =>
-  typeof navigator !== "undefined" &&
-  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Macintosh") && navigator.maxTouchPoints > 1));
-
 export function speechInputAvailable(): boolean {
   return !!recognitionCtor();
 }
 
 /** Why the mic cannot work here, in words for the person holding the phone; null when it can. */
 export function speechInputProblem(): string | null {
-  if (typeof window !== "undefined" && !window.isSecureContext) {
-    return "Voice needs a secure (https) link. Open the tunnel link, or type instead.";
-  }
-  if (!recognitionCtor()) {
-    return isIOS() ? "Voice input needs Safari on iPhone. Type instead." : "Voice input isn't available in this browser. Try Safari or Chrome, or type instead.";
-  }
+  if (typeof window !== "undefined" && !window.isSecureContext) return voiceHint();
+  if (!recognitionCtor()) return voiceHint();
   return null;
-}
-
-function errorMessage(error: string): string | undefined {
-  if (error === "no-speech" || error === "aborted") return undefined;
-  if (error === "not-allowed") {
-    return isIOS()
-      ? "Microphone is blocked. On iPhone: Settings › Apps › Safari › Microphone › Allow, then reload."
-      : isApple()
-        ? "Microphone is blocked. Allow it in Safari › Settings for This Website, then try again."
-        : "Microphone is blocked. Allow it in the site settings, then try again.";
-  }
-  if (error === "service-not-allowed") {
-    return isIOS()
-      ? "Voice input is off. On iPhone: Settings › Siri › turn on Siri (or Dictation), then try again."
-      : "Speech recognition isn't allowed here. Type instead.";
-  }
-  if (error === "audio-capture") return "No microphone found.";
-  if (error === "network") return "Speech recognition needs a network connection.";
-  return `Voice input stopped (${error}).`;
 }
 
 export interface Listener {
@@ -71,7 +44,8 @@ export interface Listener {
 
 /**
  * Push-to-talk: listen once. `onInterim` gets the live transcript, `onFinal` the finished sentence (only when
- * something was heard), `onEnd` always runs last, with a message when something went wrong.
+ * something was heard), `onEnd` always runs last, with the raw recognition error code when something went wrong
+ * (word it with `voiceHint(code)`); "no-speech" and "aborted" are not errors.
  */
 export function listen(
   lang: string,
@@ -79,7 +53,7 @@ export function listen(
 ): Listener {
   const Ctor = recognitionCtor();
   if (!Ctor) {
-    handlers.onEnd(speechInputProblem() ?? undefined);
+    handlers.onEnd("unsupported");
     return { stop: () => {}, cancel: () => {} };
   }
   const recognition = new Ctor();
@@ -99,7 +73,7 @@ export function listen(
     handlers.onInterim?.(heard);
   };
   recognition.onerror = (event) => {
-    error = errorMessage(event.error);
+    if (event.error !== "no-speech" && event.error !== "aborted") error = event.error;
   };
   recognition.onend = () => {
     if (ended) return;
@@ -109,9 +83,9 @@ export function listen(
   };
   try {
     recognition.start();
-  } catch (problem) {
+  } catch {
     ended = true;
-    handlers.onEnd(`Voice input could not start (${(problem as Error).message}).`);
+    handlers.onEnd("start-failed");
   }
   return {
     stop: () => recognition.stop(),
@@ -129,93 +103,62 @@ export function listenOnce(lang: string, onResult: (text: string) => void, onEnd
 
 // ---- voice out ----
 
-// One audio element, reused: iOS only lets an element play after it was started inside a tap once.
-let audio: HTMLAudioElement | null = null;
 let audioUrl: string | null = null;
-let unlocked = false;
-const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-
-function audioElement(): HTMLAudioElement {
-  if (!audio) audio = new Audio();
-  return audio;
-}
-
-/** Call inside a tap (mic, send): lets later replies play on iOS Safari. Safe to call often. */
-export function unlockAudio(): void {
-  if (unlocked || typeof window === "undefined") return;
-  unlocked = true;
-  const element = audioElement();
-  element.src = SILENT_WAV;
-  void element.play().catch(() => {
-    unlocked = false;
-  });
-  // The browser voice needs the same: an empty utterance inside the gesture.
-  try {
-    window.speechSynthesis?.speak(new SpeechSynthesisUtterance(""));
-  } catch {
-    /* no browser voice */
-  }
-}
 
 export function stopSpeaking(): void {
-  if (audio) {
-    audio.pause();
+  const audio = sharedAudio();
+  audio.pause();
+  if (audioUrl) {
     audio.removeAttribute("src");
+    URL.revokeObjectURL(audioUrl);
   }
-  if (audioUrl) URL.revokeObjectURL(audioUrl);
   audioUrl = null;
   window.speechSynthesis?.cancel();
 }
 
 /** True while a reply is being spoken (server audio or browser voice). */
 export function isSpeaking(): boolean {
-  return (!!audio && !audio.paused && !!audioUrl) || !!window.speechSynthesis?.speaking;
+  return (!!audioUrl && !sharedAudio().paused) || !!window.speechSynthesis?.speaking;
 }
 
+const ANSWER_LINE = /^\s*\**\s*Answer:/i;
 const ID_TOKEN = /\s*[([]?`?\b[A-Za-z][\w.]*(?:-[\w.]+){2,}`?[)\]]?/g;
 
-/**
- * What to say out loud: no ids, no markdown, and the final "Answer:" line only when the text before it does
- * not already say it.
- */
+/** The reply without its final "Answer: …" line (also "**Answer:**"). For anything shown or spoken. */
+export function withoutAnswerLine(reply: string): string {
+  const lines = reply.trimEnd().split("\n");
+  const last = lines.length - 1;
+  if (last > 0 && ANSWER_LINE.test(lines[last])) lines.pop();
+  else if (last === 0 && ANSWER_LINE.test(lines[0])) return lines[0].replace(/^\s*\**\s*Answer:\**\s*/i, "");
+  return lines.join("\n").trimEnd();
+}
+
+/** What to say out loud: no final "Answer:" line, no ids, no markdown. */
 export function spokenText(reply: string): string {
-  const lines = reply.trim().split("\n");
-  let answer = "";
-  const lastIndex = lines.length - 1;
-  if (lastIndex >= 0 && /^\s*\**Answer:\**/i.test(lines[lastIndex])) {
-    answer = lines[lastIndex].replace(/^\s*\**Answer:\**\s*/i, "").trim();
-    lines.pop();
-  }
-  const clean = (text: string) =>
-    text
-      .replace(/```[\s\S]*?```/g, " ")
-      .replace(ID_TOKEN, (token) => (/\d/.test(token) ? "" : token))
-      .replace(/[*_`#>|]+/g, "")
-      .replace(/^\s*[-•]\s+/gm, "")
-      .replace(/\(\s*\)/g, "")
-      .replace(/[ \t]+/g, " ")
-      .replace(/\s+([.,;:!?])/g, "$1")
-      .trim();
-  const body = clean(lines.join("\n"));
-  const said = clean(answer);
-  if (!body) return said;
-  if (!said || body.toLowerCase().includes(said.toLowerCase())) return body;
-  return `${body}\n${said}`;
+  return withoutAnswerLine(reply)
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(ID_TOKEN, (token) => (/\d/.test(token) ? "" : token))
+    .replace(/[*_`#>|]+/g, "")
+    .replace(/^\s*[-•]\s+/gm, "")
+    .replace(/\(\s*\)/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
 }
 
 /** Speak a reply: ElevenLabs through the server when configured, otherwise the browser voice. */
-export async function speak(text: string, serverVoice: boolean, lang = "en"): Promise<void> {
+export async function speak(text: string, serverVoice: boolean): Promise<void> {
   stopSpeaking();
   const spoken = spokenText(text);
   if (!spoken) return;
   if (serverVoice) {
     try {
-      const blob = await api.speak(spoken, lang);
+      const blob = await api.speak(spoken, "en");
       if (blob) {
-        const element = audioElement();
+        const audio = sharedAudio();
         audioUrl = URL.createObjectURL(blob);
-        element.src = audioUrl;
-        await element.play();
+        audio.src = audioUrl;
+        await audio.play();
         return;
       }
     } catch {
@@ -224,7 +167,84 @@ export async function speak(text: string, serverVoice: boolean, lang = "en"): Pr
   }
   if (!window.speechSynthesis) return;
   const utterance = new SpeechSynthesisUtterance(spoken);
-  utterance.lang = lang === "de" ? "de-DE" : "en-US";
+  utterance.lang = "en-US";
   utterance.rate = 1;
   window.speechSynthesis.speak(utterance);
+}
+
+// ===== Phone helpers (owner: mobile session): audio unlock and screen wake lock =====
+
+// 0.05 s of silence as an 8 kHz mono WAV; playing it inside the first tap unlocks audio on iOS Safari.
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA";
+
+let unlockedAudio: HTMLAudioElement | null = null;
+
+/** The one audio element, unlocked by the first tap. Reuse it for spoken replies (set src, play) so iOS
+ * lets it play later without a fresh gesture. */
+export function sharedAudio(): HTMLAudioElement {
+  if (!unlockedAudio) {
+    unlockedAudio = new Audio();
+    unlockedAudio.setAttribute("playsinline", "");
+  }
+  return unlockedAudio;
+}
+
+/** Call once at start-up: the first pointer/key gesture plays a silent WAV on the shared element and warms
+ * up speechSynthesis, so later replies can play after an await (iOS needs one gesture-started playback). */
+export function installAudioUnlock(): void {
+  const unlock = () => {
+    window.removeEventListener("pointerdown", unlock, true);
+    window.removeEventListener("keydown", unlock, true);
+    const audio = sharedAudio();
+    audio.muted = false;
+    audio.src = SILENT_WAV;
+    void audio.play().catch(() => {});
+    try {
+      const warm = new SpeechSynthesisUtterance(" ");
+      warm.volume = 0;
+      window.speechSynthesis?.speak(warm);
+    } catch {
+      /* no browser voice */
+    }
+  };
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+}
+
+type WakeSentinel = { release: () => Promise<void>; addEventListener: (type: "release", listener: () => void) => void };
+const awakeReasons = new Set<string>();
+let sentinel: WakeSentinel | null = null;
+
+async function syncWakeLock(): Promise<void> {
+  const nav = navigator as Navigator & { wakeLock?: { request: (type: "screen") => Promise<WakeSentinel> } };
+  if (!nav.wakeLock) return;
+  const want = awakeReasons.size > 0 && document.visibilityState === "visible";
+  if (want && !sentinel) {
+    try {
+      const lock = await nav.wakeLock.request("screen");
+      sentinel = lock;
+      lock.addEventListener("release", () => {
+        if (sentinel === lock) sentinel = null;
+      });
+    } catch {
+      /* refused (battery saver, not visible): try again on the next change */
+    }
+  } else if (!want && sentinel) {
+    const lock = sentinel;
+    sentinel = null;
+    await lock.release().catch(() => {});
+  }
+}
+
+/** Keep the screen on while any reason is active ("listening", "guiding"). The browser drops the lock when the
+ * tab is hidden; it is taken again when the page becomes visible. Safe to call often. */
+export function keepAwake(reason: string, on: boolean): void {
+  if (on) awakeReasons.add(reason);
+  else awakeReasons.delete(reason);
+  void syncWakeLock();
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => void syncWakeLock());
 }

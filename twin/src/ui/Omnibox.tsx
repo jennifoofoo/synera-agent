@@ -8,7 +8,8 @@ import Fuse from "fuse.js";
 import { floorLabel } from "../model/model";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
-import { listen, speak, speechInputProblem, spokenText, stopSpeaking, unlockAudio, type Listener } from "../voice";
+import { keepAwake, listen, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { voiceHint } from "./phoneHints";
 import "./Omnibox.css";
 
 interface Hit {
@@ -25,7 +26,7 @@ type Row = { kind: "hit"; hit: Hit } | { kind: "ask" };
 
 const KIND_LABEL: Record<Hit["kind"], string> = { room: "Room", thing: "Thing", connector: "Stairs/lift", floor: "Floor" };
 const QUESTION_START =
-  /^(where|what|which|how|who|why|when|is|are|can|could|would|do|does|did|show|find|take|bring|route|guide|walk|lead|navigate|get|close|open|reopen|block|add|list|count|tell|give|help|i'?m|i am|we|my|please|wo|wie|was|welche?[rsnm]?|zeig|bring|führ)\b/i;
+  /^(where|what|which|how|who|why|when|is|are|can|could|would|do|does|did|show|find|take|bring|route|guide|walk|lead|navigate|get|close|open|reopen|block|add|list|count|tell|give|help|i'?m|i am|we|my|please)\b/i;
 const VOICE_PREF = "twin.voiceOut";
 const MAX_HITS = 6;
 
@@ -205,13 +206,11 @@ export function Omnibox() {
 
   const pick = (row: Row | undefined) => {
     if (!row) return;
-    unlockAudio();
     if (row.kind === "hit") go(row.hit);
     else void submit(query);
   };
 
   const toggleMic = () => {
-    unlockAudio();
     if (listening) {
       listenerRef.current?.stop();
       return;
@@ -226,14 +225,16 @@ export function Omnibox() {
     setOpen(false);
     setHeard("");
     setListening(true);
-    listenerRef.current = listen(navigator.language?.startsWith("de") ? "de-DE" : "en-US", {
+    keepAwake("listening", true);
+    listenerRef.current = listen("en-US", {
       onInterim: setHeard,
       onFinal: (said) => void submit(said, true),
       onEnd: (error) => {
         listenerRef.current = null;
+        keepAwake("listening", false);
         setListening(false);
         setHeard("");
-        if (error) setNotice(error);
+        if (error) setNotice(voiceHint(error === "unsupported" ? undefined : error));
       },
     });
   };
@@ -411,7 +412,7 @@ export function Omnibox() {
         </button>
         <button
           type="button"
-          className={`ob-mic ${listening ? "listening" : ""}`}
+          className={`ob-mic mic ${listening ? "listening" : ""}`}
           onClick={toggleMic}
           disabled={busy}
           aria-label={listening ? "Stop and send" : "Speak"}
