@@ -2,17 +2,23 @@
 
 Reuses the starter agent loop; swaps in our tools (building_agent/tools.py) and a stricter prompt."""
 
+import hashlib
 import json
+import time
 from pathlib import Path
 
 import anthropic
 
+from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
 from starter_agent.agent import SYSTEM_PROMPT as STARTER_PROMPT
 from starter_agent.agent import BuildingAgent as StarterAgent
 from starter_agent.building_map import BuildingMap
 
 OUTPUT_DIRECTORY = Path("agent_output") / "scratch"
+CACHE_DIRECTORY = Path("agent_output") / "cache"
+RETRIES = 3
+RETRYABLE = (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError)
 
 CALCULATION_RULES = """
 
@@ -41,6 +47,28 @@ class Agent(StarterAgent):
         self.system[0]["text"] = STARTER_PROMPT.format(overview=overview) + CALCULATION_RULES
 
 
+def cache_key(building_directory: Path, question_text: str) -> str:
+    """Changes whenever the prompt or any kind description changes, so stale answers are never reused."""
+    version = CALCULATION_RULES + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
+    raw = f"{building_directory.name}\n{question_text}\n{version}"
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def answer(building_directory: Path, question_text: str) -> str:
+    """Cached per (building, question, prompt version); retries transient API errors with backoff."""
+    cache_file = CACHE_DIRECTORY / f"{cache_key(building_directory, question_text)}.txt"
+    if cache_file.exists():
+        return cache_file.read_text(encoding="utf-8")
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    return Agent(BuildingMap.load(building_directory), OUTPUT_DIRECTORY).ask(question_text)
+    for attempt in range(RETRIES):
+        try:
+            reply = Agent(BuildingMap.load(building_directory), OUTPUT_DIRECTORY).ask(question_text)
+            break
+        except RETRYABLE:
+            if attempt == RETRIES - 1:
+                raise
+            time.sleep(2**attempt)
+    if "Answer:" in reply:
+        CACHE_DIRECTORY.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(reply, encoding="utf-8")
+    return reply

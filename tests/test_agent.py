@@ -20,3 +20,26 @@ def test_system_prompt_overview_lists_floor_ids():
     agent = Agent(bm, Path("agent_output") / "test", client=object())
     for floor_id in bm.floors:
         assert floor_id in agent.system[0]["text"]
+
+
+def test_answer_is_cached_and_retries_transient_errors(tmp_path, monkeypatch):
+    from building_agent import agent as agent_module
+
+    building_dir, question = labelled_questions("errand")[0]
+    monkeypatch.setattr(agent_module, "CACHE_DIRECTORY", tmp_path)
+    monkeypatch.setattr(agent_module, "RETRYABLE", (ConnectionError,))
+    monkeypatch.setattr(agent_module.time, "sleep", lambda seconds: None)
+    calls = []
+
+    def fake_ask(self, text):
+        calls.append(text)
+        if len(calls) == 1:
+            raise ConnectionError("transient")
+        return "ok\nAnswer: 1"
+
+    monkeypatch.setattr(agent_module.Agent, "__init__", lambda self, *args, **kwargs: None)
+    monkeypatch.setattr(agent_module.Agent, "ask", fake_ask)
+    first = agent_module.answer(Path(building_dir), question["question"])
+    second = agent_module.answer(Path(building_dir), question["question"])
+    assert first == second == "ok\nAnswer: 1"
+    assert len(calls) == 2  # one failed try, one success; the second answer() came from the cache
