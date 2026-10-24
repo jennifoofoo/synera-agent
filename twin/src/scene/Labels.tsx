@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Html } from "@react-three/drei";
 import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
+import { areasOf, type Area } from "./areas";
+import { prettyType } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
 import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
@@ -30,6 +32,17 @@ const FOUND_NAMES = 3; // found things whose name is shown (in the agent's order
 const FOUND_CHAR_PX = 7.2; // the found names are semibold
 const CHIP_CHAR_PX = 7.4; // 12 px semibold chip text
 const CHIP_H_PX = 20;
+const AREA_CHAR_PX = 8.6; // area names: 14 px semibold with a little tracking
+const AREA_H_PX = 20;
+const AREA_FIT_OVERFLOW = 1.3;
+const AREA_SHIFT_PX = 28; // an area name may move this far up or down to make way for a symbol
+const AREA_FIT_OVERFLOW_H = 1.6; // a long, narrow strip of offices may carry its name a little past its walls
+const SUB_CHAR_PX = 5.9; // second line under a room name: 10.5 px
+const SUB_H_PX = 13;
+const SUB_DY_PX = (LABEL_H_PX + SUB_H_PX) / 2; // its centre below the room name's centre
+const DOOR_CHAR_PX = 5.8; // door widths: 10 px tabular numerals
+const DOOR_H_PX = 13;
+const WIDE_DOOR_M = 1.2; // doors at least this wide show their clear width (near tier)
 
 interface Box {
   x0: number;
@@ -41,7 +54,10 @@ interface Box {
 type Item =
   | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string }
   | { kind: "room"; id: string; point: Point; space: Space }
-  | { kind: "thing"; id: string; point: Point; asset: Asset; landmark: boolean };
+  | { kind: "area"; id: string; point: Point; area: Area }
+  | { kind: "thing"; id: string; point: Point; asset: Asset; landmark: boolean }
+  | { kind: "sub"; id: string; point: Point; text: string }
+  | { kind: "door"; id: string; point: Point; text: string; title: string };
 
 /** Map markers laid out before the labels (screen px), in this order: they win every collision. */
 type Pin =
@@ -127,6 +143,7 @@ function candidates(
   landmarks: ReadonlySet<string>,
 ): Item[] {
   const pois: Item[] = [];
+  const later: Item[] = []; // symbols that yield to room names (fire extinguishers: many, and not sought after)
   const rooms: Space[] = [];
   for (const space of floor.spaces) {
     const poi = poiKindOf(space, model);
@@ -138,16 +155,16 @@ function candidates(
       pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
     else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
   }
-  // 2D, from mid on: the amenity symbols (coffee, printer, fire extinguisher, first aid). Landmarks of the current
-  // directions always carry their name; machine names from near on (see mapZoom.ts).
+  // 2D, from mid on: the amenity symbols (coffee, printer, first aid, and the fire extinguishers after the room
+  // names). Landmarks of the current directions always carry their name; machine names from near on (mapZoom.ts).
   const landmarkItems: Item[] = [];
   const machineNames: Item[] = [];
   if (flat) {
     for (const asset of floor.assets) {
       // Fire extinguishers hang every few metres: only from near on, else they pepper the overview.
       const kind = amenityKindOf(asset.type);
-      const amenity = kind && (tier === "near" || (tier === "mid" && kind !== "extinguisher")) ? kind : null;
-      if (amenity) pois.push({ kind: "poi", id: asset.id, point: asset.position, poi: amenity, title: asset.name });
+      const amenity = kind && (tier === "near" || tier === "mid") ? kind : null;
+      if (amenity) (amenity === "extinguisher" ? later : pois).push({ kind: "poi", id: asset.id, point: asset.position, poi: amenity, title: asset.name });
       if (landmarks.has(asset.id)) landmarkItems.push({ kind: "thing", id: asset.id, point: asset.position, asset, landmark: true });
       else if (tier === "near" && asset.category === "machine" && asset.name)
         machineNames.push({ kind: "thing", id: asset.id, point: asset.position, asset, landmark: false });
@@ -157,6 +174,24 @@ function candidates(
   }
   const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, step: 4, firstaid: 5, extinguisher: 6, coffee: 7, printer: 8 };
   pois.sort((a, b) => (a.kind === "poi" && b.kind === "poi" ? poiRank[a.poi] - poiRank[b.poi] : 0) || a.id.localeCompare(b.id));
+  later.sort((a, b) => a.id.localeCompare(b.id));
+  // Near, 2D: the clear width of wide doors, last (they yield to everything else).
+  const doors: Item[] = [];
+  if (flat && tier === "near") {
+    for (const opening of floor.openings) {
+      if ((opening.kind !== "door" && opening.kind !== "entrance") || !opening.width_m || opening.width_m < WIDE_DOOR_M) continue;
+      const text = `${opening.width_m.toFixed(1)} m`;
+      doors.push({ kind: "door", id: opening.id, point: opening.position, text, title: `Door ${text} wide` });
+    }
+    doors.sort((a, b) => a.id.localeCompare(b.id));
+  }
+  // Overview (area tier, 2D): one calm name per area of same-kind rooms instead of single room names, if it fits.
+  if (tier === "area") {
+    const areas = areasOf(floor)
+      .filter((area) => area.name.length * AREA_CHAR_PX * scale <= area.width * AREA_FIT_OVERFLOW && AREA_H_PX * scale <= area.height * AREA_FIT_OVERFLOW_H)
+      .map((area): Item => ({ kind: "area", id: area.id, point: area.point, area }));
+    return [...pois, ...landmarkItems, ...areas];
+  }
   // Every tier: the zones (largest rooms), whatever their size on screen. Mid and near add every room whose
   // name (nearly) fits inside it at this scale. Tiers are cumulative, like a street map.
   rooms.sort((a, b) => b.area_m2 - a.area_m2 || a.id.localeCompare(b.id));
@@ -169,7 +204,7 @@ function candidates(
           return space.name.length * CHAR_PX * scale <= w * FIT_OVERFLOW && LABEL_H_PX * scale <= h;
         });
   const named = [...zones, ...fitting].slice(0, limit).map((space): Item => ({ kind: "room", id: space.id, point: space.anchor, space }));
-  return [...pois, ...landmarkItems, ...named, ...machineNames];
+  return [...pois, ...landmarkItems, ...named, ...machineNames, ...later, ...doors];
 }
 
 /** Everything with text or an icon on the focused floor, laid out together in screen px so nothing overlaps
@@ -178,7 +213,12 @@ function candidates(
  * and the selected one); then points of interest and room names in fixed zoom tiers (see mapZoom.ts). Room
  * names never sit on the drawn route; a room with a marker shows its name just above that marker. */
 export function Labels({ floor, model, y, limit, flat = false }: Props) {
-  const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
+  const zoom = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy, floor.bounds.size);
+  const scale = zoom.scale;
+  const tier: MapTier = flat || zoom.tier !== "area" ? zoom.tier : "far"; // 3D keeps its own labels
+  useEffect(() => {
+    if (flat) (window as unknown as { __twinMapZoom?: unknown }).__twinMapZoom = { tier, scale };
+  }, [flat, tier, scale]);
   const landmarks = useLandmarks();
   const state = useTwin((s) => s.state);
   const highlights = useTwin((s) => s.highlights);
@@ -324,18 +364,56 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     // 7. Points of interest and room names, by priority; no other name sits on the tapped room.
     const selected = selectedId ? model.spaceById.get(selectedId) : undefined;
     const selectedPx = selected && selected.floor_id === floor.id ? selected.polygon.map(px) : null;
-    for (const item of candidates(floor, model, tier, scale, limit, flat, landmarks)) {
+    const onRoute = (box: Box) => {
+      const clear = { x0: box.x0 - ROUTE_CLEAR_PX, y0: box.y0 - ROUTE_CLEAR_PX, x1: box.x1 + ROUTE_CLEAR_PX, y1: box.y1 + ROUTE_CLEAR_PX };
+      return routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)));
+    };
+    const roomBoxes = new Map<string, Box>();
+    const all = candidates(floor, model, tier, scale, limit, flat, landmarks);
+    for (const item of all) {
+      if (item.kind === "door") continue; // after the second lines, below
       if (marks.has(item.id) || replaced.has(item.id)) continue;
-      const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : "";
-      const halfW = item.kind === "poi" ? POI_PX / 2 : (text.length * CHAR_PX) / 2;
-      const halfH = item.kind === "poi" ? POI_PX / 2 : LABEL_H_PX / 2;
-      const box = boxOf(item.point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
-      if (kept.some((other) => overlaps(box, other))) continue;
-      if (item.kind === "room" && selectedPx && boxOnPolygon(box, selectedPx)) continue;
-      if (item.kind === "room" || (item.kind === "thing" && !item.landmark)) { // landmarks keep their name on the route
-        const clear = { x0: box.x0 - ROUTE_CLEAR_PX, y0: box.y0 - ROUTE_CLEAR_PX, x1: box.x1 + ROUTE_CLEAR_PX, y1: box.y1 + ROUTE_CLEAR_PX };
-        if (routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)))) continue;
+      const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
+      const halfW = item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2;
+      const halfH = item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 : LABEL_H_PX / 2;
+      // An area name may also move up or down a little (inside the area) to make way for a symbol.
+      const shifts = item.kind === "area" ? [0, AREA_SHIFT_PX, -AREA_SHIFT_PX] : [0];
+      for (const shift of shifts) {
+        const point: Point = shift ? [item.point[0], item.point[1] - shift * scale] : item.point;
+        if (item.kind === "area" && shift && !item.area.polygons.some((polygon) => insidePolygon(point, polygon))) continue;
+        const box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
+        if (kept.some((other) => overlaps(box, other))) continue;
+        if ((item.kind === "room" || item.kind === "area") && selectedPx && boxOnPolygon(box, selectedPx)) continue;
+        if ((item.kind === "room" || item.kind === "area" || (item.kind === "thing" && !item.landmark)) && onRoute(box)) continue; // landmarks keep their name on the route
+        kept.push(box);
+        result.push(shift ? { ...item, point } : item);
+        if (item.kind === "room") roomBoxes.set(item.id, box);
+        break;
       }
+    }
+    // Near, 2D: a second line under the room names shown ("Kitchen · 24 m²"), if it fits in the room and is free.
+    if (flat && tier === "near") {
+      for (const item of [...result]) {
+        if (item.kind !== "room") continue;
+        const space = item.space;
+        const text = `${prettyType(space.room_type)} · ${Math.round(space.area_m2)} m²`;
+        const [w, h] = spanOf(space.polygon);
+        if (text.length * SUB_CHAR_PX * scale > w * FIT_OVERFLOW || (LABEL_H_PX + SUB_H_PX) * scale > h) continue;
+        const [cx, cy] = px(item.point);
+        const halfW = (text.length * SUB_CHAR_PX) / 2;
+        const box = { x0: cx - halfW - GAP_PX / 2, y0: cy + SUB_DY_PX - SUB_H_PX / 2, x1: cx + halfW + GAP_PX / 2, y1: cy + SUB_DY_PX + SUB_H_PX / 2 + GAP_PX / 2 };
+        const own = roomBoxes.get(space.id);
+        if (kept.some((other) => other !== own && overlaps(box, other))) continue;
+        if (selectedPx && space.id !== selectedId && boxOnPolygon(box, selectedPx)) continue;
+        if (onRoute(box)) continue;
+        kept.push(box);
+        result.push({ kind: "sub", id: space.id, point: item.point, text });
+      }
+    }
+    for (const item of all) {
+      if (item.kind !== "door") continue;
+      const box = boxOf(item.point, (item.text.length * DOOR_CHAR_PX) / 2, DOOR_H_PX / 2);
+      if (kept.some((other) => overlaps(box, other))) continue;
       kept.push(box);
       result.push(item);
     }
@@ -364,15 +442,35 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       {shown.map((item) =>
         item.kind === "room" ? (
           <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
+        ) : item.kind === "area" ? (
+          <Html key={item.id} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[2, 0]} style={{ pointerEvents: "none" }}>
+            <div className={`label label-halo label-area ${flat ? "label-plan" : ""} zoom-fade`} data-zoom-kind="area" data-area-rooms={item.area.space_ids.length}>
+              {item.area.name}
+            </div>
+          </Html>
+        ) : item.kind === "sub" ? (
+          <Html key={`sub-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
+            <div className="label label-halo label-plan label-sub zoom-fade" data-zoom-kind="sub" style={{ transform: `translateY(${SUB_DY_PX}px)` }}>
+              {item.text}
+            </div>
+          </Html>
+        ) : item.kind === "door" ? (
+          <Html key={`door-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
+            <div className="label label-halo label-plan label-door zoom-fade" data-zoom-kind="door" title={item.title}>
+              {item.text}
+            </div>
+          </Html>
         ) : item.kind === "thing" ? (
           <Html key={`thing-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
-            <div className={`label label-halo label-plan label-thing ${item.landmark ? "label-landmark" : ""}`} data-label-asset={item.asset.id} style={{ transform: `translateY(calc(-50% - ${THING_LIFT_PX}px))` }}>
+            <div className={`label label-halo label-plan label-thing ${item.landmark ? "label-landmark" : ""} zoom-fade`} data-zoom-kind="thing" data-label-asset={item.asset.id} style={{ transform: `translateY(calc(-50% - ${THING_LIFT_PX}px))` }}>
               {item.asset.name}
             </div>
           </Html>
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-            <PoiBadge kind={item.poi} title={item.title} />
+            <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`}>
+              <PoiBadge kind={item.poi} title={item.title} />
+            </div>
           </Html>
         ),
       )}
@@ -389,8 +487,9 @@ function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind:
       style={{ pointerEvents: "none" }}
     >
       <div
-        className={`label label-halo ${flat ? "label-plan" : ""} ${selected ? "label-selected" : ""}`}
+        className={`label label-halo ${flat ? "label-plan" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
         data-label-space={item.space.id}
+        data-zoom-kind="room"
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
         {item.space.name}

@@ -13,7 +13,7 @@ export const POI_LEGEND: { kind: PoiKind; label: string }[] = [
   { kind: "coffee", label: "Coffee machine" },
   { kind: "printer", label: "Printer" },
   { kind: "extinguisher", label: "Fire extinguisher" },
-  { kind: "firstaid", label: "First aid / defibrillator" },
+  { kind: "firstaid", label: "First aid / defibrillator / eyewash" },
 ];
 
 /** Things shown as a symbol on the 2D map (from the middle zoom tier on), by asset type. */
@@ -21,7 +21,7 @@ export function amenityKindOf(type: string): PoiKind | null {
   if (type === "coffee_machine") return "coffee";
   if (type === "printer" || type === "multifunction_printer") return "printer";
   if (type === "fire_extinguisher") return "extinguisher";
-  if (type === "defibrillator" || type === "first_aid_kit" || type === "first_aid") return "firstaid";
+  if (type === "defibrillator" || type === "first_aid_kit" || type === "first_aid" || /^eye_?wash/.test(type)) return "firstaid";
   return null;
 }
 

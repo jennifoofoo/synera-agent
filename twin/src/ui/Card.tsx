@@ -4,8 +4,8 @@
 // Owner: the Card/Position session, see ARCHITECTURE.md. Every fact comes from `state` (the API); the card only
 // shows it and sends the user's taps back as API calls or chat words ("next", "back", "stop").
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import type { Route } from "../api/types";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Asset, Route } from "../api/types";
 import { formatPoint } from "../model/format";
 import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
@@ -145,6 +145,9 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const roomId = roomOf(model, selection);
   const canBeHere = selection.kind === "space" || selection.kind === "point";
   const hereAlready = !!position && position.space_id === roomId;
+  // Details on demand (semantic zoom, level 4): the equipment in a tapped room, not for a thing or a stair/lift.
+  const equipmentRoom = !asset && !connector ? space?.id : undefined;
+  const equipment = useMemo(() => (equipmentRoom ? equipmentOf(model.assetById.values(), equipmentRoom) : null), [model, equipmentRoom]);
 
   const imHere = () => {
     // No agent call: the position is set on screen now and travels as context.here with the next chat message.
@@ -170,6 +173,12 @@ function SelectionCard({ model }: { model: BuildingModel }) {
         {floor && context ? " · " : ""}
         {context}
       </div>
+      {equipment && equipment.items.length > 0 && (
+        <div className="card-line card-equipment" data-testid="card-equipment">
+          {equipment.items.join(", ")}
+          {equipment.more > 0 ? `, +${equipment.more} more` : ""}
+        </div>
+      )}
       {roomId && (
         <div className="card-actions">
           <button className="primary" onClick={() => openDirections(roomId)}>
@@ -184,6 +193,25 @@ function SelectionCard({ model }: { model: BuildingModel }) {
       )}
     </Sheet>
   );
+}
+
+const EQUIPMENT_SHOWN = 6;
+const EQUIPMENT_RANK: Record<string, number> = { machine: 0, equipment: 1, fixture: 2 };
+
+/** The equipment in a room for its card: machines, then equipment, then fixtures (no furniture), one entry per type
+ * with a count ("Cnc lathe ×2"), the most frequent first; at most EQUIPMENT_SHOWN entries and how many more. */
+export function equipmentOf(assets: Iterable<Asset>, spaceId: string): { items: string[]; more: number } {
+  const byType = new Map<string, { rank: number; count: number }>();
+  for (const asset of assets) {
+    const rank = EQUIPMENT_RANK[asset.category ?? ""];
+    if (asset.space_id !== spaceId || rank === undefined) continue;
+    const entry = byType.get(asset.type);
+    if (entry) entry.count += 1;
+    else byType.set(asset.type, { rank, count: 1 });
+  }
+  const sorted = [...byType].sort(([ta, a], [tb, b]) => a.rank - b.rank || b.count - a.count || ta.localeCompare(tb));
+  const items = sorted.slice(0, EQUIPMENT_SHOWN).map(([type, { count }]) => `${prettyType(type)}${count > 1 ? ` ×${count}` : ""}`);
+  return { items, more: Math.max(0, sorted.length - EQUIPMENT_SHOWN) };
 }
 
 // ---------------------------------------------------------------- guided walking

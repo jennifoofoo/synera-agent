@@ -29,3 +29,12 @@ Zoomen soll sich nach "mehr Information" anfühlen, nicht nur nach "größer". G
 - Screenshots je Stufe für proc-factory-dev-012 Etage 0 (Halle), Etage 2 (Büro), resplan-1465 (Wohnung), Desktop und Handy.
 - Langsam von außen nach innen zoomen: auf jeder Stufe kommt sichtbar etwas Neues, nichts flackert, nichts überlappt.
 - Leistung: größtes Gebäude (osm-way27917482) bleibt flüssig, Bereichsberechnung einmal pro Etage im Cache.
+
+## Umsetzung (25.10., Branch `feat/twin-semantic-zoom`)
+- `twin/src/scene/mapZoom.ts`: Stufen `area | far | mid | near`. `area` gilt, solange die längere Seite der Etage höchstens 480 px auf dem Schirm einnimmt (Pixel, nicht Bildschirmanteil, also gleich auf Handy und Desktop). Kleine Etagen (Wohnung, 22 m) erreichen `area` nur auf dem Handy, auf dem Desktop begrenzt der Zoom vorher. Hysterese: eine Stufe wird erst 0,2 Halboktaven hinter der Grenze verlassen, das Layout rechnet mit dem gröbsten gehaltenen Maßstab.
+- `twin/src/scene/areas.ts`: Bereiche = Räume derselben Gruppe mit gemeinsamer Wand (Kanten auf einer Linie, 0,35 m Toleranz, mindestens 0,5 m Überlappung). Kleine Sozialräume (höchstens 2 Räume) gehen im Nachbarbereich auf, damit ein Büroflur "Offices" bleibt und nicht in Einzelteile zerfällt. Generische Räume ("Rooms") bekommen keinen Namen. Einmal pro Etage im Cache, größte Etage (osm-way27917482) etwa 10 ms.
+- Stufe 2: Kaffee, Drucker, Erste Hilfe/Defibrillator/Augendusche (grün) vor den Raumnamen, Feuerlöscher (rot) nach den Raumnamen, sonst verdrängen sie in großen Gebäuden die Namen.
+- Stufe 3: Zweitzeile, Türbreiten ab 1,2 m (Türen und Eingänge), Stufen-Symbol und rote Balken wie bisher.
+- Stufe 4: Raumkarte listet Maschinen, Geräte, Einbauten (keine Möbel) nach Typ mit Anzahl, höchstens 6 und "+n more".
+- 3D unverändert (dort gilt `area` wie `far`).
+- Test: `tests/e2e/test_semantic_zoom.py`. Screenshots: `docs/twin-audit/semantic-zoom/`.
