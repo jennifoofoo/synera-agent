@@ -9,6 +9,7 @@ from pathlib import Path
 
 import anthropic
 
+from building_agent.guide_tools import GuideState
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
 from starter_agent.agent import SYSTEM_PROMPT as STARTER_PROMPT
@@ -39,12 +40,29 @@ def overview_with_floor_ids(building_map: BuildingMap) -> dict:
     return overview
 
 
+CONVERSATION_RULES = """
+
+Talking to a person (no 'Answer:' line asked):
+- Directions: use give_directions and read out only the steps it returns (at most 3). Offer 'weiter' for the \
+next steps (next_steps) and 'nochmal' to repeat (repeat_steps). Mention landmarks, not distances per step.
+- Changes (closing or reopening a lift, stair, door or room; adding a door): call propose_change, show the \
+understanding card in plain words (what you understood, what changes for their route), and ask for a yes. \
+Only after their next message says yes call confirm_change(true); on no or a correction call \
+confirm_change(false) and start over. Never apply a change in the same turn you proposed it.
+- If a place is ambiguous (for example 'WC' exists on several floors), ask with the floor before routing."""
+
+
 class Agent(StarterAgent):
     def __init__(self, building_map: BuildingMap, output_directory: Path, client: anthropic.Anthropic | None = None) -> None:
         super().__init__(building_map, output_directory, client)
-        self.tools = make_tools(building_map, output_directory)
+        self.guide = GuideState()
+        self.tools = make_tools(building_map, output_directory, self.guide)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)
-        self.system[0]["text"] = STARTER_PROMPT.format(overview=overview) + CALCULATION_RULES
+        self.system[0]["text"] = STARTER_PROMPT.format(overview=overview) + CALCULATION_RULES + CONVERSATION_RULES
+
+    def ask(self, user_text: str) -> str:
+        self.guide.begin_turn()
+        return super().ask(user_text)
 
 
 def cache_key(building_directory: Path, question_text: str) -> str:
