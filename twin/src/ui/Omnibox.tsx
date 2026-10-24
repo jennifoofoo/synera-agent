@@ -1,6 +1,8 @@
 // The one input: "Ask or search…". Typing completes the best place inline as grey ghost text (see Autocomplete);
 // accepting it flies there and selects it. Enter on a sentence asks the building (the reply shows in the Card).
 // Voice in via the mic (push-to-talk), replies to spoken questions are spoken back (mute toggle).
+// By default only two round buttons show: Chat (opens the input) and Talk (push-to-talk). The input stays mounted
+// but invisible, so the header search, Cmd/Ctrl+K and Chat just focus it; focus opens it, an empty blur closes it.
 // Owner: chat/search session, see ARCHITECTURE.md.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -39,6 +41,8 @@ export function Omnibox() {
   const [heard, setHeard] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [history, setHistory] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const longPress = useRef<{ timer: number; fired: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listenerRef = useRef<Listener | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -109,6 +113,7 @@ export function Omnibox() {
       setText("");
       setHistory(false);
       stopSpeaking();
+      inputRef.current?.blur(); // the keyboard goes away, the reply card shows
       const reply = await ask(message, voice);
       if (reply && voice && useTwin.getState().voiceOut) void speak(reply.reply, useTwin.getState().speechAvailable);
     },
@@ -145,6 +150,36 @@ export function Omnibox() {
 
   useEffect(() => () => listenerRef.current?.cancel(), []);
 
+  // Close the input again when it loses focus with nothing typed (not while listening or busy).
+  const collapseIfIdle = () => {
+    window.setTimeout(() => {
+      const inside = rootRef.current?.contains(document.activeElement);
+      if (!inside && !inputRef.current?.value.trim() && !listenerRef.current) setExpanded(false);
+    }, 0);
+  };
+
+  // Long-press on Talk switches spoken replies on/off (the speaker icon only lives in the open input).
+  const talkDown = () => {
+    longPress.current = {
+      fired: false,
+      timer: window.setTimeout(() => {
+        if (!longPress.current) return;
+        longPress.current.fired = true;
+        const on = !useTwin.getState().voiceOut;
+        toggleSound();
+        setNotice(on ? "Spoken replies on." : "Spoken replies off.");
+      }, 600),
+    };
+  };
+  const talkUp = () => {
+    if (longPress.current) window.clearTimeout(longPress.current.timer);
+  };
+  const talkClick = () => {
+    const fired = longPress.current?.fired;
+    longPress.current = null;
+    if (!fired) toggleMic();
+  };
+
   const toggleSound = () => {
     const on = !voiceOut;
     if (!on) stopSpeaking();
@@ -178,7 +213,7 @@ export function Omnibox() {
       : "Search rooms and things…";
 
   return (
-    <div className="omnibox" ref={rootRef}>
+    <div className={`omnibox ${expanded ? "expanded" : "collapsed"}`} ref={rootRef}>
       {history && pairs.length > 0 && (
         <ol className="ob-history" aria-label="Earlier replies">
           {pairs.map((pair) => (
@@ -217,7 +252,11 @@ export function Omnibox() {
         </div>
       )}
 
-      <form className={`omnibox-input ${listening ? "is-listening" : ""}`} onSubmit={(event) => event.preventDefault()}>
+      <form
+        className={`omnibox-input ${listening ? "is-listening" : ""}`}
+        onSubmit={(event) => event.preventDefault()}
+        aria-hidden={!expanded || undefined}
+      >
         <Autocomplete
           inputRef={inputRef}
           value={listening ? heard : text}
@@ -231,11 +270,14 @@ export function Omnibox() {
           readOnly={listening}
           enterKeyHint={looksLikeQuestion(text) ? "send" : "search"}
           onEscape={stopSpeaking}
+          onFocus={() => setExpanded(true)}
+          onBlur={collapseIfIdle}
         />
         {pairs.length > 1 && (
           <button
             type="button"
             className={`ob-icon ${history ? "on" : ""}`}
+            onPointerDown={(event) => event.preventDefault()}
             onClick={() => {
               // One card at a time: the history replaces the reply card while it is open.
               if (!history) dismissReply();
@@ -251,6 +293,7 @@ export function Omnibox() {
         <button
           type="button"
           className={`ob-icon ${voiceOut ? "" : "off"}`}
+          onPointerDown={(event) => event.preventDefault()}
           onClick={toggleSound}
           aria-label={voiceOut ? "Mute spoken replies" : "Speak replies"}
           aria-pressed={!voiceOut}
@@ -261,6 +304,7 @@ export function Omnibox() {
         <button
           type="button"
           className={`ob-mic mic ${listening ? "listening" : ""}`}
+          onPointerDown={(event) => event.preventDefault()}
           onClick={toggleMic}
           disabled={busy}
           aria-label={listening ? "Stop and send" : "Speak"}
@@ -270,6 +314,37 @@ export function Omnibox() {
           <MicIcon />
         </button>
       </form>
+
+      {!expanded && (
+        <div className="ob-fabs">
+          <button
+            type="button"
+            className="ob-fab"
+            aria-label="Chat"
+            title="Type to ask or search"
+            // Focus inside the tap so iOS opens the keyboard; the focus opens the input.
+            onClick={() => inputRef.current?.focus()}
+          >
+            <ChatIcon />
+          </button>
+          <button
+            type="button"
+            className={`ob-fab ob-talk mic ${listening ? "listening" : ""}`}
+            aria-label={listening ? "Stop and send" : "Talk"}
+            aria-pressed={listening}
+            title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
+            disabled={busy}
+            onPointerDown={talkDown}
+            onPointerUp={talkUp}
+            onPointerLeave={talkUp}
+            onPointerCancel={talkUp}
+            onContextMenu={(event) => event.preventDefault()}
+            onClick={talkClick}
+          >
+            {voiceOut ? <MicIcon /> : <MicMutedIcon />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -281,6 +356,25 @@ function MicIcon() {
     <svg {...iconProps}>
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg {...iconProps} width={22} height={22}>
+      <path d="M5 18l-1.5 3 4-1.5A8.5 8.5 0 1 0 5 18z" />
+    </svg>
+  );
+}
+
+/** Mic with a small slash in the corner: spoken replies are off. */
+function MicMutedIcon() {
+  return (
+    <svg {...iconProps}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+      <path d="M17 3.5l4 4" strokeWidth={2.2} />
     </svg>
   );
 }

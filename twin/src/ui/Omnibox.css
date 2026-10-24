@@ -74,3 +74,21 @@
   .ob-status .x { width: 44px; min-width: 44px; height: 44px; min-height: 44px; margin: -12px -10px -12px 0; }
 }
 
+
+/* closed by default: only Chat and Talk, round, bottom right of the dock (in its flow, so never over the card) */
+.omnibox.collapsed .omnibox-input {
+  position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden;
+  opacity: 0; pointer-events: none; border: 0; box-shadow: none;
+}
+.ob-fabs { display: flex; justify-content: flex-end; gap: 10px; }
+.ob-fab {
+  width: 52px; height: 52px; min-height: 52px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 6px 20px rgba(20, 48, 90, 0.16);
+  -webkit-touch-callout: none; user-select: none;
+}
+.ob-fab:hover { background: var(--panel-solid); }
+.ob-fab svg { width: 22px; height: 22px; }
+.ob-talk.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: ob-pulse 1.4s ease-out infinite; }
+.omnibox.collapsed .ob-status { align-self: flex-end; }
+@media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }
