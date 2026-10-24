@@ -197,3 +197,14 @@ def test_close_card_describes_the_effect_on_the_whole_building(tmp_path):
     card = json.loads(tools["propose_change"](action="close", element=connector))
     assert card["effect on the whole building"], "the card needs plain sentences about the building"
     assert bm.closed == set()  # still only a proposal
+
+
+def test_new_actions_are_registered_and_change_the_signature():
+    from building_agent.guide_tools import ACTIONS, building_signature
+
+    assert {"remove_door", "widen_door", "move_asset"} <= set(ACTIONS)
+    bm = fresh_map(str(min(Path("data/dev").glob("*"))))
+    before = building_signature(bm)
+    door = next(o for o in bm.openings.values() if "outside" not in o["space_ids"])
+    door["width_m"] = 3.3
+    assert building_signature(bm) != before
