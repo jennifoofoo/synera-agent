@@ -220,3 +220,86 @@ Detection alone (`building_agent/level4/markers.py`, no model), measured against
 - The eval table shows that markers are not the bottleneck on dense plans: the model's rooms are missing or shifted there, so a marker often finds fewer than two matching outlines or the wrong pair (swiss-31: 2 of 27 markers dropped, 5 pairs changed). Where rooms are right, markers fix kinds and positions (factory-003: invented entrances become doors or openings, 108 invalid sequences gone).
 - When the outline pair and the model pair disagree the outline pair wins (tested: model pair wins gives factory-003 108 invalid again, swiss-31 only 2 invalid instead of 14, so this trade-off is open for swiss).
 - Does not work for plans that draw doors as arcs or leaves, scans, JPEG below quality 90, or images resized after rendering (dots smaller than 4 px or blurred).
+
+### Room segmentation 2026-10-24 (claude-sonnet-5-5, prompt 9f2a64f5)
+
+Segmentation against the true polygons of 122 dev floors (all four sources, no API, truth from the floor svg), then the cached model extractions of the 8 default floors with the combination model -> segment -> markers -> convert -> validate.
+
+| Source | Floors | True rooms | Recall | Precision | IoU median | Area err median | Floors with a missed room | Regions merging 2 true rooms | Seconds median (max) |
+|---|---|---|---|---|---|---|---|---|---|
+| osm | 19 | 2055 | 0.986 | 0.988 | 0.971 | 0.8% | 8 | 9 | 0.13 (1.19) |
+| procedural | 45 | 1402 | 1.000 | 1.000 | 0.977 | 0.6% | 0 | 0 | 0.04 (0.23) |
+| resplan | 10 | 81 | 1.000 | 1.000 | 0.968 | 1.1% | 0 | 0 | 0.02 (0.03) |
+| swiss | 48 | 1606 | 1.000 | 0.992 | 0.939 | 3.1% | 0 | 0 | 0.04 (0.17) |
+| all | 122 | 5144 | 0.995 | 0.993 | 0.967 | 1.1% | 8 | 9 | 0.04 (1.19) |
+
+| Floor | Variant | Room recall | Door recall | Pairs >= 0.99 | Invalid | No route | Pairs |
+|---|---|---|---|---|---|---|---|
+| proc-campus-dev-000:0 | model | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | model + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | model + markers | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | model + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | segment | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | segment + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | segment + markers | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-000:0 | segment + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 156 |
+| proc-campus-dev-001:0 | model | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | model + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | model + markers | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | model + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | segment | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | segment + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | segment + markers | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-campus-dev-001:0 | segment + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 120 |
+| proc-factory-dev-003:0 | model | 1.00 | 0.96 | 81% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | model + suggest | 1.00 | 0.96 | 81% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | model + markers | 1.00 | 1.00 | 100% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | model + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | segment | 1.00 | 0.96 | 81% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | segment + suggest | 1.00 | 0.96 | 81% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | segment + markers | 1.00 | 1.00 | 100% | 0 | 0 | 264 |
+| proc-factory-dev-003:0 | segment + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 264 |
+| resplan-439:0 | model | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | model + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | model + markers | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | model + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | segment | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | segment + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | segment + markers | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-439:0 | segment + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 30 |
+| resplan-1465:0 | model | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | model + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | model + markers | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | model + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | segment | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | segment + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | segment + markers | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| resplan-1465:0 | segment + markers + suggest | 1.00 | 1.00 | 100% | 0 | 0 | 40 |
+| swiss-31:0 | model | 0.80 | 0.35 | 6% | 1 | 116 | 125 |
+| swiss-31:0 | model + suggest | 0.80 | 0.45 | 6% | 117 | 0 | 125 |
+| swiss-31:0 | model + markers | 0.80 | 0.35 | 5% | 14 | 105 | 125 |
+| swiss-31:0 | model + markers + suggest | 0.80 | 0.42 | 5% | 119 | 0 | 125 |
+| swiss-31:0 | segment | 1.00 | 0.58 | 6% | 0 | 149 | 159 |
+| swiss-31:0 | segment + suggest | 1.00 | 0.74 | 8% | 146 | 0 | 159 |
+| swiss-31:0 | segment + markers | 1.00 | 0.87 | 9% | 0 | 145 | 159 |
+| swiss-31:0 | segment + markers + suggest | 1.00 | 0.87 | 9% | 145 | 0 | 159 |
+| swiss-203:0 | model | 0.78 | 0.26 | 3% | 0 | 147 | 151 |
+| swiss-203:0 | model + suggest | 0.78 | 0.37 | 6% | 142 | 0 | 151 |
+| swiss-203:0 | model + markers | 0.78 | 0.32 | 5% | 4 | 137 | 151 |
+| swiss-203:0 | model + markers + suggest | 0.78 | 0.34 | 5% | 140 | 0 | 151 |
+| swiss-203:0 | segment | 1.00 | 0.32 | 3% | 1 | 193 | 200 |
+| swiss-203:0 | segment + suggest | 1.00 | 0.53 | 6% | 188 | 0 | 200 |
+| swiss-203:0 | segment + markers | 1.00 | 0.89 | 19% | 0 | 108 | 200 |
+| swiss-203:0 | segment + markers + suggest | 1.00 | 0.89 | 19% | 108 | 0 | 200 |
+| osm-way27326387:0 | model | 0.86 | 0.67 | 34% | 0 | 23 | 89 |
+| osm-way27326387:0 | model + suggest | 0.86 | 0.70 | 45% | 5 | 0 | 89 |
+| osm-way27326387:0 | model + markers | 0.86 | 0.74 | 46% | 2 | 0 | 89 |
+| osm-way27326387:0 | model + markers + suggest | 0.86 | 0.74 | 46% | 2 | 0 | 89 |
+| osm-way27326387:0 | segment | 1.00 | 0.67 | 22% | 14 | 54 | 108 |
+| osm-way27326387:0 | segment + suggest | 1.00 | 0.70 | 33% | 55 | 0 | 108 |
+| osm-way27326387:0 | segment + markers | 1.00 | 0.96 | 89% | 0 | 6 | 108 |
+| osm-way27326387:0 | segment + markers + suggest | 1.00 | 1.00 | 94% | 0 | 0 | 108 |
+
+- Segment alone lifts room recall on the cached floors (swiss 0.80/0.78, osm 0.86 to 1.00) but not routes: added rooms have no doors. Segment + markers is what pays off: osm pairs >= 0.99 34% to 89% (94% with suggestions), swiss-203 3% to 19%, swiss-31 6% to 9%, invalid sequences 0 everywhere, clean floors unchanged. Suggestions only turn no-route into invalid on swiss (guessed doors that do not exist).
+- Swiss limit: the doors between apartment and stairwell are not drawn in the plain image, so no marker finds them (diagnosed on swiss-31: 5 of 31 true openings missing, 4 of them stairwell doors).
+- Segmentation limits: same-coloured rooms with no wall drawn between them (osm-way360544293, grey rooms inside a grey hall) cannot be separated; closets of about 10 px under door dots are lost; fills that are not flat (hatching, photos) are skipped via the fill-share guard. Swiss polygons run about 3% large (rotated walls are wider, IoU median 0.94).

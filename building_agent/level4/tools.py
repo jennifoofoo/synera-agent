@@ -32,6 +32,7 @@ from building_agent.level4.convert import (
 from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
 from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
+from building_agent.level4.segment import match_to_extraction, segment_rooms
 from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
 from building_agent.level4.validate import describe, validate
 from starter_agent.building_map import NEW_DOOR_WIDTH_M, BuildingMap, MapError
@@ -363,9 +364,15 @@ def make_level4_tools(
             draft.cache[key] = result
             draft.cost_usd += result.cost_usd
         extraction = result.extraction
+        seg_warnings: list[str] = []
+        try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
+            extraction, seg_warnings = match_to_extraction(extraction, segment_rooms(path))
+            draft.marker_notes = seg_warnings[:10]
+        except (OSError, ValueError):
+            pass
         try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
             extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
-            draft.marker_notes = marker_warnings[:10]
+            draft.marker_notes = (seg_warnings + marker_warnings)[:10]
         except (OSError, ValueError):
             pass
         try:

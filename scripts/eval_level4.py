@@ -86,6 +86,14 @@ def store(path: Path, result: ExtractResult) -> None:
     path.write_text(json.dumps(raw), encoding="utf-8")
 
 
+def apply_segment(result: ExtractResult, building_id: str, level: int) -> ExtractResult:
+    from building_agent.level4.segment import match_to_extraction, segment_rooms
+
+    image = DATA_DEV / building_id / f"floor_{level}_plain.png"
+    extraction, _ = match_to_extraction(result.extraction, segment_rooms(image))
+    return dataclasses.replace(result, extraction=extraction)
+
+
 def best_offset(case, converted: dict) -> tuple[float, float]:
     """The image frame is unknown, so align the extracted outline to the true one (corner or centre, whichever
     matches more rooms). Only the frame is fitted, never the shapes."""
@@ -108,7 +116,9 @@ def best_offset(case, converted: dict) -> tuple[float, float]:
     return max(scored, key=lambda item: item[0])[1]
 
 
-def evaluate_floor(building_id: str, level: int, result: ExtractResult, use_markers: bool = False) -> dict:
+def evaluate_floor(
+    building_id: str, level: int, result: ExtractResult, use_markers: bool = False, use_suggest: bool = False
+) -> dict:
     case = floor_case(building_id, level)
     if use_markers:
         found = detect_markers(DATA_DEV / building_id / f"floor_{level}_plain.png")
@@ -119,6 +129,10 @@ def evaluate_floor(building_id: str, level: int, result: ExtractResult, use_mark
     converted, convert_findings = convert_floors_with_findings(
         [FloorInput(level, result.extraction, scale)], building_id, building_id
     )
+    if use_suggest:
+        from building_agent.level4.suggest import apply_suggestions, suggest_doors
+
+        converted = apply_suggestions(converted, suggest_doors(converted))
     findings = validate(converted)
     case = dataclasses.replace(case, extraction=result.extraction, scale=scale)
     case = dataclasses.replace(case, offset=best_offset(case, converted))
@@ -273,6 +287,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="eval_level4")
     parser.add_argument("--floors", default=None, help="comma list of building[:level], default 8 dev floors")
     parser.add_argument("--max-dollars", type=float, default=2.0, help="stop before a live call above this total")
+    parser.add_argument("--segment", action="store_true", help="refine rooms with the image segmentation")
     parser.add_argument("--markers", action="store_true", help="also apply merge_markers before convert and compare")
     parser.add_argument("--no-log", action="store_true", help="do not write docs/eval-log.md")
     arguments = parser.parse_args()
@@ -298,6 +313,8 @@ def main() -> None:
             store(path, result)
             spent += result.cost_usd
             source = "live"
+        if arguments.segment:
+            result = apply_segment(result, building_id, level)
         row = evaluate_floor(building_id, level, result)
         rows.append(row)
         if arguments.markers:
@@ -319,7 +336,7 @@ def main() -> None:
         title = None
     print("\n" + "\n".join(lines))
     if not arguments.no_log:
-        write_log(lines, DEFAULT_MODEL, title)
+        write_log(lines, DEFAULT_MODEL + (" + segment" if arguments.segment else ""), title)
         print(f"\n[level4] appended to {EVAL_LOG}")
 
 
