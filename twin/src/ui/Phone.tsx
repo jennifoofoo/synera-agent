@@ -59,6 +59,27 @@ function useDockHeight(worker: boolean) {
   }, [worker, setBottomInset]);
 }
 
+/** The header row (Back, name, Search) covers the top of the plan, so the camera must frame below it: topInset is
+ * at least the header's bottom edge. A bigger value (the directions sheet) wins; when that sheet closes and resets
+ * topInset to 0, this puts the header back. */
+function useHeaderInset(worker: boolean, ready: boolean) {
+  const topInset = useTwin((s) => s.topInset);
+  const setTopInset = useTwin((s) => s.setTopInset);
+  useEffect(() => {
+    if (!worker || !ready) return;
+    const measure = () => {
+      const header = document.querySelector<HTMLElement>(".phone-back");
+      if (!header) return;
+      const bottom = Math.round(header.getBoundingClientRect().bottom + 6);
+      if (useTwin.getState().topInset < bottom) setTopInset(bottom);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [worker, ready, topInset, setTopInset]);
+  useEffect(() => () => setTopInset(0), [worker, setTopInset]);
+}
+
 export function Phone() {
   const worker = useTwin((s) => s.profile === "worker");
   const guiding = useTwin((s) => !!s.state?.guide?.active);
@@ -69,6 +90,7 @@ export function Phone() {
 
   useVisualViewport();
   useDockHeight(worker);
+  useHeaderInset(worker, !!model);
   useEffect(() => {
     if (audioUnlockInstalled) return;
     audioUnlockInstalled = true;

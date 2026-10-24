@@ -93,3 +93,6 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 @media (prefers-reduced-motion: reduce) {
   .phone-sheet, .phone-sheet:not(.dragging) { animation: none; transition: none; }
 }
+
+/* the tapped room's name on the plan (Labels.tsx keeps it and drops labels that would sit on the room) */
+.worker .label.label-selected { font-weight: 650; }

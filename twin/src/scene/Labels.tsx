@@ -39,6 +39,32 @@ function cullOverlaps<T extends { anchor: [number, number] }>(items: T[], minDis
   return kept;
 }
 
+/** Rough screen box of a label in metres (12 px text, about 6.6 px per character), centred on its anchor. */
+function labelBox(name: string, anchor: Point, scale: number) {
+  const halfW = ((name.length * 6.6 + 6) * scale) / 2;
+  const halfH = 10 * scale;
+  return { minX: anchor[0] - halfW, maxX: anchor[0] + halfW, minY: anchor[1] - halfH, maxY: anchor[1] + halfH };
+}
+type Box = ReturnType<typeof labelBox>;
+
+function insidePolygon([x, y]: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** True when a label box lies on the room (a sample point of the box in the polygon, or a corner in the box). */
+function boxOnRoom(b: Box, polygon: Point[]): boolean {
+  const xs = [b.minX, (b.minX + b.maxX) / 2, b.maxX];
+  const ys = [b.minY, (b.minY + b.maxY) / 2, b.maxY];
+  if (xs.some((x) => ys.some((y) => insidePolygon([x, y], polygon)))) return true;
+  return polygon.some(([x, y]) => x > b.minX && x < b.maxX && y > b.minY && y < b.maxY);
+}
+
 /** Room names on the focused floor. What is shown depends on the scale (metres per screen pixel): far away only
  * lifts and stairs, closer the rooms that are wide enough to carry a label, never overlapping. */
 export function Labels({ floor, model, y, limit, flat = false }: Props) {
@@ -60,6 +86,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   // Rooms with a marker (you are here, route ends, the guide's next target): their label moves just above the
   // marker (screen px), so the marker never covers the name. Other labels stay at the room anchor.
   const state = useTwin((s) => s.state);
+  // The tapped room always carries its name (one label), and no other label may sit on it (mobile session).
+  const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
@@ -94,15 +122,23 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const chosen = far ? [...lifts.slice(0, 4), ...rooms.slice(0, 6)] : [...connectors.slice(0, 12), ...rooms];
     // Marked rooms always keep their label (they stack above their own markers, so they are never culled);
     // the other labels keep clear of them.
-    const marked = named.filter((space) => marks.has(space.id));
-    const rest = chosen.filter((space) => !marks.has(space.id));
+    const selected = selectedId ? named.find((space) => space.id === selectedId) : undefined;
+    const covers = (space: (typeof named)[number]) => {
+      if (!selected) return false;
+      const box = labelBox(space.name, space.anchor, scale);
+      const own = labelBox(selected.name, selected.anchor, scale);
+      const overlapsOwn = box.minX < own.maxX && box.maxX > own.minX && box.minY < own.maxY && box.maxY > own.minY;
+      return overlapsOwn || boxOnRoom(box, selected.polygon);
+    };
+    const marked = named.filter((space) => marks.has(space.id) || space.id === selectedId);
+    const rest = chosen.filter((space) => !marks.has(space.id) && space.id !== selectedId && !covers(space));
     const minDistance = LABEL_PX * scale * (flat ? 0.9 : 1.1);
     const kept = cullOverlaps(rest, minDistance);
     return [
       ...marked,
       ...kept.filter((space) => marked.every((other) => Math.hypot(other.anchor[0] - space.anchor[0], other.anchor[1] - space.anchor[1]) >= minDistance)),
     ];
-  }, [floor, model, limit, scale, flat, marks]);
+  }, [floor, model, limit, scale, flat, marks, selectedId]);
   // 2D: stairs, lifts, toilets and entrances as small round icons like a street map's points of interest.
   const pois = useMemo(() => {
     if (!flat) return [];
@@ -135,7 +171,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
             style={{ pointerEvents: "none" }}
           >
             <div
-              className={`label label-halo ${flat ? "label-plan" : ""} ${model.connectorBySpace.has(space.id) ? "label-connector" : ""}`}
+              className={`label label-halo ${flat ? "label-plan" : ""} ${model.connectorBySpace.has(space.id) ? "label-connector" : ""} ${space.id === selectedId ? "label-selected" : ""}`}
               data-label-space={space.id}
               style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
             >
