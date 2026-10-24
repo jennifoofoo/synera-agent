@@ -10,8 +10,8 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 | Kind (Testfragen) | Wer | Status | Branch |
 |---|---|---|---|
 | errand (20) | Jennifer | gemergt | feat/q-errand |
-| floor_area_total (33) | Jennifer | offen | |
-| straight_line_3d (15) | Jennifer | offen | |
+| floor_area_total (33) | Jennifer | in Arbeit | feat/q-floor_area_total |
+| straight_line_3d (15) | Jennifer | in Arbeit | feat/q-straight_line_3d |
 | shared_walls_count (26) | Leonie | in Arbeit | feat/q-shared_walls_count |
 | largest_room (21) | Leonie | in Arbeit | feat/q-largest_room |
 | wide_delivery_count (18) | Leonie | in Arbeit | feat/q-wide_delivery_count |
@@ -21,8 +21,8 @@ Split by test weight (145 test questions): Jennifer 68, Leonie 77.
 
 | Aufgabe | Wer | Status | Branch |
 |---|---|---|---|
-| Leitplanken: check.sh, ruff, Hooks | Jennifer | offen | |
-| tools.py (aus Registry), find_space, agent.py, Baseline-Lauf | Jennifer | offen | |
+| Leitplanken: check.sh, ruff, Hooks | Jennifer | gemergt | chore/guardrails |
+| tools.py (aus Registry), find_space, agent.py, Baseline-Lauf | Jennifer | in Arbeit | feat/agent-tools |
 | Test "Text zu Parametern" | Jennifer | offen | |
 | Interaction: 6 Skripte, Verständniskarte, Landmarken (directions.py) | Jennifer | offen | |
 | 2D-Web-Seite (Chat + Etagenplan mit Route) | Leonie | in Arbeit | feat/web-2d |
