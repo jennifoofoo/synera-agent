@@ -40,10 +40,11 @@ def backend_name() -> str:
 class ChatAdapter:
     """One per loaded building. ask() returns {'reply', 'backend'} and never raises."""
 
-    def __init__(self, building_dir: Path, building_map: BuildingMap, level4=None) -> None:
+    def __init__(self, building_dir: Path, building_map: BuildingMap, level4=None, campus_source=None) -> None:
         self.building_dir = building_dir
         self.map = building_map
         self.level4 = level4  # web.level4_api.PlanStudio: the page's floor plan draft, shared with the agent
+        self.campus_source = campus_source  # callable returning the page's CampusHolder (or None): one campus for both
         self.starter = None
         self.session = None
         self.saved_paths: list[Path] = []  # buildings the agent saved during the current turn (Level 4 save_building)
@@ -70,13 +71,7 @@ class ChatAdapter:
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
     def ask_building_agent(self, text: str, selection=None, here=None, voice: bool = False) -> str:
-        from building_agent.agent import Session
-
-        if self.session is None:
-            self.session = Session(self.map, OUTPUT_DIRECTORY / self.building_dir.name)
-            self.watch_saves(self.session)
-            if self.level4 is not None and not any(tool.name == "build_from_plan" for tool in self.session.tools):
-                self.session.tools = [*self.session.tools, *self.level4.chat_tools]
+        self.ensure_session()
         if self.level4 is not None:
             self.level4.begin_turn()
             note = self.level4.chat_context()
@@ -89,6 +84,33 @@ class ChatAdapter:
             return self.session.ask(text, **({"voice": True} if voice else {}))
         finally:
             self.session.guide.selection = None  # one-shot: never leaks into the next message
+
+    def add_level4_tools(self) -> None:
+        if self.level4 is not None and not any(tool.name == "build_from_plan" for tool in self.session.tools):
+            self.session.tools = [*self.session.tools, *self.level4.chat_tools]
+
+    def ensure_session(self):
+        """The agent session, created on first use. It holds the SAME CampusHolder as the page; if the page loaded
+        a campus later, the tools and rules are rebuilt (position and walk are kept)."""
+        from building_agent.agent import Session
+
+        campus = self.campus_source() if self.campus_source else None
+        if self.session is None:
+            self.session = Session(
+                self.map, OUTPUT_DIRECTORY / self.building_dir.name, **({"campus": campus} if campus else {})
+            )
+            self.watch_saves(self.session)
+            self.add_level4_tools()
+        elif campus is not getattr(self.session, "campus", None):
+            guide = self.session.guide
+            position, walk = guide.position, guide.walk
+            self.session.campus = campus
+            self.session.install_building(self.map)
+            guide.position, guide.walk = position, walk
+            self.add_level4_tools()
+        if campus is not None:
+            campus.bm = self.map  # next_steps compares against the map the tools were built with
+        return self.session
 
     def apply_here(self, here) -> None:
         """The page's validated click sets the position (source click); the next message is the next turn."""
@@ -129,7 +151,7 @@ class ChatAdapter:
 
     def move_to(self, building_dir: Path, building_map: BuildingMap) -> "ChatAdapter":
         """The conversation continues on another building (the one just saved); this adapter starts over."""
-        moved = ChatAdapter(building_dir, building_map, self.level4)
+        moved = ChatAdapter(building_dir, building_map, self.level4, self.campus_source)
         moved.session, self.session = self.session, None
         if moved.session is not None:
             moved.session.install_building(building_map)

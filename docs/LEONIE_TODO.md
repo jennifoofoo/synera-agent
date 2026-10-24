@@ -28,7 +28,13 @@ Handy-Demo: `scripts/tunnel.sh` startet die Seite mit https-Tunnel (Mikrofon geh
 Schalter "Auto-Pace" (Default aus), Timer nach jedem gesprochenen Schritt (erwartete Gehzeit plus 5 s, kommt vom Server), danach Chat-Aufruf mit Kontext `{guide_tick: true}`. Anzeige "wartet auf dich". Der Server-Teil (`building_agent/pace.py`) liegt bereit, die Anbindung kommt nach dem Merge von Position.
 
 ## 5. Level 3 in der Seite (Gebäudewahl, Route über Gebäude)
-Es gibt noch keine Campus-Endpunkte auf der Seite. Jennifer baut `/api/campus/*` (Campus laden, Gebäudeliste, Route über Gebäude). Danach: Gebäudewahl und Route über Gebäude zeichnen (W-L3d).
+Die Endpunkte stehen auf `feat/web-campus-gzip` (Spec mit allen Feldern: `docs/specs/level3-campus.md`, Abschnitt "Page API").
+- `GET /api/campus`: `available` (ladbare Campusse), Gebäude (Etagen, Eingänge, `page_key` zum Laden mit `/api/building`, `active` für das Gebäude auf dem Plan, Welt-Positionen) und Links (Art, Länge, `closed`). Mit `?key=<Gebäudeschlüssel>` markiert der Server das aktive Gebäude.
+- `POST /api/campus/load {key}`: `example` lädt drei Dev-Gebäude zum Üben. Befunde in `findings` und `summary` anzeigen (fehlende Gebäude sind Befunde, kein Fehler).
+- `POST /api/campus/route {start, destination, start_building?, destination_building?, step_free?}`: `legs` pro Gebäude (Räume, `points`, `world_points`) und pro Link. Bei `ambiguous: true` die `candidates` als Auswahl zeigen und mit Gebäude erneut anfragen. Kein Weg kommt als Satz in `error`.
+- `POST /api/campus/close {link_id, closed}`: Link sperren oder öffnen, Antwort enthält die neu gerechnete Route. Der Chat sieht dieselbe Sperrung.
+- `state_view.campus = {loaded, key, name, route, closed_links}` ist in jeder Antwort mit `state`. Verbinden von Gebäuden gibt es nur im Chat (Karte, klares Ja).
+Zu bauen (W-L3d): Gebäudewahl im Campus, Wechsel der Ansicht über `page_key`, Route über Gebäude zeichnen (Etappen nacheinander), Link-Sperren als Schalter.
 
 ## 6. Kleinigkeiten
 "Wanda is thinking" statt Stille bei langen Antworten, `touch-action: manipulation` auf `html`, 3D-Steuerelemente größer und mit Abstand.

@@ -16,6 +16,17 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
                      context.here: {space_id, point?, floor_id?} or {clear: true}, "I'm here", validated, see docs/specs/position.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 
+Level 3, campus (web/campus_api.py; one CampusHolder shared by the page and the chat agent, see docs/specs/level3-campus.md):
+  GET  /api/campus[?key=dev/...]        loaded flag, available campus keys, buildings (id, name, floors, origin,
+                                        entrances with ids/names/positions, page_key, active), links (id, kind, from/to,
+                                        level_delta, length_m, step_free, closed), findings; ?key marks the active building
+  POST /api/campus/load  {key}          key from `available` only; findings in plain words, a missing building shows up there
+  POST /api/campus/route {start, destination, start_building?, destination_building?, step_free?}
+                                        legs per building (rooms, points, world_points) and per link, or ok:false with
+                                        an error / ambiguous + candidates
+  POST /api/campus/close {link_id, closed}   close or open a link; the route is recomputed
+  state_view.campus = {loaded, key, name, route, closed_links}; connecting buildings stays a chat action (card, clear yes)
+
 Level 4, new building from floor plans (web/level4_api.py; POSTs need a same-origin page):
   POST /api/level4/upload               raw PNG/JPG body (<= 10 MB) -> {upload_id, width, height}
   POST /api/level4/build  {floors: [{upload_id, level, known_length_m | scale_bar, along}], name?}
@@ -42,7 +53,7 @@ from urllib.parse import parse_qs, urlparse
 from building_agent.structured import located_entries
 from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import MapError
-from web import api, level4_api, speech
+from web import api, campus_api, level4_api, speech
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 from web.selection import check_here, check_selection
@@ -68,10 +79,12 @@ class App:
         data_root: Path,
         uploads_root: Path = level4_api.DEFAULT_ALLOWED_ROOT,
         buildings_root: Path = level4_api.BUILDINGS_ROOT,
+        campus_roots: tuple[Path, ...] = (Path("campuses"),),
     ) -> None:
         self.data_root = data_root
         self.buildings_root = buildings_root
         self.level4 = level4_api.PlanStudio(uploads_root, buildings_root)
+        self.campus = campus_api.CampusService(data_root, buildings_root, campus_roots)
         self.sessions: dict[str, api.Session] = {}
         self.chats: dict[str, ChatAdapter] = {}
         self.lock = threading.RLock()
@@ -117,7 +130,7 @@ class App:
                     directory = api.resolve_building_dir(self.buildings_root, key[len(level4_api.USER_PREFIX) :])
                 else:
                     directory = api.resolve_building_dir(self.data_root, key)
-                self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory))
+                self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory), campus=self.campus)
             return self.sessions[key]
 
     def reset(self, key: str) -> api.Session:
@@ -130,7 +143,7 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4)
+                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, lambda: self.campus.holder)
             return self.chats[key]
 
     def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:
@@ -164,11 +177,26 @@ class App:
             return 200, self.level4.status()
         if path == "/api/level4/preview":
             return 200, self.level4.preview()
+        if path.startswith("/api/campus"):
+            with self.lock:
+                return self.campus.get(path, self.active_directory(query))
         if path == "/api/building":
             key = (query.get("key") or [""])[0]
             with self.lock:
-                return 200, api.building_view(self.session(key))
+                session = self.session(key)
+                self.campus.active_dir = session.directory  # which building of the campus the page shows
+                return 200, api.building_view(session)
         return 404, {"error": f"Unknown endpoint {path}"}
+
+    def active_directory(self, query: dict) -> Path | None:
+        """The folder of the building named by ?key= (the page's active one), None if it is missing or unknown."""
+        key = (query.get("key") or [""])[0]
+        if not key:
+            return None
+        try:
+            return self.session(key).directory
+        except (MapError, OSError, ValueError, KeyError):
+            return None
 
     def upload(self, data: bytes) -> tuple[int, dict]:
         return 200, self.level4.upload(data)
@@ -196,6 +224,9 @@ class App:
     def post(self, path: str, body: dict) -> tuple[int, dict]:
         if path.startswith("/api/level4/"):
             return self.post_level4(path, body)
+        if path.startswith("/api/campus/"):
+            with self.lock:
+                return self.campus.post(path, body)
         key = body.get("building", "")
         if path == "/api/chat":
             message = str(body.get("message", "")).strip()
