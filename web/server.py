@@ -38,6 +38,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from building_agent.structured import located_entries
 from starter_agent.building_map import MapError
 from web import api, level4_api, speech
 from web.chat import ChatAdapter, chat_available
@@ -130,6 +131,21 @@ class App:
                 self.chats[key] = ChatAdapter(session.directory, session.map, self.level4)
             return self.chats[key]
 
+    def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:
+        """The agent saved a building into our buildings folder: return its key (user/<id>) and move the chat there."""
+        path = Path(saved_path)
+        if path.parent.parent.resolve() != self.buildings_root.resolve():
+            return None
+        key = level4_api.USER_PREFIX + path.parent.name
+        self.sessions.pop(key, None)  # saving again under the same id must not show an old copy
+        self.chats.pop(key, None)
+        try:
+            session = self.session(key)
+        except (MapError, OSError, ValueError, KeyError):
+            return None
+        self.chats[key] = chat.move_to(session.directory, session.map)
+        return key
+
     # ---------- request handling (returns status, payload) ----------
 
     def get(self, path: str, query: dict) -> tuple[int, dict]:
@@ -186,18 +202,30 @@ class App:
             with self.lock:  # session and chat together, so a reset cannot pair a new map with an old chat
                 session, chat = self.session(key), self.chat(key)
                 previous_route, version = session.map.last_route, session.route_version
+            session.map.located_asset_ids = []  # so `located` below only holds what this turn found
             # Not under the lock: an API call takes seconds and must not freeze the map.
             check = check_selection(body.get("context"), session.map)
             result = chat.ask(message, selection=check.selection) if check.selection else chat.ask(message)
             if body.get("context") is not None and not check.selection:
                 result = {**result, "selection_ignored": check.reason}
+            saved_path = result.pop("saved_path", None)
             with self.lock:
                 current = self.session(key)
                 level4 = self.level4.chat_info()
                 if current is not session:  # the building was reset while the agent was thinking
                     return 200, {**result, "stale": True, "state": api.state_view(current), "level4": level4}
                 session.adopt_agent_route(previous_route, version)
-                return 200, {**result, "state": api.state_view(session), "level4": level4}
+                opened = self.open_saved(chat, saved_path) if saved_path else None
+                if opened:  # the page switches to the new building and fetches it from /api/building
+                    return 200, {
+                        **result,
+                        "opened": opened,
+                        "located": [],
+                        "state": api.state_view(session),
+                        "level4": level4,
+                    }
+                located = [] if result.get("error") else located_entries(session.map, result.get("reply", ""))
+                return 200, {**result, "located": located, "state": api.state_view(session), "level4": level4}
         with self.lock:
             session = self.session(key)
             if path == "/api/route":

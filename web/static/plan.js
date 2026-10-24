@@ -397,6 +397,6 @@
     }).catch(() => null);
   }
 
-  window.plan = { onSpaceClick, onOpeningClick, onBuildingShown, onChat, cancelPick };
+  window.plan = { openSaved, onSpaceClick, onOpeningClick, onBuildingShown, onChat, cancelPick };
   wire();
 })();

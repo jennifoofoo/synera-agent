@@ -285,3 +285,67 @@ def test_selection_is_cleared_after_the_turn(app, key, monkeypatch):
     assert during == [selection, None] and guide.selection is None
     adapter.session.ask = lambda text: (_ for _ in ()).throw(RuntimeError("boom"))
     assert adapter.ask("fail", selection=selection)["error"] == "agent" and guide.selection is None
+
+
+# ---------- finds and saved buildings in the chat reply (fake agent, no API) ----------
+
+
+def test_chat_reply_carries_what_the_agent_located(app, key, monkeypatch):
+    bm = app.session(key).map
+    asset = next(iter(bm.assets.values()))
+
+    def agent_finds(m):
+        m.located_asset_ids = [asset["id"]]
+
+    fake_chat(app, key, monkeypatch, agent_finds)
+    _, reply = app.post("/api/chat", {"building": key, "message": "where is it?"})
+    assert [entry["asset_id"] for entry in reply["located"]] == [asset["id"]]
+    assert reply["located"][0]["space_id"] == asset["space_id"]
+    fake_chat(app, key, monkeypatch, lambda m: None)
+    _, again = app.post("/api/chat", {"building": key, "message": "and the weather?"})  # nothing found this turn
+    assert again["located"] == []
+
+
+def test_agent_saving_a_building_in_the_chat_opens_it_on_the_page(tmp_path, key, monkeypatch):
+    from starter_agent.building_map import BuildingMap
+
+    app = App(DATA, tmp_path / "uploads", tmp_path / "buildings")
+    source = DATA / key / "building.json"
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.backend_name", lambda: "building_agent")
+
+    class FakeSession:
+        """What building_agent.agent.Session does on save_building: write the file, call swap_building(path)."""
+
+        def __init__(self, building_map, output_directory):
+            from types import SimpleNamespace
+
+            self.map, self.tools = building_map, []
+            self.guide = SimpleNamespace(selection=None)  # the click selection slot the adapter sets per turn
+
+        def install_building(self, building_map):
+            self.map = building_map
+
+        def swap_building(self, path):
+            self.install_building(BuildingMap.load(Path(path)))
+
+        def ask(self, text):
+            target = tmp_path / "buildings" / "drawn-1" / "building.json"
+            target.parent.mkdir(parents=True)
+            target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            self.swap_building(target)
+            return "Saved."
+
+    monkeypatch.setattr("building_agent.agent.Session", FakeSession)
+    _, reply = app.post("/api/chat", {"building": key, "message": "save it"})
+    assert reply["opened"] == "user/drawn-1" and "saved_path" not in reply
+    status, view = app.get("/api/building", {"key": [reply["opened"]]})
+    assert status == 200 and view["spaces"]
+    chat = app.chats[reply["opened"]]
+    assert chat.map is app.session(reply["opened"]).map and chat.session.map is chat.map  # one map for page and chat
+    assert key not in app.chats or app.chats[key].session is None
+    bm = chat.map
+    rooms = [s["id"] for s in bm.spaces.values() if s["type"] == "room"]
+    status, routed = app.post("/api/route", {"building": reply["opened"], "start": rooms[0], "destination": rooms[-1]})
+    assert status == 200 and "route" in routed

@@ -46,6 +46,7 @@ class ChatAdapter:
         self.level4 = level4  # web.level4_api.PlanStudio: the page's floor plan draft, shared with the agent
         self.starter = None
         self.session = None
+        self.saved_paths: list[Path] = []  # buildings the agent saved during the current turn (Level 4 save_building)
         self.lock = threading.Lock()
 
     def ask(self, text: str, selection=None) -> dict:
@@ -55,9 +56,14 @@ class ChatAdapter:
         backend = backend_name()
         try:
             with self.lock:  # one conversation per building: never two turns at once
+                self.saved_paths = []
                 if backend == "building_agent":
-                    return {"reply": self.ask_building_agent(text, selection), "backend": backend}
-                return {"reply": self.ask_starter(text), "backend": backend}
+                    result = {"reply": self.ask_building_agent(text, selection), "backend": backend}
+                else:
+                    result = {"reply": self.ask_starter(text), "backend": backend}
+                if self.saved_paths:
+                    result["saved_path"] = str(self.saved_paths[-1])
+                return result
         except Exception as error:  # noqa: BLE001 - the page must keep working whatever the API does
             return {"reply": f"The agent failed: {type(error).__name__}: {error}", "backend": backend, "error": "agent"}
 
@@ -66,6 +72,7 @@ class ChatAdapter:
 
         if self.session is None:
             self.session = Session(self.map, OUTPUT_DIRECTORY / self.building_dir.name)
+            self.watch_saves(self.session)
             if self.level4 is not None and not any(tool.name == "build_from_plan" for tool in self.session.tools):
                 self.session.tools = [*self.session.tools, *self.level4.chat_tools]
         if self.level4 is not None:
@@ -78,6 +85,26 @@ class ChatAdapter:
             return self.session.ask(text)
         finally:
             self.session.guide.selection = None  # one-shot: never leaks into the next message
+
+    def watch_saves(self, session) -> None:
+        """Note every building the agent saves, so the page can open it (the agent's own tools call swap_building)."""
+        original = session.swap_building
+
+        def swap_and_note(path) -> None:
+            original(path)
+            self.saved_paths.append(Path(path))
+
+        session.swap_building = swap_and_note
+        session.install_building(session.map)  # the tools were built with the unwrapped method
+
+    def move_to(self, building_dir: Path, building_map: BuildingMap) -> "ChatAdapter":
+        """The conversation continues on another building (the one just saved); this adapter starts over."""
+        moved = ChatAdapter(building_dir, building_map, self.level4)
+        moved.session, self.session = self.session, None
+        if moved.session is not None:
+            moved.session.install_building(building_map)
+            moved.watch_saves(moved.session)
+        return moved
 
     def ask_starter(self, text: str) -> str:
         if self.starter is None:

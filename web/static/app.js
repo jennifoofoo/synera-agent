@@ -764,6 +764,60 @@ function focusPoint(floorId, point, assetIds = null) {
   render();
 }
 
+// ---------- finds from the chat ----------
+// focusFound(entries): entries are the chat reply's `located` ({asset_id?, space_id, space_name, floor_level}).
+// One find: switch floor, pulse the asset (or select the room), pan/zoom. Several: all lit, plus a list to step through.
+// Generic on purpose: other views (3D) can wrap or replace window.app.focusFound.
+
+function foundTarget(entry) {
+  const asset = entry.asset_id ? app.building.assets.find((a) => a.id === entry.asset_id) : null;
+  const space = app.spaces.get(entry.space_id);
+  if (asset) return { floorId: asset.floor_id, point: asset.position, asset, space, label: asset.name };
+  if (space) return { floorId: space.floor_id, point: space.anchor, asset: null, space, label: space.name };
+  return null;
+}
+
+function focusFoundTarget(target, assetIds) {
+  app.pickedSpaceId = target.asset ? null : target.space.id;
+  focusPoint(target.floorId, target.point, assetIds);  // the pulse ring stops animating under prefers-reduced-motion (style.css)
+}
+
+function focusFound(entries) {
+  hideFoundList();
+  const targets = (entries || []).map(foundTarget).filter(Boolean);
+  if (!targets.length || !app.building) return [];
+  const assetIds = new Set(targets.filter((t) => t.asset).map((t) => t.asset.id));
+  focusFoundTarget(targets[0], assetIds);
+  if (targets.length > 1) showFoundList(targets, assetIds);
+  return targets.map((t) => ({ floor_id: t.floorId, asset_id: t.asset?.id ?? null, space_id: t.space?.id ?? null }));
+}
+
+function hideFoundList() {
+  const list = $("#found-list");
+  list.hidden = true;
+  list.innerHTML = "";
+}
+
+function showFoundList(targets, assetIds) {
+  const list = $("#found-list");
+  list.innerHTML = `<div class="found-title">${targets.length} found <button class="close-x" aria-label="Close">×</button></div>`;
+  list.querySelector(".close-x").onclick = hideFoundList;
+  targets.forEach((target) => {
+    const row = document.createElement("button");
+    row.className = "found-row";
+    row.innerHTML = `<b>${esc(target.label)}</b> <span>${esc(spaceName(target.space?.id))} · ${esc(floorName(target.floorId))}</span>`;
+    row.onclick = () => {
+      list.querySelectorAll(".found-row").forEach((r) => r.classList.toggle("current", r === row));
+      focusFoundTarget(target, assetIds);
+    };
+    list.appendChild(row);
+  });
+  list.firstElementChild.nextElementSibling?.classList.add("current");
+  list.hidden = false;
+}
+
+window.app = Object.assign(window.app || {}, { focusFound, state: app });
+
 // ---------- popover on the plan ----------
 
 function hidePopover() {
@@ -1019,6 +1073,7 @@ async function sendChat(text) {
   try {
     const result = await api("/api/chat", { message: text });
     pending.remove();
+    if (result.opened && window.plan) await window.plan.openSaved(result.opened, "The agent saved the building.");
     const message = addMessage(result.error ? "system" : "agent", result.reply);
     if (!result.error) window.voice?.onReply(result.reply, message);
     window.plan?.onChat(result.level4);
@@ -1028,6 +1083,7 @@ async function sendChat(text) {
     }
     const route = app.state.route;
     if (route?.ok && !app.anim && !route.floors.includes(app.floorId)) showFloor(route.floors[0], true);
+    if (!result.opened && result.located?.length && app.mode !== "draft") window.app.focusFound(result.located);
   } catch (error) {
     pending.remove();
     addMessage("system", `Chat failed: ${error.message}`);
