@@ -378,7 +378,7 @@ Wanda merkt sich über Gespräche hinweg, was zu einer Person gehört, mit einer
 - Facility Manager: "die Presse auf Linie 4 hat immer Wartung dienstags" als Notiz am Gerät.
 
 ### Was heute schon da ist
-Position und letzter Standort pro Sitzung (), Sprachregeln, Karte-und-Ja für Änderungen. Kein Gedächtnis über die Sitzung hinaus.
+Position und letzter Standort pro Sitzung (`state.position`), Sprachregeln, Karte-und-Ja für Änderungen. Kein Gedächtnis über die Sitzung hinaus.
 
 ### Was gebaut werden müsste
 - Speicher pro Person (Schlüssel: angemeldete Person oder Gerät), mem0 als Bibliothek oder eigener kleiner Speicher (Fakten mit Zeitstempel, Quelle "gesagt").
