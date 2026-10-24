@@ -87,3 +87,13 @@ def test_known_question_template_is_answered_without_the_llm(monkeypatch):
     monkeypatch.setattr(agent_module.Agent, "ask", must_not_run)
     reply = agent_module.answer(Path(building_dir), question["question"])
     assert "Answer:" in reply
+
+
+def test_saved_building_swaps_the_map_tools_and_prompt():
+    building_dir, _question = labelled_questions("errand")[0]
+    other_dir = next(path for path in sorted(Path("data/dev").iterdir()) if path.name != Path(building_dir).name)
+    agent = Agent(load_map(building_dir), Path("agent_output") / "test", client=object())
+    agent.swap_building(other_dir / "building.json")
+    assert agent.map.data["building"]["id"] == other_dir.name
+    assert other_dir.name in agent.system[0]["text"] or agent.map.data["building"]["name"] in agent.system[0]["text"]
+    assert {"build_from_plan", "save_building", "find_route"} <= {tool.name for tool in agent.tools}

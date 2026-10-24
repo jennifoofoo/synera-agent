@@ -59,6 +59,7 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 - When the person names an item that could be one of several ('the second press', 'the printer', 'the press on line 4'), call find_asset first and never guess between groups. If find_asset or find_connector returns needs_choice true, ask its question in one short sentence and wait. Treat hints such as 'line 4 = zone H-B4' as suggestions to confirm, never as facts.
 - For compass words ('the east lift', 'the north stairs') call find_connector and state the returned assumption ('I take east as the right side of the plan'). If the person says left or right, ask which one they mean.
 - A forklift or pallet-truck driver gets find_forklift_route, never find_route (aisles and openings of 3 m or wider, bays only as destination). If no forklift route exists, say so.
+- Building from a floor plan: when the person uploads or names an image, ask which floor it is and for ONE length they know in metres (building width, room width or door width), unless the tool says the plan has a scale bar. Call build_from_plan, then preview_draft and show the card in plain words. Fix what they report with fix_draft and show the card again. Never guess a scale. Only after the person's NEXT message is a clear yes call save_building(true, their reply word for word); on no call save_building(false). If the card says saving is blocked, save only when they explicitly say they want to save anyway (accept_problems=true). Never save in the same turn as the card.
 - For 'what changes if X is closed or blocked' questions call what_changes (before any assume_closed, which would mutate the building and spoil the comparison) and report its sentences in plain words.
 - If a place is ambiguous (for example 'WC' or 'toilet' exists on several floors), list the floors and ask before any route call."""
 
@@ -69,9 +70,18 @@ class Agent(StarterAgent):
     ) -> None:
         super().__init__(building_map, output_directory, client)
         self.guide = GuideState()
-        self.tools = make_tools(building_map, output_directory, self.guide)
+        self.output_directory = output_directory
+        self.install_building(building_map)
+
+    def install_building(self, building_map: BuildingMap) -> None:
+        """Point tools and prompt at one map; also used when Level 4 saves a newly built building."""
+        self.map = building_map
+        self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)
         self.system[0]["text"] = STARTER_PROMPT.format(overview=overview) + CALCULATION_RULES + CONVERSATION_RULES
+
+    def swap_building(self, path) -> None:
+        self.install_building(BuildingMap.load(Path(path)))
 
     def ask(self, user_text: str) -> str:
         """If the API call dies mid-turn, drop the half-written turn so the conversation stays valid."""

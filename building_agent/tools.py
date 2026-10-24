@@ -16,6 +16,7 @@ from building_agent.find_tools import make_find_tools
 from building_agent.guide_tools import GuideState, make_guide_tools
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
+from building_agent.level4.tools import BMHolder, make_level4_tools
 from building_agent.registry import Kind, load_kinds
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
@@ -93,7 +94,7 @@ def kind_tool(bm: BuildingMap, kind: Kind):
 REPLACED_BY_GUIDE = {"set_closed", "add_door"}  # edits go through propose_change and confirm_change
 
 
-def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None = None) -> list:
+def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None = None, on_saved=None) -> list:
     @beta_tool
     def find_space_tool(name: str, floor_level: int | None = None) -> str:
         """Resolve a room id, number or name to its space id. Use this before the calculation tools,
@@ -151,7 +152,9 @@ def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None
         for tool in make_starter_tools(bm, output_directory)
         if tool.name not in REPLACED_BY_GUIDE | REPLACED_STARTER_TOOLS
     ]
-    guide_tools = make_guide_tools(bm, output_directory, guide or GuideState())
+    guide = guide or GuideState()
+    guide_tools = make_guide_tools(bm, output_directory, guide)
+    level4_tools = make_level4_tools(BMHolder(bm), output_directory, guide, on_saved)
     return [
         *starter,
         find_route,
@@ -160,5 +163,6 @@ def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None
         *make_find_tools(bm),
         *make_impact_tools(bm),
         *guide_tools,
+        *level4_tools,
         *kinds,
     ]
