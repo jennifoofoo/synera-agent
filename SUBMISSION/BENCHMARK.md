@@ -46,14 +46,15 @@ them; the converted building is then a normal building directory for the command
 ```json
 {"answers": [
   {"question_id": "osm-way363805324-H01", "id": "osm-way363805324-H01",
-   "answer": "Generic room 1.02, 162.33 m²",
-   "reply": "The largest one is Generic room 1.02 with 162.33 square metres.\nAnswer: Generic room 1.02, 162.33 m²"}
+   "answer": "The largest one is Generic room 1.02 with 162.33 square metres.\nAnswer: Generic room 1.02, 162.33 m²",
+   "answer_line": "Generic room 1.02, 162.33 m²"}
 ]}
 ```
 
 - `question_id` / `id`: the question id (both names, as in the kit CSV and the challenge brief).
-- `answer`: the committed answer, the text after the final `Answer:` line (what the scorer reads).
-- `reply`: the full reply the agent gave.
+- `answer`: the full reply, exactly as in the kit's submission CSV. The official scorer (`benchmark/score.py`) reads the
+  last line starting with `Answer:` from it. All 145 entries were checked with that scorer.
+- `answer_line`: the text of that final `Answer:` line, for convenience.
 
 ## Check without a key
 

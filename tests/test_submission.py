@@ -57,9 +57,13 @@ def test_end_to_end_writes_valid_csv_and_json(building: Path, tmp_path: Path, mo
     assert json.loads(out_json.read_text())["answers"][1] == {
         "question_id": "S2",
         "id": "S2",
-        "answer": "42",
-        "reply": fake_agent(building, ""),
+        "answer": fake_agent(building, ""),
+        "answer_line": "42",
     }
+    # the official scorer must find the answer in the "answer" field, exactly as in the CSV
+    from benchmark.score import committed_answer
+
+    assert committed_answer(json.loads(out_json.read_text())["answers"][1]["answer"]) == "42"
 
 
 def test_failing_agent_still_writes_every_row_but_check_fails(building: Path, tmp_path: Path, monkeypatch):
