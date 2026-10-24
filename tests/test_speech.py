@@ -18,7 +18,7 @@ ID = "proc-campus-dev-000-F0-S012"
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.setenv("ELEVENLABS_API_KEY", SECRET)
-    monkeypatch.setenv("ELEVENLABS_VOICE_ID", "voice123")
+    monkeypatch.setenv("ELEVENLABS_VOICE_ID", "voice1234567890")
 
 
 # ---------- spoken_version ----------
@@ -44,6 +44,30 @@ def test_single_extra_step_is_singular():
 
 def test_three_steps_have_no_tail():
     assert "weitere" not in spoken_version("1. A.\n2. B.\n3. C.")
+
+
+def test_dates_and_refs_are_kept_but_dataset_ids_go():
+    spoken = spoken_version(f"On 2026-10-24 see ref 0-12-B, osm-way22744230-F0 and {ID} and swiss-abc1-F2-S004.")
+    assert "2026-10-24" in spoken and "0-12-B" in spoken
+    assert "osm-" not in spoken and "proc-" not in spoken and "swiss-" not in spoken and "S004" not in spoken
+
+
+def test_markdown_links_tables_rules_and_bold_steps():
+    reply = "See [the plan](http://x.y/z).\n---\n| a | b |\n|---|---|\n**1.** Go left.\n**2.** Go on."
+    assert spoken_version(reply) == "See the plan. Go left. Go on."
+
+
+def test_abbreviations_do_not_end_sentences():
+    reply = "Das Büro ist z. B. Raum 0.12, d. h. im Erdgeschoss, ca. 20 m2 groß. Noch ein Satz."
+    spoken = spoken_version(reply, max_chars=95)
+    assert spoken.endswith("groß.") and "Noch" not in spoken and "z. B. Raum" in spoken
+
+
+def test_tail_only_if_steps_survived_the_cap():
+    steps = "\n".join(f"{i}. Step {i} " + "word " * 10 for i in range(1, 6))
+    assert "weitere" in spoken_version(steps, max_chars=400)
+    short = spoken_version(steps, max_chars=60)
+    assert "weitere" not in short and "Step 3" not in short
 
 
 def test_raw_ids_and_bracketed_fragments_are_removed():
@@ -106,7 +130,7 @@ def fake_http(status=200, body=b"MP3DATA", seen=None):
 
 def test_synthesize_success(env):
     seen: dict = {}
-    assert synthesize("Hallo", "voice123", http=fake_http(seen=seen)) == b"MP3DATA"
+    assert synthesize("Hallo", "voice1234567890", http=fake_http(seen=seen)) == b"MP3DATA"
     assert seen["url"].endswith("/v1/text-to-speech/voice123?output_format=mp3_44100_128")
     assert seen["headers"]["xi-api-key"] == SECRET
     assert seen["data"] == {"text": "Hallo", "model_id": "eleven_flash_v2_5"}
@@ -116,7 +140,7 @@ def test_synthesize_success(env):
 @pytest.mark.parametrize("status", [401, 402, 429, 500, 503, 422])
 def test_synthesize_http_errors_hide_key(env, status):
     with pytest.raises(SpeechError) as error:
-        synthesize("Hallo", "voice123", http=fake_http(status=status))
+        synthesize("Hallo", "voice1234567890", http=fake_http(status=status))
     assert SECRET not in str(error.value) and str(status) in str(error.value)
 
 
@@ -129,14 +153,27 @@ def test_synthesize_timeouts_hide_key(env):
 
     for http in (timeout, url_timeout):
         with pytest.raises(SpeechError) as error:
-            synthesize("Hallo", "voice123", http=http)
-        assert "5 seconds" in str(error.value) and SECRET not in str(error.value)
+            synthesize("Hallo", "voice1234567890", http=http)
+        assert "in time" in str(error.value) and SECRET not in str(error.value)
+
+
+def test_synthesize_catches_every_exception_without_leaking(env):
+    from http.client import BadStatusLine, InvalidURL
+
+    for exc in (ValueError(SECRET), InvalidURL(SECRET), BadStatusLine(SECRET), RuntimeError(SECRET)):
+
+        def boom(url, headers, data, timeout, exc=exc):
+            raise exc
+
+        with pytest.raises(SpeechError) as error:
+            synthesize("Hallo", "voice1234567890", http=boom)
+        assert SECRET not in str(error.value)
 
 
 def test_synthesize_missing_key_or_voice(monkeypatch):
     monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
     with pytest.raises(SpeechError):
-        synthesize("Hallo", "voice123", http=fake_http())
+        synthesize("Hallo", "voice1234567890", http=fake_http())
     monkeypatch.setenv("ELEVENLABS_API_KEY", SECRET)
     with pytest.raises(SpeechError):
         synthesize("Hallo", "", http=fake_http())
@@ -178,6 +215,91 @@ def test_speak_returns_audio_with_shortened_text(env, server):
     status, content_type, body = post_speak(base, {"text": "**Hi** there.\nAnswer: 1"})
     assert (status, content_type, body) == (200, "audio/mpeg", b"MP3DATA")
     assert said == ["Hi there."]
+
+
+def raw_post(base, payload, headers=None):
+    request = urllib.request.Request(f"{base}/api/speak", data=json.dumps(payload).encode(), headers=headers or {})
+    try:
+        with urllib.request.urlopen(request) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read()
+
+
+JSON = {"Content-Type": "application/json"}
+
+
+def test_newline_in_key_never_reaches_the_response(monkeypatch, server):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "sk_line1\nsecretpart2")
+    monkeypatch.setenv("ELEVENLABS_VOICE_ID", "voice1234567890")
+    _, base = server
+    status, _, body = post_speak(base, {"text": "Hi"})
+    assert status == 502
+    assert b"secretpart2" not in body and b"line1" not in body
+
+
+def test_unexpected_exception_gives_fixed_message(env, server):
+    app, base = server
+
+    def boom(text, voice_id):
+        raise RuntimeError(SECRET)
+
+    app.synthesize = boom
+    status, _, body = post_speak(base, {"text": "Hi"})
+    assert status == 500 and SECRET.encode() not in body
+
+
+def test_voice_id_with_control_characters_is_rejected(monkeypatch, server):
+    monkeypatch.setenv("ELEVENLABS_API_KEY", SECRET)
+    monkeypatch.delenv("ELEVENLABS_VOICE_ID", raising=False)
+    _, base = server
+    for bad in ("abc\r\nX-Evil: 1234", "short", "a" * 41, "../../etc/passwd1"):
+        status, _, body = post_speak(base, {"text": "Hi", "voice_id": bad})
+        assert status == 400 and SECRET.encode() not in body
+
+
+def test_env_voice_wins_over_body(env, server):
+    app, base = server
+    used = []
+    app.synthesize = lambda text, voice_id: used.append(voice_id) or b"X"
+    post_speak(base, {"text": "Hi", "voice_id": "attackervoice99"})
+    assert used == ["voice1234567890"]
+
+
+def test_foreign_origin_and_host_are_403(env, server):
+    app, base = server
+    app.synthesize = lambda text, voice_id: b"X"
+    port = base.rsplit(":", 1)[1]
+    assert raw_post(base, {"text": "Hi"}, {**JSON, "Origin": "http://evil.example"})[0] == 403
+    assert raw_post(base, {"text": "Hi"}, {**JSON, "Origin": f"http://127.0.0.1:{int(port) + 1}"})[0] == 403
+    assert raw_post(base, {"text": "Hi"}, {**JSON, "Host": "evil.example"})[0] == 403
+    assert (
+        raw_post(base, {"text": "Hi"}, {**JSON, "Origin": f"http://localhost:{port}", "Host": f"localhost:{port}"})[0]
+        == 200
+    )
+
+
+def test_speak_requires_json_content_type(env, server):
+    app, base = server
+    app.synthesize = lambda text, voice_id: b"X"
+    assert raw_post(base, {"text": "Hi"}, {"Content-Type": "text/plain"})[0] == 415
+    assert raw_post(base, {"text": "Hi"})[0] == 415
+
+
+def test_rate_limit(env):
+    app = App(Path("data"))
+    now = [100.0]
+    app.clock = lambda: now[0]
+    app.synthesize = lambda text, voice_id: b"X"
+    assert app.speak({"text": "Hi"})[0] == 200
+    assert app.speak({"text": "Hi"})[0] == 429  # same second
+    for _ in range(29):
+        now[0] += 1.5
+        assert app.speak({"text": "Hi"})[0] == 200
+    now[0] += 1.5
+    assert app.speak({"text": "Hi"})[0] == 429  # 31st within a minute
+    now[0] += 61
+    assert app.speak({"text": "Hi"})[0] == 200
 
 
 def test_speak_without_key_is_503(monkeypatch, server):

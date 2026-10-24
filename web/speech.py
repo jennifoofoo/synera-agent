@@ -8,12 +8,14 @@ import json
 import os
 import re
 import socket
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
 
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format={output_format}"
 TIMEOUT_SECONDS = 5
+TOTAL_DEADLINE_SECONDS = 8
 MAX_STEPS = 3
 
 # http(url, headers, body, timeout) -> (status, bytes)
@@ -30,11 +32,22 @@ ANSWER_LINE = re.compile(r"^\s*(?:[-*]\s*)?(?:\*\*)?answer(?:\*\*)?\s*:", re.IGN
 NUMBERED = re.compile(r"^\s*\d+[.)]\s+(.*)$")
 BULLET = re.compile(r"^\s*[-*+]\s+")
 HEADING = re.compile(r"^\s*#{1,6}\s*")
-RAW_ID = re.compile(r"\b(?=[\w-]*\d)[A-Za-z0-9]+(?:-[A-Za-z0-9]+){2,}\b")
+# Dataset ids: a source prefix plus hyphenated segments with a digit, or a trailing -F<n>-S<nnn> shape.
+# Dates (2026-10-24) and refs (0-12-B) do not match.
+RAW_ID = re.compile(
+    r"\b(?:(?=[\w-]*\d)(?:proc|osm|resplan|swiss)(?:-[A-Za-z0-9]+)+|[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*-F-?\d+-S\d{3,})\b"
+)
+MD_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+TABLE_ROW = re.compile(r"^\s*\|")
+RULE_LINE = re.compile(r"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")
 BRACKETED = re.compile(r"\s*\[[^\]]*\]")
 EMPTY_PARENS = re.compile(r"\s*\(\s*[,;]?\s*\)")
 CARD_MARKER = re.compile(r"i understood|ich habe verstanden", re.IGNORECASE)
-SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+# Split after . ! ? but not after common abbreviations.
+SENTENCE_END = re.compile(
+    r"(?<=[.!?])(?<!\bz\. B\.)(?<!\bz\.B\.)(?<!\bd\. h\.)(?<!\bd\.h\.)(?<!\bbzw\.)(?<!\bca\.)"
+    r"(?<!\be\.g\.)(?<!\bi\.e\.)\s+"
+)
 SQUARE_METRES = re.compile(r"(?<=\d)\s*(?:m2|m²)(?!\w)")
 METRES = re.compile(r"(?<=\d)\s*m(?![\w²])")
 WC = re.compile(r"\bWC\b")
@@ -47,6 +60,7 @@ def _strip_markdown(line: str) -> str:
 
 
 def _remove_ids(text: str) -> str:
+    text = MD_LINK.sub(r"\1", text)
     text = BRACKETED.sub("", text)
     text = RAW_ID.sub("", text)
     text = EMPTY_PARENS.sub("", text)
@@ -101,9 +115,9 @@ def spoken_version(reply: str, max_chars: int = 400) -> str:
     prose: list[str] = []
     steps: list[str] = []
     for raw in reply.splitlines():
-        if ANSWER_LINE.match(raw):
+        if ANSWER_LINE.match(raw) or TABLE_ROW.match(raw) or RULE_LINE.match(raw):
             continue
-        numbered = NUMBERED.match(_strip_markdown(raw) if raw.lstrip().startswith("#") else raw)
+        numbered = NUMBERED.match(raw.replace("**", "").replace("__", ""))
         if numbered:
             step = _remove_ids(_strip_markdown(numbered.group(1)))
             if step:
@@ -115,24 +129,37 @@ def spoken_version(reply: str, max_chars: int = 400) -> str:
     text = _remove_ids(" ".join(prose))
     if CARD_MARKER.search(text) and not steps:
         text = _card_core(text)
-    tail = _more_steps(len(steps) - MAX_STEPS) if len(steps) > MAX_STEPS else ""
-    steps_text = " ".join(steps[:MAX_STEPS])
-    body = " ".join(part for part in (text, steps_text) if part)
-    body = _pronounce(body)
-    room = max_chars - len(tail) - 1 if tail else max_chars
-    result = _cap(body, room) if body else ""
-    return " ".join(part for part in (result, tail) if part)
+    shown = steps[:MAX_STEPS]
+    body = _pronounce(" ".join(part for part in (text, *shown) if part))
+    if not body:
+        return ""
+    if len(steps) <= MAX_STEPS:
+        return _cap(body, max_chars)
+    tail = _more_steps(len(steps) - MAX_STEPS)
+    result = _cap(body, max_chars - len(tail) - 1)
+    # Only announce the remaining steps if the last shown step survived the cap.
+    if _pronounce(shown[-1]) in result:
+        return f"{result} {tail}"
+    return result
 
 
 # ---------- ElevenLabs text-to-speech ----------
 
 
 def _urllib_http(url: str, headers: dict, body: bytes, timeout: float) -> tuple[int, bytes]:
+    """POST with a per-socket timeout plus an overall deadline (the body is read in chunks)."""
+    deadline = time.monotonic() + TOTAL_DEADLINE_SECONDS
     request = urllib.request.Request(url, data=body, headers=headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.status, response.read()
+            chunks = []
+            while chunk := response.read(16384):
+                chunks.append(chunk)
+                if time.monotonic() > deadline:
+                    raise TimeoutError("overall deadline")
+            return response.status, b"".join(chunks)
     except urllib.error.HTTPError as error:
+        error.close()
         return error.code, b""
 
 
@@ -167,12 +194,12 @@ def synthesize(
     try:
         status, payload = (http or _urllib_http)(url, headers, body, TIMEOUT_SECONDS)
     except TimeoutError:
-        raise SpeechError("ElevenLabs did not answer within 5 seconds.") from None
+        raise SpeechError("ElevenLabs did not answer in time.") from None
     except urllib.error.URLError as error:
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
-            raise SpeechError("ElevenLabs did not answer within 5 seconds.") from None
+            raise SpeechError("ElevenLabs did not answer in time.") from None
         raise SpeechError("Could not reach ElevenLabs.") from None
-    except OSError:
+    except Exception:  # noqa: BLE001 - ValueError, InvalidURL, BadStatusLine...: their text may hold the key
         raise SpeechError("Could not reach ElevenLabs.") from None
     if status != 200:
         raise SpeechError(_error_for_status(status))
