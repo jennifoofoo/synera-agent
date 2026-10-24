@@ -23,7 +23,7 @@ export function Card() {
   let card: ReactNode = null;
   if (selection) card = <SelectionCard key={selection.id} model={model} />;
   else if (guide?.active) card = <GuideCard model={model} />;
-  else if (busy) card = <ThinkingCard />;
+  else if (busy) card = null; // the Omnibox shows "thinking" above the input
   else if (replyShown) card = <ReplyCard model={model} />;
   else if (route?.ok) card = <RouteCard model={model} route={route} />;
 
@@ -206,18 +206,6 @@ function GuideCard({ model }: { model: BuildingModel }) {
 }
 
 // ---------------------------------------------------------------- reply
-
-function ThinkingCard() {
-  return (
-    <Sheet className="card-reply card-thinking" label="Thinking">
-      <div className="thinking" aria-live="polite">
-        <i />
-        <i />
-        <i />
-      </div>
-    </Sheet>
-  );
-}
 
 function ReplyCard({ model }: { model: BuildingModel }) {
   const chat = useTwin((s) => s.chat);

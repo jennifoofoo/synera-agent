@@ -33,12 +33,6 @@
 .card-text { white-space: pre-wrap; line-height: 1.45; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .card-text.open { display: block; -webkit-line-clamp: unset; max-height: 40vh; overflow: auto; }
 .card-guide .card-text { margin-top: 6px; font-size: 15px; }
-.card-thinking { padding: 14px; }
-.thinking { display: flex; gap: 5px; }
-.thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite ease-in-out; }
-.thinking i:nth-child(2) { animation-delay: 0.15s; }
-.thinking i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes blink { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
 /* guide: step dots, only the current one stands out */
 .steps { display: flex; gap: 4px; }
