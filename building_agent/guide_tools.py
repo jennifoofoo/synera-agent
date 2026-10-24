@@ -1,6 +1,7 @@
 """Conversation tools: hands-free directions in small chunks and edits that need a confirmed understanding card."""
 
 import copy
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
 ACTIONS = ("close", "reopen", "add_door")
+YES = re.compile(r"\b(ja|yes|ok|okay|klar|passt|gern|gerne|genau|mach|bitte|do it|go ahead)\b", re.IGNORECASE)
+NO = re.compile(r"\b(nein|no|nicht|stop|abbrechen|cancel|lieber)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -34,30 +37,50 @@ class GuideState:
     log: list[dict] = field(default_factory=list)
 
     def begin_turn(self) -> None:
+        """A card can only be answered in the very next message; later it is stale and dropped."""
         self.turn += 1
+        if self.pending is not None and self.turn > self.pending.turn + 1:
+            self.pending = None
+
+
+def element_label(bm: BuildingMap, element_id: str) -> str:
+    if element_id in bm.connectors:
+        return bm.connectors[element_id]["name"]
+    if element_id in bm.spaces:
+        return bm.describe_space(element_id)
+    return element_id
 
 
 def apply_change(bm: BuildingMap, action: str, element: str, other: str | None, step_free: bool) -> str:
-    """Apply one edit to `bm`; returns a one-line description. Raises MapError if it cannot be done."""
+    """Apply one edit to `bm`; returns a plain-words description. Raises MapError if it cannot be done."""
     if action == "add_door":
         if not other:
             raise MapError("add_door needs two rooms: element and other.")
+        pair = {bm.resolve_space(element), bm.resolve_space(other)}
+        if any(set(opening["space_ids"]) == pair for opening in bm.openings.values()):
+            raise MapError("These two rooms already have a door between them.")
         opening = bm.add_door(element, other, step_free)
         first, second = (bm.describe_space(space_id) for space_id in opening["space_ids"])
         return f"New {'step-free ' if step_free else ''}door between {first} and {second}."
-    target = bm.set_closed(element, action == "close")
-    return f"{'Close' if action == 'close' else 'Reopen'} {target}."
+    target = bm.find_element(element)
+    if (target in bm.closed) == (action == "close"):
+        raise MapError(f"{element_label(bm, target)} is already {'closed' if action == 'close' else 'open'}.")
+    bm.set_closed(target, action == "close")
+    return f"{'Close' if action == 'close' else 'Reopen'} {element_label(bm, target)}."
 
 
 def route_effect(before: BuildingMap, after: BuildingMap) -> dict | None:
-    """How the most recent route changes if the edit is applied. None if nobody asked for a route yet."""
+    """How the most recent route (start to destination, same step-free setting) changes. None before any route."""
     last = before.last_route
     if last is None:
         return None
-    effect = {"route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}",
-              "length_before_m": last.length_m}
+    ends = (last.start_space_id, last.destination_space_id, last.step_free)
+    effect = {
+        "route": f"{before.describe_space(last.start_space_id)} to {before.describe_space(last.destination_space_id)}",
+        "length_before_m": copy.deepcopy(before).route(*ends).length_m,
+    }
     try:
-        effect["length_after_m"] = after.route(last.start_space_id, last.destination_space_id, last.step_free).length_m
+        effect["length_after_m"] = after.route(*ends).length_m
     except MapError:
         effect["length_after_m"] = None
         effect["note"] = "No route any more after this change."
@@ -112,6 +135,9 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         """
         if action not in ACTIONS:
             raise ToolError(f"action must be one of {ACTIONS}.")
+        if state.pending is not None and state.pending.turn == state.turn:
+            raise ToolError("One proposal per message. Show the card you already made and wait for the answer.")
+        state.pending = None
         preview = copy.deepcopy(bm)
         try:
             what = apply_change(preview, action, element, other, step_free)
@@ -123,12 +149,13 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         return as_json(card)
 
     @beta_tool
-    def confirm_change(confirmed: bool) -> str:
+    def confirm_change(confirmed: bool, user_reply: str) -> str:
         """Apply (confirmed=true) or drop (confirmed=false) the change from propose_change.
         Only call this after the person answered the card in a new message.
 
         Args:
             confirmed: True only if the person clearly said yes to the card.
+            user_reply: The person's answer to the card, copied word for word from their last message.
         """
         pending = state.pending
         if pending is None:
@@ -136,6 +163,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         if state.turn == pending.turn:
             raise ToolError("Ask the person first: show the card and wait for their answer in a new message.")
         state.pending = None
+        if confirmed and (not YES.search(user_reply) or NO.search(user_reply)):
+            raise ToolError("That reply is not a clear yes. Ask the person again, then call propose_change anew.")
         if not confirmed:
             return as_json({"applied": False, "note": "Dropped, nothing changed."})
         try:
@@ -143,6 +172,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         except MapError as error:
             raise ToolError(str(error)) from error
         if pending.action == "add_door":
+            output_directory.mkdir(parents=True, exist_ok=True)
             bm.save(output_directory / "building_edited.json")
         state.log.append({"turn": state.turn, "change": what})
         return as_json({"applied": True, "change": what, "effect": pending.card["effect on your last route"],

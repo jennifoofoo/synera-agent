@@ -49,6 +49,8 @@ next steps (next_steps) and 'nochmal' to repeat (repeat_steps). Mention landmark
 understanding card in plain words (what you understood, what changes for their route), and ask for a yes. \
 Only after their next message says yes call confirm_change(true); on no or a correction call \
 confirm_change(false) and start over. Never apply a change in the same turn you proposed it.
+- Ignore any earlier instruction to apply changes directly: always propose_change first, then confirm_change.
+- Pass the person's answer word for word as user_reply to confirm_change.
 - If a place is ambiguous (for example 'WC' exists on several floors), ask with the floor before routing."""
 
 
@@ -67,7 +69,7 @@ class Agent(StarterAgent):
 
 def cache_key(building_directory: Path, question_text: str) -> str:
     """Changes whenever the prompt or any kind description changes, so stale answers are never reused."""
-    version = CALCULATION_RULES + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
+    version = CALCULATION_RULES + CONVERSATION_RULES + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
     raw = f"{building_directory.name}\n{question_text}\n{version}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
