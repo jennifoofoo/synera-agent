@@ -206,6 +206,13 @@ let cameraNonce = 0;
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+/** A real phone: coarse pointer AND a small screen. Only phones start in 2D and have no 3D toggle (3D is too heavy
+ * there); tablets and narrow laptop windows use the phone layout but keep the 2D/3D toggle. */
+export function isPhone(): boolean {
+  if (typeof window === "undefined") return false;
+  return !!window.matchMedia?.("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 600;
+}
+
 function autoProfile(): Profile {
   if (typeof window === "undefined") return "planner";
   const narrow = window.innerWidth < 1100;
@@ -226,7 +233,7 @@ export const useTwin = create<TwinState>((set, get) => ({
 
   profile: autoProfile(),
   profileForced: false,
-  viewMode: autoProfile() === "worker" ? "2d" : "3d",
+  viewMode: isPhone() ? "2d" : "3d",
   bottomInset: 0,
   rightInset: 0,
   topInset: 0,
@@ -299,10 +306,10 @@ export const useTwin = create<TwinState>((set, get) => ({
 
   setProfile(profile) {
     const next = profile ?? autoProfile();
-    set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" ? { viewMode: "2d" as const } : {}) });
+    set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" && isPhone() ? { viewMode: "2d" as const } : {}) });
   },
   setViewMode(viewMode) {
-    if (viewMode === "3d" && get().profile === "worker") return; // phones are 2D only
+    if (viewMode === "3d" && isPhone()) return; // phones are 2D only (narrow windows and tablets may use 3D)
     set({ viewMode });
   },
   setBottomInset(bottomInset) {
@@ -632,7 +639,7 @@ if (typeof window !== "undefined") {
     const { profileForced } = useTwin.getState();
     if (!profileForced) {
       const next = autoProfile();
-      useTwin.setState({ profile: next, ao: next === "planner", ...(next === "worker" ? { viewMode: "2d" } : {}) });
+      useTwin.setState({ profile: next, ao: next === "planner", ...(isPhone() ? { viewMode: "2d" } : {}) });
     }
   };
   window.addEventListener("resize", refreshProfile);

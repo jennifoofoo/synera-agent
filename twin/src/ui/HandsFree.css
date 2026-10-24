@@ -1,6 +1,6 @@
 /* ===== Hands-free (owner: hands-free session): mic-with-waves toggle, blue when on; one status line. */
 .hf-btn {
-  --hf-blue: var(--ob-active, #1a73e8);
+  --hf-blue: var(--signal);
   display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0;
   color: var(--text); background: var(--surface); border: 1px solid var(--line);
 }
@@ -11,7 +11,7 @@
   100% { box-shadow: 0 0 0 12px transparent; }
 }
 .hf-status {
-  --hf-blue: var(--ob-active, #1a73e8);
+  --hf-blue: var(--signal);
   display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; font-size: 13px; color: var(--muted);
 }
 .hf-status .hf-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

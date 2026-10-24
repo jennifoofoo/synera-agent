@@ -1,5 +1,5 @@
 import { useKeyHelp } from "../scene/controlsTable";
-import { useTwin } from "../store";
+import { isPhone, useTwin } from "../store";
 
 /** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
  * again = only this floor; the ⇕ toggle pulls the floors apart. Floors on the route carry a dot. */
@@ -28,7 +28,8 @@ export function FloorRail() {
       // Phone.css places the rail from --rail-top (portrait: right edge above the dock; landscape: left edge).
       style={directionsOpen && topInset > 0 && profile === "worker" ? ({ "--rail-top": `${topInset + 8}px` } as React.CSSProperties) : undefined}
     >
-      {profile !== "worker" && (
+      {/* 2D/3D at every width; only real phones (coarse pointer and small screen) stay 2D */}
+      {!isPhone() && (
         <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
           {flat ? "3D" : "2D"}
         </button>
