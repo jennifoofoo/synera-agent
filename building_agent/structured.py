@@ -23,13 +23,14 @@ def route_entry(bm: BuildingMap) -> dict | None:
     }
 
 
-def located_entries(bm: BuildingMap) -> list[dict]:
-    """Assets the agent found in its last search, with the room and floor they are in."""
+def located_entries(bm: BuildingMap, reply: str = "") -> list[dict]:
+    """Assets the agent found in its last search, narrowed to those the reply names (id or asset name)."""
+    lowered = reply.lower()
+    found = [bm.assets[asset_id] for asset_id in bm.located_asset_ids if asset_id in bm.assets]
+    named = [asset for asset in found if asset["id"].lower() in lowered or asset["name"].lower() in lowered]
     entries = []
-    for asset_id in bm.located_asset_ids:
-        asset = bm.assets.get(asset_id)
-        if asset is None:
-            continue
+    for asset in named or found:
+        asset_id = asset["id"]
         space = bm.spaces[asset["space_id"]]
         entries.append(
             {
@@ -56,8 +57,11 @@ def reply_number(reply: str) -> float | None:
 def structured_entry(question_id: str, kind: str, bm: BuildingMap, reply: str) -> dict:
     """One answers.json entry for one question, shaped by the question kind."""
     entry: dict = {"id": question_id, "kind": kind, "reply": reply}
+    committed = committed_answer(reply)
+    if committed is not None and len(numbers_in(committed)) > 1:
+        entry["warnings"] = ["the Answer line holds several numbers, the scorer counts that as wrong"]
     if kind == "locate":
-        entry["located"] = located_entries(bm)
+        entry["located"] = located_entries(bm, reply)
     elif kind == "count":
         entry["count"] = reply_number(reply)
     elif kind in {"route", "route_step_free", "route_with_closure", "tour"}:

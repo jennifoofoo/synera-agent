@@ -57,3 +57,23 @@ def test_german_decimal_comma_would_read_as_two_numbers():
     from benchmark.score import numbers_in
 
     assert numbers_in("61,4") == [61.0, 4.0]
+
+
+def test_locate_keeps_only_the_asset_the_reply_names():
+    from tests.conftest import load_map
+
+    building_dir = QUESTIONS[0][0]
+    bm = load_map(str(building_dir))
+    assets = list(bm.assets.values())[:3]
+    bm.located_asset_ids = [asset["id"] for asset in assets]
+    assert len(located_entries(bm)) == 3
+    chosen = located_entries(bm, f"It is the {assets[1]['name']} in the next room.")
+    assert [entry["asset_id"] for entry in chosen] == [assets[1]["id"]]
+    assert len(located_entries(bm, "no asset named")) == 3  # nothing narrows it down: keep all hits
+
+
+def test_several_numbers_on_the_answer_line_are_flagged():
+    bm = BuildingMap.load(QUESTIONS[0][0])
+    flagged = structured_entry("q", "count", bm, "Answer: 13 desks on floor 0")
+    assert flagged["warnings"]
+    assert "warnings" not in structured_entry("q", "count", bm, "Answer: 13")
