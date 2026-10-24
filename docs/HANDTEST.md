@@ -46,3 +46,9 @@ Needs Chrome, the page in the foreground, localhost or https, and the "Hands-fre
 
 ## Result log
 Write FAIL lines here with the exact words said and what appeared, then hand them to the agent as bugs.
+
+## Mobile smoke (automated, no phone needed)
+Protects the mobile layout from `docs/mobile-audit.md`: overflow, touch targets of 44 px, 16 px chat input, popover size, plan height, pinch and pan, mic hint, wake lock and audio unlock, 3G page weight. Runs Pixel 7 (Chromium) and iPhone 14 (WebKit) against a local page server with 2 dev buildings and no API key. It never sends a chat message.
+- Once: `uv sync --group e2e && uv run playwright install chromium webkit`
+- Run: `scripts/mobile_smoke.sh`. The end of the output lists pass, xfail (known gap) and XPASS (gap fixed, remove its `gap(...)` mark in `tests/e2e/test_mobile.py`) per audit item.
+- Not part of `scripts/check.sh`. It does not replace the real phone test in section I.
