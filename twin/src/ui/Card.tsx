@@ -189,7 +189,7 @@ function GuideCard({ model }: { model: BuildingModel }) {
           ))}
         </div>
       </div>
-      {busy ? <div className="card-text card-muted">…</div> : <Clamped text={last?.text ?? `Go to ${to}.`} />}
+      {busy ? <div className="card-text card-muted">…</div> : <Clamped text={last ? shownReply(last.text) : `Go to ${to}.`} />}
       <div className="card-actions">
         <button disabled={busy || guide.step_index === 0} onClick={() => void ask("back")}>
           Back
@@ -228,13 +228,24 @@ function ReplyCard({ model }: { model: BuildingModel }) {
   return (
     <Sheet className="card-reply" label="Reply" onClose={dismissReply}>
       <div className="card-reply-body">
-        <Clamped text={last.text} />
+        <Clamped text={shownReply(last.text)} />
         <CloseButton onClick={dismissReply} label="Dismiss" />
       </div>
       {last.note && <div className="card-note">{last.note}</div>}
       {route?.ok && <RouteLine model={model} route={route} />}
     </Sheet>
   );
+}
+
+/** The reply as shown: without the final "Answer: …" line (also "**Answer:**"). The store keeps the raw text. */
+export function shownReply(text: string): string {
+  const lines = text.trimEnd().split("\n");
+  const last = lines.length - 1 - [...lines].reverse().findIndex((line) => line.trim() !== "");
+  const answer = /^\s*(\*\*)?answer:(\*\*)?\s*/i;
+  if (last < 0 || last >= lines.length || !answer.test(lines[last])) return text.trim();
+  const value = lines[last].replace(answer, "").trim();
+  lines.splice(last, 1);
+  return lines.join("\n").trim() || value; // a reply that is only "Answer: x" shows just x
 }
 
 /** 3 lines, then "more". Only shows "more" when the text really is longer. */
