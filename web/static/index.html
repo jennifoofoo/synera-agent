@@ -44,6 +44,7 @@
         <li><i class="sw sw-added"></i>New door</li>
       </ul>
     </details>
+    <div id="anim-caption" class="anim-caption" aria-live="polite" hidden></div>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   </section>
 
@@ -58,10 +59,26 @@
     <div class="panel active" data-panel="chat">
       <div id="chat-log" class="chat-log" aria-live="polite"></div>
       <form id="chat-form" class="chat-form">
+        <button type="button" id="mic" class="mic" title="Speak your question" aria-label="Speak your question" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+        </button>
         <input id="chat-input" autocomplete="off" placeholder="e.g. How do I get from the entrance to the lab without stairs?">
         <button type="submit">Send</button>
       </form>
+      <div class="voice-row">
+        <button type="button" id="voice-out" class="voice-out" aria-pressed="true" title="Read replies aloud">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="body" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+          <span class="label">Voice on</span>
+        </button>
+        <select id="voice-lang" aria-label="Speech language" title="Speech language">
+          <option value="en">EN</option>
+          <option value="de">DE</option>
+        </select>
+        <span id="voice-status" class="voice-status" aria-live="polite"></span>
+        <button type="button" id="voice-stop" class="small secondary voice-stop" hidden>■ Stop</button>
+      </div>
       <div id="chat-note" class="note"></div>
+      <div id="voice-note" class="note"></div>
     </div>
 
     <div class="panel" data-panel="route">
@@ -102,5 +119,6 @@
   </aside>
 </main>
 <script src="app.js"></script>
+<script src="voice.js"></script>
 </body>
 </html>

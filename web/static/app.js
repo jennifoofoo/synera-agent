@@ -19,7 +19,10 @@ const app = {
   pendingDoorFrom: null,
   pickedSpaceId: null,
   status: { chat_available: false },
+  anim: null,          // route animation in progress, see "route animation"
 };
+
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 // ---------- server ----------
 
@@ -128,6 +131,7 @@ async function loadBuilding(key, reset = false) {
     }
     app.floorBoxes.set(s.floor_id, box);
   }
+  stopRouteAnimation(false);
   app.highlight = null;
   app.pendingDoorFrom = null;
   app.pickedSpaceId = null;
@@ -137,8 +141,9 @@ async function loadBuilding(key, reset = false) {
   $("#building-meta").textContent = `${data.floors.length} floor${data.floors.length > 1 ? "s" : ""} · ${nRooms} rooms · ${data.assets.length} things · ${data.source}`;
   const ground = data.floors.find((f) => f.level === 0) || data.floors[0];
   app.floorId = ground.id;
-  applyState(data.state, { silent: true });
+  applyState(data.state, { silent: true, animate: false });
   showFloor(app.floorId, true);
+  window.voice?.stop();
   $("#chat-log").innerHTML = "";
   addMessage("system", `Building: ${data.name}. Ask where things are, how to get somewhere, or tell me what is closed.`);
 }
@@ -172,7 +177,7 @@ function renderFloorTabs() {
     button.title = floor.name;
     if (floor.id === app.floorId) button.classList.add("active");
     if (routeFloors.has(floor.id)) button.classList.add("on-route");
-    button.onclick = () => showFloor(floor.id, true);
+    button.onclick = () => { stopRouteAnimation(); showFloor(floor.id, true); };
     tabs.appendChild(button);
   }
 }
@@ -294,6 +299,7 @@ function drawOpening(layer, o) {
 }
 
 function drawRoute(layer, route) {
+  if (app.anim) return drawAnimatedRoute(layer);
   for (const segment of route.segments) {
     if (segment.floor_id !== app.floorId || segment.points.length < 2) continue;
     const points = segment.points.map((p) => svgPoint(p).join(",")).join(" ");
@@ -356,11 +362,195 @@ function drawMarkers(layer = $("#markers")) {
     const [x, y] = svgPoint(app.highlight.point);
     el("circle", { cx: x, cy: y, r: 14 * px, class: "pulse" }, layer);
   }
+  if (app.anim) drawAnimationHead(layer);
+}
+
+// ---------- route animation ----------
+// The route is drawn progressively, floor by floor: a head moves along the polyline, at a stair/lift it
+// waits briefly, the plan switches to the next floor and the line continues. Reduced motion: drawn static.
+
+const ANIM_CHANGE_PAUSE_MS = 1000;
+const ANIM_FADE_MS = 260;
+
+const routeKey = (route) =>
+  route?.ok ? JSON.stringify([route.start, route.destination, route.via, route.length_m, route.segments.map((s) => s.points.length)]) : "";
+
+const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const polylineLength = (points) => points.reduce((sum, p, i) => (i ? sum + distance(points[i - 1], p) : 0), 0);
+const easeInOut = (t) => 0.5 - Math.cos(Math.PI * Math.min(1, Math.max(0, t))) / 2;
+
+// Points of the polyline up to the given length, plus the head point.
+function partialPolyline(points, length) {
+  const out = [points[0]];
+  let left = length;
+  for (let i = 1; i < points.length; i++) {
+    const step = distance(points[i - 1], points[i]);
+    if (left >= step) { out.push(points[i]); left -= step; continue; }
+    const t = step ? left / step : 0;
+    out.push([points[i - 1][0] + (points[i][0] - points[i - 1][0]) * t, points[i - 1][1] + (points[i][1] - points[i - 1][1]) * t]);
+    break;
+  }
+  return out;
+}
+
+// Consecutive segments on one floor form a leg; between legs the route changes floor.
+function routeLegs(route) {
+  const legs = [];
+  for (const segment of route.segments) {
+    if (segment.points.length < 2) continue;
+    const length = polylineLength(segment.points);
+    const last = legs[legs.length - 1];
+    if (last && last.floor_id === segment.floor_id) last.parts.push({ segment, start: last.length, length });
+    else legs.push({ floor_id: segment.floor_id, parts: [{ segment, start: 0, length }], length: 0 });
+    legs[legs.length - 1].length += length;
+  }
+  const total = legs.reduce((sum, leg) => sum + leg.length, 0);
+  // Calm and readable: 3 to 10 s of walking in total, each floor at least 1.2 s.
+  const walkMs = Math.min(10000, Math.max(3000, 2500 + total * 40));
+  for (const leg of legs) leg.duration = Math.max(1200, total ? (walkMs * leg.length) / total : 1200);
+  legs.forEach((leg, i) => {
+    const next = legs[i + 1];
+    leg.change = next ? route.floor_changes.find((c) => c.from_floor === leg.floor_id && c.to_floor === next.floor_id) || null : null;
+  });
+  return legs;
+}
+
+function startRouteAnimation() {
+  stopRouteAnimation();
+  const route = app.state.route?.ok ? app.state.route : null;
+  if (!route) return;
+  const legs = routeLegs(route);
+  if (reducedMotion.matches || !legs.length) {
+    if (legs.length && legs[0].floor_id !== app.floorId) showFloor(legs[0].floor_id, true);
+    return;
+  }
+  app.anim = { legs, leg: 0, phase: "walk", t0: performance.now(), progress: 0, head: legs[0].parts[0].segment.points[0], frame: 0 };
+  hidePopover();
+  if (app.floorId !== legs[0].floor_id) showFloor(legs[0].floor_id, true);
+  else render();
+  setAnimCaption(legs.length > 1 ? floorLabel(legs[0].floor_id) : "");
+  app.anim.frame = requestAnimationFrame(stepRouteAnimation);
+}
+
+function stopRouteAnimation(redraw = true) {
+  if (!app.anim) return;
+  cancelAnimationFrame(app.anim.frame);
+  app.anim = null;
+  setAnimCaption("");
+  $("#map").classList.remove("fading");
+  if (redraw) render();
+}
+
+function floorLabel(floorId) {
+  const floor = app.building.floors.find((f) => f.id === floorId);
+  return floor ? floor.name : floorId;
+}
+
+function stepRouteAnimation(now) {
+  const anim = app.anim;
+  if (!anim) return;
+  const leg = anim.legs[anim.leg];
+  if (anim.phase === "walk") {
+    const t = (now - anim.t0) / leg.duration;
+    anim.progress = easeInOut(t) * leg.length;
+    updateAnimatedRoute();
+    if (t >= 1) {
+      if (!leg.change) {
+        app.anim = null; // done: the static route (with its flowing dashes) takes over
+        setAnimCaption("");
+        render();
+        return;
+      }
+      anim.phase = "change";
+      anim.t0 = now;
+      const change = leg.change;
+      setAnimCaption(`${change.name}: ${change.kind === "lift" ? "ride" : "walk"} ${change.direction} to ${floorLabel(change.to_floor)}`);
+      drawMarkers();
+    }
+  } else if (anim.phase === "change" && now - anim.t0 >= ANIM_CHANGE_PAUSE_MS) {
+    anim.phase = "fade";
+    anim.t0 = now;
+    $("#map").classList.add("fading");
+  } else if (anim.phase === "fade" && now - anim.t0 >= ANIM_FADE_MS) {
+    anim.leg += 1;
+    anim.phase = "walk";
+    anim.t0 = now;
+    anim.progress = 0;
+    const next = anim.legs[anim.leg];
+    anim.head = next.parts[0].segment.points[0];
+    showFloor(next.floor_id, true);
+    $("#map").classList.remove("fading");
+    setAnimCaption(floorLabel(next.floor_id));
+  }
+  anim.frame = requestAnimationFrame(stepRouteAnimation);
+}
+
+function headPoint(leg, progress) {
+  const part = leg.parts.find((p) => progress <= p.start + p.length) || leg.parts[leg.parts.length - 1];
+  const points = partialPolyline(part.segment.points, Math.max(0, progress - part.start));
+  return points[points.length - 1];
+}
+
+// Called from render(): ghost of the whole route on this floor, plus the drawn part of the current leg.
+function drawAnimatedRoute(layer) {
+  const anim = app.anim;
+  anim.els = [];
+  for (const segment of app.state.route.segments) {
+    if (segment.floor_id !== app.floorId || segment.points.length < 2) continue;
+    el("polyline", { points: segment.points.map((p) => svgPoint(p).join(",")).join(" "), class: "route-ghost" }, layer);
+  }
+  anim.legs.forEach((leg, index) => {
+    if (leg.floor_id !== app.floorId || index > anim.leg) return;
+    for (const part of leg.parts) {
+      const casing = el("polyline", { class: "route-casing" }, layer);
+      const line = el("polyline", { class: "route-line" + (part.segment.kind === "outside" ? " outside" : "") }, layer);
+      anim.els.push({ part, done: index < anim.leg, casing, line });
+    }
+  });
+  updateAnimatedRoute();
+}
+
+function updateAnimatedRoute() {
+  const anim = app.anim;
+  if (!anim?.els) return;
+  const leg = anim.legs[anim.leg];
+  for (const item of anim.els) {
+    const { part } = item;
+    const drawn = item.done || anim.phase !== "walk" ? part.length : Math.min(part.length, Math.max(0, anim.progress - part.start));
+    const points = drawn >= part.length ? part.segment.points : partialPolyline(part.segment.points, drawn);
+    const text = drawn > 0 ? points.map((p) => svgPoint(p).join(",")).join(" ") : "";
+    item.casing.setAttribute("points", text);
+    item.line.setAttribute("points", text);
+  }
+  if (anim.phase === "walk") anim.head = headPoint(leg, anim.progress);
+  const head = $("#anim-head");
+  if (head) {
+    const [x, y] = svgPoint(anim.head);
+    head.setAttribute("transform", `translate(${x},${y})`);
+  }
+}
+
+// The moving dot keeps a fixed screen size, so it lives with the markers (redrawn on zoom).
+function drawAnimationHead(layer) {
+  const anim = app.anim;
+  const leg = anim.legs[anim.leg];
+  if (!leg || leg.floor_id !== app.floorId || !anim.head) return;
+  const px = pixelSize();
+  const [x, y] = svgPoint(anim.head);
+  const g = el("g", { id: "anim-head", class: "anim-head" + (anim.phase === "walk" ? "" : " waiting"), transform: `translate(${x},${y})` }, layer);
+  el("circle", { r: 16 * px, class: "halo" }, g);
+  el("circle", { r: 7 * px, class: "dot" }, g);
+}
+
+function setAnimCaption(text) {
+  const box = $("#anim-caption");
+  box.textContent = text;
+  box.hidden = !text;
 }
 
 // ---------- state from server ----------
 
-function applyState(state, { silent = false, cause = "" } = {}) {
+function applyState(state, { silent = false, cause = "", animate = true } = {}) {
   const before = app.state.route;
   app.state = state;
   // Mirror closures/new doors into the building copy used for drawing.
@@ -376,11 +566,14 @@ function applyState(state, { silent = false, cause = "" } = {}) {
     if (!route.floors.includes(app.floorId)) app.floorId = route.floors[0];
   }
   if (!silent && before && route) explainRouteChange(before, route, cause);
+  const key = routeKey(route);
+  if (key !== routeKey(before) || !animate) stopRouteAnimation();
   renderFloorTabs();
   render();
   renderRouteBar();
   renderRoutePanel();
   renderChanges();
+  if (animate && key && key !== routeKey(before)) startRouteAnimation();
 }
 
 function explainRouteChange(before, after, cause) {
@@ -415,6 +608,15 @@ function renderRouteBar() {
   bar.className = "route-bar";
   const via = route.floor_changes.length ? ` · via ${[...new Set(route.floor_changes.map((c) => c.name))].join(", ")}` : "";
   bar.innerHTML = `<span class="dot start"></span><b>${esc(spaceName(route.start))}</b> → <span class="dot end"></span><b>${esc(spaceName(route.destination))}</b> · ${route.length_m} m${route.step_free ? " · step-free" : ""}${esc(via)}`;
+  if (!reducedMotion.matches) {
+    const replay = document.createElement("button");
+    replay.className = "replay";
+    replay.title = "Replay the route";
+    replay.setAttribute("aria-label", "Replay the route");
+    replay.textContent = "↻";
+    replay.onclick = startRouteAnimation;
+    bar.appendChild(replay);
+  }
 }
 
 function renderRoutePanel() {
@@ -494,8 +696,7 @@ async function requestRoute(start, destination, { stepFree = $("#route-stepfree"
     app.state.route = null;
     applyState(result.state, { silent: true });
     if (result.route.ok) {
-      app.floorId = result.route.floors[0];
-      showFloor(app.floorId, true);
+      if (!app.anim) showFloor(result.route.floors[0], true);
     } else {
       toast(result.route.error, true);
     }
@@ -781,21 +982,24 @@ function updateChatNote() {
   } else {
     note.textContent = `Agent: ${app.status.chat_backend}. Changes the agent makes show up on the plan.`;
   }
+  window.voice?.refresh();
 }
 
 async function sendChat(text) {
+  window.voice?.beforeSend();
   addMessage("user", text);
   const pending = addMessage("agent pending", "thinking…");
   try {
     const result = await api("/api/chat", { message: text });
     pending.remove();
-    addMessage(result.error ? "system" : "agent", result.reply);
+    const message = addMessage(result.error ? "system" : "agent", result.reply);
+    if (!result.error) window.voice?.onReply(result.reply, message);
     if (result.state) {
       const changed = stateSignature(result.state) !== stateSignature(app.state);
       applyState(result.state, changed ? { cause: "Updated from the chat" } : { silent: true });
     }
     const route = app.state.route;
-    if (route?.ok && !route.floors.includes(app.floorId)) showFloor(route.floors[0], true);
+    if (route?.ok && !app.anim && !route.floors.includes(app.floorId)) showFloor(route.floors[0], true);
   } catch (error) {
     pending.remove();
     addMessage("system", `Chat failed: ${error.message}`);
@@ -863,7 +1067,7 @@ function wireMap() {
     const floorJump = target.closest?.("[data-floor]");
     const opening = target.closest?.("[data-opening]");
     const space = target.closest?.("[data-space]");
-    if (floorJump) showFloor(floorJump.dataset.floor, true);
+    if (floorJump) { stopRouteAnimation(); showFloor(floorJump.dataset.floor, true); }
     else if (opening) onOpeningClick(e, opening.dataset.opening);
     else if (space) onSpaceClick(e, space.dataset.space);
     else hidePopover();
@@ -897,6 +1101,7 @@ function wireUi() {
   };
   $("#route-clear").onclick = async () => {
     $("#route-from").value = ""; $("#route-to").value = ""; $("#via-list").innerHTML = "";
+    stopRouteAnimation();
     const result = await api("/api/route/clear", {});
     applyState(result.state, { silent: true });
   };
