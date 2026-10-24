@@ -10,6 +10,7 @@ import { Position } from "./ui/Position";
 import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
+import { Planner } from "./ui/Planner";
 
 /** One screen: the building, one input, one card. Everything else only when needed. */
 export function App() {
@@ -29,6 +30,7 @@ export function App() {
       <FloorRail />
       <Recenter />
       <ChangesPill />
+      <Planner />
       <Phone />
       <Position />
       <div className="dock">
