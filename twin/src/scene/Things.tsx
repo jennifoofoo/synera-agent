@@ -68,7 +68,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       temp.scale.set(w + 0.06, h + 0.03, d + 0.06);
       temp.updateMatrix();
       hull.setMatrixAt(index, temp.matrix);
-      instanced.setColorAt(index, colour.set(flat ? "#cfd4db" : assetColour(asset)));
+      instanced.setColorAt(index, colour.set(flat ? "#d3d0c9" : assetColour(asset)));
     });
     instanced.count = count;
     hull.count = count;
@@ -94,7 +94,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
         <meshStandardMaterial roughness={0.8} metalness={0.05} />
       </instancedMesh>
       <instancedMesh ref={outline} args={[unitBox, undefined, count]} frustumCulled={false} raycast={() => null}>
-        <meshBasicMaterial color={flat ? "#9aa0a6" : COLOURS.edge} side={THREE.BackSide} transparent opacity={0.9} />
+        <meshBasicMaterial color={flat ? "#9a968d" : COLOURS.edge} side={THREE.BackSide} transparent opacity={0.9} />
       </instancedMesh>
     </group>
   );

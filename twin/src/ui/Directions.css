@@ -2,31 +2,31 @@
 .directions {
   position: absolute; z-index: 6; left: 60px; top: 56px; width: 340px;
   display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; padding: 10px 10px 8px 12px;
-  background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(20, 48, 90, 0.14);
-  animation: dir-in 0.16s ease-out;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-float);
+  animation: dir-in 150ms ease-out;
 }
-@keyframes dir-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes dir-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 .dir-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .dir-field {
   display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 4px 10px;
-  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); text-align: left; color: var(--text);
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); text-align: left; color: var(--text);
 }
 .dir-field.empty .dir-value { color: var(--muted); }
-.dir-field.editing { border-color: var(--accent); background: var(--panel-solid); box-shadow: 0 0 0 3px rgba(43, 181, 160, 0.15); }
+.dir-field.editing { border-color: var(--ink); background: var(--surface); }
 .dir-value { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dir-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; }
-.dir-dot.from { background: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22); }
-.dir-dot.to { background: var(--gold); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
+.dir-dot { flex: none; width: 10px; height: 10px; }
+.dir-dot.from { border-radius: 50%; background: var(--info); box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--info); }
+.dir-dot.to { background: var(--signal); border-radius: 1px; }
 
-.dir-accept { flex: none; min-height: 30px; min-width: 30px; padding: 0 6px; border: 0; background: transparent; color: var(--accent); font-weight: 700; }
+.dir-accept { flex: none; min-height: 30px; min-width: 30px; padding: 0 6px; border: 0; background: transparent; color: var(--signal); font-weight: 700; }
 
 .dir-side { display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
-.dir-swap { width: 34px; min-width: 34px; min-height: 34px; padding: 0; border-radius: 50%; font-size: 16px; color: var(--muted); }
+.dir-swap { width: 34px; min-width: 34px; min-height: 34px; padding: 0; border-radius: var(--radius-sm); font-size: 16px; color: var(--muted); }
 .dir-foot { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); padding: 0 2px; }
 .dir-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text); }
-.dir-toggle input { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; }
+.dir-toggle input { width: 16px; height: 16px; accent-color: var(--signal); margin: 0; }
 .dir-hint { margin-left: auto; }
 .dir-error { margin: 0; }
 
@@ -34,11 +34,11 @@
 .worker .directions {
   position: fixed; left: 0; right: 0; top: 0; width: auto; z-index: 8;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px 14px;
-  border-radius: 0 0 18px 18px; border-width: 0 0 1px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg); border-width: 0 0 1px;
 }
 .worker .dir-field { min-height: 46px; font-size: 16px; }
 .worker .dir-swap { width: 44px; min-width: 44px; min-height: 44px; }
 .worker .directions .x { min-width: 44px; min-height: 44px; }
 .worker .dir-toggle input { width: 20px; height: 20px; }
 @media (prefers-reduced-motion: reduce) { .directions { animation: none; } }
-.card-directions button.primary:disabled { background: var(--accent); border-color: var(--accent); color: #fff; opacity: 0.45; }
+.card-directions button.primary:disabled { background: var(--signal); border-color: var(--signal); color: var(--signal-ink); opacity: 0.45; }

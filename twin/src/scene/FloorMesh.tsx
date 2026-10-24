@@ -4,7 +4,7 @@ import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
-import { buildFloorGeometry, withCutaway } from "./geometry";
+import { buildFloorGeometry, openingEditsOf, withCutaway } from "./geometry";
 
 interface Props {
   floor: FloorModel;
@@ -24,16 +24,20 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
   const select = useTwin((s) => s.select);
   const flat = useTwin((s) => s.viewMode === "2d");
   const reducedMotion = useTwin((s) => s.reducedMotion);
+  // Doors added, removed or widened in this session change the walls; the key keeps route updates from rebuilding.
+  const state = useTwin((s) => s.state);
+  const editsKey = JSON.stringify(openingEditsOf(state));
   const built = useMemo(() => {
     const started = performance.now();
-    const geometry = buildFloorGeometry(floor);
+    const geometry = buildFloorGeometry(floor, JSON.parse(editsKey));
     buildTimes.set(floor.id, performance.now() - started);
     return geometry;
-  }, [floor]);
+  }, [floor, editsKey]);
   useEffect(() => () => {
     built.solid.disposeBoundsTree?.();
     built.solid.dispose();
     built.edges.dispose();
+    built.zones.dispose();
   }, [built]);
 
   const materials = useMemo(() => {
@@ -50,12 +54,14 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
       side: THREE.DoubleSide,
     });
     const ghostEdges = new THREE.LineBasicMaterial({ color: COLOURS.edgeGhost, transparent: true, opacity: 0.35, depthWrite: false });
-    return { solid, edges, ghostSolid, ghostEdges };
+    const zones = new THREE.LineBasicMaterial({ color: COLOURS.edgeGhost, transparent: true, opacity: 0.8 });
+    return { solid, edges, ghostSolid, ghostEdges, zones };
   }, []);
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
   useEffect(() => {
-    materials.edges.color.set(flat ? "#a8a8a3" : COLOURS.edge);
+    materials.edges.color.set(flat ? "#a39e94" : COLOURS.edge);
     materials.edges.opacity = flat ? 1 : 0.85;
+    materials.zones.color.set(flat ? "#b6b6b1" : COLOURS.edgeGhost);
     materials.solid.roughness = flat ? 1 : 0.92;
   }, [flat, materials]);
 
@@ -111,6 +117,7 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
         frustumCulled
       />
       <lineSegments geometry={built.edges} material={ghost ? materials.ghostEdges : materials.edges} renderOrder={ghost ? 11 : 1} layers-mask={ghost ? 2 : 1} />
+      {!ghost && <lineSegments name="zone-lines" geometry={built.zones} material={materials.zones} renderOrder={1} layers-mask={1} />}
     </group>
   );
 }

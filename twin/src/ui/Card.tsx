@@ -5,11 +5,13 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Route } from "../api/types";
+import { formatPoint } from "../model/format";
 import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
 import { HERE, useTwin, type Selection } from "../store";
 import { withoutAnswerLine } from "../voice";
 import "./Card.css";
+import "./HereUi.css";
 import { HereChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
@@ -136,6 +138,8 @@ function SelectionCard({ model }: { model: BuildingModel }) {
       : space
         ? `${prettyType(space.room_type)} · ${Math.round(space.area_m2)} m²`
         : "";
+  // A tap on the floor leaves a pin; the card says where exactly (model metres).
+  const pointText = selection.point && (selection.kind === "space" || selection.kind === "point") ? formatPoint(selection.point) : "";
   // Rooms (and spots in a room) can be a destination or "where I am"; a thing routes to its room.
   const roomId = roomOf(model, selection);
   const canBeHere = selection.kind === "space" || selection.kind === "point";
@@ -160,6 +164,14 @@ function SelectionCard({ model }: { model: BuildingModel }) {
         {floor}
         {floor && context ? " · " : ""}
         {context}
+        {pointText && (
+          <>
+            {" · "}
+            <span className="card-point" data-testid="card-point">
+              Point {pointText}
+            </span>
+          </>
+        )}
       </div>
       {roomId && (
         <div className="card-actions">

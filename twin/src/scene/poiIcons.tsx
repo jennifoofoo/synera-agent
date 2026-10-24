@@ -1,7 +1,7 @@
 // Point-of-interest pictograms for the 2D map: a white glyph in a small round grey badge, like a street map.
 import "./poiIcons.css";
 
-export type PoiKind = "stairs" | "lift" | "toilet" | "entrance";
+export type PoiKind = "stairs" | "lift" | "toilet" | "entrance" | "step";
 
 /** Badge diameter in px (CSS below must match); used for collision boxes. */
 export const POI_PX = 22;
@@ -29,6 +29,12 @@ const GLYPHS: Record<PoiKind, JSX.Element> = {
       <path className="stroke thin" d="M12 3v18" />
       <circle cx="17.5" cy="5" r="2" />
       <path d="M15.6 8.5h3.8l2.4 7.5h-2.4v4.5h-3.8V16h-2.4z" />
+    </svg>
+  ),
+  // not step-free: a single step (a threshold) on the floor line
+  step: (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path className="stroke" d="M3.5 17.5h8v-6h9" />
     </svg>
   ),
   // Tabler Icons "door-exit" (MIT, https://tabler.io/icons): a door with an arrow out

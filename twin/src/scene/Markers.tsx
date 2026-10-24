@@ -11,6 +11,8 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
+import { HereDot, TapPin } from "./HerePin";
+import { BADGE_GAP_PX, END_RING_PX, ScreenSized } from "./markerLayout";
 import { assetSize } from "./Things";
 
 interface Props {
@@ -60,7 +62,7 @@ function clusterDisruptions(model: BuildingModel, closed: string[]): Disruption[
   return clusters;
 }
 
-function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
+export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
   const group = useRef<THREE.Group>(null);
   useFrame(({ clock, invalidate }) => {
     if (!group.current || reducedMotion) return;
@@ -71,18 +73,18 @@ function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { childr
   return <group ref={group}>{children}</group>;
 }
 
-function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean }) {
+export function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false, order }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean; order?: number }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 19 : 15}>
+    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={order ?? (through ? 19 : 15)}>
       <ringGeometry args={[Math.max(0.05, radius - width), radius, 48]} />
       <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} depthTest={!through} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean }) {
+export function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false, order }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean; order?: number }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 18 : 14}>
+    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={order ?? (through ? 18 : 14)}>
       <circleGeometry args={[radius, 48]} />
       <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} depthTest={!through} side={THREE.DoubleSide} />
     </mesh>
@@ -107,7 +109,7 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
 }
 
 export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
-  const hereColour = flat ? COLOURS.mapBlue : COLOURS.here;
+  const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
@@ -125,24 +127,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
 
   return (
     <group>
-      {/* You are here */}
-      {position && shown(position.floor_id) && (
-        <group position={at(position.floor_id, position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0])}>
-          <Pulse reducedMotion={reducedMotion} speed={0.8} amount={0.25}>
-            <Disc radius={flat ? 3 : 1.4} colour={hereColour} opacity={flat ? 0.18 : 0.2} through />
-          </Pulse>
-          {!flat && <Ring radius={1.4} colour={hereColour} width={0.14} opacity={0.7} through />}
-          <Disc radius={flat ? 0.75 : 0.9} colour="#ffffff" opacity={1} through y={0.08} />
-          <Disc radius={flat ? 0.55 : 0.6} colour={hereColour} opacity={1} through y={0.1} />
-          {!flat && (
-            <mesh position-y={0.35}>
-              <sphereGeometry args={[0.32, 16, 16]} />
-              <meshBasicMaterial color={hereColour} />
-            </mesh>
-          )}
-          <group position-y={2.2}>{chip("You are here", "here")}</group>
-        </group>
-      )}
+      {/* You are here (draggable) and the pin of the last floor tap */}
+      <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} colour={hereColour} />
+      <TapPin model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} />
 
       {/* floor changes of the route: where to go up or down (needed in 2D and single-floor views) */}
       {state?.route?.ok &&
@@ -174,9 +161,15 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           const target = model.spaceById.get(guide.leg.to_space_id);
           if (!target || !shown(target.floor_id)) return null;
           return (
-            <group position={at(target.floor_id, target.anchor)}>
-              <Ring radius={1.2} colour={COLOURS.route} width={0.16} />
-              <group position-y={2.2}>{chip(`Next: ${target.name}`, "route")}</group>
+            <group position={at(target.floor_id, target.anchor)} name="guide-next">
+              <ScreenSized>
+                <Ring radius={END_RING_PX} colour={COLOURS.route} width={3} through order={30} />
+              </ScreenSized>
+              <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                <div className="chip chip-route guide-next" style={{ transform: `translateY(calc(-50% - ${END_RING_PX + BADGE_GAP_PX}px))` }}>
+                  Next: {target.name}
+                </div>
+              </Html>
             </group>
           );
         })()}
@@ -188,7 +181,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           const radius = 1.6 * Math.sqrt(d.names.length) + 0.6;
           const label = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
           return (
-            <group key={index} position={at(d.floor_id, d.point)}>
+            <group key={index} name="closed-marker" userData={{ count: d.names.length }} position={at(d.floor_id, d.point)}>
               <Disc radius={radius} colour={COLOURS.danger} opacity={0.28} through />
               <Pulse reducedMotion={reducedMotion}>
                 <Ring radius={radius} colour={COLOURS.danger} width={0.2} through />
@@ -279,7 +272,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             if (!space) return null;
             return (
               <group position-y={floorY(space.floor_id)}>
-                <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.35} outline />
+                <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.12} outline />
               </group>
             );
           }
@@ -290,17 +283,6 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             return (
               <group position={at(asset.floor_id, moved[asset.id]?.position ?? asset.position)}>
                 <Ring radius={Math.max(size[0], size[2]) * 0.8 + 0.4} colour={COLOURS.selection} width={0.14} />
-              </group>
-            );
-          }
-          if (selection.kind === "point" && selection.point) {
-            return (
-              <group position={at(selection.floor_id, selection.point)}>
-                <Ring radius={0.6} colour={COLOURS.selection} width={0.12} />
-                <mesh position-y={0.2}>
-                  <sphereGeometry args={[0.18, 12, 12]} />
-                  <meshBasicMaterial color={COLOURS.selection} />
-                </mesh>
               </group>
             );
           }
