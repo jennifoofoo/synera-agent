@@ -57,6 +57,8 @@ interface TwinState {
   viewMode: ViewMode;
   /** Height in px of UI covering the bottom of the viewport (dock / sheet); the camera frames above it. */
   bottomInset: number;
+  /** A Level 4 draft (new building from floor plans) is shown instead of the building; set by ui/newBuildingStore. */
+  draft: boolean;
   floorMode: FloorMode;
   focusedFloorId: string | null;
   thingsMode: ThingsMode;
@@ -131,6 +133,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   profileForced: false,
   viewMode: autoProfile() === "worker" ? "2d" : "3d",
   bottomInset: 0,
+  draft: false,
   floorMode: "stacked",
   focusedFloorId: null,
   thingsMode: "near",

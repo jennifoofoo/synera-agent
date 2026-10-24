@@ -1,4 +1,5 @@
 import { useTwin } from "../store";
+import { useNewBuilding } from "./newBuildingStore";
 
 /** Top left: the building's name; tapping it changes the building. Nothing else up here. */
 export function TopBar() {
@@ -11,12 +12,17 @@ export function TopBar() {
       <label className="building-name">
         <span className="brand-mark" aria-hidden />
         <span className="building-title">{building?.name ?? "Building"}</span>
-        <select value={buildingKey ?? ""} onChange={(event) => void openBuilding(event.target.value)} aria-label="Building">
+        <select
+          value={buildingKey ?? ""}
+          onChange={(event) => (event.target.value === "__new" ? void useNewBuilding.getState().open() : void openBuilding(event.target.value))}
+          aria-label="Building"
+        >
           {buildings.map((entry) => (
             <option key={entry.key} value={entry.key}>
               {entry.name} ({entry.key})
             </option>
           ))}
+          <option value="__new">New building…</option>
         </select>
       </label>
     </div>

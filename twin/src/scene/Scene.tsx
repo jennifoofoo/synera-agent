@@ -132,7 +132,7 @@ export function Scene() {
       gl={{ antialias: !ao || worker, powerPreference: "high-performance", logarithmicDepthBuffer: false }}
       onPointerMissed={() => select(null)}
       shadows={false}
-      style={{ touchAction: "none" }}
+      style={{ position: "absolute", inset: 0, touchAction: "none" }}
     >
       {flat ? (
         <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} up={[0, 0, -1]} />
