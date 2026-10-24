@@ -188,3 +188,28 @@ Wir sagen immer ehrlich: "Das ist eine Beispielregel, kein echtes Berechtigungss
 - Risiko: Eine Rolle ist nur eine Angabe der Person. Sensible Regeln gehören nicht in Prompts, sondern in die Richtlinie auf dem Server. Berechtigungen nicht in Logs schreiben.
 - Frage an Synera: Gibt es Berechtigungen in den Sonntagsdaten oder Fragen dazu? (vermutlich nein)
 - Einordnung für das Ideation-Gate: Starke Alltagsgeschichte und billig auf unserem Routing, aber **keine Rubrik der Jury nennt sie**. Als Creativity-Extra neben Accessibility und 3D denkbar, nicht als Ersatz.
+
+## 5. "Wir haben weitergedacht": Roadmap-Geschichte für Pitch und Technik-Text
+Status: geparkt, Nutzung beim Schreiben von Pitch, Video und Technik-Text (`docs/submission/`). Gedanke von Jennifer: Nicht alles muss gebaut sein. Die Jury bewertet auch, was wir **nicht gefragt wurden** ("what did you add that we did not ask for"). Eine ehrlich beschriebene Roadmap zeigt Tiefe, solange wir klar trennen zwischen **gebaut und gemessen**, **als Spec oder Prototyp vorbereitet** und **nur Idee**.
+
+### Aussage in einem Satz
+"Aus einem Gebäude, das man fragen kann, machen wir ein Gebäude, das **jede Person versteht und für jede Person passt**: wer sie ist, was sie braucht, wohin sie darf, was gerade passiert."
+
+### Die Roadmap-Folie (eine Folie, drei Spalten)
+| Heute gebaut (belegt) | Als Nächstes vorbereitet | Weitergedacht |
+|---|---|---|
+| Fragen beantworten (alle 9 Typen, Parser plus Agent), Routen nach Synera-Regel, Touren, stufenfrei, Sperrungen, Gabelstapler grob, "What changes?" fürs ganze Gebäude, Edits mit Karte und Ja (Tür, Gerät platzieren, Undo), Voice in und out, Gebäude aus Plänen bauen (Level 4), Campus über mehrere Gebäude (Level 3) | Accessibility-Profil (Rollstuhl mit Türbreite, Mobilität, ruhige Wege), 3D-Ansicht mit sprechendem Agenten, Aufgabe zu Gerät ("ich will schweißen"), Ereignisprotokoll ("wo war die Presse gestern") | Zutrittsrechte und Rollen ("du brauchst Stufe 3"), Live-Updates per Scan, AR auf dem Handy, mehrere Personen gleichzeitig im Gebäude, Verbindung zu echten Systemen (Zugangskontrolle, Inventar, Wartung) |
+
+### Wie wir es erzählen (Skript für 20 Sekunden im Pitch)
+"Wir haben nicht nur die Fragen beantwortet, sondern weitergedacht: Wer fragt, hat Bedürfnisse (Rollstuhl, Reizempfindlichkeit), Rechte (nicht jeder darf in den Serverraum) und eine Aufgabe (ich will schweißen, nicht 'Station H-A4'). Das Gebäude ändert sich ständig, deshalb haben wir Edits, Undo und einen Verlauf vorgesehen. Die Teile, die schon laufen, sind gemessen, die anderen sind als Spezifikation vorbereitet."
+
+### Regeln, damit es glaubwürdig bleibt
+- Jede Zeile der Folie gehört in genau eine Spalte. Nichts aus der Spalte "weitergedacht" wird als gebaut gezeigt oder gesprochen.
+- Zahlen nur aus `docs/eval-log.md` und den Berichten, mit Quelle. Keine Schätzungen als Messwerte.
+- Die Idee mit Rechten ist keine Sicherheitsfunktion und wird nicht so verkauft. Gesundheitsangaben (Accessibility) werden nicht gespeichert.
+- Wenn etwas aus dem Fridge vor dem Freeze gebaut wird, rückt es in die erste Spalte und bekommt eine Messung.
+
+### Wohin damit
+- `docs/submission/TECHNICAL_EXPLANATION.md`: Abschnitt "Where this goes next" (englisch, 6 bis 8 Zeilen, dieselben drei Spalten, nur Belegtes in der ersten Spalte).
+- `docs/submission/DEMO_SCRIPT.md`: Schlussbild des Videos (5 Sekunden Roadmap-Folie) und eine Antwort in den Q&A ("What would you build next?").
+- Optional als Mini-Demo, wenn Zeit bleibt: eine Rollen-Auswahl in der Seite, die nur zeigt, welche Räume mit der Regel "Beispielregel" gesperrt wären (kein Routing). Nur wenn Idee 4 Phase 1 nicht gebaut wird und klar als Beispiel gekennzeichnet.
