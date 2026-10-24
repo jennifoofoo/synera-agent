@@ -1077,6 +1077,7 @@ async function sendChat(text) {
     const message = addMessage(result.error ? "system" : "agent", result.reply);
     if (!result.error) window.voice?.onReply(result.reply, message);
     window.plan?.onChat(result.level4);
+    if (result.view) window.view3d?.apply(result.view);
     if (result.state && app.mode !== "draft") {
       const changed = stateSignature(result.state) !== stateSignature(app.state);
       applyState(result.state, changed ? { cause: "Updated from the chat" } : { silent: true });

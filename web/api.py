@@ -15,6 +15,7 @@ from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
 
 COORD_DIGITS = 2
 KEPT_ROUTE_REQUESTS = 8
+DEFAULT_FLOOR_HEIGHT_M = 3.0
 
 
 class RecordingMap(BuildingMap):
@@ -205,6 +206,7 @@ def building_view(session: Session) -> dict:
             "space_id": asset["space_id"],
             "floor_id": asset["floor_id"],
             "position": rounded(asset["position"]),
+            "footprint": footprint_view(asset.get("footprint")),
         }
         for asset in bm.assets.values()
         if asset.get("position")
@@ -214,12 +216,36 @@ def building_view(session: Session) -> dict:
         "key": session.key,
         "name": info["name"],
         "source": info.get("source"),
-        "floors": [{"id": floor["id"], "level": floor["level"], "name": floor["name"]} for floor in floors],
+        "floors": [floor_view(floor) for floor in floors],
         "spaces": spaces,
         "openings": openings,
         "connectors": connectors,
         "assets": assets,
         "state": state_view(session),
+    }
+
+
+def floor_view(floor: dict) -> dict:
+    """Level, name and the heights the 3D view stacks floors with (drafts without heights get 3 m per level)."""
+    height = floor.get("height_m") or DEFAULT_FLOOR_HEIGHT_M
+    elevation = floor.get("elevation_m")
+    return {
+        "id": floor["id"],
+        "level": floor["level"],
+        "name": floor["name"],
+        "elevation_m": round(elevation if elevation is not None else floor["level"] * height, COORD_DIGITS),
+        "height_m": round(height, COORD_DIGITS),
+    }
+
+
+def footprint_view(footprint: dict | None) -> dict | None:
+    """Asset size for the 3D view: width along x before rotation, depth along y, rotation counter-clockwise."""
+    if not footprint or not footprint.get("width_m") or not footprint.get("depth_m"):
+        return None
+    return {
+        "width_m": round(footprint["width_m"], COORD_DIGITS),
+        "depth_m": round(footprint["depth_m"], COORD_DIGITS),
+        "rotation_deg": round(footprint.get("rotation_deg") or 0.0, 1),
     }
 
 

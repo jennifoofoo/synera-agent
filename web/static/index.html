@@ -6,6 +6,9 @@
 <title>Talk to Your Building</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/" } }
+</script>
 </head>
 <body>
 <header class="topbar">
@@ -23,6 +26,44 @@
     <div id="floor-tabs" class="floor-tabs" role="tablist" aria-label="Floors"></div>
     <div id="route-bar" class="route-bar" hidden></div>
     <svg id="map" class="map" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Floor plan"></svg>
+    <div class="view-switch" role="group" aria-label="View">
+      <button type="button" data-view="2d" aria-pressed="true">2D</button>
+      <button type="button" data-view="3d" aria-pressed="false">3D</button>
+    </div>
+    <div id="view3d" class="view3d" hidden>
+      <div id="view3d-stage" class="view3d-stage"></div>
+      <div id="view3d-labels" class="view3d-labels" aria-hidden="true"></div>
+      <div id="view3d-pins" class="view3d-pins"></div>
+      <div id="view3d-floor-modes" class="view3d-floor-modes" role="group" aria-label="Floors in 3D">
+        <button type="button" data-floor-mode="stacked" title="All floors, the ones above see-through">Stacked</button>
+        <button type="button" data-floor-mode="exploded" title="Floors pulled apart">Exploded</button>
+        <button type="button" data-floor-mode="single" title="Only the selected floor">One floor</button>
+      </div>
+      <div class="map-controls">
+        <button type="button" id="view3d-things" class="things" title="Show furniture and machines">Things</button>
+        <button type="button" id="view3d-zoom-in" title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" id="view3d-zoom-out" title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" id="view3d-reset" title="Reset view" aria-label="Reset view">⟲</button>
+      </div>
+      <div class="minimap-box">
+        <canvas id="minimap" class="minimap" title="Tap to move the view here" aria-label="Minimap of the selected floor"></canvas>
+        <div id="minimap-label" class="minimap-label"></div>
+      </div>
+      <details class="legend legend3d">
+        <summary>Legend</summary>
+        <ul>
+          <li><i class="sw sw-route"></i>Route</li>
+          <li><i class="sw" style="background:#f1cd8c"></i>Production</li>
+          <li><i class="sw" style="background:#e07b24"></i>Machine</li>
+          <li><i class="sw sw-lift"></i>Lift</li>
+          <li><i class="sw sw-stair"></i>Stairs</li>
+          <li><i class="sw sw-entrance"></i>Entrance</li>
+          <li><i class="sw sw-step"></i>Step</li>
+          <li><i class="sw sw-closed"></i>Closed</li>
+          <li><i class="sw sw-added"></i>New door</li>
+        </ul>
+      </details>
+    </div>
     <div id="popover" class="popover" hidden></div>
     <div id="found-list" class="found-list" hidden></div>
     <div id="mode-banner" class="mode-banner" hidden></div>
@@ -160,5 +201,6 @@
 <script src="app.js"></script>
 <script src="voice.js"></script>
 <script src="plan.js"></script>
+<script type="module" src="view3d.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
-# 2D page: floor plan, route, changes, chat
+# Building page: 2D plan and 3D view, route, changes, chat
 
-A lean web page over `BuildingMap`: plain HTML/JS/SVG, served by a stdlib `http.server`. No build step, no new dependencies.
+A lean web page over `BuildingMap`: plain HTML/JS/SVG plus three.js for 3D, served by a stdlib `http.server`. No build step, no new dependencies, works offline (three.js is vendored).
 
 ## Start
 
@@ -21,6 +21,48 @@ Then open http://127.0.0.1:8765. Options: `--data DIR` (any folder with `*/build
 - Changes tab: close/reopen every stair and lift, list of closures and new doors, reset.
 - Chat tab: posts to `/api/chat`, see below.
 
+## 3D view
+
+The **2D | 3D** switch (top right of the map) shows the same building in 3D. Both views share one state: building, closures, new doors, the current route and a Level 4 draft. Tapping a room or a marked door in 3D opens the same popover as in 2D (start here, go here, close, add door). The floor tabs pick the focused floor in both views. The choice is remembered (`localStorage`), `?view=3d` opens in 3D, `?perf=1` shows fps, draw calls and build time.
+
+- Rooms are floor slabs coloured by type (corridor, hall, stairs, lift, outdoor; production halls ochre, warehouse/logistics green-grey, labs blue) with low walls (42 % of the floor height, 1.1 to 3.2 m) so you can look in. Doors are gaps in the walls at their position and width; entrances are teal and steps orange posts; new doors are green and closed doors red panels.
+- Stairs and lifts are see-through shafts between their stop floors. Things are boxes in true size from `footprint` (width, depth, rotation); machines orange, equipment blue. "Things: near" shows them on the focused floor (up to 2500) or when zoomed in, "all" everywhere, "off" never.
+- Floors: **Stacked** (x-ray: floors above the focused one are see-through outlines), **Exploded** (floors pulled apart), **One floor**. The minimap (bottom left) shows the focused floor with the route and the camera; tap it to move the view there.
+- The route is a glowing line through 3D, with vertical runs at stairs and lifts, drawn progressively like in 2D (static with `prefers-reduced-motion`), then small pulses flow along it. A new route is shown from its lowest floor so the whole climb stays visible. Closed rooms, stairs and lifts are red.
+- Labels: room names near the camera only (rooms too small on screen get none, no overlaps, at most 60); hover shows name and type, or a thing's name and size.
+
+Files: `static/view3d.js` (view state, sync with `app.js`, steering API, labels, minimap), `static/scene3d.js` (three.js rendering only), `static/vendor/three/` (three.js r170 + OrbitControls, MIT, see `VERSION.md`).
+Data: `GET /api/building` now also carries `floors[].elevation_m`, `floors[].height_m` (drafts without them get 3 m per level) and `assets[].footprint` (`width_m`, `depth_m`, `rotation_deg`).
+
+### Steering API (for the agent, later)
+
+The view state lives in `view3d.js`; the renderer only draws it, so these calls work whether 3D is shown or not (camera moves wait until it is). Ids are space, asset, opening, connector or floor ids; exact names also work.
+
+| Call | Does |
+|---|---|
+| `view3d.show()`, `view3d.hide()`, `view3d.toggle()`, `view3d.isActive()` | switch the map pane to 3D and back |
+| `view3d.setFloorMode(mode, floorId?)` | `"stacked"`, `"exploded"` or `"single"` |
+| `view3d.focusFloor(floor)` | floor id, name or level becomes the solid one (the 2D plan follows) |
+| `view3d.focus(ids, {colour, name})` | highlight, focus their floor and fly there; returns `{unknown: [...]}` |
+| `view3d.highlight(ids, colour, {name})` | colour rooms, things, doors, stairs/lifts; the same name replaces, other names add up |
+| `view3d.clearHighlights(name?)` | one named highlight or all |
+| `view3d.flyTo(target)` | id, or `{floor_id, point: [x, y], radius}` |
+| `view3d.showRoute(route)` | draw a route in the `/api/route` shape (`null` hides; `undefined` follows the page's route again) |
+| `view3d.playRoute()` | replay the route animation |
+| `view3d.setThings(mode)` | `"auto"`, `"on"`, `"off"` |
+| `view3d.resetView()` | overview of the building |
+| `view3d.apply(spec)` | one call for a chat reply's `view` object, see below |
+| `view3d.stats()`, `view3d.benchmark(ms)` | build time, draw calls, triangles, fps (benchmark spins the camera) |
+| `view3d.state()` | current view state, e.g. for the agent to read back |
+
+A chat reply may carry `{"reply": "...", "view": {...}}`; `app.js` passes `view` to `view3d.apply()`. Keys (all optional, applied in this order): `mode` (`"2d"`/`"3d"`), `floor_mode`, `floor`, `things`, `clear_highlights` (`true` or a name), `highlight` (`{ids, colour, name}` or a list), `focus` (ids), `fly_to` (id or `{floor_id, point}`), `route` (route object or `null`), `reset`. Example: closures for "What changes?"
+
+```json
+{"view": {"mode": "3d", "floor_mode": "stacked", "highlight": [{"ids": ["...-V02"], "colour": "#dc2626", "name": "closed"}, {"ids": ["...-F2-S014", "...-F2-S015"], "colour": "#f59e0b", "name": "impact"}], "fly_to": "...-V02"}}
+```
+
+Performance (largest kit building `dev/osm-way27917482`: 5 floors, 1623 spaces, 1799 openings, 5250 things; Chrome on a MacBook): all five floors built in about 30 to 40 ms, 20 to 36 draw calls (merged geometry per floor, one instanced mesh per floor for things, doors and shafts), 60 fps (display limit) while orbiting, also exploded with all 5250 things shown (108k triangles). It only renders when something moves. The focused floor is built first, the rest one per idle slice; things are built only when first shown.
+
 ## New building from floor plans (Level 4)
 
 "+ New building" (or the New tab): drop one PNG/JPG per floor, give its floor and one length you know in metres (or tick "scale bar printed"), "Read plans". Each floor is read in the background (one vision call, 10 to 20 s), then the draft is drawn on the plan with suspicious rooms and doors in red and one findings line. Fix it on the plan (tap a room: add a door to a neighbour, set its type; tap a door: remove it) or set the scale per floor. "Save building…" shows the understanding card; only "Yes, save" saves (with "Save anyway" ticked if problems remain). The building then appears under "built from plans" in the picker and is loaded, so routes and chat work on it.
@@ -37,9 +79,9 @@ Offline demo without API calls: `uv run python -m web --fake-plans data/dev/proc
 | `api.py` | Pure functions over `BuildingMap`: building view, route geometry, closures, doors |
 | `chat.py` | Chat adapter, one-line switch `BACKEND` |
 | `level4_api.py` | Upload, background build, preview, fixes, card and save for new buildings from floor plans |
-| `static/` | `index.html`, `app.js`, `style.css`, `voice.js`, `plan.js` (new building flow) |
+| `static/` | `index.html`, `app.js`, `style.css`, `voice.js`, `plan.js` (new building flow), `view3d.js` + `scene3d.js` (3D view), `vendor/three/` |
 
-Tests: `tests/test_web.py`, `tests/test_web_level4.py` (no API calls).
+Tests: `tests/test_web.py`, `tests/test_web_level4.py`, `tests/test_web_view3d.py` (no API calls).
 
 ## Chat backend
 
