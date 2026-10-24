@@ -15,7 +15,7 @@ from PIL import Image
 from shapely.geometry import Polygon
 
 from building_agent.level4.schema import ROOM_TYPES, Extraction
-from building_agent.level4.svg_read import infer_missing_refs, read_svg
+from building_agent.level4.svg_read import infer_missing_refs, read_svg_with_note
 
 SIZE_TOLERANCE = 0.02  # the svg and the png are the same drawing; sizes may differ by rounding only
 MIN_OVERLAP = 0.3  # share of the smaller room that a vision room must cover to lend its name and type
@@ -45,9 +45,8 @@ def find_sibling(image: Path, uploads_root: Path, suffix: str) -> Path | None:
 
 
 def find_building_json(image: Path, uploads_root: Path) -> Path | None:
-    """`<stem>.building.json` next to the image, else the `building.json` of the same folder (a plan folder)."""
-    found = find_sibling(image, uploads_root, ".building.json")
-    return found or _inside(image.with_name("building.json"), uploads_root)
+    """`<stem>.building.json` next to the image (one file per plan, never a shared one)."""
+    return find_sibling(image, uploads_root, ".building.json")
 
 
 def _image_size(image: Path) -> tuple[int, int] | None:
@@ -64,9 +63,9 @@ def svg_extraction(image: Path, uploads_root: Path) -> tuple[Extraction | None, 
     svg = find_sibling(image, uploads_root, ".svg")
     if svg is None:
         return None, "", 0
-    extraction = read_svg(svg)
+    extraction, refused = read_svg_with_note(svg)
     if extraction is None:
-        return None, "The vector file next to the plan is not a plan in the kit's drawing style, so it was ignored.", 0
+        return None, refused, 0
     size = _image_size(image)
     if size is not None and any(
         abs(have - want) > SIZE_TOLERANCE * max(want, 1) + 2

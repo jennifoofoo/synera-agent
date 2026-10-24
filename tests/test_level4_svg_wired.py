@@ -102,7 +102,7 @@ def test_vision_failure_without_svg_is_still_an_error(tmp_path, monkeypatch):
         rig.build()
 
 
-@pytest.mark.parametrize("content", ["not an svg", "<svg width='9pt' height='9pt'></svg>", "<script>alert(1)</script>"])
+@pytest.mark.parametrize("content", ["not an svg", "<svg width='9pt' height='9pt'></svg>"])
 def test_non_kit_svg_is_refused_cleanly(tmp_path, monkeypatch, content):
     rig = Rig(tmp_path, monkeypatch)
     (rig.uploads / "plan.svg").write_text(content, encoding="utf-8")
@@ -116,6 +116,7 @@ def test_svg_with_scripts_or_links_is_refused(tmp_path, monkeypatch):
     text = (rig.source / f"floor_{LEVEL}.svg").read_text(encoding="utf-8")
     (rig.uploads / "plan.svg").write_text(text.replace("</svg>", "<script>alert(1)</script></svg>"), encoding="utf-8")
     assert "vision model" in rig.build()["read_from"]
+    assert any("scripts or external links" in note for note in rig.card()["notes"])  # the UNSAFE check, not "no rooms"
 
 
 def test_svg_of_another_size_is_refused(tmp_path, monkeypatch):
@@ -148,7 +149,9 @@ def test_confirmation_guard_is_unchanged_with_svg(tmp_path, monkeypatch):
     rig = Rig(tmp_path, monkeypatch)
     rig.build()
     rig.card()
-    with pytest.raises(ToolError, match="Ask the person first|new message|answer"):
+    with pytest.raises(
+        ToolError, match="Ask the person first: show the card and wait for their answer in a new message"
+    ):
         rig.call("save_building", confirmed=True, user_reply="ja")
 
 
@@ -173,10 +176,11 @@ def test_scale_from_building_json_field(tmp_path, monkeypatch):
     assert "building.json" in rig.card()["I understood"][0]["scale"]
 
 
-def test_building_json_in_the_folder_is_found(tmp_path, monkeypatch):
-    rig = Rig(tmp_path, monkeypatch)
+def test_a_shared_building_json_in_the_folder_is_not_used(tmp_path, monkeypatch):
+    rig = Rig(tmp_path, monkeypatch, svg=False)
     (rig.uploads / "building.json").write_text(json.dumps({"m_per_px": 1 / px_per_m(rig)}), encoding="utf-8")
-    assert rig.build(known_length_m=None)["scale_source"] == "building_json"
+    with pytest.raises(ToolError, match="length they know"):
+        rig.build(known_length_m=None)
 
 
 def test_scale_from_building_width_and_svg(tmp_path, monkeypatch):

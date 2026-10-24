@@ -127,15 +127,14 @@ def build_building(info: dict, mode: str, levels: list[int], work: Path) -> tupl
     truth = json.loads((directory / "building.json").read_text(encoding="utf-8"))
     uploads = work / "uploads"
     uploads.mkdir(parents=True)
-    floors_json = []
     for level in levels:
         plain = mode == "vision"
         shutil.copy(directory / f"floor_{level}{'_plain' if plain else ''}.png", uploads / f"floor_{level}.png")
         if mode != "vision":
             shutil.copy(directory / f"floor_{level}.svg", uploads / f"floor_{level}.svg")
-        floors_json.append({"level": level, "px_per_m": true_px_per_m(directory, level, truth)})
-    if mode != "vision":
-        (uploads / "building.json").write_text(json.dumps({"floors": floors_json}), encoding="utf-8")
+        if mode != "vision":  # one building.json per plan, like the files that come with each floor
+            floor_scale = {"floors": [{"level": level, "px_per_m": true_px_per_m(directory, level, truth)}]}
+            (uploads / f"floor_{level}.building.json").write_text(json.dumps(floor_scale), encoding="utf-8")
     current = {"level": 0}
 
     def fake_extract(path, client=None, allowed_root=None, **kwargs):

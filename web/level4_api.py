@@ -30,7 +30,7 @@ from building_agent.level4.extract import (
     MIN_SIDE_PX,
     ExtractResult,
 )
-from building_agent.level4.scale_source import MAX_JSON_BYTES, load_building_json
+from building_agent.level4.scale_source import MAX_JSON_BYTES, find_building_width, find_scale, load_building_json
 from building_agent.level4.schema import OUTSIDE, ExtractedDoor, ExtractedRoom, Extraction
 from building_agent.level4.svg_read import MAX_SVG_BYTES, read_svg
 from building_agent.level4.tools import ALONG, BMHolder, make_level4_tools
@@ -246,7 +246,7 @@ class PlanStudio:
         file name is made here from the upload id; the content is checked before it is kept."""
         with self.lock:
             upload = self._upload(upload_id)
-        if kind not in ATTACHMENTS:
+        if not isinstance(kind, str) or kind not in ATTACHMENTS:
             raise Level4Error(f"kind must be one of {', '.join(ATTACHMENTS)}.")
         ending, _, limit = ATTACHMENTS[str(kind)]
         if not data:
@@ -254,7 +254,7 @@ class PlanStudio:
         if len(data) > limit:
             raise Level4Error(f"The file is larger than {limit // (1024 * 1024)} MB.", 413)
         final = upload.path.with_name(upload.upload_id + ending)
-        temp = upload.path.with_name(f".{upload.upload_id}{ending}.part")
+        temp = upload.path.with_name(f".{upload.upload_id}{ending}.{uuid.uuid4().hex[:8]}.part")  # unique per call
         temp.write_bytes(data)
         try:
             if kind == "svg":
@@ -272,7 +272,10 @@ class PlanStudio:
         return {"upload_id": upload.upload_id, "kind": kind, "bytes": len(data), **info}
 
     def _has_building_json(self, upload: Upload) -> bool:
-        return upload.path.with_name(upload.upload_id + ATTACHMENTS["building_json"][0]).is_file()
+        """True only for an attached building.json that is an object holding a usable scale or building width (an
+        empty `{}` or `[]` does not take away the need to give a length)."""
+        data = load_building_json(upload.path.with_name(upload.upload_id + ATTACHMENTS["building_json"][0]))
+        return isinstance(data, dict) and (find_scale(data) is not None or find_building_width(data) is not None)
 
     def _upload(self, upload_id: object) -> Upload:
         text = str(upload_id or "")

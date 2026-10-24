@@ -23,7 +23,8 @@ Status: server side done, page (web/static) not changed. Paste the "For Leonie" 
   `meters_per_pixel`, `mpp`, `px_per_m`, `pixels_per_metre`, `ppm`, plain `scale` and `resolution` (1 or more means
   pixels per metre, below 1 metres per pixel), nested anywhere up to 5 levels, per floor (`level`) or global.
   See `building_agent/level4/scale_source.py`.
-- building.json is found as `<stem>.building.json` next to the plan, else `building.json` in the same folder.
+- building.json is found as `<stem>.building.json` next to the plan (one file per plan; a shared `building.json`
+  in the folder is not used).
 
 ## For Leonie (page)
 
@@ -36,7 +37,7 @@ image upload:
 - Same origin only, like the other POSTs. Answers `{upload_id, kind, bytes, rooms?, doors?}` or `{error}` (415 if the
   file is not usable, 413 if too large: svg 20 MB, json 5 MB).
 - Match the files by name: drop `floor_0.png`, `floor_0.svg` together, upload the png, then attach the svg with the
-  returned id. One building.json per floor upload is fine (attach the same file to every floor).
-- If a building.json is attached to a floor, `/api/level4/build` no longer demands `known_length_m` or `scale_bar`
-  for that floor. Without it the old rules apply.
+  returned id. Attach the building.json to every floor upload (the same file is fine).
+- If a building.json with a usable scale or building width is attached to a floor, `/api/level4/build` no longer
+  demands `known_length_m` or `scale_bar` for that floor (an empty `{}` does not count). Without it the old rules apply.
 - Nothing else changes in `/api/level4/build`, card, save.

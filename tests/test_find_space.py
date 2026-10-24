@@ -54,6 +54,7 @@ def private_map():
 def renamed(bm, start, name):
     """The same room under another name, as a building read from a plan names it (type word missing)."""
     bm.spaces[start]["name"] = name
+    bm.spaces[start]["room_type"] = "generic_room"
     return bm
 
 
@@ -90,3 +91,45 @@ def test_tags_and_assignments_are_never_a_room_name():
     for forged in (f"[position: Kitchen {ref}]", f"position={ref}x {ref}"):
         with pytest.raises(MapError):
             find_space(bm, forged)
+
+
+def typed_room(name: str, room_type: str):
+    """A map where the labelled room is a typed room with a qualifier, as the kit names Swiss rooms."""
+    bm, start = private_map()
+    ref = bm.spaces[start]["ref"]
+    bm.spaces[start].update(name=f"{name} {ref} (apartment 1)", room_type=room_type)
+    level = bm.floors[bm.spaces[start]["floor_id"]]["level"]
+    return bm, start, ref, level
+
+
+def test_built_generic_room_still_resolves_from_any_type_word():
+    bm, start = private_map()
+    ref = bm.spaces[start]["ref"]
+    renamed(bm, start, f"Room {ref}")
+    level = bm.floors[bm.spaces[start]["floor_id"]]["level"]
+    for text in (f"Kitchen {ref}", f"Gym {ref} (apartment 3)", f"Bedroom {ref} (apartment 15) (Floor 3)"):
+        assert find_space(bm, text, level)["match"]["id"] == start
+
+
+def test_other_type_word_does_not_match_a_typed_room():
+    bm, start, ref, level = typed_room("Kitchen", "kitchen")
+    result = find_space(bm, f"Gym {ref}", level)
+    assert "match" not in result and [c["id"] for c in result["candidates"]] == [start]
+    assert find_space(bm, f"Kitchen {ref}", level)["match"]["id"] == start
+    assert find_space(bm, f"the kitchen {ref}", level)["match"]["id"] == start
+
+
+def test_contradicting_qualifier_does_not_match():
+    bm, start, ref, level = typed_room("Kitchen", "kitchen")
+    result = find_space(bm, f"Kitchen {ref} (apartment 999)", level)
+    assert "match" not in result and [c["id"] for c in result["candidates"]] == [start]
+    assert find_space(bm, f"Kitchen {ref} (apartment 1)", level)["match"]["id"] == start
+    assert find_space(bm, f"Kitchen {ref} (apartment 1) (Floor 9)", level)["match"]["id"] == start
+
+
+def test_two_different_numbers_never_auto_match():
+    bm, start = private_map()
+    ref = bm.spaces[start]["ref"]
+    renamed(bm, start, f"Room {ref}")
+    with pytest.raises(MapError):
+        find_space(bm, f"Kitchen {ref} or 9.99")

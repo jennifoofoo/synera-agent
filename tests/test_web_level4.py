@@ -391,3 +391,38 @@ def test_http_attach_checks_origin_type_and_kind(server):
     assert http(url, b'{"mpp": 0.05}', {**good, "Origin": "http://evil.example"})[0] == 403
     assert http(f"{server}/api/level4/attach?upload_id={upload}&kind=exe", b"x", good)[0] == 400
     assert http(f"{server}/api/level4/attach?upload_id=../../x&kind=building_json", b"{}", good)[0] == 400
+
+
+@pytest.mark.parametrize("kind", [["svg"], {"a": 1}, 5, "SVG"])
+def test_attach_kind_must_be_one_of_the_known_strings(app, kind):
+    upload = app.level4.upload(png_bytes())["upload_id"]
+    with pytest.raises(Level4Error) as error:
+        app.level4.attach(upload, kind, b"{}")
+    assert error.value.status == 400
+
+
+@pytest.mark.parametrize("data", [b"{}", b"[]", b'{"building": {"id": "x"}}'])
+def test_building_json_without_a_scale_does_not_remove_the_length_question(app, data):
+    upload = app.level4.upload(png_bytes())["upload_id"]
+    app.level4.attach(upload, "building_json", data)
+    with pytest.raises(Level4Error, match="length you know"):
+        app.level4.start_build({"floors": [{"upload_id": upload, "level": 0}]}, run_async=False)
+
+
+def test_concurrent_attaches_to_one_upload_do_not_clash(app, tmp_path):
+    upload = app.level4.upload(png_bytes())["upload_id"]
+    errors = []
+
+    def attach(value: int) -> None:
+        try:
+            app.level4.attach(upload, "building_json", json.dumps({"px_per_m": value}).encode())
+        except Exception as error:  # noqa: BLE001
+            errors.append(error)
+
+    threads = [threading.Thread(target=attach, args=(10 + n,)) for n in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert not errors
+    assert sorted(p.name for p in (tmp_path / "uploads").iterdir()) == sorted(
+        [f"{upload}.png", f"{upload}.building.json"]
+    )

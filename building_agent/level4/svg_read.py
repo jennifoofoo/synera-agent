@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 
 from shapely.geometry import Point, Polygon
+from shapely.strtree import STRtree
 
 from building_agent.level4.schema import OUTSIDE, ExtractedDoor, ExtractedRoom, Extraction
 
@@ -39,30 +40,51 @@ _GLYPH_SCALE = 0.06  # pt per glyph unit in the kit's text blocks (font size abo
 _GLYPH_ADVANCE = 63.6  # width of the last glyph in those units (digits; close enough for a middle point)
 _CAP_HEIGHT = 0.73  # of the em (100 glyph units)
 MAX_SVG_BYTES = 20 * 1024 * 1024
+MAX_ROOMS = 5000  # a floor of a real building has a few hundred; more is not a plan we can read in a request
+MAX_MARKERS = 20000
+MAX_TEXTS = 5000
+MAX_SIDE_PX = 100000
 UNSAFE = re.compile(r"<script|<!ENTITY|<foreignObject|href=\"(?:https?:|file:|data:|javascript:)", re.IGNORECASE)
 
 
 def read_svg(path: Path) -> Extraction | None:
     """The floor as an Extraction in the pixel frame of the matching png, or None if the file is not such a plan."""
+    return read_svg_with_note(path)[0]
+
+
+def read_svg_with_note(path: Path) -> tuple[Extraction | None, str]:
+    """(extraction, note): the note says in plain words why a file was refused (empty when it was read)."""
+    not_a_plan = "The vector file next to the plan is not a plan in the kit's drawing style, so it was ignored."
     try:
         file = Path(path)
-        if not file.is_file() or file.stat().st_size > MAX_SVG_BYTES:
-            return None
+        if not file.is_file():
+            return None, not_a_plan
+        if file.stat().st_size > MAX_SVG_BYTES:
+            return None, "The vector file is larger than 20 MB, so it was ignored."
         text = file.read_text(encoding="utf-8")
         if UNSAFE.search(text):
-            return None
+            return None, "The vector file contains scripts or external links, so it was ignored."
         size = _SIZE.search(text)
         rooms = _rooms(text)
         if size is None or not rooms:
-            return None
-        _number_rooms(text, rooms)
-        outlines = [(room.id, Polygon(room.polygon_px)) for room in rooms]
-        doors = [door for door in (_door(m, outlines) for m in _MARKER.findall(text)) if door is not None]
-        return Extraction(
-            round(float(size.group(1)) * PNG_PER_PT), round(float(size.group(2)) * PNG_PER_PT), rooms, doors
-        )
-    except (OSError, UnicodeDecodeError, ValueError):
-        return None
+            return None, not_a_plan
+        width, height = float(size.group(1)) * PNG_PER_PT, float(size.group(2)) * PNG_PER_PT
+        markers = _MARKER.findall(text)
+        if not (0 < width <= MAX_SIDE_PX and 0 < height <= MAX_SIDE_PX):
+            return None, "The vector file has an impossible size, so it was ignored."
+        if len(rooms) > MAX_ROOMS or len(markers) > MAX_MARKERS or len(_TEXT.findall(text)) > MAX_TEXTS:
+            return None, "The vector file has too many rooms, doors or labels to read, so it was ignored."
+        tree, shapes = _index(rooms)
+        _number_rooms(text, rooms, tree, shapes)
+        doors = [door for door in (_door(m, rooms, tree, shapes) for m in markers) if door is not None]
+        return Extraction(round(width), round(height), rooms, doors), ""
+    except (OSError, UnicodeDecodeError, ValueError, OverflowError):
+        return None, not_a_plan
+
+
+def _index(rooms: list[ExtractedRoom]) -> tuple[STRtree, list[Polygon]]:
+    shapes = [Polygon(room.polygon_px) for room in rooms]
+    return STRtree(shapes), shapes
 
 
 def _rooms(text: str) -> list[ExtractedRoom]:
@@ -81,9 +103,8 @@ def _rooms(text: str) -> list[ExtractedRoom]:
     return rooms
 
 
-def _number_rooms(text: str, rooms: list[ExtractedRoom]) -> None:
+def _number_rooms(text: str, rooms: list[ExtractedRoom], tree: STRtree, shapes: list[Polygon]) -> None:
     """Set `ref` of every room that holds the middle of a printed number (smallest room wins, one number per room)."""
-    shapes = [(room, Polygon(room.polygon_px)) for room in rooms]
     blocks = list(_TEXT.finditer(text))
     for index, block in enumerate(blocks):
         end = blocks[index + 1].start() if index + 1 < len(blocks) else len(text)
@@ -91,21 +112,21 @@ def _number_rooms(text: str, rooms: list[ExtractedRoom]) -> None:
         width = (max(shifts, default=0.0) + _GLYPH_ADVANCE) * _GLYPH_SCALE
         x = (float(block.group(2)) + width / 2) * PNG_PER_PT
         y = (float(block.group(3)) - _CAP_HEIGHT * 100 * _GLYPH_SCALE / 2) * PNG_PER_PT
-        point = Point(x, y)
-        holders = sorted(
-            ((shape.area, index, room) for index, (room, shape) in enumerate(shapes) if shape.contains(point))
-        )
-        if holders and holders[0][2].ref is None:
-            holders[0][2].ref = block.group(1).strip()
+        holders = sorted((shapes[i].area, int(i)) for i in tree.query(Point(x, y), predicate="within"))
+        if holders and rooms[holders[0][1]].ref is None:
+            rooms[holders[0][1]].ref = block.group(1).strip()
 
 
-def _door(marker: tuple[str, str, str], outlines: list[tuple[str, Polygon]]) -> ExtractedDoor | None:
+def _door(
+    marker: tuple[str, str, str], rooms: list[ExtractedRoom], tree: STRtree, shapes: list[Polygon]
+) -> ExtractedDoor | None:
     x, y, colour = float(marker[0]) * PNG_PER_PT, float(marker[1]) * PNG_PER_PT, marker[2]
     kind = MARKER_KINDS.get(colour)
     if kind is None:
         return None
     point = Point(x, y)
-    near = sorted(((shape.distance(point), room_id) for room_id, shape in outlines))
+    close = tree.query(point.buffer(MAX_MARKER_DISTANCE_PX))
+    near = sorted((shapes[i].distance(point), rooms[i].id) for i in close)
     wanted = 1 if kind == "entrance" else 2
     near = [item for item in near[:wanted] if item[0] <= MAX_MARKER_DISTANCE_PX]
     if len(near) < wanted:
