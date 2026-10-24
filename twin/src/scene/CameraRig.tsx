@@ -48,19 +48,41 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const camera = useThree((s) => s.camera);
   const viewport = useThree((s) => s.size);
 
+  // The visible area is the window [bottom .. bottom + h] of a taller/wider virtual frame. The frustum must be built
+  // for the aspect (and, orthographic, the extents) of that FULL frame, otherwise the crop scales x and y
+  // differently and everything is stretched. react-three-fiber resets aspect/extents on resize, so this runs
+  // again from an effect and from a per-frame guard.
+  const insets = useRef({ bottom: 0, top: 0, right: 0 });
+  insets.current = { bottom: bottomInset, top: topInset, right: rightInset };
+  const applyFrame = () => {
+    const w = viewport.width;
+    const h = viewport.height;
+    if (w < 1 || h < 1) return;
+    const bottom = Math.min(insets.current.bottom, h * 0.6);
+    const top = Math.min(insets.current.top, h * 0.4);
+    const right = Math.min(insets.current.right, w * 0.6);
+    const fullW = w + right;
+    const fullH = h + bottom + top;
+    const covered = bottom > 0 || right > 0 || top > 0;
+    const cam = camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
+    if (cam.isPerspectiveCamera) cam.aspect = covered ? fullW / fullH : w / h;
+    else if (cam.isOrthographicCamera) {
+      const ew = covered ? fullW : w;
+      const eh = covered ? fullH : h;
+      cam.left = -ew / 2;
+      cam.right = ew / 2;
+      cam.top = eh / 2;
+      cam.bottom = -eh / 2;
+    }
+    if (covered) cam.setViewOffset(fullW, fullH, 0, bottom, w, h);
+    else cam.clearViewOffset();
+    cam.updateProjectionMatrix();
+  };
+
   // UI covering the bottom (dock, sheet): render the top part of a taller virtual frame so the framed object
   // sits in the visible area above it.
   useEffect(() => {
-    const w = viewport.width;
-    const h = viewport.height;
-    const inset = Math.min(bottomInset, h * 0.6);
-    const top = Math.min(topInset, h * 0.4);
-    const right = Math.min(rightInset, w * 0.6);
-    // The visible area is the window [bottom .. bottom + h] of a taller/wider virtual frame, so the frame's centre
-    // lands in the middle of the part not covered by UI.
-    if (inset > 0 || right > 0 || top > 0) camera.setViewOffset(w + right, h + inset + top, 0, inset, w, h);
-    else camera.clearViewOffset();
-    camera.updateProjectionMatrix();
+    applyFrame();
     invalidate();
   }, [camera, viewport.width, viewport.height, bottomInset, rightInset, topInset, invalidate]);
 
@@ -278,6 +300,16 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   useFrame(() => {
     const w = window as unknown as { __twinFrames?: number };
     w.__twinFrames = (w.__twinFrames ?? 0) + 1;
+    {
+      const pc = camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
+      const { bottom, top, right } = insets.current;
+      const covered = bottom > 0 || right > 0 || top > 0;
+      const expectW = viewport.width + Math.min(right, viewport.width * 0.6);
+      const stale = pc.isPerspectiveCamera
+        ? Math.abs(pc.aspect - (covered ? expectW / (viewport.height + Math.min(bottom, viewport.height * 0.6) + Math.min(top, viewport.height * 0.4)) : viewport.width / viewport.height)) > 1e-4
+        : Math.abs(pc.right - pc.left - (covered ? expectW : viewport.width)) > 0.5;
+      if (stale || covered !== !!pc.view?.enabled) applyFrame();
+    }
     const c = controls.current;
     if (c && flat && focusedFloorId) {
       const floor = model.floorById.get(focusedFloorId);
