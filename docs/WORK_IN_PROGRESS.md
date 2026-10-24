@@ -28,6 +28,14 @@ Für Leonie und ihren Agenten: damit niemand dieselbe Datei doppelt anfasst. Cod
 
 **Leonie selbst:** Wake Word "Hey Wanda" (Spec `docs/specs/voice-handsfree.md` Teil B). Bitte vorher pullen, `voice.ts` wurde unten (Ton-Freischaltung, Wake Lock) vom Handy-Fix geändert.
 
+### Neu seit 01:00
+| Branch | Was | Dateien |
+|---|---|---|
+| `feat/twin-semantic-zoom` | Informationsstufen beim Zoomen (`docs/specs/semantic-zoom.md`): Bereiche von weit, Gerätesymbole mittel, Typ und Fläche, Türbreiten nah | `scene/mapZoom.ts`, `scene/Labels.tsx`, Raumkarte |
+| `feat/twin-walk-motion` | **fertig**: Modul "Walk with me" (Schritte zählen, Kompass, Punkt auf der Route), `twin/src/motion/`, 32 Tests | nur `twin/src/motion/` |
+| `feat/twin-walk-wired` | Anbindung: Schalter "Walk with me" im Begleit-Sheet, Punkt "estimated", Ansage am Etappenende, Warten an Treppe/Aufzug | Begleit-Sheet (`Walk.tsx`), Marker |
+In `main` seit 01:00: Raumfarben, Geisterbild-Fix (Puffer der Nachbearbeitung bei Auflösungswechsel), Leonies Wake Word und Ein-Etagen-Ansicht.
+
 ## Beschlossene Regeln (für alle Agenten)
 1. **Was wann sichtbar ist:** "Alles zeigen, aber leise." Formen (Möbel, Maschinen) ab etwa 3 bis 4 px Bildschirmgröße auf jeder Zoomstufe. Text und Symbole nach Leonies Stufen in `mapZoom.ts` (weit: Zonen und POIs; mittel: alle Raumnamen; nah: Maschinennamen). Bei Route und Begleiten werden Formen blasser und die Landmarken der Wegbeschreibung kräftiger und beschriftet.
 2. **Etagen in 3D:** keine halbdurchsichtigen Etagen. Aktive Etage voll, darüber nichts, darunter nur Umriss.
