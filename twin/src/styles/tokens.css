@@ -24,6 +24,18 @@
   --warn: #4a5260; /* stairs / caution text */
   --info: #004fab; /* "you are here" */
 
+  /* room groups (scene, palette.ts GROUP_COLOURS): very pale hue only for places people look for, the rest stays
+   * neutral grey. Never colour alone: each also has an icon and a legend row. Ink text on each is >= 8.6:1. */
+  --room-food: #e8d8b8; /* kitchen, canteen: sand */
+  --room-sanitary: #cde2e8; /* toilet, bathroom, locker room: pale aqua */
+  --room-vertical: #c5bcd8; /* stairs and lifts: muted violet (also the shafts) */
+  --room-meeting: #c9d6c0; /* meeting, seminar, lecture hall, library: pale sage */
+  --room-walkway: #eee7b8; /* main aisles in factory halls: pale lemon, like a floor marking */
+
+  /* safety (ISO 7010 / ISO 3864), icons only, never room fills */
+  --safety-red: #a52019; /* fire extinguisher (scene) */
+  --safety-green: #237f52; /* first aid, eyewash, defibrillator, emergency exit (scene) */
+
   /* shape: small and square, no pills */
   --radius: 5px;
   --radius-sm: 4px;

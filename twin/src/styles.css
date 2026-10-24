@@ -72,7 +72,10 @@ button.x:hover { color: var(--text); background: transparent; }
   padding: 3px 4px 3px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
   font-size: 13px; color: var(--muted);
 }
-.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: var(--radius-sm); }
+.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: var(--radius-sm); border-color: transparent; background: transparent; color: var(--muted); }
+.pill button:hover { color: var(--text); background: var(--paper-2); }
+/* rarely used (List, the changes pill, step-free): quiet until hovered, so each state keeps at most two main actions */
+.planner-toggle:hover { color: var(--text); border-color: var(--line); }
 
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(244, 242, 238, 0.7); z-index: 5; pointer-events: none; }
 .overlay.error { color: var(--danger); pointer-events: auto; }
@@ -88,6 +91,9 @@ button.x:hover { color: var(--text); background: transparent; }
   background: transparent; border: 0; padding: 0; color: var(--ink); font-size: 12px; font-weight: 500;
   text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 2px var(--paper), 0 0 2px var(--paper);
 }
+/* 2D: machine names (near) are smaller and grey; landmarks of the directions are ink and a touch bolder */
+.label.label-plan.label-thing { font-size: 11px; font-weight: 400; color: var(--ink-2); }
+.label.label-plan.label-landmark { font-size: 11.5px; font-weight: 600; color: var(--ink); }
 .poi {
   width: 20px; height: 20px; border-radius: 3px; background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink-2);
   font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;

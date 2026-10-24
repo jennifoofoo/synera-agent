@@ -48,9 +48,9 @@ export function App() {
       <Phone />
       <div className="dock">
         <CampusCard />
-        {/* While walking only the step sheet: no card, no chat. */}
+        {/* While walking: the step sheet and only the Talk button (say "next" while walking). */}
         {walking ? <Walk /> : <Card />}
-        {!walking && <Omnibox />}
+        <Omnibox walking={walking} />
       </div>
       <NewBuilding />
       <KeyHelp />

@@ -102,5 +102,16 @@
   border: 2px solid var(--panel-solid); pointer-events: none;
 }
 .ob-fab .ob-badge svg { width: 14px; height: 14px; }
+/* icon plus word ("Ask", "Talk"): an icon alone makes people guess */
+.ob-fab.ob-labelled { width: auto; padding: 0 14px 0 12px; gap: 6px; font-size: 14px; font-weight: 600; }
+.ob-fab-label { line-height: 1; }
 .omnibox.collapsed .ob-status { align-self: flex-end; }
+/* suggestion chips above the empty input: send the question as if typed */
+.ob-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ob-chip {
+  min-height: 32px; padding: 4px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); font-size: 13px; box-shadow: var(--shadow-float);
+}
+.ob-chip:hover { background: var(--paper-2); }
+.worker .ob-chip { min-height: 44px; font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }
