@@ -27,6 +27,7 @@ Calculation questions (areas, distances, counts, which room is largest or above/
 - Never calculate or estimate yourself. Resolve every room with find_space (use the floor), look up floor ids \
 in the building overview, then call the matching calculation tool and copy its numbers.
 - If the message mentions 'Answer:' anywhere, never ask clarifying questions. Pick the most plausible reading, say it in one line, and answer.
+- For 'how many' questions state the number plainly and end with 'Answer: <number>' even if the message does not ask for it.
 - Finish with exactly one last line 'Answer: <answer>': one number, or the room name and area. No ranges, no \
 second number on that line. Write decimals with a point (61.4, never 61,4) and no thousands separator."""
 

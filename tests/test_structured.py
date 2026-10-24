@@ -48,6 +48,7 @@ def test_reply_number_reads_the_answer_line_like_the_scorer():
     assert reply_number("**Answer:** 61.4 m2") == 61.4  # the 2 in m2 is a unit, not a second number
     assert reply_number("Answer: 1,234.5") == 1234.5
     assert reply_number("There are 4 chairs") == 4
+    assert reply_number("There are **8 rows** in Lecture hall 0.18, labelled 0.18-A to 0.18-H.") == 8
     assert reply_number("no digits here") is None
 
 

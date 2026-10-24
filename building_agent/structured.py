@@ -45,8 +45,12 @@ def located_entries(bm: BuildingMap) -> list[dict]:
 def reply_number(reply: str) -> float | None:
     """The committed number, read exactly like the official scorer: the 'Answer:' line, else the whole reply."""
     committed = committed_answer(reply)
-    found = numbers_in(committed if committed is not None else reply)
-    return found[-1] if found else None
+    if committed is not None:
+        found = numbers_in(committed)
+        return found[-1] if found else None
+    found = numbers_in(reply)
+    whole = [value for value in found if value.is_integer()]
+    return (whole or found)[0] if found else None  # no committed line: a count is a whole number, mostly first
 
 
 def structured_entry(question_id: str, kind: str, bm: BuildingMap, reply: str) -> dict:
