@@ -32,6 +32,14 @@ Man soll auf einen Blick sehen, wo Küche, WC, Treppe oder Besprechung sind, ohn
 
 Die vier Farbtöne liegen auch in der Helligkeit auseinander, damit sie bei Rot-Grün-Schwäche unterscheidbar bleiben. Beim Bauen mit einem Farbfehlsichtigkeits-Filter (Chrome DevTools, "Emulate vision deficiencies") prüfen.
 
+## Fabriken (Ergänzung, mit Jennifer abgestimmt)
+In Hallen gelten feste Konventionen: Bodenmarkierung nach Lean/5S (Gelb = Geh- und Fahrwege) und Sicherheitsfarben nach ISO 7010 / ISO 3864 (Rot = Brandschutz, Grün = Rettung und Erste Hilfe).
+- Zonen (production, assembly, additive, warehouse, logistics) bleiben neutral, nur Helligkeit.
+- Hauptgänge und Fahrwege (Flure in Industriegebäuden, Räume mit "aisle" im Namen, Gabelstapler-Gänge) blass gelb `#eee7b8` (kühler, zitroniger Ton, klar getrennt vom warmen Sand der Küchen `#eadfc6`).
+- Maschinen neutrale Formen (Pixelgrößen-Regel aus `docs/ux-cognitive-load.md`), Landmarken an der Route hervorgehoben.
+- Sicherheit nur als Symbol in Normfarben: Feuerlöscher rot, Erste Hilfe, Augendusche, Defibrillator und Notausgang grün. Keine Raumflächen in Rot oder Grün.
+- Sozialräume in Fabriken (Küche, WC, Umkleide, Besprechung) wie im Büro gefärbt.
+
 ## Was sich ändert
 - `twin/src/model/palette.ts`: `SpaceGroup` und `GROUP_COLOURS` nach der Tabelle, Regel "never by hue" ersetzt durch "hue only for sought-after groups".
 - `twin/DESIGN.md` und `twin/src/styles/tokens.css`: die vier Gruppenfarben als Tokens.
