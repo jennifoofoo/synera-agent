@@ -135,27 +135,12 @@ async function loadBuilding(key, reset = false) {
   setBanner(null);
   const nRooms = data.spaces.filter((s) => s.type === "room" || s.type === "hall").length;
   $("#building-meta").textContent = `${data.floors.length} floor${data.floors.length > 1 ? "s" : ""} · ${nRooms} rooms · ${data.assets.length} things · ${data.source}`;
-  fillDatalist();
   const ground = data.floors.find((f) => f.level === 0) || data.floors[0];
   app.floorId = ground.id;
   applyState(data.state, { silent: true });
   showFloor(app.floorId, true);
   $("#chat-log").innerHTML = "";
   addMessage("system", `Building: ${data.name}. Ask where things are, how to get somewhere, or tell me what is closed.`);
-}
-
-function fillDatalist() {
-  const list = $("#space-names");
-  list.innerHTML = "";
-  const seen = new Set();
-  for (const s of app.building.spaces) {
-    if (seen.has(s.name)) continue;
-    seen.add(s.name);
-    const option = document.createElement("option");
-    option.value = s.name;
-    option.label = floorName(s.floor_id);
-    list.appendChild(option);
-  }
 }
 
 // What the person typed -> what the server resolves: exact unique name -> id, otherwise the raw text.
@@ -664,9 +649,10 @@ function addVia(spaceId) {
 function addViaRow() {
   const row = document.createElement("div");
   row.className = "via-row";
-  row.innerHTML = `<label>Stop <input list="space-names" autocomplete="off" placeholder="Room on the way"></label><button type="button" class="link">✕</button>`;
+  row.innerHTML = `<label>Stop <input class="place" autocomplete="off" placeholder="Room on the way"></label><button type="button" class="link">✕</button>`;
   row.querySelector("button").onclick = () => { row.remove(); };
   $("#via-list").appendChild(row);
+  attachSuggest(row.querySelector("input"));
   return row;
 }
 
@@ -675,6 +661,71 @@ function submitRoute() {
   if (!from.value.trim() || !to.value.trim()) return toast("Set a start and a destination.", true);
   const via = [...document.querySelectorAll("#via-list input")].filter((i) => i.value.trim()).map(inputRef);
   requestRoute(inputRef(from), inputRef(to), { via });
+}
+
+// ---------- place suggestions (own list: the native <datalist> popup is misplaced in embedded browsers) ----------
+
+const suggest = { input: null, items: [], index: -1 };
+
+function placeMatches(text) {
+  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const hits = app.building.spaces.filter((s) => {
+    const hay = `${s.name} ${s.ref || ""} ${s.room_type.replaceAll("_", " ")}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+  const first = words[0];
+  hits.sort((a, b) => (b.name.toLowerCase().startsWith(first) - a.name.toLowerCase().startsWith(first)) || a.name.localeCompare(b.name));
+  return hits.slice(0, 8);
+}
+
+function showSuggest(input) {
+  const box = $("#suggest");
+  suggest.input = input;
+  suggest.items = placeMatches(input.value);
+  suggest.index = -1;
+  if (!suggest.items.length || (suggest.items.length === 1 && suggest.items[0].name === input.value)) {
+    box.hidden = true;
+    return;
+  }
+  box.innerHTML = suggest.items
+    .map((s, i) => `<div class="suggest-item" data-i="${i}"><span>${esc(s.name)}</span><span class="kind">${esc(floorName(s.floor_id))}</span></div>`)
+    .join("");
+  const panel = input.closest(".panel").getBoundingClientRect();
+  const rect = input.getBoundingClientRect();
+  box.style.left = rect.left - panel.left + "px";
+  box.style.top = rect.bottom - panel.top + input.closest(".panel").scrollTop + 2 + "px";
+  box.style.width = rect.width + "px";
+  box.hidden = false;
+}
+
+function pickSuggest(i) {
+  const space = suggest.items[i];
+  if (!space || !suggest.input) return;
+  suggest.input.value = space.name;
+  suggest.input.dataset.id = space.id;
+  $("#suggest").hidden = true;
+}
+
+function attachSuggest(input) {
+  input.addEventListener("input", () => { delete input.dataset.id; showSuggest(input); });
+  input.addEventListener("focus", () => input.value && showSuggest(input));
+  input.addEventListener("blur", () => setTimeout(() => ($("#suggest").hidden = true), 150));
+  input.addEventListener("keydown", (e) => {
+    const box = $("#suggest");
+    if (box.hidden) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      const n = suggest.items.length;
+      suggest.index = (suggest.index + (e.key === "ArrowDown" ? 1 : n - 1)) % n;
+      box.querySelectorAll(".suggest-item").forEach((el, i) => el.classList.toggle("active", i === suggest.index));
+    } else if (e.key === "Enter" && suggest.index >= 0) {
+      e.preventDefault();
+      pickSuggest(suggest.index);
+    } else if (e.key === "Escape") {
+      box.hidden = true;
+    }
+  });
 }
 
 // ---------- find ----------
@@ -850,6 +901,12 @@ function wireUi() {
     applyState(result.state, { silent: true });
   };
   $("#find-input").oninput = runFind;
+  attachSuggest($("#route-from"));
+  attachSuggest($("#route-to"));
+  $("#suggest").addEventListener("mousedown", (e) => {
+    const item = e.target.closest(".suggest-item");
+    if (item) { e.preventDefault(); pickSuggest(Number(item.dataset.i)); }
+  });
   $("#reset").onclick = async () => {
     $("#route-from").value = ""; $("#route-to").value = ""; $("#via-list").innerHTML = "";
     app.state = { closed: [], added_doors: [], route: null };
