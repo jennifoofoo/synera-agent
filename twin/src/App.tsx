@@ -1,0 +1,34 @@
+import { useEffect } from "react";
+import { Scene } from "./scene/Scene";
+import { useTwin } from "./store";
+import { Card } from "./ui/Card";
+import { ChangesPill } from "./ui/ChangesPill";
+import { FloorRail } from "./ui/FloorRail";
+import { Omnibox } from "./ui/Omnibox";
+import { TopBar } from "./ui/TopBar";
+
+/** One screen: the building, one input, one card. Everything else only when needed. */
+export function App() {
+  const loadBuildings = useTwin((s) => s.loadBuildings);
+  const profile = useTwin((s) => s.profile);
+  const building = useTwin((s) => s.building);
+  const loading = useTwin((s) => s.loading);
+  const error = useTwin((s) => s.error);
+  useEffect(() => {
+    void loadBuildings();
+  }, [loadBuildings]);
+  return (
+    <div className={`app ${profile}`}>
+      <Scene />
+      <TopBar />
+      <FloorRail />
+      <ChangesPill />
+      <div className="dock">
+        <Card />
+        <Omnibox />
+      </div>
+      {loading && <div className="overlay">Loading {building?.name ?? "building"}…</div>}
+      {error && <div className="overlay error">{error}</div>}
+    </div>
+  );
+}
