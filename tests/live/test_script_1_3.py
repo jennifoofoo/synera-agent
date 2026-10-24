@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from starter_agent.building_map import BuildingMap, MapError
-from tests.live.harness import Call, Transcript, dev_building, run_script
+from tests.live.harness import Call, Transcript, dev_building, effective_start, run_script
 
 ROUTING = ("find_route", "give_directions")
 SEARCHING = ("search_building", "find_space", "find_for_task")
@@ -87,13 +87,13 @@ def assert_searched_before_routing(transcript: Transcript) -> None:
 
 
 def assert_no_invented_places(bm: BuildingMap, transcript: Transcript) -> None:
-    for _, call in routing_calls(transcript):
+    for index, call in routing_calls(transcript):
         if call.is_error:
             continue
-        for key in ("start", "destination"):
-            assert resolve(bm, call.args.get(key)) is not None, (
-                f"{call.name} {key}={call.args.get(key)!r} is not in the building"
-            )
+        assert effective_start(bm, transcript, index, call) is not None, f"{call.name} has no valid start"
+        assert resolve(bm, call.args.get("destination")) is not None, (
+            f"{call.name} destination={call.args.get('destination')!r} is not in the building"
+        )
         for place in call.args.get("via") or []:
             assert resolve(bm, place) is not None, f"via {place!r} is not in the building"
 
@@ -176,9 +176,9 @@ def test_script_3_change_of_mind_keeps_the_start():
     before = [call for index, call in routing_calls(transcript) if index == 0 and not call.is_error]
     after = [call for index, call in routing_calls(transcript) if index == 1 and not call.is_error]
     assert before and after, "expected a successful route in both turns"
-    assert resolve(bm, before[-1].args["start"]) == start["id"]
+    assert effective_start(bm, transcript, 0, before[-1]) == start["id"]
     for call in after:
-        assert resolve(bm, call.args["start"]) == start["id"], "start changed after the change of mind"
+        assert effective_start(bm, transcript, 1, call) == start["id"], "start changed after the change of mind"
     assert resolve(bm, after[-1].args["destination"]) == second["id"]
 
     asks_for_start = [

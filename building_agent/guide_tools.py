@@ -11,8 +11,12 @@ from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
 from building_agent import edit_ops, routing
+from building_agent import walk as walking
 from building_agent.directions import DirectionsSession
 from building_agent.impact import analyse
+from building_agent.position import Position, no_position_error
+from building_agent.time_words import SCHEDULED_REPLY, names_a_time, when_is_later
+from building_agent.walk import Walk
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
@@ -47,6 +51,9 @@ class GuideState:
     signature: tuple = ()
     log: list[dict] = field(default_factory=list)
     undo: deque = field(default_factory=lambda: deque(maxlen=UNDO_DEPTH))
+    position: Position | None = None  # where the person stands; only the server sets it, one per conversation
+    last_user_text: str = ""  # the person's latest message, set by the agent: guards read it, not the model
+    walk: Walk | None = None  # the route handed out last: room sequence, mode (overview, guided), current step
 
     def begin_turn(self) -> None:
         """A card can only be answered in the very next message; later it is stale and dropped."""
@@ -266,44 +273,114 @@ def check_directions(state: GuideState, bm: BuildingMap) -> None:
 
 def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState) -> list:
     @beta_tool
-    def give_directions(start: str, destination: str, step_free: bool = False, via: list[str] | None = None) -> str:
-        """Directions for a person on foot, with landmarks, handed out in chunks of at most 3 steps.
-        Read out only the steps returned; the person asks for the rest with next_steps.
+    def give_directions(
+        destination: str,
+        start: str | None = None,
+        step_free: bool = False,
+        via: list[str] | None = None,
+        guided: bool = False,
+        replace_guide: bool = False,
+    ) -> str:
+        """Directions for a person on foot, for voice. A route of 3 or more steps comes back as an OVERVIEW
+        (2 to 4 landmarks, the length and one offer): say the landmarks in one flowing sentence, the length, then
+        the offer, nothing more, and wait. A short route comes back as steps: read them out. With guided=true
+        (the person said "guide me", "walk me there", "begleite mich", or said yes to the offer) you get only the
+        first step: say it and wait. No ids, no lists, no question after a step.
 
         Args:
-            start: Space id, asset id, or exact room number/name of where the person is.
             destination: Space id, asset id, or exact room number/name of where they want to go.
+            start: Space id, asset id, or exact room number/name of where the person is. Leave it out to start at
+                the person's position (see set_position) and say so (start_assumed).
             step_free: True to avoid stairs and steps (wheelchair, pram, trolley, crutches).
             via: Optional places to visit in order before the destination.
+            guided: True to start guiding at once (see above).
+            replace_guide: True only after the person clearly agreed to drop the route they are being guided on
+                (the tool returns needs_confirmation when another destination is being guided).
         """
+        if start is None and state.position is None:
+            raise ToolError(no_position_error(state))
+        old = state.walk if state.walk is not None and state.walk.mode != "plain" else None
         try:
-            route = routing.route(bm, start, destination, step_free, via)
-            state.session = DirectionsSession.from_route(bm, route)
+            target = bm.resolve_space(destination)
+            conflict = walking.guide_conflict(bm, state, target, replace_guide)
+            if conflict is not None:
+                return as_json(conflict)
+            route = routing.route(bm, state.position.space_id if start is None else start, destination, step_free, via)
+            walk = walking.remember_route(bm, state, route, [bm.resolve_space(stop) for stop in via or []])
+            state.session = None
             state.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
         result = {
+            **({"start_assumed": bm.describe_space(route.start_space_id)} if start is None else {}),
+            **({"replaced_previous": bm.spaces[old.destination]["name"]} if old and old.destination != target else {}),
             "length_m": route.length_m,
             "step_free": route.step_free,
-            "steps": state.session.next(),
-            "steps_remaining": state.session.remaining(),
         }
+        if len(walk.steps) < walking.MIN_STEPS_FOR_OVERVIEW:
+            result.update({"steps": walk.steps, "steps_remaining": 0})
+        else:
+            walk.mode = "guided" if guided else "overview"
+            if guided:
+                walking.set_route_position(bm, state, walk)
+            result.update(walking.payload(bm, walk))
         if step_free:
             result["normal_route_length_m"] = compare_normal_length(bm, route)
         return as_json(result)
 
+    def walk_message(said: str) -> dict:
+        """One person message while a walk exists; a changed building is folded in first."""
+        if state.signature != building_signature(bm):
+            if state.walk.mode == "plain":  # all steps were handed out already: they are simply out of date
+                state.walk = None
+                raise ToolError(
+                    "The building changed since these directions (a closure or door). Call give_directions again."
+                )
+            before = state.walk.left_cache.get(state.walk.index)
+            state.signature = building_signature(bm)
+            update = walking.after_change(bm, state, before)
+            if update and "route_unaffected" not in update:
+                return {
+                    **update,
+                    "note": "The building changed (a closure or door). Say the route changed, then go on.",
+                }
+        return walking.apply(bm, state, said)
+
     @beta_tool
     def next_steps() -> str:
-        """The next (at most 3) steps of the current directions, when the person says 'weiter' or 'next'."""
+        """While guiding: the person says next, done, ok, weiter, "I'm here", "where next" or "und jetzt?" (they
+        reached the current stop): returns the next step only. Say a 1 to 3 word acknowledgement ("Good."), then the
+        step, no question; on arrived say "You're there. That was the last step." Never repeat the overview.
+        Without guiding it hands out the next (at most 3) steps of the current directions ('weiter', 'next')."""
+        if state.walk is not None:
+            return as_json(walk_message("next"))
         check_directions(state, bm)
         steps = state.session.next()
         return as_json({"steps": steps, "steps_remaining": state.session.remaining(), "done": not steps})
 
     @beta_tool
     def repeat_steps() -> str:
-        """The steps handed out last, again, when the person says 'nochmal' or 'repeat'."""
+        """The current step again, when the person says 'nochmal', 'repeat' or 'again'. It never advances.
+        Without guiding it repeats the steps handed out last."""
+        if state.walk is not None:
+            return as_json(walk_message("repeat"))
         check_directions(state, bm)
         return as_json({"steps": state.session.repeat(), "steps_remaining": state.session.remaining()})
+
+    @beta_tool
+    def walk(said: str) -> str:
+        """Guiding commands, in the person's own words (English or German), copied word for word: yes or "guide
+        me" after the offer, back, "how far" or "where am I on the way" (step k of n and metres left), stop,
+        overview, "start over", "where do I go again" (say the current step and the destination, no advance).
+        Also fine for next, repeat and "I'm here". If the person NAMES a place ("I'm at the lift") call
+        set_position instead. The result says what to say; it is short and has no ids.
+
+        Args:
+            said: What the person said.
+        """
+        if state.walk is None:
+            raise ToolError("No directions yet. Call give_directions first.")
+        return as_json(walk_message(said))
 
     @beta_tool
     def assume_closed(element: str) -> str:
@@ -315,6 +392,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         Args:
             element: Name or id of the lift, staircase, door or room that is closed.
         """
+        if names_a_time(state.last_user_text):  # a closure for later cannot be scheduled: never close it now
+            return as_json(SCHEDULED_REPLY)
         try:
             target = bm.find_element(element)
         except MapError as error:
@@ -338,6 +417,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         to_space: str | None = None,
         asset_type: str | None = None,
         hint: dict | None = None,
+        when: str | None = None,
     ) -> str:
         """Prepare a change to the building and return an understanding card. Changes nothing yet.
         Show the card to the person, wait for their explicit yes in their NEXT message, then call confirm_change.
@@ -359,7 +439,12 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             hint: Where exactly, for move_asset and add_asset. One of {"anchor": "NW"} (NW NE SW SE N S E W center;
                 a corner or a wall, back against the wall), {"near": "<room or asset>"} or {"point": [x, y]}
                 (metres, inside the room), plus optional {"rotation_deg": n}.
+            when: Any time the person named for the change ("tomorrow", "from Monday", "next week", "morgen", "ab
+                Montag"). Scheduling does not exist: pass it and nothing is changed or proposed. Not for now, today, jetzt or heute.
         """
+        if when_is_later(when) or names_a_time(state.last_user_text):  # decided on the person's own words too
+            state.pending = None
+            return as_json(SCHEDULED_REPLY)
         if action not in ACTIONS:
             raise ToolError(f"action must be one of {ACTIONS}.")
         if state.pending is not None and state.pending.turn == state.turn:
@@ -449,6 +534,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         state.pending = None
         if pending.signature != building_signature(bm):
             raise ToolError("The building changed since this card was made. Call propose_change again.")
+        left_before = walking.left_now(bm, state)
         if confirmed and (not YES.search(user_reply) or NO.search(user_reply)):
             raise ToolError("That reply is not a clear yes. Ask the person again, then call propose_change anew.")
         if not confirmed:
@@ -485,13 +571,17 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         output_directory.mkdir(parents=True, exist_ok=True)
         bm.save(output_directory / "building_edited.json")
         state.log.append({"turn": state.turn, "change": what})
+        update = walking.after_change(bm, state, left_before)
+        if update is not None:  # the walk now describes the changed building
+            state.signature = building_signature(bm)
         return as_json(
             {
                 "applied": True,
                 "change": what,
                 "effect": pending.card["effect on your last route"],
                 "all_closed": sorted(bm.closed),
+                **({"walk_update": update} if update else {}),
             }
         )
 
-    return [give_directions, next_steps, repeat_steps, assume_closed, propose_change, confirm_change]
+    return [give_directions, next_steps, repeat_steps, walk, assume_closed, propose_change, confirm_change]

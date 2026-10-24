@@ -79,7 +79,10 @@ class Session:
     directory: Path
     map: BuildingMap
     route_request: dict | None = None
+    position: dict | None = None  # where the chat thinks the person is: {space_id, floor_id, point, source}
+    guide_info: dict | None = None  # the leg being guided (rooms), from the chat; state_view draws it
     route_version: int = 0  # bumped by every route the page asks for or clears; newer page routes win
+    campus: object | None = None  # web.campus_api.CampusService (shared by all sessions), or None
     original_opening_ids: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
@@ -256,7 +259,38 @@ def state_view(session: Session) -> dict:
         "closed": sorted(bm.closed),
         "added_doors": [opening_summary(bm, opening_id) for opening_id in session.added_door_ids],
         "route": current_route(session),
+        "position": session.position,
+        "guide": guide_view(session),
+        "campus": campus_state(session),
         **edit_state(bm),
+    }
+
+
+def campus_state(session: Session) -> dict:
+    """Level 3: {loaded, key, name, route, closed_links}, see web/campus_api.py. Not loaded: loaded false."""
+    if session.campus is None:
+        return {"loaded": False, "key": None, "name": None, "route": None, "closed_links": []}
+    return session.campus.state()
+
+
+def guide_view(session: Session) -> dict | None:
+    """The current leg while guided walking is active, else None (also after arrival: the page then shows the
+    destination only). points: the leg's polyline in model metres, the same line the route would draw for it."""
+    info = session.guide_info
+    if not info:
+        return None
+    try:
+        leg = draw_route(session, info["from"], info["to"], info["step_free"], info["between"])
+        points = [point for segment in leg["segments"] for point in segment["points"]]
+        segments = leg["segments"]
+    except MapError:
+        points, segments = [], []
+    return {
+        "active": True,
+        "step_index": info["step_index"],
+        "step_count": info["step_count"],
+        "leg": {"from_space_id": info["from"], "to_space_id": info["to"], "points": points, "segments": segments},
+        "target_space_id": info["target"],
     }
 
 
@@ -382,23 +416,8 @@ def compact_steps(steps: list[str]) -> list[str]:
 
 def route_legs(bm: BuildingMap, stops: list[str], step_free: bool, space_path: list[str]) -> list[list[tuple]] | None:
     """The door and connector nodes of each leg, from the same graph and search as routing.route (which only
-    returns spaces). None if they do not give the route's space_path; the line then runs through room anchors."""
-    rg = routing.routing_graph(bm, step_free)
-    try:
-        if len(stops) == 2:
-            found = routing.shortest_leg(bm, rg, stops[0], stops[1])
-            legs = None if found is None else [found[1]]
-        else:
-            legs = routing.tour_legs(bm, rg, stops, step_free)[1]
-    except MapError:
-        return None
-    if legs is None:
-        return None
-    spaces: list[str] = []
-    for (leg_start, leg_end), nodes in zip(itertools.pairwise(stops), legs, strict=True):
-        leg = routing.leg_spaces(leg_start, leg_end, nodes)
-        spaces += leg if not spaces else leg[1:]
-    return legs if spaces == space_path else None
+    returns spaces). None if there is none; the line then runs through room anchors."""
+    return routing.leg_portals(bm, step_free, stops)
 
 
 def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:

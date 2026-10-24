@@ -10,6 +10,7 @@ from shapely.geometry import Point, Polygon
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
+from building_agent.entrance_distance import entrance_nodes
 from building_agent.level4.schema import Finding, Findings
 from starter_agent.building_map import ADJACENT_DISTANCE_M, OUTSIDE, BuildingMap
 
@@ -212,11 +213,13 @@ def _check_reachability(building: dict, found: Collector) -> None:
         return
     graph = bm.graph(step_free=False)
     if len(building["floors"]) > 1 and not building["vertical_connectors"]:
-        _check_floors_alone(building, graph, found)
+        _check_floors_alone(building, bm, graph, found)
         return
     components = list(nx.connected_components(graph))
-    if has_entrance and OUTSIDE in graph:
-        reference = next(component for component in components if OUTSIDE in component)
+    entrances = set(entrance_nodes(bm, graph))
+    if has_entrance and entrances:
+        # every part of the building that has an entrance counts as reachable from outside
+        reference = set().union(*(component for component in components if component & entrances))
     else:
         reference = max(components, key=len)
     for space in building["spaces"]:
@@ -240,24 +243,25 @@ def _check_connectivity(building: dict, found: Collector) -> None:
             found.add("low_connectivity", room_label(space))
 
 
-def _check_floors_alone(building: dict, graph, found: Collector) -> None:
+def _check_floors_alone(building: dict, bm: BuildingMap, graph, found: Collector) -> None:
     """Without stairs or lifts every floor is checked on its own: rooms must reach an entrance (the outside), or, on a
     floor without one, the biggest group of rooms of that floor, so missing connectors are not reported as doors."""
     components = list(nx.connected_components(graph))
     group_of = {node: index for index, component in enumerate(components) for node in component}
-    outside = group_of.get(OUTSIDE)
+    entrances = entrance_nodes(bm, graph)
+    outside = {group_of[node] for node in entrances}
     for floor in building["floors"]:
         spaces = [space for space in building["spaces"] if space["floor_id"] == floor["id"]]
         has_exit = any(OUTSIDE in o["space_ids"] for o in building["openings"] if o.get("floor_id") == floor["id"])
-        if has_exit and outside is not None:
+        if has_exit and outside:
             reference = outside
         else:
             sizes: dict[int, int] = defaultdict(int)
             for space in spaces:
                 sizes[group_of[space["id"]]] += 1
-            reference = max(sizes, key=sizes.__getitem__) if sizes else None
+            reference = {max(sizes, key=sizes.__getitem__)} if sizes else set()
         for space in spaces:
-            if group_of[space["id"]] != reference:
+            if group_of[space["id"]] not in reference:
                 found.add("room_unreachable", room_label(space))
 
 

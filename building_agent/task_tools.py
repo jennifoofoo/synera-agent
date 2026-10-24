@@ -838,7 +838,7 @@ def describe_asset(bm: BuildingMap, ref: str) -> dict:
 # ---------- tools ----------
 
 
-def make_task_tools(bm: BuildingMap) -> list:
+def make_task_tools(bm: BuildingMap, annotate=None) -> list:
     @beta_tool
     def find_for_task_tool(task: str, floor_level: int | None = None, room_hint: str | None = None) -> str:
         """Find the devices for what the person wants to DO or half remembers ("I want to weld", "where can I copy
@@ -858,7 +858,10 @@ def make_task_tools(bm: BuildingMap) -> list:
             room_hint: Room, zone or hall they mention ("hall 3", "H-A4"). Wrong rooms are corrected, omit if unknown.
         """
         try:
-            return as_json(find_for_task(bm, task, floor_level, room_hint))
+            result = find_for_task(bm, task, floor_level, room_hint)
+            if annotate:
+                annotate([group for candidate in result["candidates"] for group in candidate.get("groups", [])])
+            return as_json(result)
         except MapError as error:
             raise ToolError(str(error)) from error
 

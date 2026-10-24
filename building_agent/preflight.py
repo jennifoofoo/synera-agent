@@ -9,9 +9,9 @@ import traceback
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-import networkx as nx
 from shapely.geometry import Point, Polygon
 
+from building_agent.entrance_distance import distances_to_exit
 from building_agent.registry import load_kinds
 from building_agent.submission import QUESTION_FILES, load_questions
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
@@ -248,7 +248,7 @@ def check_graph(bm: BuildingMap, directory: Path, data_root: Path | None) -> lis
     for step_free in (False, True):
         label = "step-free" if step_free else "normal"
         graph = bm.graph(step_free)
-        reach = nx.node_connected_component(graph, OUTSIDE) if OUTSIDE in graph else set()
+        reach = set(distances_to_exit(bm, graph))
         unreachable = sorted(s for s in bm.spaces if s not in reach)
         share = len(unreachable) / max(len(bm.spaces), 1)
         level = OK if not unreachable else (FAIL if (not step_free and share > 0.5) else WARN)

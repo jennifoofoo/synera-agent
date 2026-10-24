@@ -1,34 +1,40 @@
-"""Route model for people: door to door inside each space, with Synera's vertical costs.
+"""Route model for people: the kit's door-to-door model (starter_agent.building_map), with the graph cached.
 
-Synera scores a route by the ordered list of spaces and measures it with its own door-to-door rule. The kit's
-model (one anchor per space, stairs 12 m, lift 15 + 6 m per floor) picks a worse sequence in about 8 percent of
-cases, so routes handed to people use this model instead. Numbers labelled by the kit (errand, what_if_door,
-optimal_length_m, step_free_reachable_count) stay on `BuildingMap.route`.
+There is exactly one model in this repo. `BuildingMap.graph` builds it (README section 3): door-to-door walking
+15 cm off the walls, doors landing 30 cm inside, stairs 2 m per metre climbed, a lift ride 15 m once plus 1 m per
+metre climbed, every pair of lift stops joined, and no way round the outside. This module only adds what the kit
+router lacks for an agent that answers many questions on one map:
 
-Graph: one node per (opening or connector, space it touches). Inside a space every pair of its nodes is joined by
-the straight distance between the door positions (connector stops sit at the space anchor). Entrances and the
-outside cost 0. The first and last space cost nothing (door to door): the spike found no real difference to
-walking from or to the anchor. Stairs cost 2 m per metre of floor height, lifts 15 m plus 1 m per metre.
-"""
+- the graph is built once per set of closures and doors (not on every call) and kept per map;
+- a failed route clears `bm.last_route`, so a stale route is never reported as the answer to an unreachable pair;
+- tours are legs in order, each leg routed on its own like the labelled tours (their length is the sum of the legs).
+
+Lengths, space paths and directions come from the kit's own functions on that graph, so `routing.route` and
+`BuildingMap.route` agree to the centimetre (tests/test_routing.py checks this on random pairs)."""
 
 import itertools
-import math
-import threading
 import weakref
+from pathlib import Path
 
 import networkx as nx
 
-from starter_agent.building_map import LIFT, OUTSIDE, BuildingMap, MapError, RouteResult
+from starter_agent.building_map import DOOR_PREFIX, BuildingMap, MapError, RouteResult
 
-STAIRS_M_PER_M = 2.0
-LIFT_WAIT_M = 15.0
-LIFT_M_PER_M = 1.0
 MAX_CACHED_GRAPHS = 6
-START, END = "start", "end"
 
-# bm -> {(closed, opening count, step_free): RoutingGraph}. Kept outside the map so deepcopy(bm) stays cheap.
-_LEG_LOCK = threading.RLock()  # shortest_leg adds temporary nodes to the shared cached graph
+# building path -> walking lengths of the unchanged building, computed once per process (see load_map)
+_WALKS: dict[Path, dict] = {}
+
+# bm -> {signature: RoutingGraph}. Kept outside the map so deepcopy(bm) stays cheap.
 _CACHE: "weakref.WeakKeyDictionary[BuildingMap, dict]" = weakref.WeakKeyDictionary()
+
+
+def load_map(path: Path) -> BuildingMap:
+    """A fresh map of the building at `path` that reuses its walking lengths from earlier loads in this process.
+
+    The walking lengths are the one heavy computation (about 2 s for the largest building, 1600 spaces); every
+    later map of the same building, also after edits like a new door, starts with them already filled in."""
+    return BuildingMap.load_cached(Path(path), _WALKS)
 
 
 def graph_signature(bm: BuildingMap, step_free: bool) -> tuple:
@@ -43,56 +49,19 @@ def graph_signature(bm: BuildingMap, step_free: bool) -> tuple:
 
 
 class RoutingGraph:
-    def __init__(self, graph: nx.Graph, members: dict[str, list[tuple]]) -> None:
+    def __init__(self, graph: nx.MultiGraph, members: dict[str, list[str]]) -> None:
         self.graph = graph
-        self.members = members  # space id -> its nodes
-
-
-def vertical_cost(bm: BuildingMap, connector: dict, floor_a: str, floor_b: str) -> float:
-    height = abs(bm.floors[floor_a]["elevation_m"] - bm.floors[floor_b]["elevation_m"])
-    if connector["kind"] == LIFT:
-        return LIFT_WAIT_M + LIFT_M_PER_M * height
-    return STAIRS_M_PER_M * height
+        self.members = members  # space id -> its nodes (the space itself and the doors that touch it)
 
 
 def build_graph(bm: BuildingMap, step_free: bool) -> RoutingGraph:
-    graph = nx.Graph()
-    members: dict[str, list[tuple]] = {}
-    positions: dict[tuple, tuple[float, float]] = {}
-
-    def add_member(space_id: str, node: tuple, position: tuple[float, float]) -> None:
-        members.setdefault(space_id, []).append(node)
-        positions[node] = position
-
-    for opening in bm.openings.values():
-        if opening["id"] in bm.closed or (step_free and not opening["step_free"]):
-            continue
-        first, second = opening["space_ids"]
-        if first in bm.closed or second in bm.closed:
-            continue
-        position = (opening["position"][0], opening["position"][1])
-        nodes = [("o", opening["id"], space_id) for space_id in (first, second)]
-        graph.add_edge(nodes[0], nodes[1], weight=0.0)
-        add_member(first, nodes[0], position)
-        add_member(second, nodes[1], position)
-    levels = {floor_id: floor["level"] for floor_id, floor in bm.floors.items()}
-    for connector in bm.connectors.values():
-        if connector["id"] in bm.closed or (step_free and not connector["step_free"]):
-            continue
-        stops = sorted(zip(connector["floor_ids"], connector["space_ids"], strict=True), key=lambda s: levels[s[0]])
-        stops = [stop for stop in stops if stop[1] in bm.spaces and stop[1] not in bm.closed]
-        for (floor_a, space_a), (floor_b, space_b) in itertools.pairwise(stops):
-            node_a, node_b = ("c", connector["id"], space_a), ("c", connector["id"], space_b)
-            graph.add_edge(node_a, node_b, weight=vertical_cost(bm, connector, floor_a, floor_b))
-            for space_id, node in ((space_a, node_a), (space_b, node_b)):
-                if node not in positions:
-                    add_member(space_id, node, bm.anchor(space_id))
-    for space_id, nodes in members.items():
-        for node_a, node_b in itertools.combinations(nodes, 2):
-            weight = 0.0 if space_id == OUTSIDE else math.dist(positions[node_a], positions[node_b])
-            if graph.has_edge(node_a, node_b):
-                weight = min(weight, graph[node_a][node_b]["weight"])
-            graph.add_edge(node_a, node_b, weight=weight)
+    graph = bm.graph(step_free)
+    members: dict[str, list[str]] = {space_id: [space_id] for space_id in graph if space_id in bm.spaces}
+    for node in graph:
+        if node.startswith(DOOR_PREFIX):
+            for space_id in bm.openings[node.removeprefix(DOOR_PREFIX)]["space_ids"]:
+                if space_id in members:
+                    members[space_id].append(node)
     return RoutingGraph(graph, members)
 
 
@@ -107,165 +76,82 @@ def routing_graph(bm: BuildingMap, step_free: bool) -> RoutingGraph:
     return cache[key]
 
 
-def shortest_leg(bm: BuildingMap, rg: RoutingGraph, start: str, end: str) -> tuple[float, list[tuple]] | None:
-    """(length, node path without the virtual start and end nodes), or None if there is no route."""
-    if start in bm.closed or end in bm.closed:
-        return None
-    if start == end:
-        return 0.0, []
-    graph = rg.graph
-    start_node, end_node = (START, start), (END, end)
-    with _LEG_LOCK:
-        return _leg(graph, rg, start, end, start_node, end_node)
-
-
-def _leg(graph, rg, start, end, start_node, end_node):
+def shortest_leg(bm: BuildingMap, rg: RoutingGraph, start: str, end: str) -> tuple[float, list[str]] | None:
+    """(length, node path) between two spaces, or None if there is no route (closed, cut off or only via outside)."""
     try:
-        for tag_node, space_id in ((start_node, start), (end_node, end)):
-            for node in rg.members.get(space_id, []):
-                graph.add_edge(tag_node, node, weight=0.0)
-        if start_node not in graph or end_node not in graph:
+        return nx.single_source_dijkstra(rg.graph, start, end, weight="weight")
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
+        return None
+
+
+def distances_from(bm: BuildingMap, rg: RoutingGraph, start: str, targets: list[str]) -> dict[str, float]:
+    """Route length from one space to each reachable target space in one pass (same rule as shortest_leg)."""
+    if start not in rg.graph:
+        return {}
+    reached = nx.single_source_dijkstra_path_length(rg.graph, start, weight="weight")
+    return {target: reached[target] for target in targets if target in reached}
+
+
+def leg_portals(bm: BuildingMap, step_free: bool, stops: list[str]) -> list[list[tuple]] | None:
+    """For drawing: per leg the doors crossed as ("o", opening id, space) pairs (from and into) and the stair or lift
+    rides as ("c", connector id, space) pairs, in walking order. Same graph and search as `route`; None if no route."""
+    rg = routing_graph(bm, step_free)
+    legs: list[list[tuple]] = []
+    for leg_start, leg_end in itertools.pairwise(stops):
+        found = shortest_leg(bm, rg, leg_start, leg_end)
+        if found is None:
             return None
-        try:
-            length, path = nx.single_source_dijkstra(graph, start_node, end_node, weight="weight")
-        except nx.NetworkXNoPath:
-            return None
-    finally:
-        graph.remove_nodes_from([start_node, end_node])
-    return length, path[1:-1]
+        portals: list[tuple] = []
+        for previous, current in itertools.pairwise(found[1]):
+            edge = bm.cheapest(rg.graph, previous, current)
+            if "via" in edge:
+                portals += [("c", edge["via"], previous), ("c", edge["via"], current)]
+            elif current.startswith(DOOR_PREFIX):
+                opening_id = current.removeprefix(DOOR_PREFIX)
+                portals += [
+                    ("o", opening_id, edge["space"]),
+                    ("o", opening_id, bm.other_side(bm.openings[opening_id], edge["space"])),
+                ]
+        legs.append(portals)
+    return legs
 
 
-def leg_spaces(start: str, end: str, nodes: list[tuple]) -> list[str]:
-    """Ordered spaces of one leg; consecutive nodes of the same space count once."""
-    spaces = [start]
-    for node in nodes:
-        if node[2] != spaces[-1]:
-            spaces.append(node[2])
-    if spaces[-1] != end:
-        spaces.append(end)
-    return spaces
-
-
-def describe_steps(bm: BuildingMap, rg: RoutingGraph, spaces: list[str], legs: list[list[tuple]]) -> list[str]:
-    """Steps worded like BuildingMap.directions: one line per room change or floor change."""
-    steps = [f"Start in {bm.describe_space(spaces[0])}."]
-    for nodes in legs:
-        steps += describe_leg(bm, rg, nodes)
-    steps.append(f"You have arrived at {bm.describe_space(spaces[-1])}.")
-    return steps
-
-
-def describe_leg(bm: BuildingMap, rg: RoutingGraph, nodes: list[tuple]) -> list[str]:
-    steps: list[str] = []
-    walked = 0.0
-    for previous, current in itertools.pairwise(nodes):
-        weight = rg.graph[previous][current]["weight"]
-        same_element = previous[:2] == current[:2] and previous[2] != current[2]
-        if not same_element:
-            walked += weight
-            continue
-        target = current[2]
-        if current[0] == "c":
-            connector = bm.connectors[current[1]]
-            verb = "Take" if connector["kind"] == LIFT else "Use"
-            floor = bm.floor_name(bm.spaces[target]["floor_id"])
-            steps.append(f"{verb} {connector['name']} ({connector['kind']}) to {floor}.")
-        elif target == OUTSIDE:
-            steps.append(f"Walk about {walked:.0f} m and leave the building through the entrance.")
-        else:
-            kind = bm.openings[current[1]]["kind"]
-            passage = {"door": "through the door", "entrance": "outside to the entrance and in"}.get(
-                kind, "through the opening"
-            )
-            steps.append(f"Walk about {walked:.0f} m {passage} into {bm.spaces[target]['name']}.")
-        walked = 0.0
-    return steps
-
-
-def _unreachable(bm: BuildingMap, leg_start: str, leg_end: str, step_free: bool) -> MapError:
+def unreachable(bm: BuildingMap, leg_start: str, leg_end: str, step_free: bool) -> MapError:
     reason = "step-free " if step_free else ""
     return MapError(
         f"No {reason}route from {bm.describe_space(leg_start)} to "
-        f"{bm.describe_space(leg_end)} with the current closures {sorted(bm.closed)}."
+        f"{bm.describe_space(leg_end)} with the current closures {sorted(bm.closed)}. "
+        "There is no way round the outside of the building."
     )
-
-
-def tour_legs(bm: BuildingMap, rg: RoutingGraph, stops: list[str], step_free: bool) -> tuple[float, list[list[tuple]]]:
-    """Joint plan over all stops: one stage per stop, the doors of a stop start with the cost to reach them.
-
-    Walking across a stop space (in through one door, out through another) is paid, and the door chosen at each
-    stop is the globally best one. The first stop costs nothing at any door, like judge_score.best_length."""
-    for previous, stop in itertools.pairwise(stops):
-        if previous in bm.closed or stop in bm.closed:
-            raise _unreachable(bm, previous, stop, step_free)
-    reached: dict[tuple, float] = {node: 0.0 for node in rg.members.get(stops[0], [])}
-    stages: list[tuple[dict | None, tuple | None]] = []  # (predecessor tree, source node) per stage
-    legs: list[list[tuple]] = []
-    graph = rg.graph
-    with _LEG_LOCK:
-        for index, stop in enumerate(stops[1:], start=1):
-            if stop == stops[index - 1]:
-                stages.append((None, None))
-                continue
-            source = ("source", index)
-            members = rg.members.get(stop, [])
-            try:
-                for node, cost in reached.items():
-                    graph.add_edge(source, node, weight=cost)
-                if source not in graph:
-                    raise _unreachable(bm, stops[index - 1], stop, step_free)
-                pred, dist = nx.dijkstra_predecessor_and_distance(graph, source, weight="weight")
-            finally:
-                graph.remove_nodes_from([source])
-            reached = {node: dist[node] for node in members if node in dist}
-            if not reached:
-                raise _unreachable(bm, stops[index - 1], stop, step_free)
-            stages.append((pred, source))
-    node = min(reached, key=reached.__getitem__)
-    length = reached[node]
-    for pred, source in reversed(stages):
-        if pred is None:
-            legs.append([])
-            continue
-        chain = []
-        while node != source:
-            chain.append(node)
-            node = pred[node][0]
-        chain.reverse()  # first door of the stage (reached from the previous stop) ... door of this stop
-        legs.append(chain)
-        node = chain[0]
-    legs.reverse()
-    return length, legs
 
 
 def route(
     bm: BuildingMap, start: str, destination: str, step_free: bool = False, via: list[str] | None = None
 ) -> RouteResult:
-    """Shortest walk start -> via... -> destination in the door-to-door model. Sets bm.last_route."""
+    """Shortest walk start -> via... -> destination, one leg per pair of stops. Sets bm.last_route.
+
+    Raises MapError with a 'No route' message if any leg has no route; bm.last_route is then None."""
     stops = [bm.resolve_space(start), *[bm.resolve_space(stop) for stop in via or []], bm.resolve_space(destination)]
     rg = routing_graph(bm, step_free)
+    nodes: list[str] = []
     length = 0.0
-    spaces: list[str] = []
-    legs: list[list[tuple]] = []
-    if len(stops) == 2:
-        found = shortest_leg(bm, rg, stops[0], stops[1])
+    for leg_start, leg_end in itertools.pairwise(stops):
+        found = shortest_leg(bm, rg, leg_start, leg_end)
         if found is None:
-            raise _unreachable(bm, stops[0], stops[1], step_free)
-        length, nodes = found
-        legs = [nodes]
-    else:
-        length, legs = tour_legs(bm, rg, stops, step_free)
-    for (leg_start, leg_end), nodes in zip(itertools.pairwise(stops), legs, strict=True):
-        leg = leg_spaces(leg_start, leg_end, nodes)
-        spaces += leg if not spaces else leg[1:]
+            bm.last_route = None
+            bm.last_route_points = []
+            raise unreachable(bm, leg_start, leg_end, step_free)
+        length += found[0]
+        nodes += found[1] if not nodes else found[1][1:]
     result = RouteResult(
         start_space_id=stops[0],
         destination_space_id=stops[-1],
         length_m=round(length, 2),
-        space_path=spaces,
-        steps=describe_steps(bm, rg, spaces, legs),
+        space_path=bm.spaces_passed(rg.graph, nodes),
+        steps=bm.directions(rg.graph, nodes),
         step_free=step_free,
         closed=sorted(bm.closed),
     )
     bm.last_route = result
+    bm.last_route_points = [bm.node_point(node) for node in nodes]
     return result
