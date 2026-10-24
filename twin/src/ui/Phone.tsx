@@ -1,7 +1,7 @@
 // Phone glue (owner: mobile session). Mounted once in App; renders only on the worker profile.
-// - header buttons: Back (one step back) left of the name, Search (focuses the one input) on the right
+// - header: the building name, Search (focuses the one input) on the right; no back button (the sheets close themselves)
 // - viewport: --vvh/--vvtop follow the visual viewport so the input stays above the iOS keyboard
-// - audio unlock on the first tap, screen wake lock while a guide is active
+// - audio unlock on the first tap, screen wake lock while a guide or the step list is active
 
 import { useEffect } from "react";
 import { useTwin } from "../store";
@@ -61,10 +61,8 @@ function useDockHeight(worker: boolean) {
 
 export function Phone() {
   const worker = useTwin((s) => s.profile === "worker");
-  const guiding = useTwin((s) => !!s.state?.guide?.active);
-  const selection = useTwin((s) => s.selection);
-  const replyShown = useTwin((s) => s.replyShown);
-  const floorMode = useTwin((s) => s.floorMode);
+  const walking = useTwin((s) => s.walkStep !== null);
+  const guiding = useTwin((s) => !!s.state?.guide?.active) || walking;
   const model = useTwin((s) => s.model);
 
   useVisualViewport();
@@ -81,35 +79,17 @@ export function Phone() {
 
   if (!worker || !model) return null;
 
-  // One step back: close the card, then the reply, then leave single-floor, then the home view.
-  const back = () => {
-    const s = useTwin.getState();
-    if (s.selection) s.select(null);
-    else if (s.replyShown) s.dismissReply();
-    else if (s.floorMode !== "stacked") s.setFloorMode("stacked");
-    else if (s.campusHook?.back()) return; // a campus building -> the site
-    else s.requestCamera({ kind: "home" });
-  };
-  const campusBack = useTwin.getState().campusHook?.backLabel() ?? null;
-  const backLabel = selection ? "Close" : replyShown ? "Dismiss reply" : floorMode !== "stacked" ? "All floors" : (campusBack ?? "Home view");
-
+  if (walking) return null; // no search or chat while walking the steps
   return (
-    <>
-      <button className="phone-back" onClick={back} aria-label={backLabel}>
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-          <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      <button
-        className="phone-search"
-        aria-label="Search"
-        onClick={() => document.querySelector<HTMLInputElement>(".omnibox-input input")?.focus()}
-      >
-        <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden>
-          <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
-          <path d="M15.5 15.5L20 20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-        </svg>
-      </button>
-    </>
+    <button
+      className="phone-search"
+      aria-label="Search"
+      onClick={() => document.querySelector<HTMLInputElement>(".omnibox-input input")?.focus()}
+    >
+      <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden>
+        <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M15.5 15.5L20 20" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+      </svg>
+    </button>
   );
 }

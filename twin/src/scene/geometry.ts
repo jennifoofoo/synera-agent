@@ -4,7 +4,7 @@
 
 import * as THREE from "three";
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from "three-mesh-bvh";
-import type { Opening, Point, Space } from "../api/types";
+import type { BuildingState, Opening, Point, Space } from "../api/types";
 import { GROUP_COLOURS, spaceGroup, type SpaceGroup } from "../model/palette";
 
 const GROUP_INDEX: Record<SpaceGroup, number> = { production: 0, logistics: 1, office: 2, technical: 3, circulation: 4, outdoor: 5 };
@@ -21,6 +21,8 @@ export const CUTAWAY_HEIGHT = 0.3;
 export interface FloorGeometry {
   solid: THREE.BufferGeometry;
   edges: THREE.BufferGeometry;
+  /** dashed zone lines where a wide opening joins two halves of one hall (no wall there) */
+  zones: THREE.BufferGeometry;
   /** space index (into floor.spaces) per vertex of `solid`, for picking */
   spaceIndexOf: (vertexIndex: number) => number;
   wallHeight: number;
@@ -66,6 +68,7 @@ class Builder {
   spaceIndices: number[] = [];
   indices: number[] = [];
   lines: number[] = [];
+  zoneLines: number[] = []; // dashed hall zone lines (their own geometry: lighter than walls)
   lineWallNormals: number[] = [];
   lineWalls: number[] = [];
 
@@ -84,6 +87,25 @@ class Builder {
     this.lines.push(a[0], a[1], -a[2], b[0], b[1], -b[2]);
     this.lineWallNormals.push(wn[0], wn[1], wn[0], wn[1]);
     this.lineWalls.push(wall, wall);
+  }
+
+  /** Jamb ticks at both ends of a gap: perpendicular hairlines about a wall thickness long, on the floor. */
+  jambs([p, q]: Gap) {
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (length < 0.05) return;
+    const nx = (-(q[1] - p[1]) / length) * JAMB_HALF;
+    const ny = ((q[0] - p[0]) / length) * JAMB_HALF;
+    for (const end of [p, q]) this.line([end[0] - nx, 0.02, end[1] - ny], [end[0] + nx, 0.02, end[1] + ny], [0, 0], 0);
+  }
+
+  /** A dashed zone line along a gap (lighter than the walls; the hall continues on both sides). */
+  zone([p, q]: Gap) {
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    for (let s = 0; s < length; s += DASH * 2) {
+      const a = pointOnEdge(p, q, s);
+      const b = pointOnEdge(p, q, Math.min(length, s + DASH));
+      this.zoneLines.push(a[0], 0.02, -a[1], b[0], 0.02, -b[1]);
+    }
   }
 
   /** A vertical quad (wall piece) between two ground points, from y0 to y1, both sides. */
@@ -123,31 +145,36 @@ class Builder {
     this.line([corners[3][0], y1, corners[3][1]], [corners[2][0], y1, corners[2][1]], outward, 1);
   }
 
-  slab(polygon: Point[], top: number, colour: THREE.Color, sid: number) {
+  slab(polygon: Point[], top: number, colour: THREE.Color, sid: number, gaps: Gap[] = []) {
     const shape = polygon.map(([x, y]) => new THREE.Vector2(x, y));
     const triangles = THREE.ShapeUtils.triangulateShape(shape, []);
     const base = this.positions.length / 3;
     for (const [x, y] of polygon) this.vertex(x, top, y, [0, 1, 0], colour, [0, 0], sid);
     for (const [a, b, c] of triangles) this.indices.push(base + a, base + b, base + c);
-    // Sides of the slab (thin), darker so the stack reads as plates.
+    // Sides of the slab (thin), darker so the stack reads as plates. Left out where an opening cuts the edge, so the
+    // plan has no outline across a gap.
     const sideColour = colour.clone().multiplyScalar(0.82);
     for (let i = 0; i < polygon.length; i++) {
-      const p = polygon[i];
-      const q = polygon[(i + 1) % polygon.length];
-      const dx = q[0] - p[0];
-      const dy = q[1] - p[1];
+      const edgeStart = polygon[i];
+      const edgeEnd = polygon[(i + 1) % polygon.length];
+      const dx = edgeEnd[0] - edgeStart[0];
+      const dy = edgeEnd[1] - edgeStart[1];
       const length = Math.hypot(dx, dy) || 1;
       const n: [number, number, number] = [dy / length, 0, dx / length];
-      const i0 = this.vertex(p[0], top - SLAB_THICKNESS, p[1], n, sideColour, [0, 0], sid);
-      const i1 = this.vertex(q[0], top - SLAB_THICKNESS, q[1], n, sideColour, [0, 0], sid);
-      const i2 = this.vertex(q[0], top, q[1], n, sideColour, [0, 0], sid);
-      const i3 = this.vertex(p[0], top, p[1], n, sideColour, [0, 0], sid);
-      this.indices.push(i0, i1, i2, i0, i2, i3);
-      this.line([p[0], top, p[1]], [q[0], top, q[1]], [0, 0]);
+      for (const [t0, t1] of keptPieces(edgeStart, edgeEnd, gaps)) {
+        const p = lerp(edgeStart, edgeEnd, t0);
+        const q = lerp(edgeStart, edgeEnd, t1);
+        const i0 = this.vertex(p[0], top - SLAB_THICKNESS, p[1], n, sideColour, [0, 0], sid);
+        const i1 = this.vertex(q[0], top - SLAB_THICKNESS, q[1], n, sideColour, [0, 0], sid);
+        const i2 = this.vertex(q[0], top, q[1], n, sideColour, [0, 0], sid);
+        const i3 = this.vertex(p[0], top, p[1], n, sideColour, [0, 0], sid);
+        this.indices.push(i0, i1, i2, i0, i2, i3);
+        this.line([p[0], top, p[1]], [q[0], top, q[1]], [0, 0]);
+      }
     }
   }
 
-  build(spaceIndexByVertex: Int32Array | null): { solid: THREE.BufferGeometry; edges: THREE.BufferGeometry } {
+  build(spaceIndexByVertex: Int32Array | null): { solid: THREE.BufferGeometry; edges: THREE.BufferGeometry; zones: THREE.BufferGeometry } {
     const solid = new THREE.BufferGeometry();
     solid.setAttribute("position", new THREE.Float32BufferAttribute(this.positions, 3));
     solid.setAttribute("normal", new THREE.Float32BufferAttribute(this.normals, 3));
@@ -165,36 +192,149 @@ class Builder {
     edges.setAttribute("wallNormal", new THREE.Float32BufferAttribute(this.lineWallNormals, 2));
     edges.setAttribute("wall", new THREE.Float32BufferAttribute(this.lineWalls, 1));
     edges.computeBoundingSphere();
-    return { solid, edges };
+    const zones = new THREE.BufferGeometry();
+    zones.setAttribute("position", new THREE.Float32BufferAttribute(this.zoneLines, 3));
+    zones.computeBoundingSphere();
+    return { solid, edges, zones };
   }
 }
 
-/** Split a wall edge by the doors on it: returns the pieces of [0, 1] (parameter along the edge) that stay wall. */
-function wallPieces(a: Point, b: Point, openings: Opening[]): [number, number][] {
+type Gap = [Point, Point];
+
+/** One cut an opening makes: the gap, whether it gets jamb ticks, whether it is a hall zone line (no wall at all). */
+export interface Cut {
+  gap: Gap;
+  jambs: boolean;
+  zone: boolean;
+}
+
+/** An opening this wide that spans most of the shared boundary is one hall in two zones, not two rooms. */
+const ZONE_MIN_WIDTH = 4;
+const ZONE_MIN_SHARE = 0.6;
+const JAMB_HALF = 0.1; // jamb tick: perpendicular hairline, 0.2 m long
+const DASH = 0.5; // zone line dash and gap length in metres
+
+const PERP_TOL = 0.35; // a gap cuts an edge that runs within this distance of it
+const SHARED_TOL = 0.35; // two polygon edges count as one shared boundary within this distance
+const CORNER_TIE = 0.05; // edges this much farther than the nearest one still count as meeting it (a corner)
+const DOOR_REACH = 0.8; // a door or entrance belongs to the polygon edge within this distance of its position
+
+function pointOnEdge(a: Point, b: Point, s: number): Point {
+  const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  return [a[0] + ((b[0] - a[0]) / length) * s, a[1] + ((b[1] - a[1]) / length) * s];
+}
+
+/** Metres along edge a-b of the point nearest to p, and its distance to the edge (clamped to the edge). */
+function nearestOnEdge(a: Point, b: Point, p: Point): { s: number; distance: number; length: number } {
+  const length = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+  const s = Math.max(0, Math.min(length, ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / length));
+  const q = pointOnEdge(a, b, s);
+  return { s, distance: Math.hypot(p[0] - q[0], p[1] - q[1]), length };
+}
+
+/** The stretches where two polygons share a boundary (collinear, overlapping edges), as segments in model metres. */
+function sharedBoundaries(first: Point[], second: Point[]): Gap[] {
+  const found: Gap[] = [];
+  for (let i = 0; i < first.length; i++) {
+    const a = first[i];
+    const b = first[(i + 1) % first.length];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (length < 0.05) continue;
+    const ux = (b[0] - a[0]) / length;
+    const uy = (b[1] - a[1]) / length;
+    for (let j = 0; j < second.length; j++) {
+      const c = second[j];
+      const d = second[(j + 1) % second.length];
+      const off = (r: Point) => Math.abs((r[0] - a[0]) * uy - (r[1] - a[1]) * ux);
+      if (off(c) > SHARED_TOL || off(d) > SHARED_TOL) continue;
+      const along = (r: Point) => (r[0] - a[0]) * ux + (r[1] - a[1]) * uy;
+      const s0 = Math.max(0, Math.min(along(c), along(d)));
+      const s1 = Math.min(length, Math.max(along(c), along(d)));
+      if (s1 - s0 > 0.05) found.push([pointOnEdge(a, b, s0), pointOnEdge(a, b, s1)]);
+    }
+  }
+  return found;
+}
+
+/**
+ * The cuts an opening makes into the walls, gaps as segments in model metres (empty: nothing to cut).
+ * - between two spaces: width_m centred on `position` projected onto the shared boundary of the two polygons,
+ *   clamped to that boundary (an opening of kind "opening" wider than the boundary opens all of it).
+ * - entrances, and doors with no shared boundary near them: width_m centred on `position` along the polygon edge nearest to it; at a
+ *   polygon corner (two edges equally near) both edges open.
+ */
+export function openingCuts(opening: Opening, polygons: Point[][]): Cut[] {
+  if (!polygons.length) return [];
+  const width = opening.width_m && opening.width_m > 0 ? opening.width_m : 0.9;
+  if (polygons.length >= 2) {
+    // Between two spaces the gap lies on their shared boundary, whatever else is near the position.
+    let best: { segment: Gap; s: number; length: number; distance: number } | null = null;
+    for (const segment of sharedBoundaries(polygons[0], polygons[1])) {
+      const hit = nearestOnEdge(segment[0], segment[1], opening.position);
+      if (!best || hit.distance < best.distance) best = { segment, ...hit };
+    }
+    if (best && (opening.kind === "opening" || best.distance <= DOOR_REACH)) {
+      const { segment, s, length } = best;
+      const half = opening.kind === "opening" ? width / 2 : Math.max(0.3, width / 2);
+      const zone = opening.kind === "opening" && width >= ZONE_MIN_WIDTH && width >= length * ZONE_MIN_SHARE;
+      const whole = zone || (opening.kind === "opening" && width >= length - 0.01);
+      const gap: Gap = [pointOnEdge(segment[0], segment[1], whole ? 0 : Math.max(0, s - half)), pointOnEdge(segment[0], segment[1], whole ? length : Math.min(length, s + half))];
+      return [{ gap, jambs: opening.kind !== "opening", zone }];
+    }
+  }
+  const near: { a: Point; b: Point; s: number; distance: number; length: number }[] = [];
+  for (const polygon of polygons) {
+    for (let i = 0; i < polygon.length; i++) {
+      const a = polygon[i];
+      const b = polygon[(i + 1) % polygon.length];
+      const hit = nearestOnEdge(a, b, opening.position);
+      if (hit.length >= 0.05) near.push({ a, b, ...hit });
+    }
+  }
+  if (!near.length) return [];
+  const closest = Math.min(...near.map((edge) => edge.distance));
+  if (closest > DOOR_REACH) return [];
+  const half = Math.max(0.3, width / 2);
+  return near
+    .filter((edge) => edge.distance <= closest + CORNER_TIE)
+    .map((edge): Cut => ({
+      gap: [pointOnEdge(edge.a, edge.b, Math.max(0, edge.s - half)), pointOnEdge(edge.a, edge.b, Math.min(edge.length, edge.s + half))],
+      jambs: opening.kind !== "opening",
+      zone: false,
+    }));
+}
+
+/** The pieces of [0, 1] (parameter along edge a-b) that stay after cutting the gaps that lie along the edge. */
+function keptPieces(a: Point, b: Point, gaps: Gap[]): [number, number][] {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const length = Math.hypot(dx, dy);
-  if (length < 0.05) return [[0, 1]];
-  const gaps: [number, number][] = [];
-  for (const opening of openings) {
-    const px = opening.position[0] - a[0];
-    const py = opening.position[1] - a[1];
-    const t = (px * dx + py * dy) / (length * length);
-    if (t < -0.02 || t > 1.02) continue;
-    const offAxis = Math.abs(px * dy - py * dx) / length;
-    if (offAxis > 0.35) continue;
-    const half = Math.max(0.45, (opening.width_m ?? 0.9) / 2) / length;
-    gaps.push([Math.max(0, t - half), Math.min(1, t + half)]);
-  }
   if (!gaps.length) return [[0, 1]];
-  gaps.sort((g, h) => g[0] - h[0]);
+  if (length < 0.05) {
+    // A stub (data noise at a corner): its direction means nothing, so it goes when it sits inside a gap.
+    const mid: Point = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const inside = gaps.some(([p, q]) => nearestOnEdge(p, q, mid).distance <= PERP_TOL);
+    return inside ? [] : [[0, 1]];
+  }
+  const cuts: [number, number][] = [];
+  for (const [p, q] of gaps) {
+    const off = (r: Point) => Math.abs((r[0] - a[0]) * dy - (r[1] - a[1]) * dx) / length;
+    if (off(p) > PERP_TOL || off(q) > PERP_TOL) continue;
+    const t = (r: Point) => ((r[0] - a[0]) * dx + (r[1] - a[1]) * dy) / (length * length);
+    const t0 = Math.max(0, Math.min(t(p), t(q)));
+    const t1 = Math.min(1, Math.max(t(p), t(q)));
+    if (t1 > t0 + 1e-3) cuts.push([t0, t1]);
+  }
+  if (!cuts.length) return [[0, 1]];
+  cuts.sort((g, h) => g[0] - h[0]);
+  const minPiece = 0.03 / length;
   const pieces: [number, number][] = [];
   let cursor = 0;
-  for (const [start, end] of gaps) {
-    if (start > cursor + 0.01) pieces.push([cursor, start]);
+  for (const [start, end] of cuts) {
+    if (start > cursor + minPiece) pieces.push([cursor, start]);
     cursor = Math.max(cursor, end);
   }
-  if (cursor < 0.99) pieces.push([cursor, 1]);
+  if (cursor < 1 - minPiece) pieces.push([cursor, 1]);
   return pieces;
 }
 
@@ -202,7 +342,32 @@ function lerp(a: Point, b: Point, t: number): Point {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 }
 
-export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
+/** What of `state` changes the walls: doors added, removed or widened since the building was loaded. */
+export interface OpeningEdits {
+  added: BuildingState["added_doors"];
+  removed: string[];
+  widened: Record<string, number>;
+}
+
+export function openingEditsOf(state: BuildingState | null): OpeningEdits {
+  return { added: state?.added_doors ?? [], removed: state?.removed_openings ?? [], widened: state?.widened_openings ?? {} };
+}
+
+/** The floor's openings with the session's edits applied (a removed door is wall again, a widened one opens more). */
+export function effectiveOpenings(floor: FloorModel, edits?: OpeningEdits): Opening[] {
+  if (!edits) return floor.openings;
+  const removed = new Set(edits.removed);
+  const known = new Set(floor.openings.map((opening) => opening.id));
+  const kept = floor.openings
+    .filter((opening) => !removed.has(opening.id))
+    .map((opening) => (edits.widened[opening.id] ? { ...opening, width_m: edits.widened[opening.id] } : opening));
+  const added: Opening[] = edits.added
+    .filter((door) => door.floor_id === floor.id && !known.has(door.id) && !removed.has(door.id))
+    .map((door) => ({ id: door.id, floor_id: door.floor_id, space_ids: door.space_ids, kind: "door", position: door.position, width_m: 0.9, step_free: door.step_free, added: true }));
+  return [...kept, ...added];
+}
+
+export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): FloorGeometry {
   const builder = new Builder();
   const wallHeight = wallHeightFor(floor);
   const colourCache = new Map<string, THREE.Color>();
@@ -221,12 +386,21 @@ export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
     }
   });
   const drawnEdges = new Set<string>();
-  const openingsBySpace = new Map<string, Opening[]>();
-  for (const opening of floor.openings) {
-    for (const spaceId of opening.space_ids) {
-      const list = openingsBySpace.get(spaceId) ?? [];
-      list.push(opening);
-      openingsBySpace.set(spaceId, list);
+  // Gaps per space: every opening cuts the walls and the outline of the spaces it joins.
+  const indexById = new Map(floor.spaces.map((space, index) => [space.id, index]));
+  const gapsBySpace = new Map<string, Gap[]>();
+  const allCuts: Cut[] = [];
+  for (const opening of effectiveOpenings(floor, edits)) {
+    const joined = opening.space_ids.filter((id) => indexById.has(id));
+    const cuts = openingCuts(
+      opening,
+      joined.map((id) => polygons[indexById.get(id)!]),
+    );
+    allCuts.push(...cuts);
+    for (const spaceId of joined) {
+      const list = gapsBySpace.get(spaceId) ?? [];
+      list.push(...cuts.map((cut) => cut.gap));
+      gapsBySpace.set(spaceId, list);
     }
   }
   floor.spaces.forEach((space: Space, sid) => {
@@ -235,14 +409,15 @@ export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
     const group = spaceGroup(space.type, space.room_type);
     const palette = GROUP_COLOURS[group];
     builder.currentGroup = GROUP_INDEX[group];
-    builder.slab(polygon, 0, colourFor(palette.slab), sid);
+    const gaps = gapsBySpace.get(space.id) ?? [];
+    builder.slab(polygon, 0, colourFor(palette.slab), sid, gaps);
     const isOutdoor = space.type === "outdoor";
     const height = isOutdoor ? Math.min(wallHeight, 0.5) : wallHeight;
-    const openings = openingsBySpace.get(space.id) ?? [];
     for (let i = 0; i < polygon.length; i++) {
       const a = polygon[i];
       const b = polygon[(i + 1) % polygon.length];
       const key = edgeKey(a, b);
+      // Edges shared by two spaces are built once, with the gaps of both.
       if (drawnEdges.has(key)) continue;
       drawnEdges.add(key);
       const outer = (edgeOwners.get(key) ?? 1) === 1;
@@ -251,16 +426,21 @@ export function buildFloorGeometry(floor: FloorModel): FloorGeometry {
       const length = Math.hypot(dx, dy) || 1;
       // Outward normal in scene xz: model (dy, -dx)/len -> scene (dy, dx)/len (z = -y flips the sign of y).
       const outward: [number, number] = outer ? [dy / length, dx / length] : [0, 0];
-      for (const [t0, t1] of wallPieces(a, b, openings)) {
+      for (const [t0, t1] of keptPieces(a, b, gaps)) {
         builder.wallPiece(lerp(a, b, t0), lerp(a, b, t1), 0, height, colourFor(palette.wall), outward, sid, WALL_THICKNESS);
       }
     }
   });
-  const { solid, edges } = builder.build(null);
+  for (const cut of allCuts) {
+    if (cut.zone) builder.zone(cut.gap);
+    else if (cut.jambs) builder.jambs(cut.gap);
+  }
+  const { solid, edges, zones } = builder.build(null);
   const spaceIndex = solid.getAttribute("spaceIndex") as THREE.BufferAttribute;
   return {
     solid,
     edges,
+    zones,
     spaceIndexOf: (vertexIndex) => spaceIndex.getX(vertexIndex),
     wallHeight,
     spaceCount: floor.spaces.length,

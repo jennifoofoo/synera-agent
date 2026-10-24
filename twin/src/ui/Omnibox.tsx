@@ -120,9 +120,21 @@ export function Omnibox() {
     [ask],
   );
 
+  // Stop listening now: the UI leaves the listening state at once; the listener sends what it heard (send) or
+  // drops it, releases the mic and then runs onEnd. Safe to call when not listening.
+  const stopListening = useCallback((send: boolean) => {
+    const listener = listenerRef.current;
+    if (!listener) return;
+    setListening(false);
+    setHeard("");
+    if (send) listener.stop();
+    else listener.cancel();
+  }, []);
+
+  // A toggle: the listener ref, not the `listening` state, says whether a listen is running (no stale closure).
   const toggleMic = () => {
-    if (listening) {
-      listenerRef.current?.stop();
+    if (listenerRef.current) {
+      stopListening(true);
       return;
     }
     const problem = speechInputProblem();
@@ -135,20 +147,44 @@ export function Omnibox() {
     setHeard("");
     setListening(true);
     keepAwake("listening", true);
-    listenerRef.current = listen("en-US", {
-      onInterim: setHeard,
+    const listener: Listener = listen("en-US", {
+      onInterim: (said) => {
+        if (listenerRef.current === listener) setHeard(said);
+      },
       onFinal: (said) => void submit(said, true),
       onEnd: (error) => {
-        listenerRef.current = null;
+        if (listenerRef.current === listener) listenerRef.current = null;
         keepAwake("listening", false);
         setListening(false);
         setHeard("");
         if (error) setNotice(voiceHint(error === "unsupported" ? undefined : error));
       },
     });
+    listenerRef.current = listener;
   };
 
+  // Leaving drops the listen: unmount, the page going to the background, another building, the directions sheet.
   useEffect(() => () => listenerRef.current?.cancel(), []);
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") stopListening(false);
+    };
+    const onPageHide = () => stopListening(false);
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [stopListening]);
+  useEffect(
+    () =>
+      useTwin.subscribe((state, before) => {
+        const sheetToggled = (state.directions === null) !== (before.directions === null);
+        if (sheetToggled || state.buildingKey !== before.buildingKey) stopListening(false);
+      }),
+    [stopListening],
+  );
 
   // Close the input again when it loses focus with nothing typed (not while listening or busy).
   const collapseIfIdle = () => {
@@ -239,7 +275,7 @@ export function Omnibox() {
           ) : listening ? (
             <>
               <span className="ob-rec" aria-hidden />
-              {heard ? <span className="ob-heard">{heard}</span> : "Listening… tap the mic again to send"}
+              {heard ? <span className="ob-heard">{heard}</span> : "Listening… tap again to send"}
             </>
           ) : (
             <>
@@ -330,7 +366,7 @@ export function Omnibox() {
           <button
             type="button"
             className={`ob-fab ob-talk mic ${listening ? "listening" : ""}`}
-            aria-label={listening ? "Stop and send" : "Talk"}
+            aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
             aria-pressed={listening}
             title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
             disabled={busy}
@@ -341,7 +377,12 @@ export function Omnibox() {
             onContextMenu={(event) => event.preventDefault()}
             onClick={talkClick}
           >
-            {voiceOut ? <MicIcon /> : <MicMutedIcon />}
+            <MicIcon />
+            {!voiceOut && !listening && (
+              <span className="ob-badge" aria-hidden>
+                <MutedIcon />
+              </span>
+            )}
           </button>
         </div>
       )}
@@ -350,12 +391,13 @@ export function Omnibox() {
 }
 
 const iconProps = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+// Filled pictograms in the standard Material shapes (as in Google Maps), so they read at a glance.
+const glyphProps = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "currentColor", "aria-hidden": true };
 
 function MicIcon() {
   return (
-    <svg {...iconProps}>
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
+    <svg {...glyphProps}>
+      <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z" />
     </svg>
   );
 }
@@ -368,31 +410,19 @@ function ChatIcon() {
   );
 }
 
-/** Mic with a small slash in the corner: spoken replies are off. */
-function MicMutedIcon() {
-  return (
-    <svg {...iconProps}>
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" />
-      <path d="M17 3.5l4 4" strokeWidth={2.2} />
-    </svg>
-  );
-}
-
 function SpeakerIcon() {
   return (
-    <svg {...iconProps}>
-      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
-      <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+    <svg {...glyphProps}>
+      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
     </svg>
   );
 }
 
+/** Standard "speaker muted": the speaker crossed by one full diagonal slash. */
 function MutedIcon() {
   return (
-    <svg {...iconProps}>
-      <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
-      <path d="M16 9.5l5 5M21 9.5l-5 5" />
+    <svg {...glyphProps}>
+      <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
     </svg>
   );
 }

@@ -13,11 +13,18 @@ export function FloorRail() {
   const viewMode = useTwin((s) => s.viewMode);
   const setViewMode = useTwin((s) => s.setViewMode);
   const profile = useTwin((s) => s.profile);
+  const topInset = useTwin((s) => s.topInset);
   if (!model) return null;
   const flat = viewMode === "2d";
   const routeFloors = new Set(state?.route?.ok ? state.route.floors : []);
   return (
-    <div className="floorrail" role="radiogroup" aria-label="Floor">
+    <div
+      className="floorrail"
+      role="radiogroup"
+      aria-label="Floor"
+      // The phone's directions sheet covers the top of the screen: keep the rail below it (topInset = its bottom edge).
+      style={topInset > 0 && profile === "worker" ? { top: topInset + 8, maxHeight: `calc(var(--vvh, 100dvh) - ${topInset + 8}px - var(--dock-h, 90px) - 16px)` } : undefined}
+    >
       {profile !== "worker" && (
         <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
           {flat ? "3D" : "2D"}
@@ -56,9 +63,11 @@ export function FloorRail() {
           </button>
         );
       })}
-      <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view" aria-label="Home view">
-        ⌂
-      </button>
+      {profile !== "worker" && (
+        <button className="rail-toggle" onClick={() => requestCamera({ kind: "home" })} title="Home view" aria-label="Home view">
+          ⌂
+        </button>
+      )}
     </div>
   );
 }

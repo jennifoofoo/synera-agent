@@ -12,6 +12,7 @@ import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
+import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
 import { Shafts } from "./Shafts";
 import { Things } from "./Things";
@@ -74,6 +75,7 @@ function Building({ model }: { model: BuildingModel }) {
         worker={worker}
         flat={flat}
       />
+      <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
     </group>
   );
@@ -142,9 +144,9 @@ export function Scene() {
       )}
       <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
       {!flat && <fog attach="fog" args={[COLOURS.background, size * 2.5, size * 9]} />}
-      <hemisphereLight args={["#ffffff", "#9fb4cc", 1.0]} />
-      <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
-      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />
+      <hemisphereLight args={["#ffffff", "#b8b4ac", 1.0]} />
+      <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#ffffff" />
+      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#e8e4dc" />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}
@@ -160,7 +162,7 @@ export function Scene() {
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && !flat && (
         <GizmoHelper alignment="bottom-right" margin={[64, 64]} renderPriority={2}>
-          <GizmoViewcube color="#ffffff" hoverColor="#e8f0fe" textColor="#14305a" strokeColor="#9fb3cc" opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
+          <GizmoViewcube color="#fbfaf8" hoverColor="#eae7e1" textColor="#1d2430" strokeColor="#bdb7ab" opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
         </GizmoHelper>
       )}
       {ao && !worker && !flat && (

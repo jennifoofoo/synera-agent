@@ -9,11 +9,11 @@ import { FloorRail } from "./ui/FloorRail";
 import { KeyHelp } from "./ui/KeyHelp";
 import { NewBuilding } from "./ui/NewBuilding";
 import { Omnibox } from "./ui/Omnibox";
-import { Position } from "./ui/Position";
 import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
+import { Walk } from "./ui/Walk";
 
 /** One screen: the building, one input, one card. Everything else only when needed. */
 export function App() {
@@ -27,12 +27,13 @@ export function App() {
   const bottomInset = useTwin((s) => s.bottomInset);
   const rightInset = useTwin((s) => s.rightInset);
   const directionsOpen = useTwin((s) => s.directions !== null);
+  const walking = useTwin((s) => s.walkStep !== null);
   useEffect(() => {
     void loadBuildings();
   }, [loadBuildings]);
   return (
     <div
-      className={`app ${profile} ${flat ? "flat" : "solid"} ${directionsOpen ? "directions-open" : ""}`}
+      className={`app ${profile} ${flat ? "flat" : "solid"} ${directionsOpen ? "directions-open" : ""} ${walking ? "walking" : ""}`}
       style={{ "--top-inset": `${topInset}px`, "--bottom-inset": `${bottomInset}px`, "--right-inset": `${rightInset}px` } as React.CSSProperties}
     >
       <Scene />
@@ -43,11 +44,11 @@ export function App() {
       <ChangesPill />
       <Planner />
       <Phone />
-      <Position />
       <div className="dock">
         <CampusCard />
-        <Card />
-        <Omnibox />
+        {/* While walking only the step sheet: no card, no chat. */}
+        {walking ? <Walk /> : <Card />}
+        {!walking && <Omnibox />}
       </div>
       <NewBuilding />
       <KeyHelp />

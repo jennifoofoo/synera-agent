@@ -49,7 +49,7 @@ function BuildingBlock({ building, detail, onRoute, active }: { building: Campus
     event.stopPropagation();
     void enterBuilding(building.id);
   };
-  const colour = active ? "#7ea3cf" : onRoute ? "#9dbbe0" : "#b4c9e3";
+  const colour = active ? "#9db6dc" : onRoute ? "#d3e0f4" : "#cfccc4";
   return (
     <group>
       {floors.map(({ floor, slab, lines }, index) => (
@@ -90,7 +90,7 @@ function LinkBlock({ link, height, onRoute, selected }: { link: CampusLink; heig
   const width = link.width_m ?? 2.5;
   const raised = link.kind === "bridge" || height > 0;
   const y = raised ? height : 0.06;
-  const colour = link.closed ? COLOURS.danger : selected ? COLOURS.gold : "#f8fafc";
+  const colour = link.closed ? COLOURS.danger : selected ? COLOURS.signal : "#fbfaf8";
   const mx = (from[0] + to[0]) / 2;
   const my = (from[1] + to[1]) / 2;
   return (
@@ -112,7 +112,7 @@ function LinkBlock({ link, height, onRoute, selected }: { link: CampusLink; heig
         [from, to].map((end, index) => (
           <mesh key={index} position={[end[0], height / 2, -end[1]]}>
             <boxGeometry args={[0.5, height, 0.5]} />
-            <meshStandardMaterial color="#94a3b8" />
+            <meshStandardMaterial color="#8f949b" />
           </mesh>
         ))}
       <Html position={[mx, y + 2, -my]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
@@ -254,8 +254,8 @@ export function CampusSite3D() {
       ))}
       {line.length > 1 && (
         <>
-          <Line points={line} color="#ffffff" lineWidth={11} transparent depthTest={false} depthWrite={false} renderOrder={10} />
-          <Line points={line} color="#0d9488" lineWidth={6} transparent depthTest={false} depthWrite={false} renderOrder={11} />
+          <Line points={line} color="#ffffff" lineWidth={9} transparent depthTest={false} depthWrite={false} renderOrder={10} />
+          <Line points={line} color={COLOURS.route} lineWidth={5} transparent depthTest={false} depthWrite={false} renderOrder={11} />
         </>
       )}
       <CampusRig frame={frame} />
