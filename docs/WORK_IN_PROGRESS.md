@@ -36,6 +36,11 @@ Für Leonie und ihren Agenten: damit niemand dieselbe Datei doppelt anfasst. Cod
 | `feat/twin-walk-wired` | Anbindung: Schalter "Walk with me" im Begleit-Sheet, Punkt "estimated", Ansage am Etappenende, Warten an Treppe/Aufzug | Begleit-Sheet (`Walk.tsx`), Marker |
 In `main` seit 01:00: Raumfarben, Geisterbild-Fix (Puffer der Nachbearbeitung bei Auflösungswechsel), Leonies Wake Word und Ein-Etagen-Ansicht.
 
+## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
+- "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
+- Folge-Modus: nach jeder gesprochenen Antwort etwa 8 s zuhören, ohne Wake Word und ohne Knopf.
+Dateien: `twin/src/handsFree.ts`, `twin/src/voice.ts` (Leonie: bitte dort gerade nichts parallel ändern).
+
 ## 3D-Look (Leonie, 25.10. nachts): Diagnose und Richtung von Jennifers Sitzung
 Feedback von Aksha: die 3D-Ansicht wirkt billig. Ursache zum Teil unsere Vorgabe "Blueprint minimal, flach" (für 2D richtig, für 3D zu karg):
 - alle Möbel und Maschinen gleiche graue Quader, Wände dunkel und voll hoch (verdecken die Räume), flaches Licht ohne echte Schatten, Boden nur Raster ohne Plattendicke.
