@@ -69,3 +69,14 @@ def test_wrong_argument_list_is_a_tool_error_but_kind_bugs_are_not_masked():
     tool = tool_by_name(make_tools(load_map(building_dir), None), "errand")
     with pytest.raises(ToolError, match="Wrong arguments"):
         tool(start=question["inputs"]["start"])  # missing parameters
+
+
+def test_bracketed_overview_string_is_reduced_to_the_id():
+    from building_agent.tools import clean_reference
+
+    building_dir, question = labelled_questions("errand")[0]
+    bm = load_map(building_dir)
+    start = question["inputs"]["start"]
+    assert clean_reference(bm, f"{bm.spaces[start]['name']} [{start}]") == start
+    assert clean_reference(bm, "Office 1.02") == "Office 1.02"
+    assert clean_reference(bm, "Room [not-an-id]") == "Room [not-an-id]"

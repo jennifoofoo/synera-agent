@@ -149,3 +149,15 @@ def test_directions_and_cards_go_stale_when_the_building_changes(tmp_path):
     state.begin_turn()
     with pytest.raises(ToolError, match="changed"):
         tools["confirm_change"](confirmed=True, user_reply="ja")
+
+
+@pytest.mark.parametrize("reply", ["mach einfach", "ja ja", "whatever", "ja, aber nicht Lift 1", "ok"])
+def test_vague_or_conditional_replies_do_not_confirm(tmp_path, reply):
+    bm, (_start, end) = route_question()
+    tools, state = tools_by_name(bm, tmp_path)
+    state.begin_turn()
+    tools["propose_change"](action="close", element=bm.resolve_space(end))
+    state.begin_turn()
+    with pytest.raises(ToolError):
+        tools["confirm_change"](confirmed=True, user_reply=reply)
+    assert bm.closed == set()

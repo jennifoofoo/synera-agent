@@ -1,3 +1,5 @@
+import re
+
 from starter_agent.building_map import MAX_SEARCH_RESULTS, BuildingMap, MapError
 
 
@@ -5,6 +7,9 @@ def find_space(bm: BuildingMap, name: str, floor_level: int | None = None) -> di
     """Resolve a room id, number or name (optionally on one floor) to a space id.
 
     Returns {"match": {...}} for exactly one hit, else {"candidates": [...]} for the agent to disambiguate."""
+    bracketed = re.search(r"\[([^\[\]]+)\]\s*$", name)
+    if bracketed and bracketed.group(1) in bm.spaces:
+        name = bracketed.group(1)
     lowered = name.strip().lower()
     spaces = [
         space

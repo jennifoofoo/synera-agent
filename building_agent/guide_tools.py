@@ -13,8 +13,8 @@ from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
 ACTIONS = ("close", "reopen", "add_door")
-YES = re.compile(r"\b(ja|yes|ok|okay|klar|passt|gern|gerne|genau|mach|bitte|do it|go ahead)\b", re.IGNORECASE)
-NO = re.compile(r"\b(nein|no|nicht|stop|abbrechen|cancel|lieber)\b", re.IGNORECASE)
+YES = re.compile(r"\b(ja|yes|yep|jep|genau|passt|do it|go ahead|mach das|bitte ja)\b", re.IGNORECASE)
+NO = re.compile(r"\b(nein|no|nicht|stop|abbrechen|cancel|lieber|whatever|egal|aber|but|ja ja)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -92,6 +92,18 @@ def route_effect(before: BuildingMap, after: BuildingMap) -> dict | None:
     return effect
 
 
+def compare_normal_length(bm: BuildingMap, route) -> float | None:
+    """Length of the same trip without the step-free constraint, to say how much longer the detour is."""
+    stops = [route.start_space_id, route.destination_space_id]
+    last = bm.last_route
+    try:
+        normal = copy.deepcopy(bm).route(*stops, False).length_m
+    except MapError:
+        normal = None
+    bm.last_route = last
+    return normal
+
+
 def check_directions(state: GuideState, bm: BuildingMap) -> None:
     if state.session is None:
         raise ToolError("No directions yet. Call give_directions first.")
@@ -118,8 +130,11 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             state.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error
-        return as_json({"length_m": route.length_m, "step_free": route.step_free, "steps": state.session.next(),
-                        "steps_remaining": state.session.remaining()})
+        result = {"length_m": route.length_m, "step_free": route.step_free, "steps": state.session.next(),
+                  "steps_remaining": state.session.remaining()}
+        if step_free:
+            result["normal_route_length_m"] = compare_normal_length(bm, route)
+        return as_json(result)
 
     @beta_tool
     def next_steps() -> str:

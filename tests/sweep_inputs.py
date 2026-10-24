@@ -116,11 +116,20 @@ def _wide_delivery(pools: Pools) -> list[dict]:
     return out
 
 
+def _step_free(pools: Pools) -> list[dict]:
+    connectors = sorted(pools.bm.connectors) or [pools.space()]
+    return [
+        {"closed": pools.rng.choice(connectors), "start": pools.space(), "floor_id": pools.floor_id()}
+        for _ in range(PER_KIND)
+    ]
+
+
 GENERATORS: dict[str, Callable[[Pools], list[dict]]] = {
     "errand": _errand,
     "floor_area_total": _floor_room,
     "largest_room": _floor_room,
     "room_stacked": _room_stacked,
+    "step_free_reachable_count": _step_free,
     "shared_walls_count": _start_only,
     "straight_line_3d": _straight_line,
     "what_if_door": _what_if_door,

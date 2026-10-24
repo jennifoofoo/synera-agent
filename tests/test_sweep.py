@@ -21,20 +21,6 @@ TIMING_LIMIT_S = 10.0
 SPACE_KEYS = {"space_id", "via", "target"}
 COORDINATE_KEYS = {"door_position", "first", "second"}
 
-# Real crashes found by the sweep (kind -> building names), kept as non-strict xfails until fixed.
-# what_if_door: spaces 0.35 to 0.6 m apart count as adjacent but the 0.35 m wall buffer misses them,
-# so shared_wall_midpoint feeds an empty LineString to MultiLineString (EmptyPartError).
-KNOWN_CRASHES: dict[str, list[str]] = {
-    "what_if_door": """
-        osm-way13507441 osm-way360544293 swiss-1104 swiss-1195 swiss-1433 swiss-1457 swiss-1543 swiss-1650
-        swiss-1689 swiss-1760 swiss-17736 swiss-18260 swiss-1829 swiss-1922 swiss-1928 swiss-2080 swiss-2084
-        swiss-210 swiss-22 swiss-2235 swiss-2314 swiss-2482 swiss-2798 swiss-2873 swiss-2974 swiss-3254
-        swiss-3418 swiss-373 swiss-433 swiss-442 swiss-460 swiss-5690 swiss-6128
-    """.split(),  # noqa: SIM905
-}
-KNOWN = {(kind, name) for kind, names in KNOWN_CRASHES.items() for name in names}
-
-
 def _name(path: str) -> str:
     return Path(path).name
 
@@ -102,21 +88,8 @@ def test_sweep_building(building_dir):
     for kind_name in sorted(KINDS):
         for inputs in build_inputs(kind_name, pools):
             message = _run(kind_name, building_dir, inputs)
-            if message and (kind_name, _name(building_dir)) not in KNOWN:
+            if message:
                 failures.append(message)
-    assert not failures, "\n".join(failures)
-
-
-@pytest.mark.xfail(strict=False, reason="known crash, see KNOWN_CRASHES")
-@pytest.mark.parametrize("kind_name,name", sorted(KNOWN), ids=[f"{k}-{n}" for k, n in sorted(KNOWN)])
-def test_known_crash(kind_name, name):
-    building_dir = next(path for path in BUILDINGS if _name(path) == name)
-    pools = Pools(load_map(building_dir), name)
-    for earlier in sorted(KINDS):  # replay the sweep's rng stream so the same inputs come out
-        if earlier == kind_name:
-            break
-        build_inputs(earlier, pools)
-    failures = [m for inputs in build_inputs(kind_name, pools) if (m := _run(kind_name, building_dir, inputs))]
     assert not failures, "\n".join(failures)
 
 

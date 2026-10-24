@@ -26,6 +26,7 @@ def shared_wall_midpoint(bm: BuildingMap, first: str, second: str) -> tuple[floa
         for part in getattr(overlap, "geoms", [overlap])
         if isinstance(part, (LineString, MultiLineString))
         for line in getattr(part, "geoms", [part])
+        if not line.is_empty
     ]
     if lines:
         merged = linemerge(MultiLineString(lines))

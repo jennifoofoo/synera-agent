@@ -2,6 +2,7 @@
 
 import functools
 import inspect
+import re
 from pathlib import Path
 
 import networkx as nx
@@ -20,6 +21,18 @@ def snake_case(name: str, value):
     """Type parameters are snake_case identifiers ("living_room"), but questions say "living room"."""
     if name.endswith("_type") and isinstance(value, str):
         return value.strip().lower().replace(" ", "_")
+    return value
+
+
+BRACKET_ID = re.compile(r"\[([^\[\]]+)\]\s*$")
+
+
+def clean_reference(bm: BuildingMap, value):
+    """The overview prints "Name [id]"; models sometimes copy that whole string. Keep just the id."""
+    if isinstance(value, str) and (match := BRACKET_ID.search(value)):
+        candidate = match.group(1)
+        if candidate in bm.spaces or candidate in bm.connectors or candidate in bm.assets:
+            return candidate
     return value
 
 
@@ -51,7 +64,7 @@ def kind_tool(bm: BuildingMap, kind: Kind):
     @functools.wraps(kind.fn)
     def run(*args, **kwargs) -> str:
         try:
-            kwargs = {name: resolve_type(bm, name, value) for name, value in kwargs.items()}
+            kwargs = {name: resolve_type(bm, name, clean_reference(bm, value)) for name, value in kwargs.items()}
             try:
                 signature.bind(bm, *args, **kwargs)
             except TypeError as error:  # a wrong argument list is the model's mistake, not a kind bug

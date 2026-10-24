@@ -14,3 +14,10 @@ def test_what_if_door_matches_expected_count(building_dir, question):
     assert result["count"] == question["answer"]["value"]
     assert len(result["space_ids"]) == result["count"]
     assert len(bm.openings) == openings_before
+
+
+def test_gap_between_wall_buffer_and_adjacency_does_not_crash():
+    """swiss-1689: rooms 0.42 m apart count as adjacent but miss the 0.35 m wall buffer (was EmptyPartError)."""
+    bm = load_map("data/dev/swiss-1689")
+    result = what_if_door(bm, "swiss-1689-F-1-S029", "swiss-1689-F-1-S031", "swiss-1689-F-1", "swiss-1689-F3")
+    assert "door_position" in result

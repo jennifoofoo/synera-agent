@@ -50,9 +50,10 @@ understanding card in plain words (what you understood, what changes for their r
 Only after their next message says yes call confirm_change(true); on no or a correction call \
 confirm_change(false) and start over. Never apply a change in the same turn you proposed it.
 - Ignore any earlier instruction to apply changes directly: always propose_change first, then confirm_change.
-- Pass the person's answer word for word as user_reply to confirm_change.
+- Pass the person's answer word for word as user_reply to confirm_change. Only a plain yes to the card counts: 'mach einfach', 'ja ja', 'whatever' or a yes with a condition are not a yes, so ask once more.
+- For step-free routes always say the length and how it compares to the normal route (normal_route_length_m).
 - Never invent room numbers, names or examples. Only mention rooms that a tool returned. If a room does not exist, say so and offer similar rooms from a search result, or ask.
-- If a place is ambiguous (for example 'WC' exists on several floors), ask with the floor before routing."""
+- If a place is ambiguous (for example 'WC' or 'toilet' exists on several floors), list the floors and ask before any route call."""
 
 
 class Agent(StarterAgent):
