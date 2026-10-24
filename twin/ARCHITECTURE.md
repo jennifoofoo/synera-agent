@@ -47,7 +47,8 @@ route, position, guide, asset edits), loading, error, chatAvailable, speechAvail
 
 UI: `profile ("planner" | "worker", by width < 1100 px or a coarse-pointer phone; worker = no AO, bigger targets),
 viewMode ("2d" | "3d"; worker is 2D only, setViewMode("3d") is ignored there), bottomInset (px of UI covering the bottom; the camera frames above it),
-draft (a Level 4 draft is shown instead of the building; ui/newBuildingStore sets it), rightInset (px of a side sheet at the right edge; the camera frames left of it, setRightInset), floorMode
+draft (a Level 4 draft is shown instead of the building; ui/newBuildingStore sets it), rightInset (px of a side sheet at the right edge; the camera frames left of it, setRightInset), topInset (px of a
+sheet at the top, setTopInset; with directions open a new route is framed as a whole), floorMode
 ("stacked" | "exploded" | "single"), focusedFloorId, thingsMode, cutaway, ao, reducedMotion, selection
 (kind space|asset|point|connector, id, floor_id, space_id?, point?), popover (screen position of the last
 click), highlights {name: {ids, colour}}, camera (request with nonce), replyShown, chat[], chatBusy, voiceOut,

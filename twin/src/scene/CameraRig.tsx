@@ -36,6 +36,9 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const profile = useTwin((s) => s.profile);
   const bottomInset = useTwin((s) => s.bottomInset);
   const rightInset = useTwin((s) => s.rightInset);
+  const topInset = useTwin((s) => s.topInset);
+  const route = useTwin((s) => s.state?.route ?? null);
+  const directionsOpen = useTwin((s) => s.directions !== null);
   const viewMode = useTwin((s) => s.viewMode);
   const focusedFloorId = useTwin((s) => s.focusedFloorId);
   const invalidate = useThree((s) => s.invalidate);
@@ -51,12 +54,33 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const w = viewport.width;
     const h = viewport.height;
     const inset = Math.min(bottomInset, h * 0.6);
+    const top = Math.min(topInset, h * 0.4);
     const right = Math.min(rightInset, w * 0.6);
-    if (inset > 0 || right > 0) camera.setViewOffset(w + right, h + inset, 0, inset, w, h);
+    // The visible area is the window [bottom .. bottom + h] of a taller/wider virtual frame, so the frame's centre
+    // lands in the middle of the part not covered by UI.
+    if (inset > 0 || right > 0 || top > 0) camera.setViewOffset(w + right, h + inset + top, 0, inset, w, h);
     else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     invalidate();
-  }, [camera, viewport.width, viewport.height, bottomInset, rightInset, invalidate]);
+  }, [camera, viewport.width, viewport.height, bottomInset, rightInset, topInset, invalidate]);
+
+  // Directions open: a new route is framed as a whole (its visible floors).
+  const routeKey = route?.ok ? `${route.start}|${route.destination}|${route.length_m}` : null;
+  useEffect(() => {
+    const c = controls.current;
+    if (!c || !routeKey || !directionsOpen || !route?.segments) return;
+    const box = new THREE.Box3();
+    for (const segment of route.segments) {
+      if (flat && segment.floor_id !== focusedFloorId) continue;
+      const y = floorY(segment.floor_id);
+      for (const [x, z] of segment.points) box.expandByPoint(new THREE.Vector3(x, y, -z));
+    }
+    if (box.isEmpty()) return;
+    box.expandByScalar(3);
+    fitBox(c, box, !reducedMotion, 1.15);
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey, directionsOpen, camera]);
 
   // Limits follow the building; the 2D plan is locked straight down, north up: pan and zoom only.
   useEffect(() => {
