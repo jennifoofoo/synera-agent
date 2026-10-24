@@ -298,3 +298,72 @@ Kern (Zeitraum-Modell, austauschbare Uhr, wirksamer Stand zu einem Zeitpunkt, `w
 
 ### Risiken
 Zeitangaben sind fehleranfällig (immer das ausgewertete Datum mit Wochentag zeigen). Keine Rechteprüfung. Die Wertung am Sonntag prüft vermutlich keine Zeiträume (Synera-Frage 13), daher nur Creativity und Alltag.
+
+
+## 8. Sicherheit, Brandschutz und Evakuierung, bezogen auf den Standort (Idee von Jennifer, 24.10.2026)
+
+Status: geparkt, nicht für die Wertung. Teile gehen heute schon, ein eigener Modus fehlt.
+
+### Idee
+Wanda kennt den Standort der Person (gesagt, geklickt, am Gerät oder entlang der Route) und den **letzten bekannten**. Daraus folgt Sicherheitswissen, das ohne Rückfrage passt: "Wo ist der nächste Feuerlöscher?", "Wo ist der Defibrillator?", "Augendusche, schnell!", "Wie komme ich hier raus?" Dazu eine **Fluchtfrage**: kürzester Weg zum nächsten Ausgang, ein **zweiter, anderer** Ausgang, ohne gesperrte Bereiche, auf Wunsch stufenfrei (Rollstuhl). Proaktiv: Beim Begleiten zu einer gefährlichen Maschine ("Welding station") nennt sie nebenbei den nächsten Feuerlöscher und die Augendusche auf dem Weg, mit den Sicherheitshinweisen, die `describe_asset` schon kennt.
+
+### Was heute schon geht (belegt)
+- **Nächster Treffer vom Standort aus** (`find_nearest`, Standort aus `set_position` oder Klick): Feuerlöscher (1859 Stück in 177 von 280 Gebäuden), Duschen (391), Augenduschen (158, in 23 Gebäuden), Defibrillatoren (37, einer pro Gebäude, in 37 Gebäuden).
+- **Eingänge** gibt es in allen 280 Gebäuden (987 Eingänge). Die Weglänge zum nächsten Eingang rechnet `building_agent/entrance_distance.py` schon (für `what_if_door` und die Wirkung von Sperrungen), nur als Werkzeug für den Chat ist sie nicht freigegeben.
+- **Sperrungen** (`assume_closed`, `propose_change`) und stufenfrei sind im Routing; **Sicherheitshinweise** zu Geräten (Schweißen, Drehbank, Härteofen, Laser, Batterieladestation) stehen in `asset_knowledge.py`.
+
+### Was fehlt
+- Werkzeug `find_exit` (nächster und zweiter, unabhängiger Ausgang vom Standort, mit Weglänge und Wegbeschreibung) und eine Prompt-Zeile "Notfall": zuerst kurz antworten, keine Rückfrage, nur der Weg. Etwa eine Stunde.
+- Letzten bekannten Standort mit Alter nennen ("von deinem letzten Ort, Küche 0.28"), wenn er alt ist, einmal nachfragen. Klein.
+- **Nicht in den Daten:** Brandabschnitte, Brandschutztüren, Sammelplätze, Alarmmelder, Sprinkler, Fluchtwegschilder, Kameras, Zutrittssysteme (Ausweisleser, Schlösser), Zutrittsrechte (siehe Nr. 4). Die Antworten sind eine **Orientierungshilfe**, keine Fluchtwegplanung nach Vorschrift, und das muss im Text stehen.
+
+### Risiken
+Falsche Sicherheit ist schlimmer als keine Antwort: kein Versprechen wie "das ist der sichere Weg", immer "kürzester Weg im Plan, folge den echten Schildern". Gesperrte Bereiche kennt nur, was jemand gemeldet hat. Stufenfrei heißt nicht barrierefrei evakuierbar (Aufzüge im Brandfall sperren), das gehört in den Hinweis.
+
+## 9. Echte Räume als 3D-Scan einblenden (Matterport o. ä.) (Idee von Leonie, 24.10.2026)
+Status: geparkt.
+
+### Idee
+Neben dem Modell aus dem Grundriss zeigt die App für einen Raum den **echten Raum** als begehbaren 3D-Scan (360-Grad-Ansicht). Beim Begleiten: "So sieht es an der nächsten Abzweigung aus", oder beim Fund: "Hier steht der 3D-Drucker" mit Blick in den echten Raum.
+
+### Was es gibt
+- **Matterport:** Räume mit 360-Kamera oder iPhone mit LiDAR scannen, Ergebnis ist ein begehbarer "Digital Twin". Einbinden per iframe oder **Showcase SDK** (Kamera steuern, Markierungen "Mattertags" setzen, Position abfragen). Braucht Konto, gescannte Räume und für das SDK einen kostenpflichtigen Plan mit SDK-Key.
+- Freie Alternativen: iPhone-LiDAR-Apps (z. B. Polycam, Scaniverse) exportieren Meshes oder Gaussian Splats, die man direkt in three.js laden kann.
+
+### Was das für uns heißt
+- Unsere Daten haben **keine Scans**, nur Grundrisse. Für eine Demo müssten wir selbst einen Raum scannen (z. B. den Hackathon-Raum mit dem iPhone) und ihn einem Raum im Modell zuordnen.
+- Passt zu Level 5 "Capture on site" und zur Foto-Ortung (Idee 7): Scan zeigt, wo man steht.
+- Aufwand: iframe-Einbindung eines fertigen Matterport-Rundgangs ca. 1 h; Kopplung mit Route und Markierungen über das SDK 4 bis 6 h; eigener Scan als Splat im Twin 3 bis 5 h.
+- Haken: Kosten und Konto bei Matterport, Datenschutz bei Scans echter Räume, die Jury prüft Level 1 bis 4 auf Grundrissen, nicht auf Scans.
+
+
+## 10. Fotos vor Ort am Plan: "Gestern wurde dieses Foto gemacht" (Idee von Jennifer, 24.10.2026, aus ihrer Zeit bei KINEXON)
+
+Status: geparkt, nicht für die Wertung. Verwandt mit Nr. 9 (3D-Scan von Leonie: einmalige, saubere Aufnahme) und mit `docs/specs/live-updates.md` (Änderungen mit Zeitraum, Dokumente). Hier geht es um **laufende, einfache Fotos von Menschen vor Ort**.
+
+### Hintergrund
+Bei KINEXON war Jennifers Aufgabe, durch Fotos von Lagerhallen zu gehen, die jemand anderes gemacht hatte, und darin etwas zu platzieren. Der Aufwand lag im Zuordnen: Wo war das, was ist zu sehen, was hat sich geändert. Der Plan kann das heute schon fast: Standort, Klick auf den Plan und "Gerät hinzufügen" mit Karte und Ja gibt es.
+
+### Idee
+Ein Techniker geht durch die Halle und macht Fotos. Jedes Foto landet **am richtigen Ort im Plan** (Standort aus "I'm here", Klick auf den Plan, am Gerät, oder beim Begleiten die aktuelle Etappe) mit Zeit und Name. Dann:
+- **Nächster Tag:** Der nächste Techniker sieht am Raum eine Markierung, tippt darauf: "Foto von gestern 14:12, Halle A3, Maschine 4: Ölfleck am Boden." Wanda nennt es beim Hinführen: "Dort liegt seit gestern ein Foto, soll ich es zeigen?"
+- **Online in Echtzeit:** Wer im Büro im Digital Twin sitzt, sieht das neue Foto sofort (Abfrage alle 30 Sekunden wie bei den Live-Updates) und kann damit planen.
+- **Neue Objekte:** Auf dem Foto steht eine neue Palette, eine Maschine, ein Hindernis. Das Bildmodell schlägt einen Eintrag vor ("Palette, etwa 1,2 mal 0,8 m, hier"), der Mensch bestätigt per Karte und Ja, danach steht das Objekt im Plan und im 3D-Zwilling (derselbe Weg wie `add_asset` und `propose_change`).
+- **"Was hat sich seit gestern geändert?"** zählt die neuen Fotos und Objekte pro Bereich.
+
+### Was heute schon da ist
+Standort (gesagt, geklickt, am Gerät), Klick-Auswahl mit Validierung auf dem Server, `add_asset` mit Karte und klarem Ja, Upload-Muster mit festem Ordner und Typprüfung (`web/level4_api.py`), `state_view` mit Abfrage alle 30 Sekunden, Vision-Aufruf mit festem Werkzeugschema (Level 4).
+
+### Was gebaut werden müsste
+- Fotospeicher pro Gebäude (`agent_output/photos/<gebäude>/` plus Index mit Zeit, Raum, Etage, Punkt, Autor, Beschriftung), Größen- und Typgrenze, atomar geschrieben.
+- Anzeige: Markierung am Ort (2D und 3D), Liste, Zeitleiste "heute, gestern, diese Woche", Vollbild. Handy: Kamera direkt über das Eingabefeld (`accept="image/*"`).
+- Chat und Stimme: "Foto hier hinzufügen", "Zeig mir die Fotos aus Halle A3", "Was ist seit gestern neu?".
+- Bildlesen: pro Foto eine kurze Beschreibung und Vorschläge für neue Objekte (nur Kandidaten, nichts wird ohne Karte und Ja angelegt).
+- Aufwand grob: Phase 1 (Foto zum Ort speichern, Markierung, Liste, Frage nach Neuem) 3 bis 4 Stunden Server plus 2 bis 3 Stunden Seite (Leonie). Phase 2 (Bildlesen und Objektvorschläge) etwa 3 Stunden.
+
+### Risiken und Haken
+- **Datenschutz:** Personen und Gesichter auf Fotos, Betriebsgeheimnisse. Aufbewahrungsfrist, nur Beteiligte sehen die Fotos, Hinweis beim Aufnehmen; Gesichter zu verwischen ist eine eigene Aufgabe.
+- **Ort ist nur so gut wie der Standort:** Es gibt keine Ortung, die Person sagt oder tippt, wo sie ist. Falsch zugeordnete Fotos sind schlimmer als keine. Das Foto zeigt deshalb immer "zugeordnet zu Raum X, von Hand gesetzt" und lässt sich verschieben.
+- **Bildlesen irrt sich:** Größen und Typen sind Schätzungen. Darum nur Vorschläge mit Karte und Ja, wie überall sonst.
+- **Datenmenge:** Fotos sind groß, Handy-Upload über schlechtes Netz in der Halle. Verkleinern vor dem Hochladen.
+- Wertung: Die Sonntagsfragen prüfen das vermutlich nicht. Gut für Creativity, Demo ("Capture on site" und "Make things move" aus den Level-5-Ideen) und für den Pitch.
