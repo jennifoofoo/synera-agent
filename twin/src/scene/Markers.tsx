@@ -12,7 +12,7 @@ import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
-import { BADGE_GAP_PX, END_RING_PX, ScreenSized, guideNextPoint } from "./markerLayout";
+import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
 
 interface Props {
@@ -28,13 +28,13 @@ interface Props {
   flat?: boolean;
 }
 
-interface Disruption {
+export interface Disruption {
   floor_id: string;
   point: Point;
   names: string[];
 }
 
-function clusterDisruptions(model: BuildingModel, closed: string[]): Disruption[] {
+export function clusterDisruptions(model: BuildingModel, closed: string[]): Disruption[] {
   const items: Disruption[] = [];
   for (const id of closed) {
     const space = model.spaceById.get(id);
@@ -119,8 +119,6 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
     </Html>
   );
 
-  const position = state?.position;
-  const guide = state?.guide;
   const added = state?.added_assets ?? {};
   const moved = state?.moved_assets ?? {};
   const removed = state?.removed_assets ?? [];
@@ -131,53 +129,25 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
       <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} colour={hereColour} />
       <TapPin model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} />
 
-      {/* floor changes of the route: where to go up or down (needed in 2D and single-floor views) */}
-      {state?.route?.ok &&
-        state.route.floor_changes?.map((change, index) => {
-          const fromFloor = model.floorById.get(change.from_floor);
-          const toFloor = model.floorById.get(change.to_floor);
-          const arrow = change.direction === "up" ? "↑" : "↓";
-          return (
-            <group key={`fc-${index}`}>
-              {shown(change.from_floor) && (
-                <group position={at(change.from_floor, change.from_point)}>
-                  <Ring radius={0.9} colour={COLOURS.route} width={0.14} through />
-                  <group position-y={1.4}>{chip(`${arrow} ${change.name} to ${toFloor?.name ?? change.to_floor}`, "route")}</group>
-                </group>
-              )}
-              {shown(change.to_floor) && (
-                <group position={at(change.to_floor, change.to_point)}>
-                  <Ring radius={0.9} colour={COLOURS.route} width={0.14} through />
-                  <group position-y={1.4}>{chip(`from ${fromFloor?.name ?? change.from_floor}`, "route")}</group>
-                </group>
-              )}
-            </group>
-          );
-        })}
-
-      {/* guide: only the end of the current leg, small and on the route line (the destination pin covers the
-          last leg, so no second marker there) */}
-      {guide?.active &&
-        guide.leg.to_space_id !== state?.route?.destination &&
-        (() => {
-          const target = model.spaceById.get(guide.leg.to_space_id);
-          if (!target || !shown(target.floor_id)) return null;
-          return (
-            <group position={at(target.floor_id, guideNextPoint(guide, target))} name="guide-next">
-              <ScreenSized>
-                <Disc radius={END_RING_PX} colour={COLOURS.routeGlow} opacity={1} through y={0.1} order={30} />
-                <Ring radius={END_RING_PX} colour={COLOURS.route} width={2} through y={0.12} order={31} />
-              </ScreenSized>
-              <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-                <div className="chip chip-route guide-next" style={{ transform: `translateY(calc(-50% - ${END_RING_PX + BADGE_GAP_PX}px))` }}>
-                  Next: {target.name}
-                </div>
+      {/* floor changes of the route in 3D: one small "↑ 1" badge where to go up or down (2D: Labels.tsx lays it out) */}
+      {!flat &&
+        state?.route?.ok &&
+        state.route.floor_changes?.map((change, index) =>
+          shown(change.from_floor) ? (
+            <group key={`fc-${index}`} position={at(change.from_floor, change.from_point)}>
+              <Html center position-y={1.4} zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                <FloorBadge
+                  kind={change.kind === "lift" ? "lift" : "stairs"}
+                  direction={change.direction}
+                  level={model.floorById.get(change.to_floor)?.level ?? 0}
+                  title={`${change.name} ${change.direction} to ${model.floorById.get(change.to_floor)?.name ?? change.to_floor}`}
+                />
               </Html>
             </group>
-          );
-        })()}
+          ) : null,
+        )}
 
-      {/* disruptions: red circles, radius ~ sqrt(n), pulsing ring and a "!" badge */}
+      {/* disruptions: red circles, radius ~ sqrt(n), pulsing ring and a "⚠" chip (2D: Labels.tsx lays the chip out) */}
       {disruptions
         .filter((d) => shown(d.floor_id))
         .map((d, index) => {
@@ -189,7 +159,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
               <Pulse reducedMotion={reducedMotion}>
                 <Ring radius={radius} colour={COLOURS.danger} width={0.2} through />
               </Pulse>
-              <group position-y={1.6}>{chip(`⚠ ${label}`, "danger")}</group>
+              {!flat && <group position-y={1.6}>{chip(`⚠ ${label}`, "danger")}</group>}
             </group>
           );
         })}
@@ -239,7 +209,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
         );
       })}
 
-      {/* highlights (finds etc.) */}
+      {/* highlights (finds etc.); found things in 2D are dots laid out by Labels.tsx, collision-free */}
       {Object.entries(highlights).flatMap(([name, highlight]) =>
         highlight.ids.map((id) => {
           const space = model.spaceById.get(id);
@@ -251,7 +221,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             );
           }
           const asset = model.assetById.get(id);
-          if (asset && shown(asset.floor_id)) {
+          if (asset && shown(asset.floor_id) && !flat) {
             const size = assetSize(asset);
             return (
               <group key={`${name}-${id}`} position={at(asset.floor_id, asset.position)}>

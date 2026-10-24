@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { CampusCard } from "./campus/CampusCard";
 import { CampusSite } from "./campus/CampusSite";
 import { Scene } from "./scene/Scene";
+import { installHandsFree } from "./handsFree";
 import { useTwin } from "./store";
 import { Card } from "./ui/Card";
 import { ChangesPill } from "./ui/ChangesPill";
@@ -31,6 +32,7 @@ export function App() {
   useEffect(() => {
     void loadBuildings();
   }, [loadBuildings]);
+  useEffect(installHandsFree, []);
   return (
     <div
       className={`app ${profile} ${flat ? "flat" : "solid"} ${directionsOpen ? "directions-open" : ""} ${walking ? "walking" : ""}`}

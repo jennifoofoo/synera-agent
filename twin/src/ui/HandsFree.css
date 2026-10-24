@@ -1,0 +1,40 @@
+/* ===== Hands-free (owner: hands-free session): mic-with-waves toggle, blue when on; one status line. */
+.hf-btn {
+  --hf-blue: var(--ob-active, #1a73e8);
+  display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0;
+  color: var(--text); background: var(--surface); border: 1px solid var(--line);
+}
+.hf-btn.on { background: var(--hf-blue); border-color: var(--hf-blue); color: #fff; }
+.hf-btn.on.heard { animation: hf-pulse 1.5s ease-out infinite; }
+@keyframes hf-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--hf-blue) 45%, transparent); }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+.hf-status {
+  --hf-blue: var(--ob-active, #1a73e8);
+  display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; font-size: 13px; color: var(--muted);
+}
+.hf-status .hf-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hf-status .hf-text.strong { color: var(--text); font-weight: 600; }
+.hf-status.notice { color: var(--text); }
+.hf-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hf-blue); flex: none; opacity: 0.55; }
+.hf-dot.live { opacity: 1; animation: hf-blink 0.8s ease-in-out infinite alternate; }
+@keyframes hf-blink { from { opacity: 1; } to { opacity: 0.35; } }
+.hf-dots { display: inline-flex; gap: 3px; flex: none; }
+.hf-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--hf-blue); animation: hf-dot 1.2s ease-in-out infinite; }
+.hf-dots i:nth-child(2) { animation-delay: 0.15s; }
+.hf-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes hf-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hf-btn.on.heard, .hf-dot.live, .hf-dots i { animation: none; } }
+
+/* in the step sheet: a small round button left of ×, the status under the step */
+.card-walk .card-head .hf-btn { width: 36px; height: 36px; min-height: 36px; border-radius: 50%; margin-left: auto; }
+.card-walk .card-head .hf-btn svg { width: 20px; height: 20px; }
+.card-walk .hf-status { display: flex; min-height: 20px; margin-top: 6px; }
+@media (pointer: coarse) { .card-walk .card-head .hf-btn { width: 44px; height: 44px; min-height: 44px; } }
+
+/* next to the omnibox buttons: the status as a small pill above them, right-aligned like the buttons */
+.ob-hf-status {
+  align-self: flex-end; padding: 4px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
+}
+.omnibox.expanded .ob-hf-status { align-self: center; }

@@ -15,7 +15,7 @@ import "./Card.css";
 import { HereChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
-import { readable } from "./Walk";
+import { readable } from "../walkInfo";
 
 export function Card() {
   const model = useTwin((s) => s.model);

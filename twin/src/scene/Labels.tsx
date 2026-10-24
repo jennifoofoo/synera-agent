@@ -4,10 +4,11 @@ import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
-import { LABEL_LIFT, guideNextPoint } from "./markerLayout";
+import { clusterDisruptions } from "./Markers";
+import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
-import { PoiBadge, POI_PX, amenityKindOf, type PoiKind } from "./poiIcons";
+import { FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
 
 interface Props {
   floor: FloorModel;
@@ -25,6 +26,10 @@ const LABEL_H_PX = 16;
 const GAP_PX = 4; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
+const FOUND_NAMES = 3; // found things whose name is shown (in the agent's order); the selected one always tries too
+const FOUND_CHAR_PX = 7.2; // the found names are semibold
+const CHIP_CHAR_PX = 7.4; // 12 px semibold chip text
+const CHIP_H_PX = 20;
 
 interface Box {
   x0: number;
@@ -37,6 +42,13 @@ type Item =
   | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string }
   | { kind: "room"; id: string; point: Point; space: Space }
   | { kind: "thing"; id: string; point: Point; asset: Asset; landmark: boolean };
+
+/** Map markers laid out before the labels (screen px), in this order: they win every collision. */
+type Pin =
+  | { kind: "floor"; id: string; point: Point; connector: "stairs" | "lift"; direction: "up" | "down"; level: number; title: string }
+  | { kind: "found"; id: string; point: Point; ids: string[]; title: string }
+  | { kind: "closed"; id: string; point: Point; text: string; title: string; dy: number }
+  | { kind: "name"; id: string; point: Point; text: string; dx: number; dy: number };
 
 function overlaps(a: Box, b: Box): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
@@ -160,14 +172,17 @@ function candidates(
   return [...pois, ...landmarkItems, ...named, ...machineNames];
 }
 
-/** Room names and points of interest of the focused floor, in fixed zoom tiers (see mapZoom.ts). Lower
- * priority yields: nothing overlaps another label, and room names never sit on the drawn route. Rooms with a
- * marker (you are here, route ends, the guide's next target) always keep their name, lifted just above the
- * marker (screen px) so the marker never covers it. */
+/** Everything with text or an icon on the focused floor, laid out together in screen px so nothing overlaps
+ * (lower priority yields): kept clear of the "You are here" dot and the route ends; in 2D also the route's
+ * floor-change badges ("↑ 1"), closures ("⚠ Kitchen 0.28"), found things (dots, names for the first few
+ * and the selected one); then points of interest and room names in fixed zoom tiers (see mapZoom.ts). Room
+ * names never sit on the drawn route; a room with a marker shows its name just above that marker. */
 export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
   const landmarks = useLandmarks();
   const state = useTwin((s) => s.state);
+  const highlights = useTwin((s) => s.highlights);
+  const selectedAssetId = useTwin((s) => (s.selection?.kind === "asset" ? s.selection.id : null));
   const route = state?.route ?? null;
   // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
   const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
@@ -185,19 +200,32 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.start, ROUTE_LIFT);
       if (last.floor_id === floor.id) put(route.destination, last.points[last.points.length - 1], LABEL_LIFT.end, ROUTE_LIFT);
     }
-    const guide = state?.guide;
-    const next = guide?.active && guide.leg.to_space_id !== route?.destination ? model.spaceById.get(guide.leg.to_space_id) : undefined;
-    if (guide && next) put(next.id, guideNextPoint(guide, next), LABEL_LIFT.guide);
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
     if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
     return out;
-  }, [route, state?.guide, state?.position, model, floor.id, selectedId]);
+  }, [route, state?.position, model, floor.id, selectedId]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
   );
-  const shown = useMemo(() => {
+  // Found things on this floor, in the agent's order (2D: Labels draws them; 3D keeps the rings in Markers.tsx).
+  const found = useMemo(() => {
+    if (!flat) return [];
+    const ids = Object.values(highlights).flatMap((highlight) => highlight.ids);
+    return [...new Set(ids)].flatMap((id) => {
+      const asset = model.assetById.get(id);
+      const point = state?.moved_assets?.[id]?.position ?? asset?.position;
+      return asset && point && asset.floor_id === floor.id ? [{ id, name: asset.name, point }] : [];
+    });
+  }, [flat, highlights, model, floor.id, state?.moved_assets]);
+  const closed = useMemo(
+    () => (flat ? clusterDisruptions(model, state?.closed ?? []).filter((d) => d.floor_id === floor.id) : []),
+    [flat, model, state?.closed, floor.id],
+  );
+  const changes = useMemo(() => (flat && route?.ok ? (route.floor_changes ?? []).filter((change) => change.from_floor === floor.id) : []), [flat, route, floor.id]);
+
+  const { shown, pins } = useMemo(() => {
     // Layout in screen pixels at the bucket's coarsest scale (y flipped: north is up on screen).
     const px = ([x, yy]: Point): Point => [x / scale, -yy / scale];
     const routePx = routeOnFloor.map((points) => points.map(px));
@@ -206,19 +234,98 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       const y = cy - lift - (lift ? halfH : 0); // a lifted label's bottom edge sits `lift` px above the point
       return { x0: cx - halfW - GAP_PX / 2, y0: y - halfH - GAP_PX / 2, x1: cx + halfW + GAP_PX / 2, y1: y + halfH + GAP_PX / 2 };
     };
-    // Marked rooms first: they always keep their name (above their marker); everything else keeps clear of them.
+    const kept: Box[] = [];
+    const pins: Pin[] = [];
+    // 1. Fixed markers drawn elsewhere: the "You are here" dot and the route ends. Nothing may sit on them.
+    const here = state?.position;
+    const herePoint = here?.floor_id === floor.id ? (here.point ?? model.spaceById.get(here.space_id)?.anchor) : undefined;
+    if (herePoint) kept.push(boxOf(herePoint, HERE_RIM_PX, HERE_RIM_PX));
+    for (const points of routeOnFloor) {
+      if (points.length < 2) continue;
+      kept.push(boxOf(points[0], START_DOT_PX + 2, START_DOT_PX + 2));
+      const [ex, ey] = px(points[points.length - 1]); // the destination pin stands on its tip
+      kept.push({ x0: ex - PIN_HEAD_PX - 2, y0: ey - PIN_HEIGHT_PX, x1: ex + PIN_HEAD_PX + 2, y1: ey + 2 });
+    }
+    // 2. Floor changes of the route: one small badge where to go up or down (it replaces that stairs/lift POI).
+    const replaced = new Set<string>();
+    for (const change of changes) {
+      const connector = model.connectorById.get(change.connector_id);
+      for (const spaceId of connector?.space_ids ?? []) replaced.add(spaceId);
+      const level = model.floorById.get(change.to_floor)?.level ?? 0;
+      const box = boxOf(change.from_point, floorBadgeWidth(level) / 2, FLOOR_BADGE_H_PX / 2);
+      kept.push(box);
+      const toName = model.floorById.get(change.to_floor)?.name ?? change.to_floor;
+      pins.push({ kind: "floor", id: `fc-${change.connector_id}-${change.to_floor}`, point: change.from_point, connector: change.kind === "lift" ? "lift" : "stairs", direction: change.direction, level, title: `${change.name} ${change.direction} to ${toName}` });
+    }
+    // 3. Found things: a dot each; dots that would touch merge into one with a count.
+    const dots: { pin: Extract<Pin, { kind: "found" }>; names: string[]; box: Box }[] = [];
+    for (const item of found) {
+      const near = dots.find((dot) => overlaps(dot.box, boxOf(item.point, FOUND_DOT_PX / 2, FOUND_DOT_PX / 2)));
+      if (near) {
+        near.pin.ids.push(item.id);
+        near.names.push(item.name);
+        near.box = boxOf(near.pin.point, FOUND_MANY_PX / 2, FOUND_MANY_PX / 2);
+        near.pin.title = near.names.join(", ");
+        continue;
+      }
+      dots.push({ pin: { kind: "found", id: item.id, point: item.point, ids: [item.id], title: item.name }, names: [item.name], box: boxOf(item.point, FOUND_DOT_PX / 2, FOUND_DOT_PX / 2) });
+    }
+    for (const dot of dots) {
+      kept.push(dot.box);
+      pins.push(dot.pin);
+    }
+    // 4. Closures: "⚠ Kitchen 0.28" on the red circle (or just above / below it), else a bare "⚠" badge, if free.
+    closed.forEach((d, index) => {
+      const text = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
+      const title = `Closed: ${d.names.join(", ")}`;
+      const [cx, cy] = px(d.point);
+      const halfW = (text.length * CHIP_CHAR_PX + 30) / 2; // text, icon and padding
+      const halfH = CHIP_H_PX / 2;
+      const tries: [number, number, string][] = [[halfW, 0, text], [halfW, -(halfH + 6), text], [halfW, halfH + 6, text], [CHIP_H_PX / 2, 0, ""]];
+      for (const [w, dy, label] of tries) {
+        const box = { x0: cx - w - GAP_PX / 2, y0: cy + dy - halfH - GAP_PX / 2, x1: cx + w + GAP_PX / 2, y1: cy + dy + halfH + GAP_PX / 2 };
+        if (kept.some((other) => overlaps(box, other))) continue;
+        kept.push(box);
+        pins.push({ kind: "closed", id: `closed-${index}`, point: d.point, text: label, title, dy });
+        break;
+      }
+    });
+    // 5. Names of the first found things (and the selected one): beside the dot, right / left / above / below, if free.
+    const top = new Set(found.slice(0, FOUND_NAMES).map((item) => item.id));
+    const named = dots.filter((dot) => dot.pin.ids.length === 1 && (top.has(dot.pin.id) || dot.pin.id === selectedAssetId));
+    named.sort((a, b) => Number(b.pin.id === selectedAssetId) - Number(a.pin.id === selectedAssetId));
+    for (const dot of named) {
+      const text = dot.names[0];
+      const halfW = (text.length * FOUND_CHAR_PX) / 2;
+      const halfH = LABEL_H_PX / 2;
+      const r = FOUND_DOT_PX / 2 + GAP_PX; // clear of its own dot (whose box carries the gap too)
+      const [cx, cy] = px(dot.pin.point);
+      const spots: [number, number][] = [[r + halfW, 0], [-(r + halfW), 0], [0, -(r + halfH)], [0, r + halfH]];
+      for (const [dx, dy] of spots) {
+        const box = { x0: cx + dx - halfW - GAP_PX / 2, y0: cy + dy - halfH - GAP_PX / 2, x1: cx + dx + halfW + GAP_PX / 2, y1: cy + dy + halfH + GAP_PX / 2 };
+        if (kept.some((other) => overlaps(box, other))) continue;
+        kept.push(box);
+        pins.push({ kind: "name", id: dot.pin.id, point: dot.pin.point, text, dx, dy });
+        break;
+      }
+    }
+    // 6. Room names of marked rooms: they keep their name (above their marker) unless a marker above sits there.
     const markedItems = floor.spaces
       .filter((space) => space.name && marks.has(space.id))
-      .sort((a, b) => a.id.localeCompare(b.id))
+      .sort((a, b) => Number(b.id === selectedId) - Number(a.id === selectedId) || a.id.localeCompare(b.id)) // the tapped room first
       .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
-    const kept: Box[] = markedItems.map((item) =>
-      boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2, LABEL_H_PX / 2, marks.get(item.id)!.lift),
-    );
-    const result: Item[] = [...markedItems];
+    const result: Item[] = [];
+    for (const item of markedItems) {
+      const box = boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2, LABEL_H_PX / 2, marks.get(item.id)!.lift);
+      if (kept.some((other) => overlaps(box, other))) continue;
+      kept.push(box);
+      result.push(item);
+    }
+    // 7. Points of interest and room names, by priority; no other name sits on the tapped room.
     const selected = selectedId ? model.spaceById.get(selectedId) : undefined;
     const selectedPx = selected && selected.floor_id === floor.id ? selected.polygon.map(px) : null;
     for (const item of candidates(floor, model, tier, scale, limit, flat, landmarks)) {
-      if (marks.has(item.id)) continue;
+      if (marks.has(item.id) || replaced.has(item.id)) continue;
       const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : "";
       const halfW = item.kind === "poi" ? POI_PX / 2 : (text.length * CHAR_PX) / 2;
       const halfH = item.kind === "poi" ? POI_PX / 2 : LABEL_H_PX / 2;
@@ -232,11 +339,28 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       kept.push(box);
       result.push(item);
     }
-    return result;
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, selectedId, flat, landmarks]);
+    return { shown: result, pins };
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, selectedId, selectedAssetId, state?.position, flat, landmarks]);
 
   return (
     <group position-y={y + 0.5}>
+      {pins.map((pin) => (
+        <Html key={`${pin.kind}-${pin.id}`} position={[pin.point[0], 0, -pin.point[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
+          {pin.kind === "floor" ? (
+            <FloorBadge kind={pin.connector} direction={pin.direction} level={pin.level} title={pin.title} />
+          ) : pin.kind === "found" ? (
+            <FoundDot count={pin.ids.length} title={pin.title} />
+          ) : pin.kind === "closed" ? (
+            <div className="chip chip-danger" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
+              ⚠{pin.text ? ` ${pin.text}` : ""}
+            </div>
+          ) : (
+            <div className="label label-halo label-plan found-name" style={{ transform: `translate(${pin.dx}px, ${pin.dy}px)` }}>
+              {pin.text}
+            </div>
+          )}
+        </Html>
+      ))}
       {shown.map((item) =>
         item.kind === "room" ? (
           <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
