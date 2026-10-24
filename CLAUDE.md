@@ -10,7 +10,15 @@ Replies must end with exactly one `Answer:` line (the scorer reads only that).
 - `starter_agent/`, `benchmark/`: kit code, do not edit. Reuse `BuildingMap` (routing model is already correct).
 - `building_agent/`: our code. `geometry.py`, `queries.py`, `tools.py`, `agent.py`.
 - `tests/`: one test per question kind against dev/train answers, no API calls.
-- `data/`: kit data, git-ignored.
+- `data/`: kit data, git-ignored (get it with `scripts/get_data.sh`).
+- `docs/STATUS.md`: who works on what, file ownership, priorities.
+
+## Setup (new machine or fresh worktree)
+1. `uv sync`
+2. `scripts/get_data.sh` (fetches the git-ignored `data/` from the kit repo, skips if it exists)
+3. `cp .env.example .env`. The person types her own `ANTHROPIC_API_KEY` into `.env`. Never ask for, invent or print the key; only check that `.env` exists and is not tracked by git.
+4. `uv run pytest` must be green before any work.
+5. Claim a task in `docs/STATUS.md`, commit, push, then create `feat/q-<kind>` from `main`.
 
 ## Commands
 - `uv sync`
@@ -22,7 +30,9 @@ Replies must end with exactly one `Answer:` line (the scorer reads only that).
 - Before working on a task: claim it in `docs/STATUS.md` (name, status, branch), commit and push first.
 - One branch per task (`feat/q-<kind>`), small merges to `main`, `uv run pytest` green before merging.
 - Parallel sessions only in separate worktrees (`claude -w <name>`).
-- One query function per question kind in `queries.py`, signature stays stable.
+- File ownership: Leonie `queries.py`, `geometry.py`; Jennifer `tools.py`, `agent.py`, `directions.py`, `queries_routing.py`. Do not edit the other person's files without asking in chat.
+- One query function per question kind, signature stays stable.
+- Use `labelled_questions(kind)` from `tests/conftest.py` to test a kind against train/dev answers (see `tests/test_errand.py`).
 - Only one person uploads submissions, agree in chat first.
 
 ## Rules
