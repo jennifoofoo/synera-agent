@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { GizmoHelper, GizmoViewcube, Grid, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
+import { GizmoHelper, GizmoViewcube, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 
 // Postprocessing (N8AO etc.) is planner-only and loaded on demand, so phones never download it.
 const Effects = lazy(() => import("./Effects"));
@@ -9,6 +9,7 @@ import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
 import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
+import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { RouteLine } from "./RouteLine";
@@ -140,7 +141,7 @@ export function Scene() {
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
       <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
-      {!flat && <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />}
+      {!flat && <fog attach="fog" args={[COLOURS.background, size * 2.5, size * 9]} />}
       <hemisphereLight args={["#ffffff", "#9fb4cc", 1.0]} />
       <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
       <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />
@@ -151,25 +152,10 @@ export function Scene() {
         onIncline={() => setQuality((q) => Math.min(2, q + 1))}
       />
       <mesh rotation-x={-Math.PI / 2} position={[centre[0], groundY, centre[2]]} renderOrder={-1}>
-        <planeGeometry args={[size * 12, size * 12]} />
+        <planeGeometry args={[size * 60, size * 60]} />
         <meshBasicMaterial color={flat ? COLOURS.plan : COLOURS.ground} />
       </mesh>
-      {!flat && (
-      <Grid
-        position={[centre[0], groundY + 0.02, centre[2]]}
-        args={[size * 6, size * 6]}
-        cellSize={2}
-        cellThickness={0.6}
-        cellColor="#c9d6e5"
-        sectionSize={10}
-        sectionThickness={1}
-        sectionColor="#afc2d8"
-        fadeDistance={size * 3.2}
-        fadeStrength={1.2}
-        infiniteGrid
-        followCamera={false}
-      />
-      )}
+      {!flat && <GroundGrid centre={centre} radius={size * 1.6} />}
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && !flat && (
