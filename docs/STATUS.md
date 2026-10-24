@@ -27,7 +27,7 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | Interaction: Landmarken, 3er-Schritte, Verständniskarte, 6 Skripte plus Gegner-Varianten (live) | Jennifer | gemergt | |
 | Test "Text zu Parametern" (Haiku, alle gelabelten und 145 Testfragen) | Jennifer | gemergt | |
 | A. Warm-up: `structured.py` (Route als Knotenliste, Länge, Raum-ID), Live-Auswertung der 6 Warm-up-Typen, Kosten festhalten (Tools allein: 369 von 369 in Dev) | Jennifer | offen | |
-| C. Voice-Spike (ElevenLabs mit eigenem LLM oder Browser-STT plus ElevenLabs-TTS), Ergebnis in `docs/specs/voice-spike.md` | Jennifer | offen | |
+| C. Voice-Spike (Ergebnis `docs/specs/voice-spike.md`: Browser-STT plus ElevenLabs-TTS, ca. 1,8 h) | Jennifer | gemergt | spike/voice |
 | D. Level-4-Spike (Plan-Bild nach `building.json` mit Claude-Vision, Qualität gegen Original messen) | Jennifer | offen | |
 | Testlauf auf `data/test` (3 pro Typ), `docs/eval-log.md`, Tool-Schleife 20 auf 8 Runden | Jennifer | offen | |
 | 2D-Web-Seite (Chat, Etagenplan, Route, Sperren, Türen) | Leonie | gemergt (Chat mit Session, siehe Blocker) | feat/web-2d |

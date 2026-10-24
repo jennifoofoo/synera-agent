@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- Throwaway spike: browser speech recognition (Web Speech API) only. No server, no key. -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Voice spike</title>
+<style>
+  body { font: 16px system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+  button { font: inherit; padding: .5rem 1rem; margin-right: .5rem; }
+  #transcript { min-height: 4rem; border: 1px solid #aaa; padding: .75rem; margin-top: 1rem; }
+  .interim { color: #888; }
+  #status { margin: .75rem 0; color: #555; }
+</style>
+</head>
+<body>
+<h1>Voice spike: Spracheingabe</h1>
+<p>
+  <label><input type="radio" name="lang" value="de-DE" checked> Deutsch (de-DE)</label>
+  <label><input type="radio" name="lang" value="en-US"> English (en-US)</label>
+</p>
+<p>
+  <button id="talk">Sprechen</button>
+  <button id="stop">Stopp</button>
+  <button id="speak">Browser-Stimme testen</button>
+</p>
+<div id="status">Starte...</div>
+<div id="transcript"></div>
+<script>
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const statusEl = document.getElementById("status");
+const out = document.getElementById("transcript");
+const lang = () => document.querySelector("input[name=lang]:checked").value;
+let rec = null;
+
+statusEl.textContent = Recognition
+  ? "SpeechRecognition erkannt. Mikro-Erlaubnis kommt beim ersten Klick."
+  : "SpeechRecognition NICHT verfuegbar (Chrome oder Edge nutzen).";
+document.title = Recognition ? "Voice spike (API ok)" : "Voice spike (API fehlt)";
+
+function start() {
+  if (!Recognition || rec) return;
+  rec = new Recognition();
+  rec.lang = lang();
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.onstart = () => (statusEl.textContent = `Hoert zu (${rec.lang})...`);
+  rec.onresult = (event) => {
+    let finalText = "", interim = "";
+    for (const r of event.results) (r.isFinal ? (finalText += r[0].transcript) : (interim += r[0].transcript));
+    out.innerHTML = "";
+    out.append(finalText);
+    const span = document.createElement("span");
+    span.className = "interim";
+    span.textContent = interim;
+    out.append(span);
+  };
+  rec.onerror = (event) => (statusEl.textContent = `Fehler: ${event.error}`); // not-allowed, no-speech, network
+  rec.onend = () => { rec = null; if (!statusEl.textContent.startsWith("Fehler")) statusEl.textContent = "Fertig."; };
+  rec.start();
+}
+document.getElementById("talk").onclick = start;
+document.getElementById("stop").onclick = () => { if (rec) rec.stop(); speechSynthesis.cancel(); };
+document.getElementById("speak").onclick = () => {
+  const u = new SpeechSynthesisUtterance(lang() === "de-DE" ? "Hallo, ich bin dein Gebaeude." : "Hello, I am your building.");
+  u.lang = lang();
+  speechSynthesis.speak(u);
+};
+</script>
+</body>
+</html>
