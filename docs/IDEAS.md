@@ -50,3 +50,45 @@ Ein **Demo-Schnitt** ist in 3 bis 4 Stunden möglich: Rollstuhl-Profil mit Türb
 
 ### Entscheidung offen
 Beim Ideation-Gate (höchstens zwei Extras): Accessibility-Modus gegen Hausmeister-Stimme gegen Chaos-Button. Meine Einschätzung: Accessibility hat den stärksten Bezug zur Rubrik und zu den Personas des README, ist mit unserem Routing am billigsten umzusetzen und hat die beste Demo-Geschichte (dieselbe Frage, drei Profile, drei Routen).
+
+## 2. Das "Krasse": 3D-Gebäude und Walkthrough (Antwort auf die Konkurrenz)
+Status: geparkt (Idee von Jennifer, 24.10.2026). Andere Teams zeigen 3D-Gebäude, oft mit 2D-Minimap in der Ecke und einem Gefühl, als liefe man durch das Haus. Wir sollten uns davon absetzen, nicht nur nachziehen.
+
+### Was die Daten für 3D hergeben (geprüft im README)
+- Polygone pro Raum (Grundriss), Etagenhöhe (`height_m`) und Höhe über Null (`elevation_m`): daraus lassen sich Räume als Quader (extrudierte Polygone) bauen.
+- Türen mit Position und Breite, Treppen und Aufzüge mit Stop-Räumen, Assets mit Position und Maßen (`footprint` Breite, Tiefe, Drehung): Möbel und Maschinen als Kisten, Maschinen farbig.
+- Nicht vorhanden: Fassade, Fenster, Texturen, Dachformen, echte Raumhöhe pro Raum. Alles Fehlende wäre erfunden, also stilisiert (reduzierte Optik), nicht "realistisch". Realismus wie bei einem Spiel erreichen wir damit nicht, und wir sollten es nicht versprechen.
+
+### Optionen (nach Wirkung pro Aufwand)
+| Idee | Was die Jury sieht | Aufwand | Risiko |
+|---|---|---|---|
+| A. 3D-Ansicht mit three.js: Räume als Quader, Etagen gestapelt oder aufgeklappt, Route als leuchtende Linie, Assets als Kisten, 2D-Plan als Minimap in der Ecke | "Haben wir auch", saubere Basis | 6 bis 8 h | gering, Standard |
+| B. **Begehbare Ego-Perspektive:** Kamera läuft die Route ab (Türen, Treppen, Aufzugsfahrt), dazu sprechen Voice und Wegbeschreibung synchron ("Jetzt links am CNC-Fräser vorbei") | "Man geht durch das Haus", direkter Bezug zu "directions a person can follow" | 4 bis 6 h zusätzlich zu A | mittel, Kameraführung durch Türen und Treppen |
+| C. **Der Agent steuert die Ansicht:** "Zeig mir den Aufzug" fliegt die Kamera hin, "zeig die Etage ohne Decke", Funde leuchten auf, Sperrungen färben rot, "What changes?" markiert betroffene Räume farbig im 3D-Modell | Das unterscheidet uns: Konkurrenten zeigen, wir **sprechen und erklären** in der Ansicht | 3 bis 4 h zusätzlich | gering, nutzt vorhandene Tools |
+| D. **Gebäude entsteht beim Hochladen:** Level 4 Plan hochgeladen, Räume wachsen live in 3D aus dem Grundriss, Türen erscheinen, Prüfung zeigt rote Räume ohne Weg direkt im Modell | Level 4 wird sichtbar und eindrucksvoll, sonst ist es nur ein JSON | 3 bis 4 h zusätzlich | gering |
+| E. Auswirkungs-Ansicht: "Aufzug 1 gesperrt" zeigt im 3D-Modell, welche Räume jetzt abgeschnitten oder länger entfernt sind (Heatmap der Wegdifferenz) | Starke Demo für "React: What changes?" | 2 bis 3 h zusätzlich zu A und C | gering, Zahlen aus `impact.py` |
+| F. Rush-Hour oder Crowd-Simulation (viele Punkte laufen, Engstellen werden rot) | Wow, aber ohne Bezug zur Aufgabe | 6 h | hoch, kein Nutzen für die Punkte |
+| G. AR-Overlay mit Handy | Aufgabe nennt es, braucht Standortbestimmung (QR-Codes) | 10 h und mehr | hoch |
+
+### Meine Einschätzung (Ideation-Gate)
+- A allein ist Pflichtprogramm, wenn die anderen es auch haben, bringt aber kaum Differenzierung.
+- Der Unterschied entsteht aus **A + B + C + E zusammen**: Eine 3D-Ansicht, durch die der Agent spricht und führt. Das ist unser Kern ("talk to your building") sichtbar gemacht und mit unseren echten Stärken verbunden (Verständniskarte, "What changes?", Barrierefreiheit).
+- Mit **D** wird Level 4 in der Demo greifbar. Das ist vermutlich der beste Schnitt für Creativity und Demo-Punkte.
+- **Zusammen mit dem Accessibility-Modus** (Idee 1) gibt es eine starke Geschichte: dieselbe Frage, Rollstuhl-Profil gegen Standard, zwei Routen im 3D-Modell, eine stufenfrei, eine über die Treppe.
+- Höchstens zwei Level-5-Extras: Vorschlag **3D mit Agentensteuerung** (A, B, C, E) und **Accessibility-Modus**. Hausmeister-Stimme und Chaos-Button nur, wenn Zeit bleibt. Den Chaos-Button kann man ohne Aufwand in C einbauen ("Aufzug sperren" per Klick im 3D-Modell, Route berechnet sich live neu).
+
+### Technische Skizze
+- `web/static/` bekommt eine neue Datei `view3d.js` (three.js; **die Bibliothek lokal ins Repo legen**, nicht vom Netz laden, sonst scheitert die Demo ohne WLAN).
+- Ein Endpunkt `GET /api/building3d?key=...` liefert Räume mit Polygon und Höhe, Türen, Connectors und Assets (vorhandene `building_view`-Daten reichen fast).
+- Der Chat-Antwort wird ein optionales Feld `view` mitgegeben: `{"focus": [...ids], "camera": "..."}`. Der Agent hat dafür ein Tool `show_in_view(...)` (nur Anzeige, kein Rechnen).
+- Für B: Kamera folgt der Knotenliste der Route (`space_path` plus Türpositionen), Auf- und Abfahrt bei Treppen und Aufzügen, Tempo einstellbar, Pause und Wiederholen per Stimme.
+- Barrierefreiheit der Ansicht: reduzierte Bewegung respektieren, Kameraflug abschaltbar, Hochkontrast.
+
+### Risiken
+- Zeit: A bis E sind zusammen etwa 18 bis 24 Stunden. Wir müssen vorher festlegen, was **in der Demo wirklich vorkommt** (Drehbuch zuerst, dann bauen).
+- Leistung bei großen Gebäuden (OSM mit 1600 Räumen und 5000 Assets): Assets nur bei Zoom, Etagen einzeln laden.
+- Nicht kopieren: Wir bauen eigene Ansicht, ohne Code anderer Teams.
+- Realismus nicht versprechen. Besser "klare, lesbare 3D-Darstellung, die der Agent erklärt".
+
+### Entscheidung offen
+Gemeinsam mit Leonie beim Gate: Wer baut die Oberfläche (Leonie), wer die Agentensteuerung (Jennifer)? Zuerst ein 90-Sekunden-Drehbuch schreiben, dann nur bauen, was darin vorkommt.
