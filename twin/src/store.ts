@@ -109,6 +109,10 @@ interface TwinState {
   chatBusy: boolean;
   voiceOut: boolean;
   hereArmed: boolean;
+  /** "I'm here" set on screen, not yet told to the server: it travels as context.here with the next chat message. */
+  pendingHere: { space_id: string; floor_id: string; point?: Point | null } | null;
+  /** "I'm here" without the agent: the position is set at once on screen, the server learns it with the next message. */
+  setHere: (here: { space_id: string; floor_id: string; point?: Point | null }) => void;
   /** True while the "You are here" dot is dragged: camera gestures are off (set by scene/HerePin). */
   dragLock: boolean;
   setDragLock: (on: boolean) => void;
@@ -215,6 +219,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   chatBusy: false,
   voiceOut: false,
   hereArmed: false,
+  pendingHere: null,
   dragLock: false,
   campusHook: null,
   campusRoute: false,
@@ -321,6 +326,15 @@ export const useTwin = create<TwinState>((set, get) => ({
   setVoiceOut(voiceOut) {
     set({ voiceOut });
   },
+  setHere(here) {
+    set((s) => ({
+      state: s.state ? { ...s.state, position: { space_id: here.space_id, floor_id: here.floor_id, point: here.point ?? null, source: "click" } } : s.state,
+      pendingHere: here,
+      hereArmed: false,
+      focusedFloorId: here.floor_id,
+    }));
+  },
+
   armHere(hereArmed) {
     set({ hereArmed });
   },
@@ -422,6 +436,10 @@ export const useTwin = create<TwinState>((set, get) => ({
     }
     const context: ChatContext = {};
     if (opts.here) context.here = opts.here;
+    else if (get().pendingHere) {
+      const pending = get().pendingHere!;
+      context.here = { space_id: pending.space_id, floor_id: pending.floor_id, ...(pending.point ? { point: pending.point } : {}) };
+    }
     if (selection) {
       if (selection.kind === "space") context.space_id = selection.id;
       if (selection.kind === "asset") (context.asset_id = selection.id), (context.space_id = selection.space_id);
@@ -436,6 +454,7 @@ export const useTwin = create<TwinState>((set, get) => ({
       chat: [...s.chat, { id: ++messageId, role: "user", text: message }],
       chatBusy: true,
       hereArmed: false,
+      pendingHere: null,
     }));
     try {
       const reply = await api.chat(buildingKey, message, hasContext ? context : undefined, voice);
@@ -463,7 +482,8 @@ export const useTwin = create<TwinState>((set, get) => ({
         }
         if (reply.state.guide?.active) {
           const leg = reply.state.guide.leg;
-          const floorId = model?.spaceById.get(leg.from_space_id)?.floor_id;
+          // A stair or lift space belongs to several floors: the leg's first segment says where it starts.
+          const floorId = leg.segments?.[0]?.floor_id ?? model?.spaceById.get(leg.from_space_id)?.floor_id;
           if (floorId) set({ focusedFloorId: floorId });
         } else if (reply.state.position) {
           set({ focusedFloorId: reply.state.position.floor_id });

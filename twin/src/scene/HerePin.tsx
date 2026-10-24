@@ -231,14 +231,10 @@ export function HereDot({ model, floorY, visibleFloors, flat, reducedMotion, col
           return;
         }
         const sent = last;
-        // Same path as the "I'm here" button: context.here travels with one short message.
-        void useTwin
-          .getState()
-          .ask("I moved here.", false, { here: { space_id: sent.space_id, point: sent.point, floor_id: here.floor_id } })
-          .finally(() => {
-            setDrag(null);
-            invalidate();
-          });
+        // Same path as the "I'm here" button: set on screen at once, no agent call.
+        useTwin.getState().setHere({ space_id: sent.space_id, point: sent.point, floor_id: here.floor_id });
+        setDrag(null);
+        invalidate();
       };
       const onUp = (up: PointerEvent) => finish(up, false);
       const onCancel = (cancel: PointerEvent) => finish(cancel, true);

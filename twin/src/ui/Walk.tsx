@@ -69,7 +69,12 @@ export function Walk() {
   if (step === null || !model || !route?.ok) return null;
   const steps = walkSteps().map(readable);
   const last = step >= steps.length - 1;
-  const length = route.length_m !== undefined ? Math.round(route.length_m) : null;
+  // What is left from the current step on: the metres named in the remaining step lines, scaled to the route length.
+  const metresIn = (line: string) => [...line.matchAll(/(\d+(?:\.\d+)?)\s*m\b/g)].reduce((sum, m) => sum + Number(m[1]), 0);
+  const allMetres = steps.reduce((sum, line) => sum + metresIn(line), 0);
+  const leftMetres = steps.slice(step).reduce((sum, line) => sum + metresIn(line), 0);
+  const length =
+    route.length_m === undefined ? null : Math.round(allMetres > 0 ? (route.length_m * leftMetres) / allMetres : route.length_m * (1 - step / steps.length));
   const minutes = length !== null ? walkMinutes(length) : null;
   const end = () => {
     stopWalk();
@@ -82,7 +87,7 @@ export function Walk() {
         <div className="card-head">
           <span className="card-kicker">
             Step {step + 1} of {steps.length}
-            {length !== null && <span className="card-muted"> · {length} m · {minutes} min</span>}
+            {length !== null && <span className="card-muted"> · {length} m left · {minutes} min</span>}
           </span>
           <button className="x" onClick={end} aria-label="End directions">
             ×
