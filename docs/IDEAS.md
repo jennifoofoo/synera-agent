@@ -92,3 +92,23 @@ Status: geparkt (Idee von Jennifer, 24.10.2026). Andere Teams zeigen 3D-Gebäude
 
 ### Entscheidung offen
 Gemeinsam mit Leonie beim Gate: Wer baut die Oberfläche (Leonie), wer die Agentensteuerung (Jennifer)? Zuerst ein 90-Sekunden-Drehbuch schreiben, dann nur bauen, was darin vorkommt.
+
+## 3. Fabrik-Werkzeuge in 3D (Manufacturing statt "schönes Modell")
+Status: 3a und 3b **gesetzt** (Leonie, 24.10.2026), 3c geparkt. Gedanke: 3D nicht als Deko, sondern als Werkzeug für eine Entscheidung in der Fabrik. Passt zu Synera (Geometrie, "was passiert, wenn") und zu Level 5 "Make things move" und "Industrial logistics". Baut auf der 3D-Ansicht aus Idee 2 (A) auf.
+
+### 3a. "Passt die neue Maschine rein?" (Einbring-Check), gesetzt
+- Eingabe im Gespräch: "Wir bekommen eine CNC-Fräse, 2,5 × 1,5 × 2,8 m, für Halle 3."
+- Der Block fährt in echter Größe vom Tor zur Zielhalle. Jede Tür, Öffnung und jeder Aufzug auf dem Weg wird grün oder rot (zu schmal, zu niedrig, nur gedreht). Ergebnis: Weg passt / passt nicht, mit dem Engpass.
+- Abstellen in der Halle: Kollision mit vorhandenen Maschinen (`footprint`, Drehung) und Restbreite der Staplergassen (mindestens 3 m) werden geprüft und rot markiert.
+- Daten: `width_m` der Öffnungen, Etagenhöhe `height_m`, Assets mit `footprint`, Stapler-Router (`judge_route.py`, `find_forklift_route`). Fehlt: Türhöhen, Aufzug-Innenmaße (Annahmen klar benennen).
+
+### 3b. Sicherheits-Hotspots: Stapler und Menschen, gesetzt
+- Fußwege und Staplerwege werden gleichzeitig berechnet (typische Wege: Eingang zu Arbeitsplätzen, Lager zu Produktion). Räume und Öffnungen, die beide oft nutzen, werden rot.
+- Vorschlag des Agenten: "Fußweg über Gang H1B3 trennt die Ströme, kostet 12 m Umweg."
+- Zusammen mit 3a: "Neue Maschine steht hier. Was ändert sich an den Staplerwegen und an den Kreuzungen?"
+- Daten: beide Router vorhanden. Fehlt: echte Verkehrsmengen, also "oft" als Anzahl Routen zwischen typischen Paaren, kein Messwert.
+
+### 3c. Spaghetti-Diagramm (Lean: Laufwege sichtbar machen), geparkt
+- Ein Schichtablauf ("Teil holen, Prüflabor, Montage, Lager") wird als Linien gezeichnet, mit Metern pro Schicht.
+- Der Agent probiert Varianten ("Werkzeugregal nach Halle 2") und zeigt die bessere: "minus 340 m pro Schicht".
+- Daten: `errand`-Logik, nächster Raum mit Asset, Was-wäre-wenn. Fehlt: echte Abläufe und Häufigkeiten (Annahmen vom Nutzer erfragen).
