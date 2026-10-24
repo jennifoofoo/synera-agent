@@ -92,27 +92,38 @@ def probe_points(opening, polygons):
     """Points on the wall line where the opening must be a gap, or None when the data puts it off any wall."""
     width = opening.get("width_m") or 0.9
     pos = opening["position"]
-    if opening["kind"] == "opening" and len(polygons) >= 2:
+    if len(polygons) >= 2:
         best = None
         for seg in shared_boundaries(polygons[0], polygons[1]):
             s, dist, length, _ = _nearest_on_edge(seg[0], seg[1], pos)
             if best is None or dist < best[0]:
                 best = (dist, seg, s, length)
-        if best:
+        if best and (opening["kind"] == "opening" or best[0] <= DOOR_REACH):
             _, seg, s, length = best
             ux, uy = (seg[1][0] - seg[0][0]) / length, (seg[1][1] - seg[0][1]) / length
-            lo, hi = (0.0, length) if width >= length - 0.01 else (max(0.0, s - width / 2), min(length, s + width / 2))
+            if opening["kind"] == "opening":
+                lo, hi = (0.0, length) if width >= length - 0.01 else (max(0.0, s - width / 2), min(length, s + width / 2))
+            else:
+                half = max(0.3, width / 2)
+                lo, hi = max(0.0, s - half), min(length, s + half)
             # inside the gap, away from its ends (an end can be a wall corner)
-            return [(seg[0][0] + ux * (lo + (hi - lo) * k), seg[0][1] + uy * (lo + (hi - lo) * k)) for k in (0.25, 0.5, 0.75)]
-    nearest = None
+            return [(seg[0][0] + ux * (lo + (hi - lo) * k), seg[0][1] + uy * (lo + (hi - lo) * k)) for k in (0.35, 0.5, 0.65)]
+    near = []
     for polygon in polygons:
         for a, b in _edges(polygon):
-            s, dist, length, q = _nearest_on_edge(a, b, pos)
-            if length >= 0.05 and (nearest is None or dist < nearest[0]):
-                nearest = (dist, q)
-    if nearest is None or nearest[0] > DOOR_REACH:
+            s, dist, length, _ = _nearest_on_edge(a, b, pos)
+            if length >= 0.05:
+                near.append((dist, a, b, s, length))
+    if not near or min(n[0] for n in near) > DOOR_REACH:
         return None
-    return [nearest[1]]
+    closest = min(n[0] for n in near)
+    half = max(0.3, width / 2)
+    out = []
+    for dist, a, b, s, length in near:
+        if dist <= closest + 0.05:  # a door at a corner opens both edges
+            mid = (max(0.0, s - half) + min(length, s + half)) / 2  # middle of that gap
+            out.append((a[0] + (b[0] - a[0]) / length * mid, a[1] + (b[1] - a[1]) / length * mid))
+    return out
 
 
 # ---------------------------------------------------------------- plumbing
