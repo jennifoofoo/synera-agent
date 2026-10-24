@@ -178,6 +178,8 @@ def test_walk_with_me_moves_the_estimate_and_never_sends_it(page):
     if not found:
         pytest.skip("no route across floors with a walk before the stairs in the picked building")
     steps = found["steps"]
+    if len(steps) > 1 and steps[0].startswith(("Start in ", "Start at ")):
+        steps = steps[1:]  # the guide leaves out the opening "Start in X" line (store.ts walkLines)
     ride = next(i for i, line in enumerate(steps) if line.startswith(("Take ", "Use ")))
     page.evaluate("() => window.__twinStore.getState().startWalk()")
     page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
@@ -210,8 +212,8 @@ def test_walk_with_me_moves_the_estimate_and_never_sends_it(page):
     assert page.locator(".walk-estimated").is_visible(), "the dot is labelled estimated"
     walked = [s for s in page.evaluate("() => window.__stepLog") if s is not None]
     assert walked == sorted(walked) and walked[-1] == ride, "the step moved forward with the estimate"
-    if ride > 2:
-        assert len(set(walked)) > 2, "steps before the stairs advanced on their own"
+    if ride >= 2:
+        assert len(set(walked)) >= 3, "steps before the stairs advanced on their own"
 
     held = page.evaluate("() => window.__walkMotion.getState().estimate.alongRouteM")
     page.wait_for_timeout(1500)
