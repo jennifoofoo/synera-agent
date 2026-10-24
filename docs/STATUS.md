@@ -32,7 +32,7 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | Testlauf auf `data/test` (3 pro Typ), `docs/eval-log.md`, Tool-Schleife 20 auf 8 Runden | Jennifer | offen | |
 | 2D-Web-Seite (Chat, Etagenplan, Route, Sperren, Türen) | Leonie | gemergt (Chat mit Session, siehe Blocker) | feat/web-2d |
 | B. Abgabe: `run_benchmark <building_dir> <questions.json> <answers.json>`, `BENCHMARK.md`, `make_submission`, Format-Adapter (nutzt `structured.py`), Test-CSV, Tag `known-good` | Leonie | in Arbeit (`building_agent/submission.py`: alle Frageformate, CSV + answers.json, Prüfung wie Jury; structured.py fehlt noch) | main |
-| B. `scripts/preflight.py <building_dir>`: neues Gebäude in Sekunden prüfen (Polygone, Schlüssel, alle Typen einmal) | Leonie | offen | |
+| B. `scripts/preflight.py <building_dir>`: neues Gebäude in Sekunden prüfen (Polygone, Schlüssel, alle Typen einmal) | Leonie | gemergt | feat/preflight |
 | 2D-Seite: Route animieren, Blocker bei `web/server.py` und `web/api.py` beheben | Leonie | gemergt (Blocker behoben, Route animiert) | feat/web-anim-voice |
 | C. Voice-Oberfläche in der Seite (Mikrofon, Sprachausgabe), nach dem Spike | Leonie | gemergt (Mikrofon, Vorlesen über /api/speak, Stumm) | feat/web-anim-voice |
 | D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | in Arbeit (auf Basis von feat/level4-chat) | feat/level4-web |
