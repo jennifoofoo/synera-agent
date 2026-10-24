@@ -15,6 +15,7 @@ interface Props {
 }
 
 const HOME_AZIMUTH = -Math.PI / 4;
+const PLAN_TILT = 0.004;
 
 /** camera-controls' fitToBox snaps the rotation to 90° steps; fitting the bounding sphere keeps the view angle. */
 function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 1.08, minRadius = 3) {
@@ -62,8 +63,9 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.maxDistance = size * 4;
     c.minZoom = 0.2;
     c.maxZoom = 60;
-    c.minPolarAngle = flat ? 0 : 0.08;
-    c.maxPolarAngle = flat ? 0 : Math.PI / 2 - 0.12;
+    // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
+    c.minPolarAngle = flat ? PLAN_TILT : 0.08;
+    c.maxPolarAngle = flat ? PLAN_TILT : Math.PI / 2 - 0.12;
     c.minAzimuthAngle = flat ? 0 : -Infinity;
     c.maxAzimuthAngle = flat ? 0 : Infinity;
     const A = CameraControlsImpl.ACTION;
@@ -72,7 +74,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.mouseButtons.wheel = flat ? A.ZOOM : A.DOLLY;
     c.touches.one = flat ? A.TOUCH_TRUCK : A.TOUCH_ROTATE;
     c.touches.two = flat ? A.TOUCH_ZOOM_TRUCK : A.TOUCH_DOLLY_TRUCK;
-    if (flat) void c.rotateTo(0, 0, false);
+    if (flat) void c.rotateTo(0, PLAN_TILT, false);
     c.smoothTime = 0.32;
     c.draggingSmoothTime = 0.08;
     c.dollyToCursor = true;
@@ -81,7 +83,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, -1, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
     c.boundaryFriction = 0.2;
     invalidate();
-  }, [bounds, size, topY, flat, invalidate]);
+    // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
+  }, [bounds, size, topY, flat, invalidate, camera]);
 
   // Entering 2D or changing the floor in 2D frames the focused floor.
   useEffect(() => {

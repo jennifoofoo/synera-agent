@@ -8,7 +8,7 @@ import { floorElevation, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
-import { FloorMesh, buildTimes } from "./FloorMesh";
+import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { RouteLine } from "./RouteLine";
@@ -98,6 +98,7 @@ function Stats() {
   useEffect(() => {
     (window as unknown as { __twinMounted: number }).__twinMounted = Math.round(performance.now());
     (window as unknown as { __twinScene: unknown }).__twinScene = scene;
+    (window as unknown as { __twinControls: unknown }).__twinControls = controlsRef;
     (window as unknown as { __twinStats: () => unknown }).__twinStats = () => ({
       calls: gl.info.render.calls,
       triangles: gl.info.render.triangles,
@@ -146,7 +147,7 @@ export function Scene() {
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
     >
       {flat ? (
-        <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} up={[0, 0, -1]} />
+        <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} />
       ) : (
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
