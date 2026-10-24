@@ -40,11 +40,11 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
     const ghostSolid = new THREE.MeshBasicMaterial({
       color: COLOURS.ghost,
       transparent: true,
-      opacity: 0.13,
+      opacity: 0.1,
       depthWrite: false,
       side: THREE.DoubleSide,
     });
-    const ghostEdges = new THREE.LineBasicMaterial({ color: COLOURS.edgeGhost, transparent: true, opacity: 0.4, depthWrite: false });
+    const ghostEdges = new THREE.LineBasicMaterial({ color: COLOURS.edgeGhost, transparent: true, opacity: 0.35, depthWrite: false });
     return { solid, edges, ghostSolid, ghostEdges };
   }, []);
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);

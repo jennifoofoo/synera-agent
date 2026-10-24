@@ -14,10 +14,10 @@ export const GROUP_COLOURS: Record<SpaceGroup, { slab: string; wall: string; lab
 
 export const COLOURS = {
   edge: "#14305a",
-  edgeGhost: "#5f7fa8",
-  ghost: "#f4f8fc",
-  ground: "#0d2448",
-  background: "#0b1e3a",
+  edgeGhost: "#466a9a",
+  ghost: "#7f9fc6",
+  ground: "#dfe7f0",
+  background: "#edf2f8",
   accent: "#5eead4",
   gold: "#e3b45a",
   accentBlue: "#60a5fa",

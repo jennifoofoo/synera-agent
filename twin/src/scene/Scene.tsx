@@ -76,11 +76,11 @@ function Building({ model }: { model: BuildingModel }) {
           position={[model.bounds.cx, Math.min(...model.floors.map((floor) => floor.elevation_m)) - 0.25, -model.bounds.cy]}
           scale={model.bounds.size * 1.6}
           blur={2.4}
-          opacity={0.45}
+          opacity={0.35}
           far={topY + 4}
           resolution={512}
           frames={1}
-          color="#061227"
+          color="#1a3560"
         />
       )}
     </group>
@@ -131,7 +131,7 @@ export function Scene() {
     >
       <color attach="background" args={[COLOURS.background]} />
       <fog attach="fog" args={[COLOURS.background, size * 6, size * 16]} />
-      <hemisphereLight args={["#e8f0fa", "#0b1e3a", 1.1]} />
+      <hemisphereLight args={["#ffffff", "#9fb4cc", 1.0]} />
       <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
       <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />
       <PerformanceMonitor
@@ -149,10 +149,10 @@ export function Scene() {
         args={[size * 6, size * 6]}
         cellSize={2}
         cellThickness={0.6}
-        cellColor="#1a3864"
+        cellColor="#c9d6e5"
         sectionSize={10}
         sectionThickness={1}
-        sectionColor="#26507f"
+        sectionColor="#afc2d8"
         fadeDistance={size * 3.2}
         fadeStrength={1.2}
         infiniteGrid
@@ -167,9 +167,9 @@ export function Scene() {
       )}
       {ao && !worker && (
         <EffectComposer multisampling={0} enableNormalPass={false}>
-          <N8AO aoRadius={2.2} intensity={2.4} distanceFalloff={1.2} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color("#061227")} />
+          <N8AO aoRadius={2.2} intensity={2.4} distanceFalloff={1.2} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color("#1f3a63")} />
           <SMAA />
-          <Vignette eskil={false} offset={0.25} darkness={0.32} />
+          <Vignette eskil={false} offset={0.3} darkness={0.22} />
         </EffectComposer>
       )}
     </Canvas>
