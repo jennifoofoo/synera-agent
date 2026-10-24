@@ -33,9 +33,9 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | 2D-Web-Seite (Chat, Etagenplan, Route, Sperren, Türen) | Leonie | gemergt (Chat mit Session, siehe Blocker) | feat/web-2d |
 | B. Abgabe: `run_benchmark <building_dir> <questions.json> <answers.json>`, `BENCHMARK.md`, `make_submission`, Format-Adapter (nutzt `structured.py`), Test-CSV, Tag `known-good` | Leonie | in Arbeit (`building_agent/submission.py`: alle Frageformate, CSV + answers.json, Prüfung wie Jury; structured.py fehlt noch) | main |
 | B. `scripts/preflight.py <building_dir>`: neues Gebäude in Sekunden prüfen (Polygone, Schlüssel, alle Typen einmal) | Leonie | offen | |
-| 2D-Seite: Route animieren, Blocker bei `web/server.py` und `web/api.py` beheben | Leonie | Blocker behoben (lokal), Animation + Voice-UI in Arbeit | feat/web-anim-voice |
-| C. Voice-Oberfläche in der Seite (Mikrofon, Sprachausgabe), nach dem Spike | Leonie | offen (wartet auf Spike) | |
-| D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | offen (wartet auf Spike) | |
+| 2D-Seite: Route animieren, Blocker bei `web/server.py` und `web/api.py` beheben | Leonie | gemergt (Blocker behoben, Route animiert) | feat/web-anim-voice |
+| C. Voice-Oberfläche in der Seite (Mikrofon, Sprachausgabe), nach dem Spike | Leonie | gemergt (Mikrofon, Vorlesen über /api/speak, Stumm) | feat/web-anim-voice |
+| D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | in Arbeit (auf Basis von feat/level4-chat) | feat/level4-web |
 | Fragen an Synera vor Ort: Format, Locate/Route, Level 3 mehrere Gebäude, Freeze, Zeitlimit | wer vor Ort ist | offen | |
 | G. Routen-Modell: Raumfolge mit Tür-zu-Tür-Distanz und Synera-Kosten (Spike: 92,4 % auf 99,6 % volle Punkte), Kit-Modell für errand und what_if_door behalten, siehe `docs/specs/route-metric-spike.md` | Jennifer | offen | |
 | E. Demo-Video, Technik-Text, Pitch (3 Minuten plus 1 Minute Fragen) | beide | offen | |
