@@ -1,7 +1,7 @@
 // Probe for the drawn-vs-data audit (scripts/twin_audit.sh, tests/e2e/test_twin_audit.py): `window.__twinAudit`
 // reads what is actually in the three.js scene (not the data) so a test can compare it with the API.
 // Read-only; nothing in the app uses it. Scene objects it relies on: group `floor:<id>` (FloorMesh), the Line2 named
-// `route-line` (RouteLine), groups named `closed-marker` (Markers), the instanced meshes of Things and `[data-audit=campus-route]` (CampusMap2D).
+// `route-line` (RouteLine), groups named `closed-marker` (Markers), `closed-bar` (OpeningMarks), `zone-lines` (FloorMesh), the instanced meshes of Things and `[data-audit=campus-route]` (CampusMap2D).
 
 import * as THREE from "three";
 import { useCampus } from "./campus/campusStore";
@@ -47,6 +47,7 @@ export function blockedAt(floorId: string, point: Pt, radius = 0.04): { wall: bo
     const geometry = mesh.geometry as THREE.BufferGeometry | undefined;
     if (!geometry) return;
     if ((o as THREE.LineSegments).isLineSegments) {
+      if (o.name === "zone-lines") return; // dashed hall zone lines are not walls
       const pos = geometry.getAttribute("position");
       for (let i = 0; i + 1 < pos.count && !result.line; i += 2) {
         const ax = pos.getX(i), az = pos.getZ(i), bx = pos.getX(i + 1), bz = pos.getZ(i + 1);
@@ -68,6 +69,26 @@ export function blockedAt(floorId: string, point: Pt, radius = 0.04): { wall: bo
     }
   });
   return result;
+}
+
+/** Whether a dashed hall zone line (`zone-lines`) is drawn within `radius` metres of the model point. */
+export function zoneLineNear(floorId: string, point: Pt, radius = 0.6): boolean {
+  const group = floorGroups().get(floorId);
+  if (!group) return false;
+  const p = toScene(point);
+  let found = false;
+  group.traverse((o) => {
+    if (o.name !== "zone-lines") return;
+    const pos = (o as THREE.LineSegments).geometry.getAttribute("position");
+    for (let i = 0; i + 1 < pos.count && !found; i += 2) {
+      const ax = pos.getX(i), az = pos.getZ(i), bx = pos.getX(i + 1), bz = pos.getZ(i + 1);
+      const dx = bx - ax, dz = bz - az;
+      const len2 = dx * dx + dz * dz || 1e-9;
+      const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - az) * dz) / len2));
+      if (Math.hypot(ax + dx * t - p[0], az + dz * t - p[1]) <= radius) found = true;
+    }
+  });
+  return found;
 }
 
 /** The route line as drawn: x/z of each vertex converted back to model metres. */
@@ -101,16 +122,18 @@ export function drawnThings(): number {
 }
 
 /** Closed-element markers: one per cluster, `elements` = elements in them. */
-export function drawnClosed(): { markers: number; elements: number } {
+export function drawnClosed(): { markers: number; elements: number; bars: number } {
   let markers = 0;
   let elements = 0;
+  let bars = 0;
   sceneRoot()?.traverse((o) => {
+    if (o.name === "closed-bar") bars++;
     if (o.name === "closed-marker") {
       markers++;
       elements += Number(o.userData.count ?? 1);
     }
   });
-  return { markers, elements };
+  return { markers, elements, bars };
 }
 
 /** Ids of the spaces with at least one drawn vertex across all mounted floors. */
@@ -135,5 +158,5 @@ export function drawnSpaces(): string[] {
 }
 
 if (typeof window !== "undefined") {
-  (window as unknown as { __twinAudit: unknown }).__twinAudit = { store: useTwin, campus: useCampus, blockedAt, drawnRoute, drawnThings, drawnClosed, drawnSpaces };
+  (window as unknown as { __twinAudit: unknown }).__twinAudit = { store: useTwin, campus: useCampus, blockedAt, zoneLineNear, drawnRoute, drawnThings, drawnClosed, drawnSpaces };
 }
