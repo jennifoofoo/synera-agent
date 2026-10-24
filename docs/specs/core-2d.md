@@ -1,6 +1,6 @@
 # Spec: Core 2D (benchmark, agent, interaction basics, 2D view)
 
-Status: ENTWURF. Verteilung von Jennifer bestätigt (68 zu 77 Testfragen). Leonie liest die Spec beim ersten Start und meldet Einwände im Chat. Danach auf "bestätigt" setzen.
+Status: bestätigt (Jennifer und Leonie, 2026-10-24). Änderungen nur nach Absprache im Chat, dann hier eintragen.
 
 ## Ziel
 Ein Agent beantwortet Fragen zu beliebigen Gebäuden im Kit-Format korrekt und prüfbar. Jede Zahl und jede Route kommt aus deterministischem Python, das LLM wählt nur Tools und formuliert die Antwort. Darauf aufbauend ein Gespräch, das nachfragt und zeigt, was es verstanden hat, plus eine 2D-Ansicht der Route.
