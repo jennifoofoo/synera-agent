@@ -3,7 +3,7 @@
 // when the position is known, else empty and focused ("Choose start"). Both set = the route is computed at once.
 // Owner: the Card/Position session. The fields are the Omnibox's PlaceInput (one grey ghost match, no list).
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
@@ -60,16 +60,33 @@ export function DirectionsPanel({ model }: { model: BuildingModel }) {
   const setStepFree = useTwin((s) => s.setDirectionsStepFree);
   const close = useTwin((s) => s.closeDirections);
   const editing = directions.editing;
+  const worker = useTwin((s) => s.profile === "worker");
+  const setTopInset = useTwin((s) => s.setTopInset);
+  const panel = useRef<HTMLElement>(null);
+
+  // Phone: the top sheet covers the plan, so the camera frames below it (scene reads topInset); 0 when closed.
+  useEffect(() => {
+    const element = panel.current;
+    if (!worker || !element) return;
+    const observer = new ResizeObserver(() => setTopInset(Math.round(element.getBoundingClientRect().bottom)));
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      setTopInset(0);
+    };
+  }, [worker, setTopInset]);
 
   useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => event.key === "Escape" && !useTwin.getState().directions?.editing && close();
+    // Esc inside a field belongs to the field (PlaceInput: clear, then stop editing); elsewhere it closes the panel.
+    const onKey = (event: globalThis.KeyboardEvent) =>
+      event.key === "Escape" && !(event.target instanceof HTMLInputElement) && !useTwin.getState().directions?.editing && close();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
   const host = document.querySelector(".app") ?? document.body;
   return createPortal(
-    <section className="directions" aria-label="Directions">
+    <section ref={panel} className="directions" aria-label="Directions">
       <div className="dir-fields">
         <PlaceField model={model} field="from" value={directions.from} placeholder="Choose start" />
         <PlaceField model={model} field="to" value={directions.to} placeholder="Choose destination" />
