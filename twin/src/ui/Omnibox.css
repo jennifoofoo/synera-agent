@@ -1,5 +1,8 @@
 /* ===== Omnibox (owner: chat/search session). Uses the base tokens from styles.css only. ===== */
-.omnibox { position: relative; display: flex; flex-direction: column; gap: 6px; }
+.omnibox {
+  position: relative; display: flex; flex-direction: column; gap: 6px;
+  --ob-active: #4285f4; /* the map blue (palette.ts mapBlue, route line): listening / active only */
+}
 
 .omnibox-input {
   display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px; border-radius: 999px;
@@ -8,7 +11,7 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .omnibox-input:focus-within { border-color: color-mix(in srgb, var(--gold) 70%, transparent); }
-.omnibox-input.is-listening { border-color: var(--danger); }
+.omnibox-input.is-listening { border-color: var(--ob-active); }
 .omnibox-input input {
   flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; /* 16px: no iOS zoom */
   padding: 8px 4px; outline: none; color: var(--text);
@@ -23,16 +26,20 @@
 .ob-icon { width: 36px; height: 36px; min-height: 36px; }
 .ob-icon:hover { color: var(--text); }
 .ob-icon.on { color: var(--gold); }
-.ob-icon.off { color: var(--muted); opacity: 0.75; }
+/* spoken replies off: a filled grey disc behind the muted speaker, plainly visible but no signal colour */
+.ob-icon.off { color: var(--text); background: color-mix(in srgb, var(--text) 12%, transparent); }
 .ob-mic {
   width: 42px; height: 42px; min-height: 42px; color: var(--text);
   background: color-mix(in srgb, var(--text) 9%, transparent); border: 1px solid var(--line);
 }
 .ob-mic:hover { background: color-mix(in srgb, var(--text) 15%, transparent); }
-.ob-mic.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: ob-pulse 1.4s ease-out infinite; }
+/* listening, as in Google Maps voice: blue filled mic with a ring pulsing outwards */
+.ob-mic.listening, .ob-talk.listening {
+  background: var(--ob-active); border-color: var(--ob-active); color: #fff; animation: ob-pulse 1.5s ease-out infinite;
+}
 @keyframes ob-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 55%, transparent); }
-  100% { box-shadow: 0 0 0 12px transparent; }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ob-active) 50%, transparent), 0 0 0 0 color-mix(in srgb, var(--ob-active) 30%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent, 0 0 0 20px transparent; }
 }
 
 /* status line: thinking / listening / notice */
@@ -44,7 +51,7 @@
 .ob-status .x { width: 22px; min-width: 22px; min-height: 22px; font-size: 16px; }
 .ob-notice { color: var(--text); border-color: color-mix(in srgb, var(--warn) 60%, transparent); border-radius: 14px; align-self: stretch; justify-content: space-between; }
 .ob-heard { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ob-rec { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; animation: ob-blink 1s ease-in-out infinite alternate; }
+.ob-rec { width: 8px; height: 8px; border-radius: 50%; background: var(--ob-active); flex: none; animation: ob-blink 1s ease-in-out infinite alternate; }
 @keyframes ob-blink { from { opacity: 1; } to { opacity: 0.3; } }
 .ob-dots { display: inline-flex; gap: 3px; }
 .ob-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--gold); animation: ob-dot 1.2s ease-in-out infinite; }
@@ -89,6 +96,13 @@
 }
 .ob-fab:hover { background: var(--panel-solid); }
 .ob-fab svg { width: 22px; height: 22px; }
-.ob-talk.listening { background: var(--danger); border-color: var(--danger); color: #fff; animation: ob-pulse 1.4s ease-out infinite; }
+.ob-talk { position: relative; }
+/* spoken replies off: a muted-speaker badge on the Talk button */
+.ob-badge {
+  position: absolute; top: -3px; right: -3px; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--text);
+  border: 2px solid var(--panel-solid); pointer-events: none;
+}
+.ob-fab .ob-badge svg { width: 14px; height: 14px; }
 .omnibox.collapsed .ob-status { align-self: flex-end; }
 @media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }
