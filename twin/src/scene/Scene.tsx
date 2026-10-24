@@ -185,8 +185,8 @@ export function Scene() {
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && !flat && (
-        <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={2}>
-          <GizmoViewcube color="#17345f" hoverColor="#2b5a95" textColor="#dbe7f5" strokeColor="#5eead4" opacity={0.92} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
+        <GizmoHelper alignment="bottom-right" margin={[64, 64]} renderPriority={2}>
+          <GizmoViewcube color="#ffffff" hoverColor="#e8f0fe" textColor="#14305a" strokeColor="#9fb3cc" opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
         </GizmoHelper>
       )}
       {ao && !worker && !flat && (

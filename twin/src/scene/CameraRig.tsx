@@ -187,6 +187,55 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     };
   });
 
+  // Keyboard: arrows pan (Shift + arrows orbit in 3D), + / - zoom, Home = home view. Ignored while typing.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable)) return;
+      const c = controls.current;
+      if (!c || event.metaKey || event.ctrlKey || event.altKey) return;
+      const animate = !reducedMotion;
+      const step = Math.max(1, c.distance * 0.08);
+      const handled = () => {
+        event.preventDefault();
+        invalidate();
+      };
+      switch (event.key) {
+        case "ArrowLeft":
+          if (event.shiftKey && !flat) void c.rotate(-0.15, 0, animate);
+          else void c.truck(-step, 0, animate);
+          return handled();
+        case "ArrowRight":
+          if (event.shiftKey && !flat) void c.rotate(0.15, 0, animate);
+          else void c.truck(step, 0, animate);
+          return handled();
+        case "ArrowUp":
+          if (event.shiftKey && !flat) void c.rotate(0, -0.1, animate);
+          else void c.truck(0, -step, animate);
+          return handled();
+        case "ArrowDown":
+          if (event.shiftKey && !flat) void c.rotate(0, 0.1, animate);
+          else void c.truck(0, step, animate);
+          return handled();
+        case "+":
+        case "=":
+          if (flat) void c.zoom(c.camera.zoom * 0.5, animate);
+          else void c.dolly(c.distance * 0.25, animate);
+          return handled();
+        case "-":
+        case "_":
+          if (flat) void c.zoom(-c.camera.zoom * 0.33, animate);
+          else void c.dolly(-c.distance * 0.33, animate);
+          return handled();
+        case "Home":
+          useTwin.getState().requestCamera({ kind: "home" });
+          return handled();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [flat, reducedMotion, invalidate]);
+
   // Cutaway: outer walls facing the camera are lowered. In 2D, note when the view was panned away from the floor.
   const direction = new THREE.Vector2();
   const target = new THREE.Vector3();
