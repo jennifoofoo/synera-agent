@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
@@ -208,7 +209,10 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         }
         if action in ("close", "reopen"):
             effect_key = "closed_add" if action == "close" else "closed_remove"
-            card["effect on the whole building"] = analyse(bm, **{effect_key: [element]}).sentences()
+            try:
+                card["effect on the whole building"] = analyse(bm, **{effect_key: [element]}).sentences()
+            except (MapError, KeyError, ValueError, nx.NetworkXException):
+                pass  # the card still works without the building-wide sentences
         state.pending = Pending(action, element, other, step_free, card, state.turn, building_signature(bm))
         return as_json(card)
 

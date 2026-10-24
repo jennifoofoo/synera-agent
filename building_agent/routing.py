@@ -13,6 +13,7 @@ walking from or to the anchor. Stairs cost 2 m per metre of floor height, lifts 
 
 import itertools
 import math
+import threading
 import weakref
 
 import networkx as nx
@@ -26,6 +27,7 @@ MAX_CACHED_GRAPHS = 6
 START, END = "start", "end"
 
 # bm -> {(closed, opening count, step_free): RoutingGraph}. Kept outside the map so deepcopy(bm) stays cheap.
+_LEG_LOCK = threading.RLock()  # shortest_leg adds temporary nodes to the shared cached graph
 _CACHE: "weakref.WeakKeyDictionary[BuildingMap, dict]" = weakref.WeakKeyDictionary()
 
 
@@ -37,7 +39,7 @@ def graph_signature(bm: BuildingMap, step_free: bool) -> tuple:
             for o in bm.openings.values()
         )
     )
-    return (tuple(sorted(bm.closed)), len(bm.openings), openings, step_free)
+    return (tuple(sorted(bm.closed)), len(bm.openings), openings, len(bm.connectors), len(bm.spaces), step_free)
 
 
 class RoutingGraph:
@@ -113,6 +115,11 @@ def shortest_leg(bm: BuildingMap, rg: RoutingGraph, start: str, end: str) -> tup
         return 0.0, []
     graph = rg.graph
     start_node, end_node = (START, start), (END, end)
+    with _LEG_LOCK:
+        return _leg(graph, rg, start, end, start_node, end_node)
+
+
+def _leg(graph, rg, start, end, start_node, end_node):
     try:
         for tag_node, space_id in ((start_node, start), (end_node, end)):
             for node in rg.members.get(space_id, []):

@@ -47,7 +47,7 @@ CONVERSATION_RULES = """
 Talking to a person (no 'Answer:' line asked):
 - Directions: use give_directions and read out only the steps it returns (at most 3). Offer 'weiter' for the \
 next steps (next_steps) and 'nochmal' to repeat (repeat_steps). Mention landmarks, not distances per step.
-- A closure stated as a fact inside a question ('The east lift is closed for maintenance. How do I get from A to B?') is not a request: call assume_closed(element) first, then route. Never propose or ask for confirmation for it.
+- A closure stated as a fact inside a question ('The east lift is closed for maintenance. How do I get from A to B?') is not a request: call assume_closed(element) first, then route. Exception: if the same message asks what changes or what happens, call what_changes FIRST and do not call assume_closed at all. Never propose or ask for confirmation for it.
 - Changes (closing or reopening a lift, stair, door or room; adding a door): call propose_change, show the \
 understanding card in plain words (what you understood, what changes for their route), and ask for a yes. \
 Only after their next message says yes call confirm_change(true); on no or a correction call \
@@ -58,7 +58,7 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 - Never invent room numbers, names or examples. Only mention rooms that a tool returned. If a room does not exist, say so and offer similar rooms from a search result, or ask.
 - When the person names an item that could be one of several ('the second press', 'the printer', 'the press on line 4'), call find_asset first and never guess between groups. If find_asset or find_connector returns needs_choice true, ask its question in one short sentence and wait. Treat hints such as 'line 4 = zone H-B4' as suggestions to confirm, never as facts.
 - For compass words ('the east lift', 'the north stairs') call find_connector and state the returned assumption ('I take east as the right side of the plan'). If the person says left or right, ask which one they mean.
-- For 'what changes if X is closed or blocked' questions call what_changes and report its sentences in plain words.
+- For 'what changes if X is closed or blocked' questions call what_changes (before any assume_closed, which would mutate the building and spoil the comparison) and report its sentences in plain words.
 - If a place is ambiguous (for example 'WC' or 'toilet' exists on several floors), list the floors and ask before any route call."""
 
 
