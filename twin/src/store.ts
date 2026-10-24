@@ -162,7 +162,7 @@ export const useTwin = create<TwinState>((set, get) => ({
         model,
         state: building.state,
         loading: false,
-        focusedFloorId: model.floors[0]?.id ?? null,
+        focusedFloorId: (model.floors.find((floor) => floor.level === 0) ?? model.floors.find((floor) => floor.level > 0) ?? model.floors[0])?.id ?? null,
         camera: { nonce: ++cameraNonce, kind: "home" },
       });
     } catch (error) {

@@ -53,7 +53,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     const drawn = reducedMotion ? 1 : Math.min(1, elapsed / 1.4);
     for (const ref of [line, glow]) {
       const material = ref.current?.material as THREE.ShaderMaterial & { dashOffset: number } | undefined;
-      if (material) material.dashOffset = -total * (1 - drawn) + total;
+      if (material) material.dashOffset = total * (1 - drawn);
     }
     if (pulse.current && points.length > 1) {
       if (reducedMotion || drawn < 1) {

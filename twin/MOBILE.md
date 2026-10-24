@@ -1,29 +1,29 @@
-# Mobile (Worker-Ansicht): das Nötigste
+# Mobile (worker view): the essentials
 
-Quellen: `docs/mobile-audit.md`, `docs/specs/mobile-first.md`, Leonies Design-Entscheidungen.
+Sources: `docs/mobile-audit.md`, `docs/specs/mobile-first.md`, Leonie's design decisions.
 
-## Bildschirm
-- Nur das Gebäude, oben schmale Kopfzeile (Zurück, Name, Suche). Keine Listen, Tabs, Panels, keine Minimap.
-- Unten in Daumenreichweite: ein Feld "Ask or search…" mit großem Mikrofon.
-- Route, nächster Schritt, Funde nur bei Bedarf, als Bottom Sheet (nie über dem Plan). Karten nur beim Antippen, 2 bis 3 Zeilen.
-- Touch-Ziele mindestens 44 px. Eingabefelder mindestens 16 px Schrift (sonst zoomt iOS). `touch-action: manipulation`.
+## Screen
+- Only the building, a slim header (back, name, search). No lists, tabs, panels, no minimap.
+- At the bottom, in thumb reach: one "Ask or search…" input with a big mic.
+- Route, next step and finds only when needed, as a bottom sheet (never over the plan). Cards only on tap, 2 to 3 lines.
+- Touch targets at least 44 px. Inputs at least 16 px font (otherwise iOS zooms). `touch-action: manipulation`.
 
-## Sprache und Ton (Demo-Gerät: iPhone mit Safari)
-- Push-to-talk: Mikrofon antippen, sprechen. Kein Hands-free im Video.
-- https nötig: `scripts/tunnel.sh`.
-- Ton freischalten beim ersten Tipp (stilles WAV abspielen, Audio-Element wiederverwenden).
-- Bildschirm wach halten (Wake Lock) beim Zuhören und Begleiten.
-- "Wanda is thinking" statt Stille. Bei Spracheingabe `voice: true` mitsenden.
+## Voice and sound (demo device: iPhone with Safari)
+- Push-to-talk: tap the mic, speak. No hands-free in the video.
+- Needs https: `scripts/tunnel.sh`.
+- Unlock audio on the first tap (play a silent WAV, reuse the audio element).
+- Keep the screen awake (Wake Lock) while listening and guiding.
+- "Wanda is thinking" instead of silence. Send `voice: true` for speech input.
 
-## Standort und Begleiten
-- Blauer Punkt "You are here", gesetzt mit "I'm here" (`context.here`).
-- Nur die aktuelle Etappe zeigen, klein "Step 2 of 5" (`state.guide`).
+## Position and guidance
+- Blue "You are here" dot, set with "I'm here" (`context.here`).
+- Show only the current leg, small "Step 2 of 5" (`state.guide`).
 
-## Leistung
-- Leichtes Rendering am Handy: kein Ambient Occlusion, keine Nacheffekte, 3D erst bei Bedarf laden, Dinge nur in der Nähe.
+## Performance
+- Light rendering on the phone: no ambient occlusion, no post effects, load 3D on demand, things only nearby.
 
 ## Look
-- Bläulich, clean, wenig Gold als Akzent, Farbe nur für Information, `prefers-reduced-motion` beachten.
+- Bluish, clean, a little gold as accent, colour only for information, respect `prefers-reduced-motion`.
 
-## Abnahme
-- Am echten iPhone über den Tunnel: lädt ohne Querscrollen, Antippen wählt aus, Sprache per Tipp, Antwort wird gesprochen, Begleiten bleibt an.
+## Acceptance
+- On a real iPhone over the tunnel: loads without horizontal scrolling, tap selects, voice by tap, reply is spoken, guidance keeps the screen on.

@@ -15,6 +15,13 @@ interface Props {
 }
 
 const HOME_AZIMUTH = -Math.PI / 4;
+
+/** camera-controls' fitToBox snaps the rotation to 90° steps; fitting the bounding sphere keeps the view angle. */
+function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 1.08) {
+  const sphere = box.getBoundingSphere(new THREE.Sphere());
+  sphere.radius = Math.max(3, sphere.radius * pad);
+  void c.fitToSphere(sphere, animate);
+}
 const HOME_POLAR = Math.PI / 3.6;
 
 /** Smooth camera with limits: never below the floor, never away from the building, a sensible distance, and
@@ -54,8 +61,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const box = new THREE.Box3();
     if (request.kind === "home") {
       box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
-      c.rotateTo(HOME_AZIMUTH, HOME_POLAR, animate);
-      c.fitToBox(box, animate, { paddingTop: size * 0.05, paddingBottom: size * 0.05, paddingLeft: size * 0.05, paddingRight: size * 0.05 });
+      void c.rotateTo(HOME_AZIMUTH, HOME_POLAR, animate);
+      fitBox(c, box, animate, 0.95);
       return;
     }
     if (request.kind === "floor" && request.floorId) {
@@ -63,14 +70,14 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       if (!floor) return;
       const y = floorY(floor.id);
       box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + floor.height_m, -floor.bounds.minY));
-      c.fitToBox(box, animate, { paddingTop: 2, paddingBottom: 2, paddingLeft: 2, paddingRight: 2 });
+      fitBox(c, box, animate, 0.95);
       return;
     }
     if (request.kind === "point" && request.point && request.floorId) {
       const y = floorY(request.floorId);
       const r = request.radius ?? 6;
       box.set(new THREE.Vector3(request.point[0] - r, y, -request.point[1] - r), new THREE.Vector3(request.point[0] + r, y + 3, -request.point[1] + r));
-      c.fitToBox(box, animate, { paddingTop: 1, paddingBottom: 1, paddingLeft: 1, paddingRight: 1 });
+      fitBox(c, box, animate, 1.1);
       return;
     }
     if (request.kind === "object" && request.ids?.length) {
@@ -109,10 +116,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         }
       }
       if (box.isEmpty()) return;
-      const extent = new THREE.Vector3();
-      box.getSize(extent);
-      const pad = Math.max(2, Math.max(extent.x, extent.z) * 0.6);
-      c.fitToBox(box, animate, { paddingTop: pad, paddingBottom: pad, paddingLeft: pad, paddingRight: pad });
+      fitBox(c, box, animate, 1.6);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request.nonce, floorMode]);

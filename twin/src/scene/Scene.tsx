@@ -1,13 +1,13 @@
-import { Suspense, useCallback, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
-import { Canvas } from "@react-three/fiber";
-import { AdaptiveDpr, ContactShadows, GizmoHelper, GizmoViewcube, Grid, PerformanceMonitor } from "@react-three/drei";
+import { Canvas, useThree } from "@react-three/fiber";
+import { ContactShadows, GizmoHelper, GizmoViewcube, Grid, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
 import { floorElevation, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
-import { FloorMesh } from "./FloorMesh";
+import { FloorMesh, buildTimes } from "./FloorMesh";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { RouteLine } from "./RouteLine";
@@ -73,7 +73,7 @@ function Building({ model }: { model: BuildingModel }) {
       {!worker && (
         <ContactShadows
           key={`${model.building.key}-${floorMode}`}
-          position={[model.bounds.cx, -0.25, -model.bounds.cy]}
+          position={[model.bounds.cx, Math.min(...model.floors.map((floor) => floor.elevation_m)) - 0.25, -model.bounds.cy]}
           scale={model.bounds.size * 1.6}
           blur={2.4}
           opacity={0.45}
@@ -87,18 +87,37 @@ function Building({ model }: { model: BuildingModel }) {
   );
 }
 
+/** `window.__twinStats()` for measuring: draw calls, triangles, geometry build times per floor (ms). */
+function Stats() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    (window as unknown as { __twinScene: unknown }).__twinScene = scene;
+    (window as unknown as { __twinStats: () => unknown }).__twinStats = () => ({
+      calls: gl.info.render.calls,
+      triangles: gl.info.render.triangles,
+      buildMs: Object.fromEntries([...buildTimes].map(([id, ms]) => [id, Math.round(ms)])),
+    });
+  }, [gl, scene]);
+  return null;
+}
+
 export function Scene() {
   const model = useTwin((s) => s.model);
   const profile = useTwin((s) => s.profile);
   const ao = useTwin((s) => s.ao);
   const worker = profile === "worker";
   const size = model?.bounds.size ?? 60;
-  const centre: [number, number, number] = model ? [model.bounds.cx, 0, -model.bounds.cy] : [0, 0, 0];
+  const groundY = (model ? Math.min(...model.floors.map((floor) => floor.elevation_m)) : 0) - 0.3;
+  const centre: [number, number, number] = model ? [model.bounds.cx, groundY, -model.bounds.cy] : [0, groundY, 0];
   const select = useTwin((s) => s.select);
+  // Adaptive quality: the PerformanceMonitor steps this down when frames drop (pixel ratio, AO quality).
+  const [quality, setQuality] = useState(2);
+  const dpr = worker ? [1, 1.5][Math.min(quality, 1)] : [1, 1.5, 2][quality];
 
   return (
     <Canvas
-      dpr={[1, worker ? 1.5 : 2]}
+      dpr={dpr}
       camera={{ fov: 38, near: 0.5, far: size * 12, position: [centre[0] + size, size * 0.9, centre[2] + size] }}
       gl={{ antialias: !ao, powerPreference: "high-performance", logarithmicDepthBuffer: false }}
       onPointerMissed={() => select(null)}
@@ -110,14 +129,18 @@ export function Scene() {
       <hemisphereLight args={["#e8f0fa", "#0b1e3a", 1.1]} />
       <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#fdfdff" />
       <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#bcd3f0" />
-      <PerformanceMonitor flipflops={3} factor={1} />
-      <AdaptiveDpr pixelated={false} />
-      <mesh rotation-x={-Math.PI / 2} position={[centre[0], -0.3, centre[2]]} receiveShadow renderOrder={-1}>
+      <PerformanceMonitor
+        flipflops={4}
+        bounds={() => [40, 58]}
+        onDecline={() => setQuality((q) => Math.max(0, q - 1))}
+        onIncline={() => setQuality((q) => Math.min(2, q + 1))}
+      />
+      <mesh rotation-x={-Math.PI / 2} position={[centre[0], groundY, centre[2]]} renderOrder={-1}>
         <planeGeometry args={[size * 12, size * 12]} />
         <meshBasicMaterial color={COLOURS.ground} />
       </mesh>
       <Grid
-        position={[centre[0], -0.28, centre[2]]}
+        position={[centre[0], groundY + 0.02, centre[2]]}
         args={[size * 6, size * 6]}
         cellSize={2}
         cellThickness={0.6}
@@ -130,6 +153,7 @@ export function Scene() {
         infiniteGrid
         followCamera={false}
       />
+      <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && (
         <GizmoHelper alignment="bottom-right" margin={[72, 72]} renderPriority={2}>
@@ -138,7 +162,7 @@ export function Scene() {
       )}
       {ao && !worker && (
         <EffectComposer multisampling={0} enableNormalPass={false}>
-          <N8AO aoRadius={2.2} intensity={2.4} distanceFalloff={1.2} quality="medium" halfRes color={new THREE.Color("#061227")} />
+          <N8AO aoRadius={2.2} intensity={2.4} distanceFalloff={1.2} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color("#061227")} />
           <SMAA />
           <Vignette eskil={false} offset={0.25} darkness={0.32} />
         </EffectComposer>

@@ -69,20 +69,20 @@ function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { childr
   return <group ref={group}>{children}</group>;
 }
 
-function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1 }: { radius: number; colour: string; width?: number; y?: number; opacity?: number }) {
+function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={15}>
+    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 19 : 15}>
       <ringGeometry args={[Math.max(0.05, radius - width), radius, 48]} />
-      <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} side={THREE.DoubleSide} />
+      <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} depthTest={!through} side={THREE.DoubleSide} />
     </mesh>
   );
 }
 
-function Disc({ radius, colour, y = 0.05, opacity = 0.22 }: { radius: number; colour: string; y?: number; opacity?: number }) {
+function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false }: { radius: number; colour: string; y?: number; opacity?: number; through?: boolean }) {
   return (
-    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={14}>
+    <mesh rotation-x={-Math.PI / 2} position-y={y} renderOrder={through ? 18 : 14}>
       <circleGeometry args={[radius, 48]} />
-      <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} side={THREE.DoubleSide} />
+      <meshBasicMaterial color={colour} transparent opacity={opacity} depthWrite={false} depthTest={!through} side={THREE.DoubleSide} />
     </mesh>
   );
 }
@@ -126,9 +126,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
       {position && shown(position.floor_id) && (
         <group position={at(position.floor_id, position.point)}>
           <Pulse reducedMotion={reducedMotion} speed={0.8} amount={0.25}>
-            <Ring radius={1.4} colour={COLOURS.here} width={0.14} opacity={0.7} />
+            <Ring radius={1.4} colour={COLOURS.here} width={0.14} opacity={0.7} through />
           </Pulse>
-          <Disc radius={0.9} colour={COLOURS.here} opacity={0.35} />
+          <Disc radius={0.9} colour={COLOURS.here} opacity={0.35} through />
           <mesh position-y={0.35}>
             <sphereGeometry args={[0.32, 16, 16]} />
             <meshBasicMaterial color={COLOURS.here} />
@@ -158,9 +158,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           const label = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
           return (
             <group key={index} position={at(d.floor_id, d.point)}>
-              <Disc radius={radius} colour={COLOURS.danger} opacity={0.28} />
+              <Disc radius={radius} colour={COLOURS.danger} opacity={0.28} through />
               <Pulse reducedMotion={reducedMotion}>
-                <Ring radius={radius} colour={COLOURS.danger} width={0.2} />
+                <Ring radius={radius} colour={COLOURS.danger} width={0.2} through />
               </Pulse>
               <group position-y={1.6}>{chip(`⚠ ${label}`, "danger")}</group>
             </group>
