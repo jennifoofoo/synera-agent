@@ -5,22 +5,20 @@ import { useRef, type ReactNode } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 
-/** "You are here": white rim, blue core, pulse disc (radius in px). */
+/** "You are here": white rim, blue core, soft accuracy halo (radius in px). No text: the dot is the marker. */
 export const HERE_RIM_PX = 9;
 export const HERE_CORE_PX = 6.5;
-export const HERE_PULSE_PX = 28;
-/** Gap between the dot and its "You are here" badge (badge bottom = rim + gap above the dot centre). */
+export const HERE_HALO_PX = 22;
+/** Gap between a marker and the drag hint below it. */
 export const BADGE_GAP_PX = 4;
-export const BADGE_LIFT_PX = HERE_RIM_PX + BADGE_GAP_PX;
-/** Route ends and the guide's next target: a small ring. */
+/** Route ends: a small dot at the start, a red disc at the destination. */
 export const END_RING_PX = 8;
 export const START_DOT_PX = 5;
 
 /** How far above its marker a room label's bottom edge sits (px). */
 export const LABEL_LIFT = {
-  here: BADGE_LIFT_PX + 19 + 4, // above the badge (19 px tall) with a small gap
-  guide: END_RING_PX + BADGE_GAP_PX + 19 + 4, // above the "Next: ..." chip
-  end: 20, // just above a route end ring
+  here: HERE_RIM_PX + BADGE_GAP_PX,
+  end: 20, // just above a route end
 };
 
 const at = new THREE.Vector3();
