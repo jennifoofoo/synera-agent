@@ -27,3 +27,10 @@
 .card-walk .walk-motion-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-2); }
 .card-walk .walk-motion-switch input { width: 18px; height: 18px; margin: 0; accent-color: var(--signal); }
 .worker .card-walk .walk-motion-switch { min-height: 44px; }
+/* Phone in landscape: little height. A smaller step line and tighter gaps keep Back/Next on screen (tap areas stay 44 px). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .card-walk .walk-now { margin-top: 4px; }
+  .card-walk .walk-now p { font-size: 16px; line-height: 1.25; }
+  .card-walk .walk-foot { margin-top: 2px; }
+  .card-walk .card-actions { margin-top: 6px; }
+}
