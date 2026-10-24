@@ -52,3 +52,34 @@ export function PoiBadge({ kind, title }: { kind: PoiKind; title: string }) {
     </div>
   );
 }
+
+/** Height of the floor-change badge and the found-item name (px); widths come from floorBadgeWidth / the text. */
+export const FLOOR_BADGE_H_PX = 22;
+export function floorBadgeWidth(level: number): number {
+  return 22 + 8 + String(level).length * 7 + 6; // glyph, arrow, level digits, padding
+}
+
+/** Where the route changes floor: the stairs or lift glyph with "↑ 1", in the route blue (map-app style). */
+export function FloorBadge({ kind, direction, level, title }: { kind: "stairs" | "lift"; direction: "up" | "down"; level: number; title: string }) {
+  return (
+    <div className="floor-badge" title={title} role="img" aria-label={title} data-floor-change={level}>
+      {GLYPHS[kind]}
+      <span>
+        {direction === "up" ? "↑" : "↓"}
+        {level}
+      </span>
+    </div>
+  );
+}
+
+/** Diameter (px) of a found thing's dot, and of a dot that stands for several close together. */
+export const FOUND_DOT_PX = 12;
+export const FOUND_MANY_PX = 18;
+
+export function FoundDot({ count, title }: { count: number; title: string }) {
+  return (
+    <div className={`found-dot ${count > 1 ? "many" : ""}`} title={title} role="img" aria-label={title}>
+      {count > 1 ? count : null}
+    </div>
+  );
+}
