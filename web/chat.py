@@ -40,9 +40,10 @@ def backend_name() -> str:
 class ChatAdapter:
     """One per loaded building. ask() returns {'reply', 'backend'} and never raises."""
 
-    def __init__(self, building_dir: Path, building_map: BuildingMap) -> None:
+    def __init__(self, building_dir: Path, building_map: BuildingMap, level4=None) -> None:
         self.building_dir = building_dir
         self.map = building_map
+        self.level4 = level4  # web.level4_api.PlanStudio: the page's floor plan draft, shared with the agent
         self.starter = None
         self.session = None
         self.lock = threading.Lock()
@@ -64,6 +65,13 @@ class ChatAdapter:
 
         if self.session is None:
             self.session = Session(self.map, OUTPUT_DIRECTORY / self.building_dir.name)
+            if self.level4 is not None and not any(tool.name == "build_from_plan" for tool in self.session.tools):
+                self.session.tools = [*self.session.tools, *self.level4.chat_tools]
+        if self.level4 is not None:
+            self.level4.begin_turn()
+            note = self.level4.chat_context()
+            if note:
+                text = f"{note}\n{text}"
         return self.session.ask(text)
 
     def ask_starter(self, text: str) -> str:

@@ -14,6 +14,16 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
   POST /api/chat     {message}
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
+
+Level 4, new building from floor plans (web/level4_api.py; POSTs need a same-origin page):
+  POST /api/level4/upload               raw PNG/JPG body (<= 10 MB) -> {upload_id, width, height}
+  POST /api/level4/build  {floors: [{upload_id, level, known_length_m | scale_bar, along}], name?}
+  GET  /api/level4/status               background reading progress
+  GET  /api/level4/preview              draft in the building_view shape + findings + red spots
+  POST /api/level4/fix    {action: add_door|remove_door|set_room_type|set_scale, ref, other_ref, room_type, ...}
+  POST /api/level4/card                 the understanding card; the very next action must be the answer
+  POST /api/level4/save   {answer: "yes"|"no", accept_problems?}  -> {saved, key: "user/<id>"}
+  POST /api/level4/reset                start a new draft
 """
 
 import argparse
@@ -29,7 +39,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from starter_agent.building_map import MapError
-from web import api, speech
+from web import api, level4_api, speech
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 
@@ -49,8 +59,15 @@ def speech_available() -> bool:
 class App:
     """All loaded buildings. The page is a single-user demo, so state lives in memory per building key."""
 
-    def __init__(self, data_root: Path) -> None:
+    def __init__(
+        self,
+        data_root: Path,
+        uploads_root: Path = level4_api.DEFAULT_ALLOWED_ROOT,
+        buildings_root: Path = level4_api.BUILDINGS_ROOT,
+    ) -> None:
         self.data_root = data_root
+        self.buildings_root = buildings_root
+        self.level4 = level4_api.PlanStudio(uploads_root, buildings_root)
         self.sessions: dict[str, api.Session] = {}
         self.chats: dict[str, ChatAdapter] = {}
         self.lock = threading.RLock()
@@ -92,7 +109,10 @@ class App:
     def session(self, key: str) -> api.Session:
         with self.lock:
             if key not in self.sessions:
-                directory = api.resolve_building_dir(self.data_root, key)
+                if key.startswith(level4_api.USER_PREFIX):  # saved from floor plans on this page
+                    directory = api.resolve_building_dir(self.buildings_root, key[len(level4_api.USER_PREFIX) :])
+                else:
+                    directory = api.resolve_building_dir(self.data_root, key)
                 self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory))
             return self.sessions[key]
 
@@ -106,7 +126,7 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map)
+                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4)
             return self.chats[key]
 
     # ---------- request handling (returns status, payload) ----------
@@ -119,14 +139,44 @@ class App:
                 "speech_available": speech_available(),
             }
         if path == "/api/buildings":
-            return 200, {"buildings": api.list_buildings(self.data_root)}
+            saved = level4_api.saved_buildings(self.buildings_root)
+            return 200, {"buildings": api.list_buildings(self.data_root) + saved}
+        if path == "/api/level4/status":
+            return 200, self.level4.status()
+        if path == "/api/level4/preview":
+            return 200, self.level4.preview()
         if path == "/api/building":
             key = (query.get("key") or [""])[0]
             with self.lock:
                 return 200, api.building_view(self.session(key))
         return 404, {"error": f"Unknown endpoint {path}"}
 
+    def upload(self, data: bytes) -> tuple[int, dict]:
+        return 200, self.level4.upload(data)
+
+    def post_level4(self, path: str, body: dict) -> tuple[int, dict]:
+        studio = self.level4
+        if path == "/api/level4/build":
+            return 200, studio.start_build(body)
+        if path == "/api/level4/fix":
+            return 200, studio.fix(body)
+        if path == "/api/level4/card":
+            return 200, studio.card()
+        if path == "/api/level4/save":
+            result = studio.save(body)
+            if result.get("saved"):
+                with self.lock:  # saving again under the same id must not show an old copy
+                    self.sessions.pop(result["key"], None)
+                    self.chats.pop(result["key"], None)
+            return 200, result
+        if path == "/api/level4/reset":
+            studio.new_draft(forget_uploads=True)
+            return 200, studio.status()
+        return 404, {"error": f"Unknown endpoint {path}"}
+
     def post(self, path: str, body: dict) -> tuple[int, dict]:
+        if path.startswith("/api/level4/"):
+            return self.post_level4(path, body)
         key = body.get("building", "")
         if path == "/api/chat":
             message = str(body.get("message", "")).strip()
@@ -139,10 +189,11 @@ class App:
             result = chat.ask(message)
             with self.lock:
                 current = self.session(key)
+                level4 = self.level4.chat_info()
                 if current is not session:  # the building was reset while the agent was thinking
-                    return 200, {**result, "stale": True, "state": api.state_view(current)}
+                    return 200, {**result, "stale": True, "state": api.state_view(current), "level4": level4}
                 session.adopt_agent_route(previous_route, version)
-                return 200, {**result, "state": api.state_view(session)}
+                return 200, {**result, "state": api.state_view(session), "level4": level4}
         with self.lock:
             session = self.session(key)
             if path == "/api/route":
@@ -210,6 +261,8 @@ def make_handler(app: App) -> type:
                 status, payload = action()
             except MapError as error:
                 status, payload = 400, {"error": str(error)}
+            except level4_api.Level4Error as error:
+                status, payload = error.status, {"error": str(error)}
             except Exception as error:  # noqa: BLE001 - report it, don't kill the server
                 status, payload = 500, {"error": f"{type(error).__name__}: {error}"}
             self.send_json(status, payload)
@@ -221,8 +274,8 @@ def make_handler(app: App) -> type:
             else:
                 super().do_GET()
 
-        def speak_request_allowed(self) -> bool:
-            """Browser-origin guard for the costly endpoint: same-origin page only, JSON only."""
+        def speak_request_allowed(self, content_types: tuple[str, ...] = ("application/json",)) -> bool:
+            """Browser-origin guard for costly or writing endpoints: same-origin page only, expected body type."""
             port = self.server.server_address[1]
             allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
             origin = self.headers.get("Origin")
@@ -232,14 +285,35 @@ def make_handler(app: App) -> type:
             ):
                 self.send_json(403, {"error": "Forbidden origin."})
                 return False
-            if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
-                self.send_json(415, {"error": "Content-Type must be application/json."})
+            if self.headers.get("Content-Type", "").split(";")[0].strip().lower() not in content_types:
+                self.send_json(415, {"error": f"Content-Type must be {' or '.join(content_types)}."})
                 return False
             return True
 
+        def run_upload(self) -> None:
+            """Raw image body. Size is checked before reading; the name and path are made on the server."""
+            if not self.speak_request_allowed(("image/png", "image/jpeg")):
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if length <= 0:
+                self.send_json(411, {"error": "The upload needs a Content-Length."})
+                return
+            if length > level4_api.MAX_FILE_BYTES:
+                self.close_connection = True  # the body is not read
+                self.send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "The image is larger than 10 MB."})
+                return
+            data = self.rfile.read(length)
+            self.run(lambda: app.upload(data))
+
         def do_POST(self) -> None:
             url = urlparse(self.path)
-            if url.path == "/api/speak" and not self.speak_request_allowed():
+            if url.path == "/api/level4/upload":
+                self.run_upload()
+                return
+            if url.path.startswith(("/api/speak", "/api/level4/")) and not self.speak_request_allowed():
                 return
             length = int(self.headers.get("Content-Length") or 0)
             if length > MAX_BODY_BYTES:
@@ -283,9 +357,18 @@ def main() -> None:
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--env-file", type=Path, default=Path(".env"), help="read ANTHROPIC_API_KEY from here")
+    parser.add_argument(
+        "--fake-plans",
+        type=Path,
+        metavar="BUILDING_DIR",
+        help="offline demo: read every uploaded plan as this building's floor (no vision call, no cost)",
+    )
     arguments = parser.parse_args()
     load_env_file(arguments.env_file)
     app = App(arguments.data)
+    if arguments.fake_plans:
+        level4_api.use_fake_extraction(app.level4, arguments.fake_plans)
+        print(f"Floor plans are faked from {arguments.fake_plans} (no vision call).")
     server = ThreadingHTTPServer((arguments.host, arguments.port), make_handler(app))
     chat_state = f"chat via {chat_backend_name()}" if chat_available() else "chat off (no ANTHROPIC_API_KEY)"
     print(

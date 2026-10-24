@@ -20,6 +20,8 @@ const app = {
   pickedSpaceId: null,
   status: { chat_available: false },
   anim: null,          // route animation in progress, see "route animation"
+  mode: null,          // "draft" while a floor plan draft is shown (plan.js), null for a saved building
+  suspect: { spaces: new Set(), openings: new Set() },  // drawn red in draft mode
 };
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -81,8 +83,22 @@ function pixelSize() {
 async function init() {
   wireUi();
   app.status = await api("/api/status").catch(() => ({ chat_available: false }));
+  const buildings = await fillBuildingSelect();
+  const fromHash = decodeURIComponent((location.hash.match(/b=([^&]+)/) || [])[1] || "");
+  const initial = buildings.find((b) => b.key === fromHash) || buildings.find((b) => b.key.includes("campus")) || buildings[0];
+  if (initial) {
+    $("#building-select").value = initial.key;
+    await loadBuilding(initial.key);
+  }
+  updateChatNote();
+}
+
+const SPLIT_LABELS = { user: "built from plans" };
+
+async function fillBuildingSelect() {
   const { buildings } = await api("/api/buildings");
   const select = $("#building-select");
+  select.innerHTML = "";
   const groups = new Map();
   for (const b of buildings) {
     if (!groups.has(b.split)) groups.set(b.split, []);
@@ -98,24 +114,36 @@ async function init() {
       option.textContent = `${b.name} (${b.key.split("/").pop()})${floors}`;
       group.appendChild(option);
     }
+    group.label = SPLIT_LABELS[split] || group.label;
     select.appendChild(group);
   }
-  const fromHash = decodeURIComponent((location.hash.match(/b=([^&]+)/) || [])[1] || "");
-  const initial = buildings.find((b) => b.key === fromHash) || buildings.find((b) => b.key.includes("campus")) || buildings[0];
-  if (initial) {
-    select.value = initial.key;
-    await loadBuilding(initial.key);
-  }
-  updateChatNote();
+  if (app.key) select.value = app.key;
+  return buildings;
 }
 
-async function loadBuilding(key, reset = false) {
+async function loadBuilding(key, reset = false, { keepChat = false } = {}) {
   app.key = key;
   history.replaceState(null, "", `#b=${encodeURIComponent(key)}`);
   $("#building-meta").textContent = "loading…";
   $("#map").innerHTML = `<text x="0" y="0" font-size="1" text-anchor="middle" fill="#6b6f76">Loading building…</text>`;
   $("#map").setAttribute("viewBox", "-10 -6 20 12");
   const data = reset ? await api("/api/reset", {}) : await api(`/api/building?key=${encodeURIComponent(key)}`);
+  setBuildingData(data);
+  window.plan?.onBuildingShown();
+  const nRooms = data.spaces.filter((s) => s.type === "room" || s.type === "hall").length;
+  $("#building-meta").textContent = `${data.floors.length} floor${data.floors.length > 1 ? "s" : ""} · ${nRooms} rooms · ${data.assets.length} things · ${data.source}`;
+  applyState(data.state, { silent: true, animate: false });
+  showFloor(app.floorId, true);
+  if (keepChat) return;
+  window.voice?.stop();
+  $("#chat-log").innerHTML = "";
+  addMessage("system", `Building: ${data.name}. Ask where things are, how to get somewhere, or tell me what is closed.`);
+}
+
+// The drawing model for one building view (a saved building, or a floor plan draft from plan.js).
+function setBuildingData(data, { mode = null, suspect = null } = {}) {
+  app.mode = mode;
+  app.suspect = { spaces: new Set(suspect?.spaces || []), openings: new Set(suspect?.openings || []) };
   app.building = data;
   app.spaces = new Map(data.spaces.map((s) => [s.id, s]));
   app.openings = new Map(data.openings.map((o) => [o.id, o]));
@@ -137,15 +165,9 @@ async function loadBuilding(key, reset = false) {
   app.pickedSpaceId = null;
   hidePopover();
   setBanner(null);
-  const nRooms = data.spaces.filter((s) => s.type === "room" || s.type === "hall").length;
-  $("#building-meta").textContent = `${data.floors.length} floor${data.floors.length > 1 ? "s" : ""} · ${nRooms} rooms · ${data.assets.length} things · ${data.source}`;
+  const keep = app.floorId && data.floors.some((f) => f.id === app.floorId) && mode === "draft";
   const ground = data.floors.find((f) => f.level === 0) || data.floors[0];
-  app.floorId = ground.id;
-  applyState(data.state, { silent: true, animate: false });
-  showFloor(app.floorId, true);
-  window.voice?.stop();
-  $("#chat-log").innerHTML = "";
-  addMessage("system", `Building: ${data.name}. Ask where things are, how to get somewhere, or tell me what is closed.`);
+  if (!keep) app.floorId = ground.id;
 }
 
 // What the person typed -> what the server resolves: exact unique name -> id, otherwise the raw text.
@@ -193,7 +215,8 @@ function fitView(box = app.floorBoxes.get(app.floorId)) {
   const cx = (box.minX + box.maxX) / 2, cy = (box.minY + box.maxY) / 2;
   app.view = { x: cx - w / 2, y: cy - h / 2, w, h };
   // Keep the top strip free for the route bar.
-  const reserve = $("#route-bar").hidden ? 0 : 56 * (h / Math.max(svg.clientHeight, 1));
+  const topBar = !$("#route-bar").hidden || !$("#draft-banner").hidden;
+  const reserve = topBar ? 56 * (h / Math.max(svg.clientHeight, 1)) : 0;
   app.view.y -= reserve;
   app.view.h += reserve;
   app.view.w = app.view.h * aspect;
@@ -234,6 +257,7 @@ function render() {
     if (route && s.id === route.destination) classes.push("end");
     if (closed) classes.push("closed");
     if (s.id === app.pickedSpaceId || s.id === app.pendingDoorFrom) classes.push("picked");
+    if (app.suspect.spaces.has(s.id)) classes.push("suspect");
     const points = s.polygon.map((p) => svgPoint(p).join(",")).join(" ");
     const shape = el("polygon", { points, class: classes.join(" "), "data-space": s.id }, spacesLayer);
     const title = el("title", {}, shape);
@@ -282,7 +306,8 @@ function drawOpening(layer, o) {
   const g = el("g", { class: "opening", "data-opening": o.id }, layer);
   el("circle", { cx: x, cy: y, r: r * 2.2, class: "hit" }, g);
   const kindClass = o.kind === "entrance" ? "entrance" : o.kind === "opening" ? "opening-kind" : "";
-  const classes = ["door", kindClass, o.step_free ? "" : "step", o.added ? "added" : ""].join(" ");
+  const suspect = app.suspect.openings.has(o.id) ? "suspect" : "";
+  const classes = ["door", kindClass, o.step_free ? "" : "step", o.added ? "added" : "", suspect].join(" ");
   if (o.kind === "entrance") {
     el("rect", { x: x - r, y: y - r, width: 2 * r, height: 2 * r, rx: 0.12, class: classes }, g);
   } else {
@@ -770,6 +795,7 @@ function showPopover(event, html, actions) {
 }
 
 function onSpaceClick(event, spaceId) {
+  if (app.mode === "draft") return window.plan.onSpaceClick(event, spaceId);
   const s = app.spaces.get(spaceId);
   if (app.pendingDoorFrom) {
     const first = app.pendingDoorFrom;
@@ -805,6 +831,7 @@ function onSpaceClick(event, spaceId) {
 }
 
 function onOpeningClick(event, openingId) {
+  if (app.mode === "draft") return window.plan.onOpeningClick(event, openingId);
   const o = app.openings.get(openingId);
   const closed = isClosed(openingId);
   const sides = o.space_ids.map((id) => (id === "outside" ? "outside" : esc(spaceName(id)))).join(" ↔ ");
@@ -818,7 +845,7 @@ function setBanner(text) {
   const banner = $("#mode-banner");
   if (!text) { banner.hidden = true; return; }
   banner.innerHTML = `${esc(text)} <button class="small secondary">Cancel</button>`;
-  banner.querySelector("button").onclick = () => { app.pendingDoorFrom = null; setBanner(null); render(); };
+  banner.querySelector("button").onclick = () => { app.pendingDoorFrom = null; window.plan?.cancelPick(); setBanner(null); render(); };
   banner.hidden = false;
 }
 
@@ -994,7 +1021,8 @@ async function sendChat(text) {
     pending.remove();
     const message = addMessage(result.error ? "system" : "agent", result.reply);
     if (!result.error) window.voice?.onReply(result.reply, message);
-    if (result.state) {
+    window.plan?.onChat(result.level4);
+    if (result.state && app.mode !== "draft") {
       const changed = stateSignature(result.state) !== stateSignature(app.state);
       applyState(result.state, changed ? { cause: "Updated from the chat" } : { silent: true });
     }
@@ -1126,7 +1154,7 @@ function wireUi() {
     sendChat(text);
   };
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { hidePopover(); app.pendingDoorFrom = null; setBanner(null); }
+    if (e.key === "Escape") { hidePopover(); app.pendingDoorFrom = null; window.plan?.cancelPick(); setBanner(null); }
   });
 }
 

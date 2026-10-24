@@ -21,6 +21,14 @@ Then open http://127.0.0.1:8765. Options: `--data DIR` (any folder with `*/build
 - Changes tab: close/reopen every stair and lift, list of closures and new doors, reset.
 - Chat tab: posts to `/api/chat`, see below.
 
+## New building from floor plans (Level 4)
+
+"+ New building" (or the New tab): drop one PNG/JPG per floor, give its floor and one length you know in metres (or tick "scale bar printed"), "Read plans". Each floor is read in the background (one vision call, 10 to 20 s), then the draft is drawn on the plan with suspicious rooms and doors in red and one findings line. Fix it on the plan (tap a room: add a door to a neighbour, set its type; tap a door: remove it) or set the scale per floor. "Save building…" shows the understanding card; only "Yes, save" saves (with "Save anyway" ticked if problems remain). The building then appears under "built from plans" in the picker and is loaded, so routes and chat work on it.
+
+The page uses the same tools as the chat agent (`building_agent/level4/tools.py`), so card and yes rules are identical. The chat (building_agent backend) gets these tools too and shares the page's draft: a draft the agent builds is shown on the plan, a building it saves is opened.
+Uploads: PNG/JPG only (magic bytes and Pillow), at most 10 MB, stored as `agent_output/uploads/plan-<random>.png|jpg`; the browser only sends upload ids, never paths. Saved buildings: `agent_output/buildings/<id>/building.json` (key `user/<id>`).
+Offline demo without API calls: `uv run python -m web --fake-plans data/dev/proc-campus-dev-000` reads every uploaded image as that building's floor (with a printed scale bar and one door missing, so a red finding shows).
+
 ## Files
 
 | File | What |
@@ -28,9 +36,10 @@ Then open http://127.0.0.1:8765. Options: `--data DIR` (any folder with `*/build
 | `server.py` | HTTP server and JSON API (endpoint list in the module docstring) |
 | `api.py` | Pure functions over `BuildingMap`: building view, route geometry, closures, doors |
 | `chat.py` | Chat adapter, one-line switch `BACKEND` |
-| `static/` | `index.html`, `app.js`, `style.css` |
+| `level4_api.py` | Upload, background build, preview, fixes, card and save for new buildings from floor plans |
+| `static/` | `index.html`, `app.js`, `style.css`, `voice.js`, `plan.js` (new building flow) |
 
-Tests: `tests/test_web.py` (no API calls).
+Tests: `tests/test_web.py`, `tests/test_web_level4.py` (no API calls).
 
 ## Chat backend
 
