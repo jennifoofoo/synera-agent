@@ -3,13 +3,15 @@
 // Owner: the Card/Position session, see ARCHITECTURE.md. Every fact comes from `state` (the API); the card only
 // shows it and sends the user's taps back as API calls or chat words ("next", "back", "stop").
 
-import { useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Route } from "../api/types";
 import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
+import { withoutAnswerLine } from "../voice";
 import "./Card.css";
 import { HereChip } from "./HereChip";
+import { PhoneSheet } from "./PhoneSheet";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -18,7 +20,8 @@ export function Card() {
   const route = useTwin((s) => s.state?.route ?? null);
   const replyShown = useTwin((s) => s.replyShown);
   const busy = useTwin((s) => s.chatBusy);
-  if (!model) return null;
+  const draft = useTwin((s) => s.draft);
+  if (!model || draft) return null; // a Level 4 draft has its own ids; Route/I'm here would hit the API with them
 
   let card: ReactNode = null;
   if (selection) card = <SelectionCard key={selection.id} model={model} />;
@@ -35,33 +38,18 @@ export function Card() {
   );
 }
 
-/** The card frame: a floating card on the laptop, a bottom sheet with a grabber on the phone (swipe down = close). */
-function Sheet({ className = "", label, onClose, children }: { className?: string; label: string; onClose?: () => void; children: ReactNode }) {
-  const profile = useTwin((s) => s.profile);
-  const start = useRef<number | null>(null);
-  const [drag, setDrag] = useState(0);
-  const phone = profile === "worker";
-  const down = (event: PointerEvent) => {
-    if (!phone || !onClose) return;
-    start.current = event.clientY;
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  };
-  const move = (event: PointerEvent) => {
-    if (start.current !== null) setDrag(Math.max(0, event.clientY - start.current));
-  };
-  const up = () => {
-    if (start.current === null) return;
-    start.current = null;
-    if (drag > 60) onClose?.();
-    setDrag(0);
-  };
+/** The card frame: a floating card on the laptop; on the phone the PhoneSheet (phone session) is the surface. */
+function Sheet({ className = "", label, onClose, peek, children }: { className?: string; label: string; onClose?: () => void; peek?: boolean; children: ReactNode }) {
   return (
-    <section className={`card ${className}`} role="dialog" aria-label={label} style={drag ? { transform: `translateY(${drag}px)`, transition: "none" } : undefined}>
-      {phone && onClose && <div className="card-grab" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} aria-hidden />}
-      {children}
-    </section>
+    <PhoneSheet open onClose={onClose ?? noop} label={label} peek={peek}>
+      <section className={`card ${className}`} role="dialog" aria-label={label}>
+        {children}
+      </section>
+    </PhoneSheet>
   );
 }
+
+const noop = () => {};
 
 function CloseButton({ onClick, label = "Close" }: { onClick: () => void; label?: string }) {
   return (
@@ -177,7 +165,7 @@ function GuideCard({ model }: { model: BuildingModel }) {
   const to = spaceName(model, guide.leg.to_space_id);
   const target = spaceName(model, guide.target_space_id);
   return (
-    <Sheet className="card-guide" label={`Step ${step} of ${guide.step_count}`}>
+    <Sheet className="card-guide" label={`Step ${step} of ${guide.step_count}`} peek>
       <div className="card-head">
         <span className="card-kicker">
           Step {step} of {guide.step_count}
@@ -189,7 +177,7 @@ function GuideCard({ model }: { model: BuildingModel }) {
           ))}
         </div>
       </div>
-      {busy ? <div className="card-text card-muted">…</div> : <Clamped text={last ? shownReply(last.text) : `Go to ${to}.`} />}
+      {busy ? <div className="card-text card-muted">…</div> : <Clamped text={last ? withoutAnswerLine(last.text) : `Go to ${to}.`} />}
       <div className="card-actions">
         <button disabled={busy || guide.step_index === 0} onClick={() => void ask("back")}>
           Back
@@ -216,24 +204,13 @@ function ReplyCard({ model }: { model: BuildingModel }) {
   return (
     <Sheet className="card-reply" label="Reply" onClose={dismissReply}>
       <div className="card-reply-body">
-        <Clamped text={shownReply(last.text)} />
+        <Clamped text={withoutAnswerLine(last.text)} />
         <CloseButton onClick={dismissReply} label="Dismiss" />
       </div>
       {last.note && <div className="card-note">{last.note}</div>}
       {route?.ok && <RouteLine model={model} route={route} />}
     </Sheet>
   );
-}
-
-/** The reply as shown: without the final "Answer: …" line (also "**Answer:**"). The store keeps the raw text. */
-export function shownReply(text: string): string {
-  const lines = text.trimEnd().split("\n");
-  const last = lines.length - 1 - [...lines].reverse().findIndex((line) => line.trim() !== "");
-  const answer = /^\s*(\*\*)?answer:(\*\*)?\s*/i;
-  if (last < 0 || last >= lines.length || !answer.test(lines[last])) return text.trim();
-  const value = lines[last].replace(answer, "").trim();
-  lines.splice(last, 1);
-  return lines.join("\n").trim() || value; // a reply that is only "Answer: x" shows just x
 }
 
 /** 3 lines, then "more". Only shows "more" when the text really is longer. */

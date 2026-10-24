@@ -59,10 +59,9 @@
 .here-chip .here-name b { color: var(--text); font-weight: 600; }
 .here-dot { width: 9px; height: 9px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
 
-/* phone: the card is a bottom sheet with a grabber (swipe down = close), big targets */
-.worker .card { border-radius: 18px 18px 14px 14px; padding: 8px 16px 14px; }
-.worker .card-grab { height: 18px; margin: 0 -16px 2px; cursor: grab; touch-action: none; display: grid; place-items: center; }
-.worker .card-grab::before { content: ""; width: 36px; height: 4px; border-radius: 2px; background: var(--line); }
+/* phone: PhoneSheet (Phone.css) is the surface; here only sizes, and the 3-line clamp kept inside the sheet */
+.phone-sheet .card { animation: none; }
+.phone-sheet .card-text:not(.open) { overflow: hidden; }
 .worker .card-title strong { font-size: 17px; }
 .worker .card-text { font-size: 15.5px; }
 .worker .card-actions button { min-height: 46px; font-size: 15px; }
