@@ -91,7 +91,7 @@ class ImpactReport:
         if not count:
             extra = len(self.other_lost_route)
             return [
-                f"{subject} cuts off {extra} {plural(extra, 'corridor or stairwell')}, but no room loses its way out."
+                f"{subject} cuts off {extra} {'corridor or stairwell' if extra == 1 else 'corridors or stairwells'}, but no room loses its way out."
             ]
         floors = f"{join(self.floors_cut_off)} is completely cut off. " if self.floors_cut_off else ""
         text = (
@@ -138,7 +138,7 @@ class ImpactReport:
             via = f" via {top.via}" if top.via else ""
             lead = f"{subject}: " if subject and not out else ""
             out.append(
-                f"{lead}{count} {plural(count, 'room')} get a {noun} walk to the nearest entrance "
+                f"{lead}{count} {plural(count, 'room')} {'gets' if count == 1 else 'get'} a {noun} walk to the nearest entrance "
                 f"(median {sign}{median:g} m), the {'worst' if noun == 'longer' else 'best'} is {top.name} "
                 f"({sign}{abs(top.delta_m):g} m{via})."
             )
