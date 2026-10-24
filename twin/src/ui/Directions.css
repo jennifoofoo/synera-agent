@@ -20,12 +20,6 @@
 .dir-dot.from { background: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22); }
 .dir-dot.to { background: var(--gold); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
 
-/* inline ghost completion: the typed text is invisible in the ghost layer, the rest shows grey after it */
-.dir-input { position: relative; flex: 1; min-width: 0; }
-.dir-input input, .dir-ghost { font: inherit; font-size: 16px; padding: 6px 0; line-height: 1.3; letter-spacing: normal; }
-.dir-input input { position: relative; width: 100%; border: 0; outline: none; background: transparent; color: var(--text); }
-.dir-ghost { position: absolute; inset: 0; pointer-events: none; white-space: pre; overflow: hidden; color: var(--muted); }
-.dir-typed { visibility: hidden; }
 .dir-accept { flex: none; min-height: 30px; min-width: 30px; padding: 0 6px; border: 0; background: transparent; color: var(--accent); font-weight: 700; }
 
 .dir-side { display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
@@ -47,5 +41,4 @@
 .worker .directions .x { min-width: 44px; min-height: 44px; }
 .worker .dir-toggle input { width: 20px; height: 20px; }
 @media (prefers-reduced-motion: reduce) { .directions { animation: none; } }
-.dir-input input:focus-visible { outline: none; }
 .card-directions button.primary:disabled { background: var(--accent); border-color: var(--accent); color: #fff; opacity: 0.45; }
