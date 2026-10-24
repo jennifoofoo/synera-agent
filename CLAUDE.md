@@ -2,6 +2,11 @@
 
 Industrial Agents Hackathon 2026, Track 01 "Talk to Your Building". Kit README: `README.md` (read sections 3, 4, 6 first).
 
+## Start here (every session, both people)
+1. `git pull`, then read `docs/specs/core-2d.md` (the contract: question kinds, signatures, rules, file ownership) and `docs/STATUS.md` (who works on what).
+2. Work only on your own files and your claimed rows. Ownership: Leonie `geometry.py`, `queries.py` (floor_area_total, shared_walls_count, largest_room, straight_line_3d, room_stacked, wide_delivery_count); Jennifer `queries_routing.py`, `tools.py`, `agent.py`, `directions.py`, `registry.py` (errand done, what_if_door).
+3. Tests are the contract: add `tests/test_<kind>.py` using `labelled_questions(kind)` from `tests/conftest.py` (example: `tests/test_errand.py`). No merge without a test.
+
 ## Principle
 Every fact comes from deterministic Python (`building_agent/queries.py`), the LLM only picks tools and phrases the reply.
 Replies must end with exactly one `Answer:` line (the scorer reads only that).
