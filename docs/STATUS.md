@@ -38,6 +38,8 @@ Phase 2 (siehe `docs/specs/phase-2.md`). Reihenfolge nach Punkten: A und B zuers
 | D. Plan-Upload in der Seite, nach dem Level-4-Spike | Leonie | gemergt (Upload, Vorschau, Korrektur, Bestätigen, Speichern; live 10,5 s, 0,03 $ pro Etage) | feat/level4-web |
 | W-L2a Seite routet mit `building_agent.routing` (Kit-Route bleibt im JSON), W-L1a Funde aus dem Chat auf dem Plan, W-L4b Gebäudewechsel nach Speichern im Chat, 3D-Basis (three.js lokal, Röntgen, aufgeklappt, Minimap, Steuer-API) | Leonie | gemergt (lokal) | feat/web-l2a, feat/web-l1a-l4b, feat/view3d |
 | Seite: Auswahl per Klick (Chip, `context` an /api/chat), Seite zeigt Asset-Änderungen (`added_assets` usw.) in 2D und 3D | Leonie | gemergt | feat/web-selection, feat/web-asset-edits |
+| Mobile Version der Seite (Spec `docs/specs/mobile-first.md`, Audit-Liste folgt von Jennifer) | Leonie | in Arbeit | feat/web-mobile |
+| Standort-Punkt, Chip, "I'm here", Kamera folgt (Phase 2 von `docs/specs/position.md`) und Aktivierungswort "Hey Wanda" (Teil B von `docs/specs/voice-handsfree.md`), Auto-Pace-Timer (`docs/specs/auto-pace.md`) | Leonie | zugesagt, nach Merge der Server-Branches | feat/web-position |
 | Fragen an Synera vor Ort: Format, Locate/Route, Level 3 mehrere Gebäude, Freeze, Zeitlimit | wer vor Ort ist | offen | |
 | G. Routen-Modell: Raumfolge mit Tür-zu-Tür-Distanz und Synera-Kosten (Spike: 92,4 % auf 99,6 % volle Punkte), Kit-Modell für errand und what_if_door behalten, siehe `docs/specs/route-metric-spike.md` | Jennifer | gemergt-bereit | feat/route-model |
 | E. Demo-Video, Technik-Text, Pitch (3 Minuten plus 1 Minute Fragen) | beide | offen | |
