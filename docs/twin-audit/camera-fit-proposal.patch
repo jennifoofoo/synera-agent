@@ -1,0 +1,44 @@
+diff --git a/twin/src/scene/CameraRig.tsx b/twin/src/scene/CameraRig.tsx
+index 6bcc95b..8f929fc 100644
+--- a/twin/src/scene/CameraRig.tsx
++++ b/twin/src/scene/CameraRig.tsx
+@@ -48,6 +48,21 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
+   const camera = useThree((s) => s.camera);
+   const viewport = useThree((s) => s.size);
+ 
++  /** Fits a floor into the part of the screen no UI covers (the 2D plan is orthographic: zoom = pixels per metre).
++   * fitToSphere sizes by the diagonal and ignores the dock, so a tall floor ran off the top and under the dock. */
++  const fitPlan = (c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad: number) => {
++    const w = viewport.width;
++    const h = viewport.height;
++    const { bottomInset: bottom, topInset: top, rightInset: right } = useTwin.getState();
++    const usableW = Math.max(80, w - Math.min(right, w * 0.6));
++    const usableH = Math.max(80, h - Math.min(bottom, h * 0.6) - Math.min(top, h * 0.4));
++    const extent = box.getSize(new THREE.Vector3());
++    const middle = box.getCenter(new THREE.Vector3());
++    const zoom = Math.min(usableW / Math.max(1, extent.x * pad), usableH / Math.max(1, extent.z * pad));
++    void c.moveTo(middle.x, middle.y, middle.z, animate);
++    void c.zoomTo(THREE.MathUtils.clamp(zoom, c.minZoom, c.maxZoom), animate);
++  };
++
+   // UI covering the bottom (dock, sheet): render the top part of a taller virtual frame so the framed object
+   // sits in the visible area above it.
+   useEffect(() => {
+@@ -121,7 +136,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
+     if (!floor) return;
+     const y = floorY(floor.id);
+     const box = new THREE.Box3(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+-    fitBox(c, box, !reducedMotion, 0.9);
++    fitPlan(c, box, !reducedMotion, 1.06);
+     invalidate();
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [flat, focusedFloorId, camera]);
+@@ -140,7 +155,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
+         const floor = model.floorById.get(focusedFloorId ?? "") ?? model.floors[0];
+         const y = floorY(floor.id);
+         box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+-        fitBox(c, box, animate, 0.9);
++        fitPlan(c, box, animate, 1.06);
+         return;
+       }
+       box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));

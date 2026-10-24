@@ -21,6 +21,8 @@ export const CUTAWAY_HEIGHT = 0.3;
 export interface FloorGeometry {
   solid: THREE.BufferGeometry;
   edges: THREE.BufferGeometry;
+  /** dashed zone lines where a wide opening joins two halves of one hall (no wall there) */
+  zones: THREE.BufferGeometry;
   /** space index (into floor.spaces) per vertex of `solid`, for picking */
   spaceIndexOf: (vertexIndex: number) => number;
   wallHeight: number;
@@ -66,6 +68,7 @@ class Builder {
   spaceIndices: number[] = [];
   indices: number[] = [];
   lines: number[] = [];
+  zoneLines: number[] = []; // dashed hall zone lines (their own geometry: lighter than walls)
   lineWallNormals: number[] = [];
   lineWalls: number[] = [];
 
@@ -84,6 +87,25 @@ class Builder {
     this.lines.push(a[0], a[1], -a[2], b[0], b[1], -b[2]);
     this.lineWallNormals.push(wn[0], wn[1], wn[0], wn[1]);
     this.lineWalls.push(wall, wall);
+  }
+
+  /** Jamb ticks at both ends of a gap: perpendicular hairlines about a wall thickness long, on the floor. */
+  jambs([p, q]: Gap) {
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (length < 0.05) return;
+    const nx = (-(q[1] - p[1]) / length) * JAMB_HALF;
+    const ny = ((q[0] - p[0]) / length) * JAMB_HALF;
+    for (const end of [p, q]) this.line([end[0] - nx, 0.02, end[1] - ny], [end[0] + nx, 0.02, end[1] + ny], [0, 0], 0);
+  }
+
+  /** A dashed zone line along a gap (lighter than the walls; the hall continues on both sides). */
+  zone([p, q]: Gap) {
+    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    for (let s = 0; s < length; s += DASH * 2) {
+      const a = pointOnEdge(p, q, s);
+      const b = pointOnEdge(p, q, Math.min(length, s + DASH));
+      this.zoneLines.push(a[0], 0.02, -a[1], b[0], 0.02, -b[1]);
+    }
   }
 
   /** A vertical quad (wall piece) between two ground points, from y0 to y1, both sides. */
@@ -152,7 +174,7 @@ class Builder {
     }
   }
 
-  build(spaceIndexByVertex: Int32Array | null): { solid: THREE.BufferGeometry; edges: THREE.BufferGeometry } {
+  build(spaceIndexByVertex: Int32Array | null): { solid: THREE.BufferGeometry; edges: THREE.BufferGeometry; zones: THREE.BufferGeometry } {
     const solid = new THREE.BufferGeometry();
     solid.setAttribute("position", new THREE.Float32BufferAttribute(this.positions, 3));
     solid.setAttribute("normal", new THREE.Float32BufferAttribute(this.normals, 3));
@@ -170,11 +192,27 @@ class Builder {
     edges.setAttribute("wallNormal", new THREE.Float32BufferAttribute(this.lineWallNormals, 2));
     edges.setAttribute("wall", new THREE.Float32BufferAttribute(this.lineWalls, 1));
     edges.computeBoundingSphere();
-    return { solid, edges };
+    const zones = new THREE.BufferGeometry();
+    zones.setAttribute("position", new THREE.Float32BufferAttribute(this.zoneLines, 3));
+    zones.computeBoundingSphere();
+    return { solid, edges, zones };
   }
 }
 
 type Gap = [Point, Point];
+
+/** One cut an opening makes: the gap, whether it gets jamb ticks, whether it is a hall zone line (no wall at all). */
+export interface Cut {
+  gap: Gap;
+  jambs: boolean;
+  zone: boolean;
+}
+
+/** An opening this wide that spans most of the shared boundary is one hall in two zones, not two rooms. */
+const ZONE_MIN_WIDTH = 4;
+const ZONE_MIN_SHARE = 0.6;
+const JAMB_HALF = 0.1; // jamb tick: perpendicular hairline, 0.2 m long
+const DASH = 0.5; // zone line dash and gap length in metres
 
 const PERP_TOL = 0.35; // a gap cuts an edge that runs within this distance of it
 const SHARED_TOL = 0.35; // two polygon edges count as one shared boundary within this distance
@@ -219,13 +257,13 @@ function sharedBoundaries(first: Point[], second: Point[]): Gap[] {
 }
 
 /**
- * The gaps an opening cuts into the walls, as segments in model metres (empty: nothing to cut).
+ * The cuts an opening makes into the walls, gaps as segments in model metres (empty: nothing to cut).
  * - between two spaces: width_m centred on `position` projected onto the shared boundary of the two polygons,
  *   clamped to that boundary (an opening of kind "opening" wider than the boundary opens all of it).
  * - entrances, and doors with no shared boundary near them: width_m centred on `position` along the polygon edge nearest to it; at a
  *   polygon corner (two edges equally near) both edges open.
  */
-function openingGaps(opening: Opening, polygons: Point[][]): Gap[] {
+export function openingCuts(opening: Opening, polygons: Point[][]): Cut[] {
   if (!polygons.length) return [];
   const width = opening.width_m && opening.width_m > 0 ? opening.width_m : 0.9;
   if (polygons.length >= 2) {
@@ -238,8 +276,10 @@ function openingGaps(opening: Opening, polygons: Point[][]): Gap[] {
     if (best && (opening.kind === "opening" || best.distance <= DOOR_REACH)) {
       const { segment, s, length } = best;
       const half = opening.kind === "opening" ? width / 2 : Math.max(0.3, width / 2);
-      const whole = opening.kind === "opening" && width >= length - 0.01;
-      return [[pointOnEdge(segment[0], segment[1], whole ? 0 : Math.max(0, s - half)), pointOnEdge(segment[0], segment[1], whole ? length : Math.min(length, s + half))]];
+      const zone = opening.kind === "opening" && width >= ZONE_MIN_WIDTH && width >= length * ZONE_MIN_SHARE;
+      const whole = zone || (opening.kind === "opening" && width >= length - 0.01);
+      const gap: Gap = [pointOnEdge(segment[0], segment[1], whole ? 0 : Math.max(0, s - half)), pointOnEdge(segment[0], segment[1], whole ? length : Math.min(length, s + half))];
+      return [{ gap, jambs: opening.kind !== "opening", zone }];
     }
   }
   const near: { a: Point; b: Point; s: number; distance: number; length: number }[] = [];
@@ -257,7 +297,11 @@ function openingGaps(opening: Opening, polygons: Point[][]): Gap[] {
   const half = Math.max(0.3, width / 2);
   return near
     .filter((edge) => edge.distance <= closest + CORNER_TIE)
-    .map((edge): Gap => [pointOnEdge(edge.a, edge.b, Math.max(0, edge.s - half)), pointOnEdge(edge.a, edge.b, Math.min(edge.length, edge.s + half))]);
+    .map((edge): Cut => ({
+      gap: [pointOnEdge(edge.a, edge.b, Math.max(0, edge.s - half)), pointOnEdge(edge.a, edge.b, Math.min(edge.length, edge.s + half))],
+      jambs: opening.kind !== "opening",
+      zone: false,
+    }));
 }
 
 /** The pieces of [0, 1] (parameter along edge a-b) that stay after cutting the gaps that lie along the edge. */
@@ -345,15 +389,17 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
   // Gaps per space: every opening cuts the walls and the outline of the spaces it joins.
   const indexById = new Map(floor.spaces.map((space, index) => [space.id, index]));
   const gapsBySpace = new Map<string, Gap[]>();
+  const allCuts: Cut[] = [];
   for (const opening of effectiveOpenings(floor, edits)) {
     const joined = opening.space_ids.filter((id) => indexById.has(id));
-    const gaps = openingGaps(
+    const cuts = openingCuts(
       opening,
       joined.map((id) => polygons[indexById.get(id)!]),
     );
+    allCuts.push(...cuts);
     for (const spaceId of joined) {
       const list = gapsBySpace.get(spaceId) ?? [];
-      list.push(...gaps);
+      list.push(...cuts.map((cut) => cut.gap));
       gapsBySpace.set(spaceId, list);
     }
   }
@@ -385,11 +431,16 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
       }
     }
   });
-  const { solid, edges } = builder.build(null);
+  for (const cut of allCuts) {
+    if (cut.zone) builder.zone(cut.gap);
+    else if (cut.jambs) builder.jambs(cut.gap);
+  }
+  const { solid, edges, zones } = builder.build(null);
   const spaceIndex = solid.getAttribute("spaceIndex") as THREE.BufferAttribute;
   return {
     solid,
     edges,
+    zones,
     spaceIndexOf: (vertexIndex) => spaceIndex.getX(vertexIndex),
     wallHeight,
     spaceCount: floor.spaces.length,

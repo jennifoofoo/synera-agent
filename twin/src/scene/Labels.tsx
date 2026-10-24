@@ -4,6 +4,8 @@ import type { Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
+import { LABEL_LIFT } from "./markerLayout";
+import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { PoiBadge, POI_PX, type PoiKind } from "./poiIcons";
 
 interface Props {
@@ -113,10 +115,33 @@ function candidates(floor: FloorModel, model: BuildingModel, tier: MapTier, scal
 }
 
 /** Room names and points of interest of the focused floor, in fixed zoom tiers (see mapZoom.ts). Lower
- * priority yields: nothing overlaps another label, and room names never sit on the drawn route. */
+ * priority yields: nothing overlaps another label, and room names never sit on the drawn route. Rooms with a
+ * marker (you are here, route ends, the guide's next target) always keep their name, lifted just above the
+ * marker (screen px) so the marker never covers it. */
 export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
-  const route = useTwin((s) => s.state?.route ?? null);
+  const state = useTwin((s) => s.state);
+  const route = state?.route ?? null;
+  const marks = useMemo(() => {
+    const out = new Map<string, { point: Point; lift: number; height: number }>();
+    const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
+      const space = spaceId ? model.spaceById.get(spaceId) : undefined;
+      if (!space || space.floor_id !== floor.id || !point) return;
+      const known = out.get(space.id);
+      if (!known || known.lift < lift) out.set(space.id, { point, lift, height });
+    };
+    if (route?.ok && route.segments?.length) {
+      const first = route.segments[0];
+      const last = route.segments[route.segments.length - 1];
+      if (first.floor_id === floor.id) put(route.start, first.points[0], LABEL_LIFT.end, ROUTE_LIFT);
+      if (last.floor_id === floor.id) put(route.destination, last.points[last.points.length - 1], LABEL_LIFT.end, ROUTE_LIFT);
+    }
+    const guide = state?.guide;
+    if (guide?.active) put(guide.leg.to_space_id, model.spaceById.get(guide.leg.to_space_id)?.anchor, LABEL_LIFT.guide);
+    const here = state?.position;
+    if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
+    return out;
+  }, [route, state?.guide, state?.position, model, floor.id]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -125,13 +150,25 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     // Layout in screen pixels at the bucket's coarsest scale (y flipped: north is up on screen).
     const px = ([x, yy]: Point): Point => [x / scale, -yy / scale];
     const routePx = routeOnFloor.map((points) => points.map(px));
-    const kept: Box[] = [];
-    const result: Item[] = [];
+    const boxOf = (point: Point, halfW: number, halfH: number, lift = 0): Box => {
+      const [cx, cy] = px(point);
+      const y = cy - lift - (lift ? halfH : 0); // a lifted label's bottom edge sits `lift` px above the point
+      return { x0: cx - halfW - GAP_PX / 2, y0: y - halfH - GAP_PX / 2, x1: cx + halfW + GAP_PX / 2, y1: y + halfH + GAP_PX / 2 };
+    };
+    // Marked rooms first: they always keep their name (above their marker); everything else keeps clear of them.
+    const markedItems = floor.spaces
+      .filter((space) => space.name && marks.has(space.id))
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
+    const kept: Box[] = markedItems.map((item) =>
+      boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2, LABEL_H_PX / 2, marks.get(item.id)!.lift),
+    );
+    const result: Item[] = [...markedItems];
     for (const item of candidates(floor, model, tier, scale, limit)) {
-      const [cx, cy] = px(item.point);
+      if (marks.has(item.id)) continue;
       const halfW = item.kind === "poi" ? POI_PX / 2 : (item.space.name.length * CHAR_PX) / 2;
       const halfH = item.kind === "poi" ? POI_PX / 2 : LABEL_H_PX / 2;
-      const box = { x0: cx - halfW - GAP_PX / 2, y0: cy - halfH - GAP_PX / 2, x1: cx + halfW + GAP_PX / 2, y1: cy + halfH + GAP_PX / 2 };
+      const box = boxOf(item.point, halfW, halfH);
       if (kept.some((other) => overlaps(box, other))) continue;
       if (item.kind === "room") {
         const clear = { x0: box.x0 - ROUTE_CLEAR_PX, y0: box.y0 - ROUTE_CLEAR_PX, x1: box.x1 + ROUTE_CLEAR_PX, y1: box.y1 + ROUTE_CLEAR_PX };
@@ -141,15 +178,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return result;
-  }, [floor, model, tier, scale, limit, routeOnFloor]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks]);
 
   return (
     <group position-y={y + 0.5}>
       {shown.map((item) =>
         item.kind === "room" ? (
-          <Html key={item.id} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-            <div className={`label ${flat ? "label-plan" : ""}`}>{item.space.name}</div>
-          </Html>
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} />
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             <PoiBadge kind={item.poi} title={item.title} />
@@ -157,5 +192,24 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         ),
       )}
     </group>
+  );
+}
+
+function RoomLabel({ item, mark, flat }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean }) {
+  return (
+    <Html
+      position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
+      center
+      zIndexRange={[2, 0]}
+      style={{ pointerEvents: "none" }}
+    >
+      <div
+        className={`label label-halo ${flat ? "label-plan" : ""}`}
+        data-label-space={item.space.id}
+        style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
+      >
+        {item.space.name}
+      </div>
+    </Html>
   );
 }

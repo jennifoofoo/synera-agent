@@ -31,10 +31,10 @@ const GLYPHS: Record<PoiKind, JSX.Element> = {
       <path d="M15.6 8.5h3.8l2.4 7.5h-2.4v4.5h-3.8V16h-2.4z" />
     </svg>
   ),
-  // a single step (not step-free door or threshold)
+  // not step-free: a single step (a threshold) on the floor line
   step: (
     <svg viewBox="0 0 24 24" aria-hidden>
-      <path className="stroke" d="M3.5 17.5h8.5v-7h8.5" />
+      <path className="stroke" d="M3.5 17.5h8v-6h9" />
     </svg>
   ),
   // Tabler Icons "door-exit" (MIT, https://tabler.io/icons): a door with an arrow out

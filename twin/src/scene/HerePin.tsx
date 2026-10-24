@@ -13,6 +13,7 @@ import { useTwin } from "../store";
 import { controlsRef } from "./FloorMesh";
 import { Disc, Pulse, Ring } from "./Markers";
 import "./HerePin.css";
+import { BADGE_LIFT_PX, HERE_CORE_PX, HERE_PULSE_PX, HERE_RIM_PX, ScreenSized } from "./markerLayout";
 
 const HINT_KEY = "twin.here.dragHint";
 const hintSeen = (): boolean => {
@@ -82,11 +83,11 @@ export function TapPin({ floorY, visibleFloors, flat }: PinProps) {
   const radius = flat ? 1.1 : 0.8;
   return (
     <group position={[selection.point[0], floorY(selection.floor_id) + 0.07, -selection.point[1]]} name="tap-pin">
-      <Ring radius={radius} colour={COLOURS.selection} width={flat ? 0.16 : 0.12} through />
+      <Ring radius={radius} colour={COLOURS.selection} width={flat ? 0.16 : 0.12} through order={30} />
       <lineSegments geometry={cross} renderOrder={19}>
         <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={false} />
       </lineSegments>
-      <Disc radius={flat ? 0.28 : 0.2} colour={COLOURS.selection} opacity={1} through y={0.02} />
+      <Disc radius={flat ? 0.28 : 0.2} colour={COLOURS.selection} opacity={1} through y={0.02} order={31} />
       {!flat && (
         <>
           <mesh position-y={0.55}>
@@ -251,26 +252,27 @@ export function HereDot({ model, floorY, visibleFloors, flat, reducedMotion, col
   const point = drag?.point ?? position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0];
   return (
     <group position={[point[0], floorY(position.floor_id), -point[1]]} name="here-dot">
-      <Pulse reducedMotion={reducedMotion || dragging} speed={0.8} amount={0.25}>
-        <Disc radius={flat ? 3 : 1.4} colour={colour} opacity={flat ? 0.18 : 0.2} through />
-      </Pulse>
-      {!flat && <Ring radius={1.4} colour={colour} width={0.14} opacity={0.7} through />}
-      <Disc radius={flat ? 0.75 : 0.9} colour="#ffffff" opacity={1} through y={0.08} />
-      <Disc radius={flat ? 0.55 : 0.6} colour={colour} opacity={1} through y={0.1} />
-      {!flat && (
-        <mesh position-y={0.35}>
-          <sphereGeometry args={[0.32, 16, 16]} />
-          <meshBasicMaterial color={colour} />
-        </mesh>
-      )}
-      <group position-y={2.2}>
+      {/* constant size on screen: the pulse never grows past HERE_PULSE_PX, whatever the zoom */}
+      <ScreenSized>
+        <Pulse reducedMotion={reducedMotion || dragging} speed={0.8} amount={0.2}>
+          <Disc radius={HERE_PULSE_PX / 1.2} colour={colour} opacity={0.12} through />
+        </Pulse>
+        <Disc radius={HERE_RIM_PX} colour="#ffffff" opacity={1} through y={0.08} order={30} />
+        <Disc radius={HERE_CORE_PX} colour={colour} opacity={1} through y={0.1} order={31} />
+      </ScreenSized>
+      {/* the badge sits above the dot with a small gap, the hint below it */}
+      <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+        <div className="chip chip-here here-badge" style={{ transform: `translateY(calc(-50% - ${BADGE_LIFT_PX}px))` }}>
+          You are here
+        </div>
+      </Html>
+      {hint && !dragging && (
         <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-          <div className="here-dot-labels">
-            <div className="chip chip-here">You are here</div>
-            {hint && !dragging && <div className="here-drag-hint">Drag to correct your position</div>}
+          <div className="here-drag-hint" style={{ transform: `translateY(calc(50% + ${BADGE_LIFT_PX + 4}px))` }}>
+            Drag to correct your position
           </div>
         </Html>
-      </group>
+      )}
     </group>
   );
 }

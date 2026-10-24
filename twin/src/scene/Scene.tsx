@@ -12,6 +12,7 @@ import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
+import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
 import { Shafts } from "./Shafts";
 import { Things } from "./Things";
@@ -74,6 +75,7 @@ function Building({ model }: { model: BuildingModel }) {
         worker={worker}
         flat={flat}
       />
+      <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
     </group>
   );
