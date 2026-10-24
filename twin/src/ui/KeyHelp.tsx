@@ -1,6 +1,19 @@
 import { useEffect } from "react";
 import { KEY_CONTROLS, MOUSE_CONTROLS, useKeyHelp } from "../scene/controlsTable";
 import { PoiBadge, POI_LEGEND } from "../scene/poiIcons";
+import * as palette from "../model/palette";
+
+/** Room colours from palette.ts (LEGEND_GROUPS, added by the room-colours branch); none while it is not merged. */
+function roomColours(): { label: string; colour: string }[] {
+  const groups = (palette as Record<string, unknown>).LEGEND_GROUPS;
+  if (!Array.isArray(groups)) return [];
+  return groups.flatMap((group: unknown) => {
+    const g = group as Record<string, unknown>;
+    const label = g.label ?? g.name ?? g.title;
+    const colour = g.colour ?? g.color ?? g.fill;
+    return typeof label === "string" && typeof colour === "string" ? [{ label, colour }] : [];
+  });
+}
 import "./KeyHelp.css";
 
 /** Small help card (? or H, or the ? button under the floor rail): controls and the map symbols. Closes with Esc or
@@ -22,6 +35,7 @@ export function KeyHelp() {
   }, [open, setOpen]);
 
   if (!open) return null;
+  const rooms = roomColours();
   return (
     <div className="keyhelp" role="dialog" aria-label="Keyboard and mouse help" onPointerDown={() => setOpen(false)}>
       <h2>Controls</h2>
@@ -49,11 +63,24 @@ export function KeyHelp() {
             <span>{row.label}</span>
           </li>
         ))}
-        <li>
+        <li className="wide">
           <span className="keyhelp-shape" aria-hidden />
           <span>Machine, rack or furniture (darker and named: a landmark of your route)</span>
         </li>
       </ul>
+      {rooms.length > 0 && (
+        <>
+          <h3 className="keyhelp-sub">Room colours</h3>
+          <ul className="keyhelp-legend">
+            {rooms.map((row) => (
+              <li key={row.label}>
+                <span className="keyhelp-room" style={{ background: row.colour }} aria-hidden />
+                <span>{row.label}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <p>Press any key to close</p>
     </div>
   );
