@@ -1,7 +1,9 @@
 """Comparison logic for the parameter-reading eval (scripts/eval_params.py). No API access here."""
 
+import re
+
 from building_agent.find_space import find_space
-from building_agent.tools import snake_case
+from building_agent.tools import resolve_type, snake_case
 from starter_agent.building_map import BuildingMap, MapError
 
 MISSING = "<missing>"
@@ -82,3 +84,63 @@ def group_mismatches(bm_for: dict, mismatches: list[tuple[str, str, str, object,
         groups.setdefault(label, []).append((kind, question_id, key, expected, got))
     return dict(sorted(groups.items(), key=lambda item: -len(item[1])))
 
+
+
+SPACE_PARAMS = {"start", "first", "second"}
+
+
+def building_source(building_id: str) -> str:
+    """osm / proc / resplan / swiss, from the building id prefix."""
+    return building_id.split("-")[0]
+
+
+def floor_levels_in_text(bm: BuildingMap, text: str) -> set[int]:
+    """Levels of floors the question names ("Basement 1", "Floor 2")."""
+    return {
+        floor["level"]
+        for floor in bm.floors.values()
+        if re.search(rf"(?<![\w-]){re.escape(floor['name'])}(?![\w])", text, re.IGNORECASE)
+    }
+
+
+def space_problem(bm: BuildingMap, value: object, levels: set[int]) -> str | None:
+    """None if the value names exactly one space (id, or name/ref via find_space, floors from the question), else the reason."""
+    if not isinstance(value, str):
+        return f"not a string: {value!r}"
+    if value in bm.spaces:
+        return None
+    found: dict[str, dict] = {}
+    for level in sorted(levels) or [None]:
+        try:
+            result = find_space(bm, value, level)
+        except MapError:
+            continue
+        for item in [result["match"]] if "match" in result else result["candidates"]:
+            found[item["id"]] = item
+    if len(found) == 1:
+        return None
+    if not found:
+        return f"unknown space {value!r}"
+    return f"ambiguous space {value!r}, candidates: {', '.join(sorted(found)[:6])}"
+
+
+def check_unlabelled(bm: BuildingMap, kind: str, question: str, response: dict, schema: dict) -> list[str]:
+    """Reasons the model output is unusable without labels; empty when it is usable."""
+    if response["tool"] != kind:
+        return [f"wrong tool: {response['tool']!r}, expected {kind!r}"]
+    args = response["input"]
+    reasons = [f"missing param {name}" for name in schema.get("required", []) if name not in args]
+    levels = floor_levels_in_text(bm, question)
+    for name, value in args.items():
+        if name in SPACE_PARAMS:
+            problem = space_problem(bm, value, levels)
+            if problem:
+                reasons.append(f"{name}: {problem}")
+        elif name.endswith("floor_id") and value not in bm.floors:
+            reasons.append(f"unknown floor {value!r} for {name}")
+        elif name.endswith("_type"):
+            try:
+                resolve_type(bm, name, value)
+            except MapError as error:
+                reasons.append(f"unknown type {value!r} for {name} ({str(error).split('Valid values here: ')[-1][:120]})")
+    return reasons

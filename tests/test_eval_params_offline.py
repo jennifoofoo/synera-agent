@@ -3,6 +3,8 @@ from building_agent.params_eval import (
     MISSING,
     PRICE_INPUT_PER_MTOK,
     PRICE_OUTPUT_PER_MTOK,
+    building_source,
+    check_unlabelled,
     classify_mismatch,
     compare_params,
     estimate_cost,
@@ -58,3 +60,50 @@ def test_classify_and_group():
     assert classify_mismatch(bm, "x", 1, MISSING) == "parameter missing"
     groups = group_mismatches({"q1": bm}, [("errand", "q1", "floor_id", inputs["floor_id"], other)] * 3)
     assert {label: len(items) for label, items in groups.items()} == {"wrong floor id": 3}
+
+
+SCHEMA = {"required": ["start", "floor_id", "room_type"]}
+
+
+def unlabelled_case():
+    building_dir, _ = labelled_questions("errand")[0]
+    bm = load_map(building_dir)
+    unique = next(s for s in bm.spaces.values() if "match" in find_space(bm, s["name"]))
+    return bm, unique
+
+
+def response(**args):
+    return {"tool": "errand", "input": args}
+
+
+def test_unlabelled_usable():
+    bm, space = unlabelled_case()
+    args = {"start": space["name"], "floor_id": space["floor_id"], "room_type": space["room_type"]}
+    assert check_unlabelled(bm, "errand", "q", response(**args), SCHEMA) == []
+
+
+def test_unlabelled_ambiguous_name():
+    bm, space = unlabelled_case()
+    twin = {**space, "id": "twin-of-" + space["id"]}
+    bm.spaces[twin["id"]] = twin
+    args = {"start": space["name"], "floor_id": space["floor_id"], "room_type": space["room_type"]}
+    try:
+        reasons = check_unlabelled(bm, "errand", "q", response(**args), SCHEMA)
+    finally:
+        del bm.spaces[twin["id"]]
+    assert any(r.startswith("start: ambiguous space") and twin["id"] in r for r in reasons)
+
+
+def test_unlabelled_unknown_floor_type_and_missing_param():
+    bm, space = unlabelled_case()
+    reasons = check_unlabelled(bm, "errand", "q", response(start=space["id"], floor_id="nope", room_type="zzz"), SCHEMA)
+    assert any("unknown floor" in r for r in reasons)
+    assert any("unknown type" in r for r in reasons)
+    reasons = check_unlabelled(bm, "errand", "q", response(start=space["id"]), SCHEMA)
+    assert sorted(reasons) == ["missing param floor_id", "missing param room_type"]
+
+
+def test_unlabelled_wrong_tool_and_source():
+    bm, _ = unlabelled_case()
+    assert check_unlabelled(bm, "errand", "q", {"tool": "other", "input": {}}, SCHEMA)[0].startswith("wrong tool")
+    assert building_source("resplan-102") == "resplan"
