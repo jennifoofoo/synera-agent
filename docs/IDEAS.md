@@ -335,3 +335,35 @@ Neben dem Modell aus dem Grundriss zeigt die App für einen Raum den **echten Ra
 - Passt zu Level 5 "Capture on site" und zur Foto-Ortung (Idee 7): Scan zeigt, wo man steht.
 - Aufwand: iframe-Einbindung eines fertigen Matterport-Rundgangs ca. 1 h; Kopplung mit Route und Markierungen über das SDK 4 bis 6 h; eigener Scan als Splat im Twin 3 bis 5 h.
 - Haken: Kosten und Konto bei Matterport, Datenschutz bei Scans echter Räume, die Jury prüft Level 1 bis 4 auf Grundrissen, nicht auf Scans.
+
+
+## 10. Fotos vor Ort am Plan: "Gestern wurde dieses Foto gemacht" (Idee von Jennifer, 24.10.2026, aus ihrer Zeit bei KINEXON)
+
+Status: geparkt, nicht für die Wertung. Verwandt mit Nr. 9 (3D-Scan von Leonie: einmalige, saubere Aufnahme) und mit `docs/specs/live-updates.md` (Änderungen mit Zeitraum, Dokumente). Hier geht es um **laufende, einfache Fotos von Menschen vor Ort**.
+
+### Hintergrund
+Bei KINEXON war Jennifers Aufgabe, durch Fotos von Lagerhallen zu gehen, die jemand anderes gemacht hatte, und darin etwas zu platzieren. Der Aufwand lag im Zuordnen: Wo war das, was ist zu sehen, was hat sich geändert. Der Plan kann das heute schon fast: Standort, Klick auf den Plan und "Gerät hinzufügen" mit Karte und Ja gibt es.
+
+### Idee
+Ein Techniker geht durch die Halle und macht Fotos. Jedes Foto landet **am richtigen Ort im Plan** (Standort aus "I'm here", Klick auf den Plan, am Gerät, oder beim Begleiten die aktuelle Etappe) mit Zeit und Name. Dann:
+- **Nächster Tag:** Der nächste Techniker sieht am Raum eine Markierung, tippt darauf: "Foto von gestern 14:12, Halle A3, Maschine 4: Ölfleck am Boden." Wanda nennt es beim Hinführen: "Dort liegt seit gestern ein Foto, soll ich es zeigen?"
+- **Online in Echtzeit:** Wer im Büro im Digital Twin sitzt, sieht das neue Foto sofort (Abfrage alle 30 Sekunden wie bei den Live-Updates) und kann damit planen.
+- **Neue Objekte:** Auf dem Foto steht eine neue Palette, eine Maschine, ein Hindernis. Das Bildmodell schlägt einen Eintrag vor ("Palette, etwa 1,2 mal 0,8 m, hier"), der Mensch bestätigt per Karte und Ja, danach steht das Objekt im Plan und im 3D-Zwilling (derselbe Weg wie `add_asset` und `propose_change`).
+- **"Was hat sich seit gestern geändert?"** zählt die neuen Fotos und Objekte pro Bereich.
+
+### Was heute schon da ist
+Standort (gesagt, geklickt, am Gerät), Klick-Auswahl mit Validierung auf dem Server, `add_asset` mit Karte und klarem Ja, Upload-Muster mit festem Ordner und Typprüfung (`web/level4_api.py`), `state_view` mit Abfrage alle 30 Sekunden, Vision-Aufruf mit festem Werkzeugschema (Level 4).
+
+### Was gebaut werden müsste
+- Fotospeicher pro Gebäude (`agent_output/photos/<gebäude>/` plus Index mit Zeit, Raum, Etage, Punkt, Autor, Beschriftung), Größen- und Typgrenze, atomar geschrieben.
+- Anzeige: Markierung am Ort (2D und 3D), Liste, Zeitleiste "heute, gestern, diese Woche", Vollbild. Handy: Kamera direkt über das Eingabefeld (`accept="image/*"`).
+- Chat und Stimme: "Foto hier hinzufügen", "Zeig mir die Fotos aus Halle A3", "Was ist seit gestern neu?".
+- Bildlesen: pro Foto eine kurze Beschreibung und Vorschläge für neue Objekte (nur Kandidaten, nichts wird ohne Karte und Ja angelegt).
+- Aufwand grob: Phase 1 (Foto zum Ort speichern, Markierung, Liste, Frage nach Neuem) 3 bis 4 Stunden Server plus 2 bis 3 Stunden Seite (Leonie). Phase 2 (Bildlesen und Objektvorschläge) etwa 3 Stunden.
+
+### Risiken und Haken
+- **Datenschutz:** Personen und Gesichter auf Fotos, Betriebsgeheimnisse. Aufbewahrungsfrist, nur Beteiligte sehen die Fotos, Hinweis beim Aufnehmen; Gesichter zu verwischen ist eine eigene Aufgabe.
+- **Ort ist nur so gut wie der Standort:** Es gibt keine Ortung, die Person sagt oder tippt, wo sie ist. Falsch zugeordnete Fotos sind schlimmer als keine. Das Foto zeigt deshalb immer "zugeordnet zu Raum X, von Hand gesetzt" und lässt sich verschieben.
+- **Bildlesen irrt sich:** Größen und Typen sind Schätzungen. Darum nur Vorschläge mit Karte und Ja, wie überall sonst.
+- **Datenmenge:** Fotos sind groß, Handy-Upload über schlechtes Netz in der Halle. Verkleinern vor dem Hochladen.
+- Wertung: Die Sonntagsfragen prüfen das vermutlich nicht. Gut für Creativity, Demo ("Capture on site" und "Make things move" aus den Level-5-Ideen) und für den Pitch.
