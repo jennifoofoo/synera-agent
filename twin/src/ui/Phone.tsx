@@ -32,16 +32,31 @@ function useVisualViewport() {
   }, []);
 }
 
-/** --dock-h: how much of the bottom the input (and sheet) cover; the floor rail stops above it. */
+/** --dock-h: how much of the bottom the input (and sheet) cover; the floor rail stops above it. The same number
+ * (from the dock's top edge to the bottom of the screen) goes to the store as bottomInset so the camera frames
+ * above it. In landscape the dock sits bottom right beside the plan, so the inset is 0 there. */
 function useDockHeight(worker: boolean) {
+  const setBottomInset = useTwin((s) => s.setBottomInset);
   useEffect(() => {
     const dock = document.querySelector<HTMLElement>(".dock");
     if (!dock || !worker) return;
     const root = document.documentElement;
-    const observer = new ResizeObserver(() => root.style.setProperty("--dock-h", `${Math.round(dock.getBoundingClientRect().height)}px`));
+    const app = dock.parentElement ?? root;
+    const measure = () => {
+      const box = dock.getBoundingClientRect();
+      const covered = Math.max(0, Math.round(app.getBoundingClientRect().bottom - box.top));
+      root.style.setProperty("--dock-h", `${Math.round(box.height)}px`);
+      const beside = box.left > window.innerWidth * 0.3; // landscape: dock on the right, plan uses the left
+      setBottomInset(beside ? 0 : covered);
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(dock);
-    return () => observer.disconnect();
-  }, [worker]);
+    observer.observe(app);
+    return () => {
+      observer.disconnect();
+      setBottomInset(0);
+    };
+  }, [worker, setBottomInset]);
 }
 
 export function Phone() {
