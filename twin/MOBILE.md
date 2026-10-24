@@ -4,6 +4,7 @@ Sources: `docs/mobile-audit.md`, `docs/specs/mobile-first.md`, Leonie's design d
 
 ## Screen
 - Only the building, a slim header (back, name, search). No lists, tabs, panels, no minimap.
+- Starts in the 2D top-down view of the current floor; 3D is one tap away.
 - At the bottom, in thumb reach: one "Ask or search…" input with a big mic.
 - Route, next step and finds only when needed, as a bottom sheet (never over the plan). Cards only on tap, 2 to 3 lines.
 - Touch targets at least 44 px. Inputs at least 16 px font (otherwise iOS zooms). `touch-action: manipulation`.

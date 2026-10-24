@@ -20,7 +20,9 @@ another one). `?building=dev/proc-factory-dev-003` opens a building directly.
 
 ## Build
 
-`npm run build` → `twin/dist/` (index.html + assets, all relative). To serve it from the Python server later:
+`npm run build` → `twin/dist/`; `npm run preview` serves that build on http://localhost:5181 with the same `/api` proxy
+(use this for timing: the dev server loads ~170 unbundled modules on every reload).
+It writes `twin/dist/` (index.html + assets, all relative). To serve it from the Python server later:
 copy `dist/` to `web/static/twin/` (or point the server at it) and open `/twin/`; the API calls are same-origin
 `/api/...`, nothing else to configure.
 

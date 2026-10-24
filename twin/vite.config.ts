@@ -5,20 +5,19 @@ import react from "@vitejs/plugin-react";
 // The server checks Origin/Host on /api/speak and /api/level4/*, so the proxy presents itself as the same origin.
 const API = process.env.TWIN_API ?? "http://127.0.0.1:8765";
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5180,
-    host: true,
-    proxy: {
-      "/api": {
-        target: API,
-        changeOrigin: true,
-        configure(proxy) {
-          proxy.on("proxyReq", (req) => req.setHeader("Origin", API));
-        },
-      },
+const proxy = {
+  "/api": {
+    target: API,
+    changeOrigin: true,
+    configure(proxy: { on: (event: string, handler: (req: { setHeader: (k: string, v: string) => void }) => void) => void }) {
+      proxy.on("proxyReq", (req) => req.setHeader("Origin", API));
     },
   },
+};
+
+export default defineConfig({
+  plugins: [react()],
+  server: { port: 5180, host: true, proxy },
+  preview: { port: 5181, host: true, proxy },
   build: { outDir: "dist", sourcemap: false, chunkSizeWarningLimit: 1500 },
 });

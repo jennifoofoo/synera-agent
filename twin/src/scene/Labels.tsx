@@ -30,8 +30,9 @@ export function Labels({ floor, model, y, limit }: Props) {
     const rooms = named
       .filter((space) => !model.connectorBySpace.has(space.id) && space.type !== "corridor")
       .sort((a, b) => b.area_m2 - a.area_m2);
-    if (tier === 0) return connectors.slice(0, 6);
-    if (tier === 1) return [...connectors, ...rooms.slice(0, Math.min(10, limit))];
+    const lifts = connectors.filter((space) => model.connectorBySpace.get(space.id)?.kind === "lift");
+    if (tier === 0) return lifts.slice(0, 4);
+    if (tier === 1) return [...connectors.slice(0, 8), ...rooms.slice(0, Math.min(10, limit))];
     return [...connectors, ...rooms.slice(0, limit)];
   }, [floor, model, limit, tier]);
   return (

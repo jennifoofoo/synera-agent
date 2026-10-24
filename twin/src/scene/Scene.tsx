@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
-import { Canvas, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { ContactShadows, GizmoHelper, GizmoViewcube, Grid, PerformanceMonitor } from "@react-three/drei";
 import { EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
 import { floorElevation, type BuildingModel } from "../model/model";
@@ -92,6 +92,7 @@ function Stats() {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   useEffect(() => {
+    (window as unknown as { __twinMounted: number }).__twinMounted = Math.round(performance.now());
     (window as unknown as { __twinScene: unknown }).__twinScene = scene;
     (window as unknown as { __twinStats: () => unknown }).__twinStats = () => ({
       calls: gl.info.render.calls,
@@ -99,6 +100,10 @@ function Stats() {
       buildMs: Object.fromEntries([...buildTimes].map(([id, ms]) => [id, Math.round(ms)])),
     });
   }, [gl, scene]);
+  useFrame(() => {
+    const w = window as unknown as { __twinFirstFrame?: number };
+    if (w.__twinFirstFrame === undefined && gl.info.render.triangles > 100) w.__twinFirstFrame = Math.round(performance.now());
+  });
   return null;
 }
 
