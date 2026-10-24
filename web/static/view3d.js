@@ -23,7 +23,7 @@ const view = {
 };
 
 let scene = null;
-const seen = { building: null, state: null, suspect: null, floorId: null, highlight: null, picked: null, routeKey: "" };
+const seen = { building: null, state: null, suspect: null, floorId: null, highlight: null, picked: null, selection: null, routeKey: "" };
 
 const routeKey = (route) =>
   route?.ok ? JSON.stringify([route.start, route.destination, route.via, route.length_m, route.segments.map((s) => s.points.length)]) : "";
@@ -242,6 +242,14 @@ function pushHighlights() {
   // The page's own selections: the room with an open popover, the Find tab's hits.
   const picked = a.pickedSpaceId || a.pendingDoorFrom;
   if (picked) highlights.set("page:picked", { spaceIds: [picked], assetIds: [], openingIds: [], connectorIds: [], points: [], colour: "#2563eb" });
+  const sel = a.selection;
+  if (sel) {
+    const ids = sel.asset_id ? [sel.asset_id] : sel.point ? [] : [sel.space_id];
+    highlights.set("page:selection", {
+      spaceIds: sel.asset_id || sel.point ? [] : ids, assetIds: sel.asset_id ? ids : [], openingIds: [], connectorIds: [],
+      points: sel.point ? [{ floor_id: sel.floor_id, point: sel.point }] : [], colour: "#2563eb",
+    });
+  }
   if (a.highlight) {
     const assetIds = a.highlight.assetIds ? [...a.highlight.assetIds].slice(0, MAX_FIND_HALOS) : [];
     highlights.set("page:find", { spaceIds: [], assetIds, openingIds: [], connectorIds: [], points: [{ floor_id: a.highlight.floor_id, point: a.highlight.point }], colour: DEFAULT_HIGHLIGHT });
@@ -323,10 +331,11 @@ function sync() {
     }
   }
   const picked = a.pickedSpaceId || a.pendingDoorFrom;
-  if (a.highlight !== seen.highlight || picked !== seen.picked) {
+  if (a.highlight !== seen.highlight || picked !== seen.picked || a.selection !== seen.selection) {
     const fly = a.highlight && a.highlight !== seen.highlight;
     seen.highlight = a.highlight;
     seen.picked = picked;
+    seen.selection = a.selection;
     pushHighlights();
     if (fly) scene.flyToPoint(a.highlight.floor_id, a.highlight.point, 14);
   }
@@ -338,7 +347,7 @@ function ensureScene() {
   if (scene) return true;
   try {
     scene = new Scene3D($("#view3d-stage"), {
-      onSpaceClick: (event, id) => onSpaceClick(event, id),
+      onSpaceClick: (event, id, hit) => onSpaceClick(event, id, hit),
       onOpeningClick: (event, id) => onOpeningClick(event, id),
       onEmptyClick: () => hidePopover(),
       onCaption: (text) => setAnimCaption(text),

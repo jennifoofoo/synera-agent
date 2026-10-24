@@ -18,6 +18,7 @@ const app = {
   highlight: null,     // {floor_id, point, assetIds}
   pendingDoorFrom: null,
   pickedSpaceId: null,
+  selection: null,     // click selection for the next chat message: {space_id?, asset_id?, point?, floor_id, label}
   status: { chat_available: false },
   anim: null,          // route animation in progress, see "route animation"
   mode: null,          // "draft" while a floor plan draft is shown (plan.js), null for a saved building
@@ -142,6 +143,8 @@ async function loadBuilding(key, reset = false, { keepChat = false } = {}) {
 
 // The drawing model for one building view (a saved building, or a floor plan draft from plan.js).
 function setBuildingData(data, { mode = null, suspect = null } = {}) {
+  app.selection = null;
+  renderSelectionChip();
   app.mode = mode;
   app.suspect = { spaces: new Set(suspect?.spaces || []), openings: new Set(suspect?.openings || []) };
   app.building = data;
@@ -257,6 +260,7 @@ function render() {
     if (route && s.id === route.destination) classes.push("end");
     if (closed) classes.push("closed");
     if (s.id === app.pickedSpaceId || s.id === app.pendingDoorFrom) classes.push("picked");
+    if (app.selection?.space_id === s.id && !app.selection.asset_id) classes.push("selected");
     if (app.suspect.spaces.has(s.id)) classes.push("suspect");
     const points = s.polygon.map((p) => svgPoint(p).join(",")).join(" ");
     const shape = el("polygon", { points, class: classes.join(" "), "data-space": s.id }, spacesLayer);
@@ -269,7 +273,15 @@ function render() {
     if (a.floor_id !== floorId) continue;
     const [x, y] = svgPoint(a.position);
     const hit = app.highlight?.assetIds?.has(a.id);
-    el("circle", { cx: x, cy: y, r: hit ? 0.45 : 0.22, class: `asset ${a.category || ""}${hit ? " hit" : ""}` }, assetLayer);
+    const selected = app.selection?.asset_id === a.id;
+    el("circle", { cx: x, cy: y, r: hit || selected ? 0.45 : 0.22, class: `asset ${a.category || ""}${hit ? " hit" : ""}${selected ? " selected" : ""}` }, assetLayer);
+    const target = el("circle", { cx: x, cy: y, r: 0.5, class: "asset-hit", "data-asset": a.id }, assetLayer);
+    el("title", {}, target).textContent = a.name;
+  }
+  const sel = app.selection;
+  if (sel?.point && sel.floor_id === floorId) {
+    const [x, y] = svgPoint(sel.point);
+    el("circle", { cx: x, cy: y, r: 0.4, class: "select-point" }, assetLayer);
   }
 
   for (const o of app.building.openings) {
@@ -816,7 +828,59 @@ function showFoundList(targets, assetIds) {
   list.hidden = false;
 }
 
-window.app = Object.assign(window.app || {}, { focusFound, state: app });
+window.app = Object.assign(window.app || {}, { focusFound, state: app, setSelection, clearSelection, selectionContext });
+
+// ---------- click selection (context for the next chat message) ----------
+
+// The selection is one-shot: sendChat sends it with the next message and clears it. Exactly the fields that apply:
+// room {space_id, floor_id}, thing {asset_id, space_id, floor_id}, spot {space_id, point, floor_id}.
+function selectionContext(sel = app.selection) {
+  if (!sel) return null;
+  const context = { floor_id: sel.floor_id };
+  if (sel.space_id) context.space_id = sel.space_id;
+  if (sel.asset_id) context.asset_id = sel.asset_id;
+  if (sel.point) context.point = [sel.point[0], sel.point[1]];
+  return context;
+}
+
+function setSelection(kind, id, point = null) {
+  if (app.mode === "draft") return;
+  let sel = null;
+  if (kind === "asset") {
+    const a = app.building.assets.find((x) => x.id === id);
+    if (a) sel = { asset_id: a.id, space_id: a.space_id, floor_id: a.floor_id, label: a.name };
+  } else if (kind === "space") {
+    const s = app.spaces.get(id);
+    if (s) sel = { space_id: s.id, floor_id: s.floor_id, label: s.name };
+  } else if (kind === "point" && point) {
+    const s = app.spaces.get(id);
+    if (s) sel = { space_id: s.id, point: [Number(point[0].toFixed(2)), Number(point[1].toFixed(2))], floor_id: s.floor_id, label: `Point in ${s.name}` };
+  }
+  app.selection = sel;
+  renderSelectionChip();
+  render();
+}
+
+function clearSelection() {
+  if (!app.selection) return;
+  app.selection = null;
+  renderSelectionChip();
+  render();
+}
+
+function renderSelectionChip() {
+  const chip = $("#selection-chip");
+  chip.hidden = !app.selection;
+  $("#selection-text").textContent = app.selection ? `Selected: ${app.selection.label}` : "";
+}
+
+// Model metres (+y north) under a pointer event on the 2D plan.
+function modelPointAt(clientX, clientY) {
+  const rect = $("#map").getBoundingClientRect();
+  const x = app.view.x + ((clientX - rect.left) / rect.width) * app.view.w;
+  const y = app.view.y + ((clientY - rect.top) / rect.height) * app.view.h;
+  return [x, -y];
+}
 
 // ---------- popover on the plan ----------
 
@@ -848,7 +912,9 @@ function showPopover(event, html, actions) {
   pop.style.top = Math.max(10, top) + "px";
 }
 
-function onSpaceClick(event, spaceId) {
+// A click on a room selects it (a thing: that thing; Shift-click: the spot) and still opens the room menu, whose
+// "Select this spot" entry does the same for the clicked point. 3D passes the picked hit with its world point.
+function onSpaceClick(event, spaceId, hit = null) {
   if (app.mode === "draft") return window.plan.onSpaceClick(event, spaceId);
   const s = app.spaces.get(spaceId);
   if (app.pendingDoorFrom) {
@@ -858,6 +924,10 @@ function onSpaceClick(event, spaceId) {
     if (first !== spaceId) addDoor(first, spaceId); else render();
     return;
   }
+  const spot = hit?.point ? [hit.point.x, -hit.point.z] : modelPointAt(event.clientX, event.clientY);
+  if (hit?.kind === "asset") setSelection("asset", hit.id);
+  else if (event.shiftKey) setSelection("point", spaceId, spot);
+  else setSelection("space", spaceId);
   app.pickedSpaceId = spaceId;
   render();
   const connector = app.connectorBySpace.get(spaceId);
@@ -875,6 +945,7 @@ function onSpaceClick(event, spaceId) {
   } else {
     actions.push([closed ? "Reopen room" : "Close room", closed ? "ok" : "danger", () => setClosed(spaceId, !closed)]);
   }
+  actions.push(["Select this spot", "secondary", () => setSelection("point", spaceId, spot)]);
   actions.push(["Add door to…", "secondary", () => {
     app.pendingDoorFrom = spaceId;
     render();
@@ -1071,8 +1142,11 @@ async function sendChat(text) {
   addMessage("user", text);
   const pending = addMessage("agent pending", "thinking…");
   try {
-    const result = await api("/api/chat", { message: text });
+    const context = selectionContext();
+    const result = await api("/api/chat", context ? { message: text, context } : { message: text });
     pending.remove();
+    if (result.selection_ignored) addMessage("system", `I couldn't use the selection: ${result.selection_ignored}`);  // chip stays, retry
+    else if (!result.error) clearSelection();
     if (result.opened && window.plan) await window.plan.openSaved(result.opened, "The agent saved the building.");
     const message = addMessage(result.error ? "system" : "agent", result.reply);
     if (!result.error) window.voice?.onReply(result.reply, message);
@@ -1152,7 +1226,9 @@ function wireMap() {
     const floorJump = target.closest?.("[data-floor]");
     const opening = target.closest?.("[data-opening]");
     const space = target.closest?.("[data-space]");
-    if (floorJump) { stopRouteAnimation(); showFloor(floorJump.dataset.floor, true); }
+    const asset = target.closest?.("[data-asset]");
+    if (asset && app.mode !== "draft" && !floorJump && !opening) { hidePopover(); setSelection("asset", asset.dataset.asset); }
+    else if (floorJump) { stopRouteAnimation(); showFloor(floorJump.dataset.floor, true); }
     else if (opening) onOpeningClick(e, opening.dataset.opening);
     else if (space) onSpaceClick(e, space.dataset.space);
     else hidePopover();
@@ -1203,6 +1279,7 @@ function wireUi() {
     await loadBuilding(app.key, true);
     toast("Building reset: all closures, new doors and the route are gone.");
   };
+  $("#selection-clear").onclick = clearSelection;
   $("#chat-form").onsubmit = (e) => {
     e.preventDefault();
     const text = $("#chat-input").value.trim();

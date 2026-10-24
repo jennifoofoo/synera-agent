@@ -262,6 +262,36 @@ def test_chat_passes_a_validated_selection_and_drops_an_invalid_one(app, key, mo
     assert seen[-1] is None
 
 
+def test_page_shaped_selection_contexts_reach_the_agent(app, key, monkeypatch):
+    """The three shapes web/static/app.js builds (selectionContext): room, thing, spot."""
+    seen = selection_probe(monkeypatch)
+    bm = app.session(key).map
+    asset = next(iter(bm.assets.values()))
+    space = bm.spaces[asset["space_id"]]
+    spot = list(
+        __import__("shapely.geometry", fromlist=["Polygon"]).Polygon(space["polygon"]).representative_point().coords[0]
+    )
+    shapes = [
+        ({"floor_id": space["floor_id"], "space_id": space["id"]}, (space["id"], None, None)),
+        (
+            {"floor_id": space["floor_id"], "space_id": space["id"], "asset_id": asset["id"]},
+            (space["id"], asset["id"], None),
+        ),
+        ({"floor_id": space["floor_id"], "space_id": space["id"], "point": spot}, (space["id"], None, tuple(spot))),
+    ]
+    for context, (space_id, asset_id, point) in shapes:
+        status, reply = app.post(
+            "/api/chat", {"building": key, "message": "move this next to the door", "context": context}
+        )
+        assert status == 200 and "selection_ignored" not in reply
+        got = seen[-1]
+        assert (got.space_id, got.asset_id, got.point, got.floor_id) == (space_id, asset_id, point, space["floor_id"])
+    status, reply = app.post(
+        "/api/chat", {"building": key, "message": "x", "context": {"floor_id": "f1", "space_id": "gone"}}
+    )
+    assert reply["selection_ignored"] == "unknown space"  # the page shows this and keeps its chip
+
+
 def test_selection_is_cleared_after_the_turn(app, key, monkeypatch):
     from types import SimpleNamespace
 
