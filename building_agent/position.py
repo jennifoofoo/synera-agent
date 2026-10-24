@@ -4,15 +4,19 @@ The server alone sets a Position (tools, or the validated click context of the p
 message. Everything here is plain Python on the building map: ranking hits by route length from the position and
 the remembered route with its room sequence. The model only chooses which tool to call and phrases the reply."""
 
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 
 from building_agent import routing
 from building_agent.find_tools import matching_assets, parse_query, words_of
+from building_agent.safety_words import safety_query
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
 
 SOURCES = ("said", "click", "device", "route")
 MAX_QUERY_CHARS = 120
 MAX_OPTIONS = 6
+CLOCK = time.monotonic  # seconds; tests replace it to age a position without waiting
+STALE_AFTER_S = 600.0  # a position older than this is 'last known'
 TIE_M = 1.0  # two different rooms this close in route length count as equally near
 BENCHMARK_START = (
     "The start is given in the question: pass it as `start` (a room number or name from the question). "
@@ -28,6 +32,9 @@ class Position:
     point: tuple[float, float] | None = None
     source: str = "said"
     turn: int = 0
+    set_at: float | None = field(
+        default=None, compare=False
+    )  # CLOCK() when set; None for a hand-built Position (age unknown)
 
     def view(self) -> dict:
         """What the page gets in state_view: {space_id, floor_id, point, source}."""
@@ -47,7 +54,8 @@ def no_position_error(state) -> str:
 def make_position(bm: BuildingMap, space_id: str, point=None, source: str = "said", turn: int = 0) -> Position:
     if space_id not in bm.spaces or source not in SOURCES:
         raise MapError(f"Unknown space or source: {space_id!r}, {source!r}.")
-    return Position(space_id, bm.spaces[space_id]["floor_id"], tuple(point) if point else None, source, turn)
+    floor_id = bm.spaces[space_id]["floor_id"]
+    return Position(space_id, floor_id, tuple(point) if point else None, source, turn, CLOCK())
 
 
 def place_label(bm: BuildingMap, space_id: str) -> str:
@@ -55,9 +63,33 @@ def place_label(bm: BuildingMap, space_id: str) -> str:
     return f"{space['name']} ({bm.floor_name(space['floor_id'])})"
 
 
+def age_seconds(position: Position) -> float | None:
+    return None if position.set_at is None else max(0.0, CLOCK() - position.set_at)
+
+
+def age_words(seconds: float) -> str:
+    minutes = int(seconds // 60)
+    return f"{minutes} minutes" if minutes < 120 else f"{minutes // 60} hours"
+
+
+def position_note(bm: BuildingMap, position: Position | None) -> dict:
+    """{'position_note': ..., 'position_old': True} when the position is older than 10 minutes, else {}.
+
+    Used wherever the position is the default start. Emergency answers state it, other answers ask once."""
+    age = None if position is None else age_seconds(position)
+    if position is None or age is None or age <= STALE_AFTER_S:
+        return {}
+    return {
+        "position_old": True,
+        "position_note": f"from your last known position, {place_label(bm, position.space_id)}, "
+        f"set {age_words(age)} ago",
+    }
+
+
 def describe_position(bm: BuildingMap, position: Position, now_turn: int | None = None) -> dict:
     space = bm.spaces[position.space_id]
     return {
+        **position_note(bm, position),
         "space_id": position.space_id,
         "room": space["name"],
         "floor": bm.floor_name(position.floor_id),
@@ -78,7 +110,7 @@ def lengths_from(bm: BuildingMap, start: str, targets: list[str], step_free: boo
 def matching_places(bm: BuildingMap, what: str, floor_level: int | None = None) -> tuple[dict[str, list[str]], str]:
     """Rooms that count as 'X': by room type first, else rooms holding a matching device. Returns
     ({space_id: [asset names]}, label). Raises MapError when nothing matches."""
-    text = str(what or "")[:MAX_QUERY_CHARS]
+    text = safety_query(bm, str(what or "")[:MAX_QUERY_CHARS])
     tokens = words_of(text)
     if not tokens:
         raise MapError("Say what to find, for example 'coffee machine' or 'toilet'.")

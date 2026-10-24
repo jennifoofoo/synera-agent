@@ -11,6 +11,7 @@ import anthropic
 
 from building_agent import routing
 from building_agent.campus_tools import CampusHolder
+from building_agent.exit_tools import EMERGENCY_RULES
 from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
@@ -121,6 +122,7 @@ class Agent(StarterAgent):
             STARTER_PROMPT.format(overview=overview)
             + CALCULATION_RULES
             + CONVERSATION_RULES
+            + EMERGENCY_RULES
             + (CAMPUS_RULES if self.campus else "")
         )
 
@@ -157,6 +159,7 @@ def cache_key(building_directory: Path, question_text: str) -> str:
     version = (
         CALCULATION_RULES
         + CONVERSATION_RULES
+        + EMERGENCY_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)
     )
     raw = f"{building_directory.name}\n{question_text}\n{version}"
