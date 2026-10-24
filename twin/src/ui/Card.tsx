@@ -21,6 +21,7 @@ export function Card() {
   const replyShown = useTwin((s) => s.replyShown);
   const busy = useTwin((s) => s.chatBusy);
   const draft = useTwin((s) => s.draft);
+  const campusRoute = useTwin((s) => s.campusRoute);
   if (!model || draft) return null; // a Level 4 draft has its own ids; Route/I'm here would hit the API with them
 
   let card: ReactNode = null;
@@ -28,7 +29,7 @@ export function Card() {
   else if (guide?.active) card = <GuideCard model={model} />;
   else if (busy) card = null; // the Omnibox shows "thinking" above the input
   else if (replyShown) card = <ReplyCard model={model} />;
-  else if (route?.ok) card = <RouteCard model={model} route={route} />;
+  else if (route?.ok && !campusRoute) card = <RouteCard model={model} route={route} />;
 
   return (
     <>
@@ -102,6 +103,15 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const goHere = async () => {
     if (!roomId) return;
     setError(null);
+    try {
+      if (await useTwin.getState().campusHook?.routeHere(roomId)) {
+        select(null); // a route across buildings (campus card)
+        return;
+      }
+    } catch (e) {
+      setError((e as Error).message);
+      return;
+    }
     if (position && position.space_id !== roomId) {
       // Known start: the route comes straight from the routing API, no language model involved.
       try {
