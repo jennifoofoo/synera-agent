@@ -7,6 +7,7 @@ Industrial Agents Hackathon 2026, Track 01 "Talk to Your Building". Kit README: 
 2. `git pull`, then read `docs/specs/core-2d.md` (the contract: kinds, signatures, rules, tasks per person) and `docs/STATUS.md` (who owns which kind, blockers).
 3. Work only on your own kinds and claimed rows. If you need to change someone else's file, do not: add a line under "Blocker" in `docs/STATUS.md` and continue elsewhere.
 4. Tests are the contract. No merge without a test.
+5. Parked ideas (not decided, do not build without the team): `docs/IDEAS.md`.
 
 ## Principle
 Every fact comes from deterministic Python (`building_agent/kinds/`), the LLM only picks tools and phrases the reply.
