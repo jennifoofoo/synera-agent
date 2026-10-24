@@ -69,7 +69,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     for (const opening of floor.openings) {
       if (opening.kind === "entrance") items.push({ id: opening.id, point: opening.position, glyph: "⎆", title: "Entrance" });
     }
-    return cullOverlaps(items.map((item) => ({ ...item, anchor: item.point })), 26 * scale);
+    // Icons keep clear of each other and of the text labels (which win).
+    const taken = labelled.map((space) => ({ anchor: space.anchor, id: "", point: space.anchor, glyph: "", title: "" }));
+    return cullOverlaps([...taken, ...items.map((item) => ({ ...item, anchor: item.point }))], 26 * scale).filter((item) => item.id);
   }, [flat, floor, model, labelled, scale]);
   return (
     <group position-y={y + 0.5}>
