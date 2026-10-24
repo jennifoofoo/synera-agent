@@ -134,7 +134,9 @@ function syncOverlay(focus = false) {
   const patch: Partial<ReturnType<typeof useTwin.getState>> = { state: { ...twin.state, route } as BuildingState };
   if (focus && route.floors?.length) patch.focusedFloorId = route.floors[0];
   useTwin.setState(patch);
-  if (focus && route.space_path?.length) useTwin.getState().requestCamera({ kind: "object", ids: route.space_path });
+  // After the scene has the new building (and the card its height), frame the leg's rooms.
+  const ids = route.space_path ?? [];
+  if (focus && ids.length) setTimeout(() => useTwin.getState().requestCamera({ kind: "object", ids }), 250);
 }
 
 function campusBuildingForKey(view: CampusView | null, key: string | null) {
@@ -215,10 +217,12 @@ export const useCampus = create<CampusStore>((set, get) => ({
       set({ error: `${building?.name ?? "This building"} has no map to show.` });
       return;
     }
-    set({ mode: "building", current: buildingId, selectedLink: null, error: null });
+    set({ mode: "building", current: buildingId, selectedLink: null, error: null, note: null });
     const twin = useTwin.getState();
     if (twin.buildingKey !== building.page_key || !twin.model) await twin.openBuilding(building.page_key);
     syncOverlay(true);
+    // The scene sat hidden under the site; frame the building again once it is visible (a leg frames itself).
+    if (!currentLeg(get())) setTimeout(() => useTwin.getState().requestCamera({ kind: "home" }), 250);
   },
 
   backToSite() {
@@ -241,6 +245,7 @@ export const useCampus = create<CampusStore>((set, get) => ({
       if (get().route) {
         const route = result.route ?? null;
         set({ route, step: route?.ok ? Math.min(get().step ?? 0, steps(route).length - 1) : null });
+        if (route && !route.ok) set({ error: route.error ?? "No route any more." });
       }
       set({ busy: false, note: note || null });
       syncOverlay();

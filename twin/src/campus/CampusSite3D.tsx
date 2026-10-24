@@ -46,18 +46,18 @@ function BuildingBlock({ building, detail, onRoute, active }: { building: Campus
     event.stopPropagation();
     void enterBuilding(building.id);
   };
-  const colour = active ? "#a9c4e6" : onRoute ? "#bcd2ec" : "#cfdeef";
+  const colour = active ? "#7ea3cf" : onRoute ? "#9dbbe0" : "#b4c9e3";
   return (
     <group>
       {floors.map(({ floor, slab, lines }, index) => (
         <group key={floor.floorId} position={[0, floor.elevation, 0]}>
           {slab && (
             <mesh geometry={slab} rotation={[-Math.PI / 2, 0, 0]} onClick={enter} onPointerOver={() => (document.body.style.cursor = "pointer")} onPointerOut={() => (document.body.style.cursor = "")}>
-              <meshStandardMaterial color={colour} transparent opacity={index === 0 ? 0.95 : 0.55} side={THREE.DoubleSide} depthWrite={index === 0} />
+              <meshStandardMaterial color={colour} transparent opacity={index === 0 ? 1 : 0.6} side={THREE.DoubleSide} depthWrite={index === 0} />
             </mesh>
           )}
           <lineSegments geometry={lines}>
-            <lineBasicMaterial color={COLOURS.edge} transparent opacity={index === 0 ? 0.45 : 0.22} />
+            <lineBasicMaterial color={COLOURS.edge} transparent opacity={index === 0 ? 0.55 : 0.35} />
           </lineSegments>
         </group>
       ))}
@@ -156,8 +156,10 @@ export function CampusSite3D() {
     const b = boundsOf(campusPoints(view, details));
     const centre = new THREE.Vector3((b.minX + b.maxX) / 2, 0, -(b.minY + b.maxY) / 2);
     const size = Math.max(b.maxX - b.minX, b.maxY - b.minY, 40);
-    const camera = centre.clone().add(new THREE.Vector3(size * 0.45, size * 0.75, size * 0.75));
-    return { centre, size, camera };
+    // aim a little south of the centre so the site sits above the card and input at the bottom
+    const target = centre.clone().add(new THREE.Vector3(0, 0, size * 0.18));
+    const camera = target.clone().add(new THREE.Vector3(size * 0.35, size * 0.95, size * 0.85));
+    return { centre, target, size, camera };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.key, loaded]);
 
@@ -206,11 +208,11 @@ export function CampusSite3D() {
       ))}
       {line.length > 1 && (
         <>
-          <Line points={line} color={COLOURS.routeGlow} lineWidth={12} transparent opacity={0.45} depthTest={false} renderOrder={5} />
-          <Line points={line} color="#0f9f8c" lineWidth={5} depthTest={false} renderOrder={6} />
+          <Line points={line} color="#ffffff" lineWidth={11} transparent depthTest={false} depthWrite={false} renderOrder={10} />
+          <Line points={line} color="#0d9488" lineWidth={6} transparent depthTest={false} depthWrite={false} renderOrder={11} />
         </>
       )}
-      <OrbitControls makeDefault target={frame.centre} maxPolarAngle={Math.PI * 0.47} minDistance={frame.size * 0.15} maxDistance={frame.size * 3} enableDamping={false} />
+      <OrbitControls makeDefault target={frame.target} maxPolarAngle={Math.PI * 0.47} minDistance={frame.size * 0.15} maxDistance={frame.size * 3} enableDamping={false} />
     </Canvas>
   );
 }
