@@ -328,3 +328,66 @@ def test_http_full_flow(server):
     assert preview["draft"]["spaces"] and "60 m taken as the building width" in preview["scales"][0]["note"]
     status, error = http(f"{server}/api/level4/save", b'{"answer": "yes"}', headers)
     assert status == 400 and "card" in error["error"]
+
+
+# ---------- vector file and building.json next to an upload ----------
+
+PLAN_SVG = Path("data/dev/resplan-439/floor_0.svg")
+
+
+def test_attach_svg_and_building_json_are_stored_next_to_the_image(app, tmp_path):
+    if not PLAN_SVG.exists():
+        pytest.skip("kit data missing")
+    upload = app.level4.upload(png_bytes())["upload_id"]
+    done = app.level4.attach(upload, "svg", PLAN_SVG.read_bytes())
+    assert done["rooms"] > 0 and done["kind"] == "svg"
+    app.level4.attach(upload, "building_json", b'{"px_per_m": 20}')
+    assert sorted(p.name for p in (tmp_path / "uploads").iterdir()) == sorted(
+        [f"{upload}.png", f"{upload}.svg", f"{upload}.building.json"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("kind", "data", "status"),
+    [
+        ("svg", b"<svg>nothing</svg>", 415),
+        ("svg", b"", 400),
+        ("building_json", b"{broken", 415),
+        ("building_json", b"[1, 2", 415),
+        ("exe", b"MZ", 400),
+        (None, b"x", 400),
+    ],
+)
+def test_attach_refuses_bad_files_and_kinds(app, tmp_path, kind, data, status):
+    upload = app.level4.upload(png_bytes())["upload_id"]
+    with pytest.raises(Level4Error) as error:
+        app.level4.attach(upload, kind, data)
+    assert error.value.status == status
+    assert [p.name for p in (tmp_path / "uploads").iterdir()] == [f"{upload}.png"]  # nothing left behind
+
+
+@pytest.mark.parametrize("upload_id", ["plan-000000000000", "../../x", "", None])
+def test_attach_only_knows_upload_ids_never_paths(app, upload_id):
+    with pytest.raises(Level4Error, match="Unknown upload"):
+        app.level4.attach(upload_id, "building_json", b"{}")
+
+
+def test_building_json_makes_the_scale_optional_on_the_page(app):
+    upload = app.level4.upload(png_bytes())["upload_id"]
+    floor = {"upload_id": upload, "level": 0}
+    with pytest.raises(Level4Error, match="length you know"):
+        app.level4.start_build({"floors": [floor]}, run_async=False)
+    app.level4.attach(upload, "building_json", b'{"px_per_m": 20}')
+    assert app.level4.start_build({"floors": [floor]}, run_async=False)["floors_total"] == 1
+
+
+def test_http_attach_checks_origin_type_and_kind(server):
+    upload = http(f"{server}/api/level4/upload", png_bytes(), {"Content-Type": "image/png"})[1]["upload_id"]
+    url = f"{server}/api/level4/attach?upload_id={upload}&kind=building_json"
+    good = {"Content-Type": "application/json"}
+    status, payload = http(url, b'{"mpp": 0.05}', good)
+    assert status == 200 and payload["kind"] == "building_json"
+    assert http(url, b'{"mpp": 0.05}', {"Content-Type": "text/plain"})[0] == 415
+    assert http(url, b'{"mpp": 0.05}', {**good, "Origin": "http://evil.example"})[0] == 403
+    assert http(f"{server}/api/level4/attach?upload_id={upload}&kind=exe", b"x", good)[0] == 400
+    assert http(f"{server}/api/level4/attach?upload_id=../../x&kind=building_json", b"{}", good)[0] == 400

@@ -33,8 +33,16 @@ from building_agent.level4.convert import (
     scale_from_known_length,
     tag_fills,
 )
-from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
+from building_agent.level4.extract import (
+    DEFAULT_ALLOWED_ROOT,
+    ExtractError,
+    ExtractResult,
+    _resolve_inside,
+    extract_floor,
+)
 from building_agent.level4.markers import detect_markers, merge_markers
+from building_agent.level4.plan_files import adopt_vision, compose_names, find_building_json, svg_extraction
+from building_agent.level4.scale_source import find_building_width, find_scale, load_building_json
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.segment import NOISE_NOTE, SCAN_NOTE, match_to_extraction, segment_rooms
 from building_agent.level4.stair_doors import describe_stair_doors, suggest_stairs_then_generic
@@ -78,6 +86,10 @@ ASK_CLEARER = (
     "If the person wants to go on with this reading anyway, they say 'build it anyway' (or 'trotzdem'); show the "
     "card first, saving still needs the card and a clear yes in their next message."
 )
+SOURCE_WORDS = {
+    "svg": "the vector file (svg) next to the plan: exact room outlines, doors and room numbers",
+    "image": "the plan image, read by the vision model",
+}
 ASK_SCALE = (
     "The plan has no printed scale bar and no known length was given. Ask the person for ONE length they know in "
     "metres (the width of the whole building, the width of one room, or a door width), then call build_from_plan "
@@ -99,6 +111,7 @@ class FloorSource:
     scale_args: dict
     added_from_segments: int = 0  # rooms that exist only because the colour analysis found them
     scan_fallback: bool = False  # segmentation was rejected (scan, photo, noise): the model's rooms stand alone
+    source: str = "image"  # "svg" (rooms, doors and numbers read from the vector file) or "image" (vision pipeline)
 
 
 @dataclass
@@ -460,6 +473,33 @@ def _to_metres(draft: "Level4Draft"):
     return convert
 
 
+def plan_json_scale(json_path: Path | None, level: int) -> Scale | None:
+    """Scale from a scale field of the building.json that came with the plan (per floor first), else None."""
+    data = load_building_json(json_path) if json_path is not None else None
+    hit = find_scale(data, level) if data is not None else None
+    if hit is None:
+        return None
+    return Scale(hit.metres_per_px, "building_json", f"taken from building.json ({hit.key}, read as {hit.reading})")
+
+
+def plan_json_width_scale(json_path: Path | None, level: int, extraction: Extraction) -> Scale | None:
+    """Scale from the building width in the building.json and the exact room outlines of an svg, else None."""
+    data = load_building_json(json_path) if json_path is not None else None
+    width = find_building_width(data, level) if data is not None else None
+    if width is None:
+        return None
+    try:
+        scale = scale_from_known_length(extraction, width.metres, "building_width")
+    except ConvertError:
+        return None
+    return Scale(
+        scale.metres_per_px,
+        "building_json",
+        f"worked out from the building width of {width.metres:g} m in building.json ({width.key}) "
+        "and the exact room outlines in the svg",
+    )
+
+
 def _trusted_scale(draft: Level4Draft) -> bool:
     """True when every floor got its scale from a length the person gave (not a printed bar or a door width)."""
     return all(
@@ -540,37 +580,79 @@ def make_level4_tools(
             key = (str(path), stamp.st_mtime_ns, stamp.st_size)
         except OSError:
             key = (str(path), None, None)
+        # The vector file of the plan (floor_<n>.svg next to the image) is looked up from the image that is already
+        # known to lie inside the upload folder; nothing the browser or the message says can point elsewhere.
+        svg_read, svg_note, svg_inferred = None, "", 0
+        json_path: Path | None = None
+        try:
+            checked = _resolve_inside(path, uploads_root)
+            svg_read, svg_note, svg_inferred = svg_extraction(checked, uploads_root)
+            json_path = find_building_json(checked, uploads_root)
+        except ExtractError:
+            pass  # extract_floor below says what is wrong with the path
         result: ExtractResult | None = draft.cache.get(key)
         fresh = result is None
+        vision_problem = ""
         if fresh:
             try:
                 result = extract_floor(path, allowed_root=uploads_root)
             except ExtractError as error:
-                raise ToolError(str(error)) from error
-            draft.cache[key] = result
-            draft.cost_usd += result.cost_usd
-        extraction = result.extraction
+                if svg_read is None:
+                    raise ToolError(str(error)) from error
+                vision_problem = str(error)  # the svg alone still gives rooms, doors and numbers
+                result = None
+                fresh = False
+            else:
+                draft.cache[key] = result
+                draft.cost_usd += result.cost_usd
         seg_warnings: list[str] = []
-        try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
-            found_segments = segment_rooms(path)
-            extraction, seg_warnings = match_to_extraction(extraction, found_segments)
-            draft.marker_notes = seg_warnings[:10]
-            if NOISE_NOTE not in seg_warnings:
-                extraction = tag_fills(extraction, found_segments)
-        except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
-            draft.marker_notes = [f"Room outline detection was skipped ({type(error).__name__})."]
-        try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
-            extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
-            draft.marker_notes = (seg_warnings + marker_warnings)[:10]
-        except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
-            draft.marker_notes = (
-                draft.marker_notes + [f"Door marker detection was skipped ({type(error).__name__})."]
-            )[:10]
+        if svg_read is not None:
+            extraction, adopted = adopt_vision(svg_read, result.extraction if result else None)
+            extraction = compose_names(extraction)
+            numbered = sum(room.ref is not None for room in extraction.rooms)
+            draft.marker_notes = [
+                f"Read from the vector file (svg) next to the plan: {len(extraction.rooms)} rooms, "
+                f"{len(extraction.doors)} doors, entrances and openings; {numbered} room numbers"
+                + (f" ({svg_inferred} of them worked out from the numbering order)." if svg_inferred else "."),
+                (
+                    f"Names and room types come from the image reading for {adopted} of {len(extraction.rooms)} rooms."
+                    if result is not None
+                    else "Names and room types could not be read from the image"
+                    + (f" ({vision_problem})" if vision_problem else "")
+                    + ", so rooms are named by their number only."
+                ),
+            ]
+            origin = "svg"
+        else:
+            extraction = result.extraction
+            origin = "image"
+            if svg_note:
+                draft.marker_notes = [svg_note]
+        if origin == "image":
+            marker_start = [svg_note] if svg_note else []
+            try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
+                found_segments = segment_rooms(path)
+                extraction, seg_warnings = match_to_extraction(extraction, found_segments)
+                draft.marker_notes = marker_start + seg_warnings[:10]
+                if NOISE_NOTE not in seg_warnings:
+                    extraction = tag_fills(extraction, found_segments)
+            except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
+                draft.marker_notes = marker_start + [f"Room outline detection was skipped ({type(error).__name__})."]
+            try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
+                extraction, marker_warnings = merge_markers(extraction, detect_markers(path))
+                draft.marker_notes = (marker_start + seg_warnings + marker_warnings)[:10]
+            except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
+                draft.marker_notes = (
+                    draft.marker_notes + [f"Door marker detection was skipped ({type(error).__name__})."]
+                )[:10]
         try:
+            scale = None
             if known_length_m is not None:
                 scale = scale_from_known_length(extraction, known_length_m, along)
             else:
-                scale = scale_from_bar(extraction)
+                scale = plan_json_scale(json_path, level) or scale_from_bar(extraction)
+                if scale is None and origin == "svg":
+                    scale = plan_json_width_scale(json_path, level, extraction)
         except ConvertError as error:
             raise ToolError(str(error)) from error
         if scale is None:
@@ -579,7 +661,7 @@ def make_level4_tools(
         scanned = any(note in seg_warnings for note in (SCAN_NOTE, NOISE_NOTE))
         added = sum(warning.startswith("room_added_from_image") for warning in seg_warnings)
         draft.floors[level] = FloorSource(
-            extraction, scale, {"known_length_m": known_length_m, "along": along}, added, scanned
+            extraction, scale, {"known_length_m": known_length_m, "along": along}, added, scanned, origin
         )
         try:
             _rebuild(draft)
@@ -595,6 +677,7 @@ def make_level4_tools(
             **counts(draft.building, level),
             "scale": scale.note,
             "scale_source": scale.source,
+            "read_from": SOURCE_WORDS[origin],
             "problems": describe(draft.findings),
             "next": "Draft only, nothing saved. Call preview_draft to show the person the card.",
         }
@@ -616,7 +699,7 @@ def make_level4_tools(
         if fresh:
             summary["seconds"] = round(result.seconds, 1)
             summary["cost_usd"] = round(result.cost_usd, 4)
-        if result.warnings:
+        if result is not None and result.warnings:
             summary["warnings"] = result.warnings
         return as_json(summary)
 
@@ -681,6 +764,7 @@ def make_level4_tools(
                 scale,
                 {"known_length_m": known_length_m, "along": along},
                 source.added_from_segments,
+                source=source.source,
             )
             try:
                 _rebuild(draft)
@@ -760,6 +844,7 @@ def make_level4_tools(
                     **counts(building, floor["level"]),
                     "room numbers": labels[:40],
                     "scale": draft.floors[floor["level"]].scale.note,
+                    "read from": SOURCE_WORDS[draft.floors[floor["level"]].source],
                 }
             )
         poor = poor_reasons(draft)
