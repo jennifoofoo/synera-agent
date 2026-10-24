@@ -7,6 +7,7 @@ from itertools import islice, product
 
 import pytest
 
+from building_agent import routing
 from starter_agent.building_map import BuildingMap, MapError
 from tests.live.harness import dev_building, run_script
 
@@ -38,9 +39,9 @@ def cross_floor_pairs(bm: BuildingMap):
 def route_lengths(building, start: str, destination: str) -> tuple[float, float | None]:
     """(plain length, step-free length or None if impossible), computed on a fresh map."""
     bm = BuildingMap.load(building)
-    plain = bm.route(start, destination).length_m
+    plain = routing.route(bm, start, destination).length_m  # the model the agent answers with
     try:
-        return plain, bm.route(start, destination, step_free=True).length_m
+        return plain, routing.route(bm, start, destination, step_free=True).length_m
     except MapError:
         return plain, None
 

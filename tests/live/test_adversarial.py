@@ -6,6 +6,7 @@ import re
 
 import pytest
 
+from building_agent import routing as route_model
 from starter_agent.building_map import BuildingMap, MapError
 from tests.live.harness import Transcript, dev_building, run_script
 from tests.live.test_script_1_3 import (
@@ -188,7 +189,7 @@ def test_wheelchair_reply_states_step_free_length_and_difference():
     """Tightened script 4: the reply gives the step-free length and says how it relates to the stairs route."""
     building, start, destination, plain, step_free = wheelchair_case()
     bm = BuildingMap.load(building)
-    assert bm.route(start, destination).length_m == pytest.approx(plain)
+    assert route_model.route(bm, start, destination).length_m == pytest.approx(plain)
     transcript = run_script(building, [f"I use a wheelchair. How do I get from {start} to {destination}?"])
     reply = transcript.turns[0].reply
     routing = [call for call in transcript.turns[0].calls if call.name in ROUTING and not call.is_error]
@@ -204,14 +205,14 @@ def test_wheelchair_reply_states_step_free_length_and_difference():
 
 def lift_that_changes_step_free_route(building, start: str, destination: str) -> str:
     bm = BuildingMap.load(building)
-    before = bm.route(start, destination, step_free=True).length_m
+    before = route_model.route(bm, start, destination, step_free=True).length_m
     for connector in bm.connectors.values():
         if connector["kind"] != "lift":
             continue
         trial = copy.deepcopy(bm)
         trial.set_closed(trial.find_element(connector["name"]), True)
         try:
-            after = trial.route(start, destination, step_free=True).length_m
+            after = route_model.route(trial, start, destination, step_free=True).length_m
         except MapError:
             return connector["name"]
         if abs(after - before) > 1.5:
