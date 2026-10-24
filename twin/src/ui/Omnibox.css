@@ -23,10 +23,12 @@
   border-radius: var(--radius-sm); border: 0; background: transparent; color: var(--muted);
 }
 .ob-icon { width: 36px; height: 36px; min-height: 36px; }
-.ob-icon:hover { color: var(--text); }
+.ob-icon:hover, .ob-icon:active { color: var(--text); background: transparent; }
 .ob-icon.on { color: var(--signal); }
-/* spoken replies off: a filled grey disc behind the muted speaker, plainly visible but no signal colour */
-.ob-icon.off { color: var(--text); background: color-mix(in srgb, var(--text) 12%, transparent); }
+/* spoken replies on/off: a quiet icon button; the state is the icon itself (speaker / crossed speaker) and
+   aria-pressed, never a grey block behind it */
+.ob-icon.off { color: var(--muted); background: transparent; }
+.ob-icon:focus:not(:focus-visible) { outline: none; }
 .ob-mic {
   width: 42px; height: 42px; min-height: 42px; color: var(--text);
   background: var(--surface); border: 1px solid var(--line);
