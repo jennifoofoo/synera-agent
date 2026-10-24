@@ -14,40 +14,13 @@ import pytest
 import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
 from building_agent.campus import entrances, load_maps, make_example_campus
-from building_agent.campus_tools import CampusHolder, make_campus_tools
+from building_agent.campus_tools import CampusHolder
 from tests.live.harness import LIVE_CACHE, LIVE_MODEL, Call, Transcript, Turn, calls_in
 
 DATA = Path("data")
 CAMPUS_A, FACTORY, RESPLAN = "proc-campus-dev-000", "proc-factory-dev-003", "resplan-439"
 
-CAMPUS_RULES = """
-
-Campus (several buildings, tools list_buildings, campus_route, link_what_changes, connect_buildings, close_link, \
-confirm_campus_change):
-- When the person names another building, or a place that is not in the building above, call campus_route (start and \
-destination, plus start_building and destination_building when they said them) instead of give_directions. Call \
-list_buildings first if you do not know the buildings. Read out only the steps it returns (at most 3); 'weiter' means \
-next_steps. If the person uses a wheelchair, pram or trolley pass step_free=true and say the length and \
-normal_route_length_m.
-- If campus_route returns candidates for a name, ask which building. If there is no link between two buildings, say so \
-and offer to connect them. Never invent links, entrances, lengths or buildings.
-- To connect two buildings call connect_buildings and show the card in plain words (what you understood, the length \
-and whether it is an estimate, which buildings become connected). Ask for a yes. Only after the person's NEXT message \
-is a clear yes call confirm_campus_change(true, reply word for word); on no call confirm_campus_change(false). 'ja ja' \
-or 'whatever' is not a yes. Closing or reopening a link works the same way with close_link.
-- 'What if the walkway is closed' is a question: call link_what_changes and report its sentences. Do not call close_link \
-for a question."""
-
-
-class CampusAgent(agent_module.Agent):
-    def __init__(self, holder: CampusHolder, output_directory: Path) -> None:
-        self.holder = holder
-        super().__init__(holder.bm, output_directory)
-
-    def install_building(self, building_map) -> None:
-        super().install_building(building_map)
-        self.tools = [*self.tools, *make_campus_tools(self.holder, self.output_directory, self.guide)]
-        self.system[0]["text"] += CAMPUS_RULES
+CAMPUS_RULES = agent_module.CAMPUS_RULES
 
 
 def build_holder(connected: bool = True) -> CampusHolder:
@@ -88,7 +61,7 @@ def run_campus_script(user_turns: list[str], connected: bool = True) -> tuple[Tr
     previous_model = starter_module.MODEL
     starter_module.MODEL = LIVE_MODEL
     try:
-        agent = CampusAgent(holder, Path("agent_output") / "live_scratch")
+        agent = agent_module.Agent(holder.bm, Path("agent_output") / "live_scratch", campus=holder)
         turns = []
         for user_text in user_turns:
             seen = len(agent.messages)

@@ -11,6 +11,7 @@ from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
 from building_agent import routing
+from building_agent.campus_tools import CampusHolder, make_campus_tools
 from building_agent.find_space import find_space
 from building_agent.find_tools import make_find_tools
 from building_agent.guide_tools import GuideState, make_guide_tools
@@ -95,7 +96,13 @@ def kind_tool(bm: BuildingMap, kind: Kind):
 REPLACED_BY_GUIDE = {"set_closed", "add_door"}  # edits go through propose_change and confirm_change
 
 
-def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None = None, on_saved=None) -> list:
+def make_tools(
+    bm: BuildingMap,
+    output_directory: Path,
+    guide: GuideState | None = None,
+    on_saved=None,
+    campus: CampusHolder | None = None,
+) -> list:
     @beta_tool
     def find_space_tool(name: str, floor_level: int | None = None) -> str:
         """Resolve a room id, number or name to its space id. Use this before the calculation tools,
@@ -166,5 +173,6 @@ def make_tools(bm: BuildingMap, output_directory: Path, guide: GuideState | None
         *guide_tools,
         *make_selection_tools(bm, guide),
         *level4_tools,
+        *(make_campus_tools(campus, output_directory, guide) if campus else []),
         *kinds,
     ]

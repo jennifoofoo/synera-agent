@@ -97,3 +97,24 @@ def test_saved_building_swaps_the_map_tools_and_prompt():
     assert agent.map.data["building"]["id"] == other_dir.name
     assert other_dir.name in agent.system[0]["text"] or agent.map.data["building"]["name"] in agent.system[0]["text"]
     assert {"build_from_plan", "save_building", "find_route"} <= {tool.name for tool in agent.tools}
+
+
+def test_campus_holder_adds_campus_tools_and_rules_only_when_given(tmp_path):
+    from pathlib import Path as P
+
+    from building_agent.agent import CAMPUS_RULES
+    from building_agent.campus import make_example_campus
+    from building_agent.campus_tools import CampusHolder, load_maps
+
+    building_dir, _question = labelled_questions("errand")[0]
+    plain = Agent(load_map(building_dir), P("agent_output") / "test", client=object())
+    assert "campus_route" not in {tool.name for tool in plain.tools}
+    assert CAMPUS_RULES not in plain.system[0]["text"]
+
+    campus = make_example_campus(P("data"))
+    maps, _ = load_maps(campus)
+    first = next(iter(maps.values()))
+    holder = CampusHolder(campus, maps, path=tmp_path / "campus.json", bm=first)
+    multi = Agent(first, P("agent_output") / "test", client=object(), campus=holder)
+    assert {"campus_route", "list_buildings", "connect_buildings"} <= {tool.name for tool in multi.tools}
+    assert CAMPUS_RULES in multi.system[0]["text"]

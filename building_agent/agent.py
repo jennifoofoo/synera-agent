@@ -9,6 +9,7 @@ from pathlib import Path
 
 import anthropic
 
+from building_agent.campus_tools import CampusHolder
 from building_agent.guide_tools import GuideState
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
@@ -66,10 +67,34 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 - If a place is ambiguous (for example 'WC' or 'toilet' exists on several floors), list the floors and ask before ANY route or directions call. Do not route to several candidates to compare them: when the same room type exists on more than one floor and the person gave no floor, ask first."""
 
 
+CAMPUS_RULES = """
+
+Campus (several buildings, tools list_buildings, campus_route, link_what_changes, connect_buildings, close_link, \
+confirm_campus_change):
+- When the person names another building, or a place that is not in the building above, call campus_route (start and \
+destination, plus start_building and destination_building when they said them) instead of give_directions. Call \
+list_buildings first if you do not know the buildings. Read out only the steps it returns (at most 3); 'weiter' means \
+next_steps. If the person uses a wheelchair, pram or trolley pass step_free=true and say the length and \
+normal_route_length_m.
+- If campus_route returns candidates for a name, ask which building. If there is no link between two buildings, say so \
+and offer to connect them. Never invent links, entrances, lengths or buildings.
+- To connect two buildings call connect_buildings and show the card in plain words (what you understood, the length \
+and whether it is an estimate, which buildings become connected). Ask for a yes. Only after the person's NEXT message \
+is a clear yes call confirm_campus_change(true, reply word for word); on no call confirm_campus_change(false). 'ja ja' \
+or 'whatever' is not a yes. Closing or reopening a link works the same way with close_link.
+- 'What if the walkway is closed' is a question: call link_what_changes and report its sentences. Do not call close_link \
+for a question."""
+
+
 class Agent(StarterAgent):
     def __init__(
-        self, building_map: BuildingMap, output_directory: Path, client: anthropic.Anthropic | None = None
+        self,
+        building_map: BuildingMap,
+        output_directory: Path,
+        client: anthropic.Anthropic | None = None,
+        campus: CampusHolder | None = None,
     ) -> None:
+        self.campus = campus  # several buildings: adds the campus tools and rules
         super().__init__(building_map, output_directory, client)
         self.guide = GuideState()
         self.output_directory = output_directory
@@ -80,9 +105,14 @@ class Agent(StarterAgent):
         if hasattr(self.guide, "undo"):
             self.guide.undo.clear()
         self.map = building_map
-        self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building)
+        self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building, campus=self.campus)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)
-        self.system[0]["text"] = STARTER_PROMPT.format(overview=overview) + CALCULATION_RULES + CONVERSATION_RULES
+        self.system[0]["text"] = (
+            STARTER_PROMPT.format(overview=overview)
+            + CALCULATION_RULES
+            + CONVERSATION_RULES
+            + (CAMPUS_RULES if self.campus else "")
+        )
 
     def swap_building(self, path) -> None:
         self.install_building(BuildingMap.load(Path(path)))
@@ -101,9 +131,11 @@ class Agent(StarterAgent):
 class Session(Agent):
     """One conversation on an existing BuildingMap (the 2D page's), so edits and routes show up there."""
 
-    def __init__(self, building_map: BuildingMap, output_directory: Path = OUTPUT_DIRECTORY, client=None) -> None:
+    def __init__(
+        self, building_map: BuildingMap, output_directory: Path = OUTPUT_DIRECTORY, client=None, campus=None
+    ) -> None:
         output_directory.mkdir(parents=True, exist_ok=True)
-        super().__init__(building_map, output_directory, client)
+        super().__init__(building_map, output_directory, client, campus)
 
 
 def cache_key(building_directory: Path, question_text: str) -> str:
