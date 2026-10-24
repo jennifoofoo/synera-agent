@@ -1,10 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import * as THREE from "three";
 import { CameraControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
 import type { BuildingModel } from "../model/model";
 import { useTwin } from "../store";
+import { useCameraMouse } from "./cameraMouse";
 import { controlsRef, cutawayUniforms } from "./FloorMesh";
 
 interface Props {
@@ -24,6 +25,16 @@ function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 
   void c.fitToSphere(sphere, animate);
 }
 const HOME_POLAR = Math.PI / 3.6;
+
+function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 /** Smooth camera with limits: never below the floor, never away from the building, a sensible distance, and
  * fly-to for rooms, things, floors and points. Reduced motion: the camera jumps. */
@@ -115,14 +126,18 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
     c.maxPolarAngle = flat ? PLAN_TILT : Math.PI / 2 - 0.12;
-    c.minAzimuthAngle = flat ? 0 : -Infinity;
-    c.maxAzimuthAngle = flat ? 0 : Infinity;
+    // The plan may be rotated (right drag, two fingers) but never tilted; Home turns it back north up.
+    c.minAzimuthAngle = -Infinity;
+    c.maxAzimuthAngle = Infinity;
     const A = CameraControlsImpl.ACTION;
-    c.mouseButtons.left = flat ? A.TRUCK : A.ROTATE;
-    c.mouseButtons.right = A.TRUCK;
+    // Left drag and middle drag pan (grab the map) in cameraMouse.ts; Ctrl or Alt + left, and right drag, rotate.
+    c.mouseButtons.left = A.NONE;
+    c.mouseButtons.middle = A.NONE;
+    c.mouseButtons.right = A.ROTATE;
     c.mouseButtons.wheel = flat ? A.ZOOM : A.DOLLY;
-    c.touches.one = flat ? A.TOUCH_TRUCK : A.TOUCH_ROTATE;
-    c.touches.two = flat ? A.TOUCH_ZOOM_TRUCK : A.TOUCH_DOLLY_TRUCK;
+    // One finger pans (cameraMouse.ts); two fingers pinch-zoom and rotate (vertical movement tilts in 3D).
+    c.touches.one = A.NONE;
+    c.touches.two = flat ? A.TOUCH_ZOOM_ROTATE : A.TOUCH_DOLLY_ROTATE;
     if (flat) void c.rotateTo(0, PLAN_TILT, false);
     c.smoothTime = 0.32;
     c.draggingSmoothTime = 0.08;
@@ -162,6 +177,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         const floor = model.floorById.get(focusedFloorId ?? "") ?? model.floors[0];
         const y = floorY(floor.id);
         box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+        void c.rotateTo(0, PLAN_TILT, animate);
         fitBox(c, box, animate, 0.9);
         return;
       }
@@ -293,6 +309,41 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [flat, reducedMotion, invalidate]);
+
+  // Double click on a room or the floor in 3D flies to that room (2D keeps the floor mesh's zoom-in handler).
+  const scene = useThree((s) => s.scene);
+  const gl = useThree((s) => s.gl);
+  const raycaster = useThree((s) => s.raycaster);
+  const onDoubleClick = useCallback(
+    (event: MouseEvent) => {
+      if (flat) return;
+      const rect = gl.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      camera.updateMatrixWorld();
+      raycaster.setFromCamera(ndc, camera);
+      const targets: THREE.Object3D[] = [];
+      scene.traverse((object) => {
+        if (object.userData?.floorId && !object.userData.ghost && (object as THREE.Mesh).isMesh) {
+          let visible = true;
+          for (let o: THREE.Object3D | null = object; o; o = o.parent) visible = visible && o.visible;
+          if (visible) targets.push(object);
+        }
+      });
+      const hit = raycaster.intersectObjects(targets, false)[0];
+      if (!hit) return;
+      const floorId = hit.object.userData.floorId as string;
+      const floor = model.floorById.get(floorId);
+      if (!floor) return;
+      const x = hit.point.x;
+      const y = -hit.point.z;
+      const space = floor.spaces.find((candidate) => pointInPolygon(x, y, candidate.polygon));
+      if (space) useTwin.getState().flyTo(space.id);
+      else useTwin.getState().requestCamera({ kind: "point", floorId, point: [x, y], radius: 8 });
+    },
+    [flat, gl, camera, raycaster, scene, model],
+  );
+  const inUse = useCallback(() => !document.body.classList.contains("campus-site-open"), []);
+  useCameraMouse({ controls, onDoubleClick, active: inUse });
 
   // Cutaway: outer walls facing the camera are lowered. In 2D, note when the view was panned away from the floor.
   const direction = new THREE.Vector2();
