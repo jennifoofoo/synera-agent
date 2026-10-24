@@ -386,3 +386,9 @@ Fast niemand verbindet **Gespräch, Gebäudegeometrie und Wegführung**. Die War
 - Suchen: "Hey Wanda, ich brauch noch X" baut den nächsten X als Zwischenstopp in die laufende Route (`via`).
 - Wissen: Ortsnotizen per Sprache ("Hey Wanda, merk dir hier: ..."), beim nächsten Vorbeilotsen vorgelesen.
 - Dokumentation: "Hey Wanda, fertig" erzeugt ein Einsatzprotokoll (Ziel, Zeit, Meter, Sperrungen, Notizen), ohne LLM.
+
+### Ortsnotizen: Schichtübergabe und Wissen des Erfahrenen (Leonie: "spannend", "cute")
+Ein Feature, zwei Geschichten:
+- **Schichtübergabe:** "Hey Wanda, merk dir: Ventil an Presse 2 tropft, morgen tauschen." Die Notiz hängt am Ort; die nächste Schicht hört sie beim Vorbeilotsen.
+- **Wissen des Erfahrenen:** Der Senior sagt beim Rundgang "hier immer erst den Hebel links". Der Neue hört es an derselben Stelle.
+Technik: Standort + freihändiger Befehl "merk dir" (lokal, ohne LLM) + Pin auf der Karte + Vorlesen in der Schrittliste, wenn die Route den Raum betritt. Für mehrere Geräte braucht es einen kleinen Speicher auf dem Server (Jennifer).
