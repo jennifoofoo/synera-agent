@@ -197,14 +197,14 @@ def stair_cached_rows(floors: list[tuple[str, int]]) -> list[dict]:
     return rows
 
 
-def stair_drop_rows(split: str) -> list[dict]:
+def stair_drop_rows(split: str, every: int = 1) -> list[dict]:
     """Every Swiss floor of a split (dev or train) with the stair doors dropped."""
     import tests.level4_helpers as helpers
 
     helpers.DATA_DEV = Path("data") / split
     rows = []
     try:
-        for directory in sorted(helpers.DATA_DEV.glob("swiss-*")):
+        for directory in sorted(helpers.DATA_DEV.glob("swiss-*"))[::every]:
             for floor in helpers.load_building(directory.name)["floors"]:
                 case = drop_stair_doors(floor_case(directory.name, floor["level"]))
                 if not case.dropped_doors:
@@ -228,8 +228,8 @@ def stairs_report(arguments) -> None:
         if arguments.summary:
             continue
         print(f"{variant}\n" + "\n".join(table(rows, "floor")) + "\n")
-    for split in ("dev", "train"):
-        rows = stair_drop_rows(split)
+    for split in arguments.splits.split(","):
+        rows = stair_drop_rows(split, arguments.every if split == "train" else 1)
         print(f"\nSwiss {split} floors, stair doors dropped ({len({r['floor'] for r in rows})} floors)\n")
         for variant in SUGGESTERS:
             part = [r for r in rows if r["variant"] == variant]
@@ -240,6 +240,8 @@ def stairs_report(arguments) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="eval_suggest")
+    parser.add_argument("--splits", default="dev,train", help="with --stairs: dev, train or both")
+    parser.add_argument("--every", type=int, default=1, help="with --stairs: use every Nth train building")
     parser.add_argument("--stairs", action="store_true", help="compare the stair hall rule on cached and Swiss floors")
     parser.add_argument("--set", action="append", default=[], help="override a score weight, e.g. HUB_BONUS=2")
     parser.add_argument("--summary", action="store_true", help="only the per-source tables")
