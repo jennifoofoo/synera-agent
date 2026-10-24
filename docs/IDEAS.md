@@ -121,7 +121,7 @@ Status: 3a und 3b **gesetzt** (Leonie, 24.10.2026), 3c geparkt. Gedanke: 3D nich
 - Wegbeschreibung per Sprache in kurzen Schritten mit Landmarken.
 - Unterschied zur normalen Route: Der Agent denkt den Auftrag mit (holen, wo anpacken), nicht nur den Weg. Näher an "üblich" als 3a und 3b.
 
-## 3. Funde aus der Synera-Präsentation ("Industrial Agents Hackathon.pdf")
+## 4. Funde aus der Synera-Präsentation ("Industrial Agents Hackathon.pdf")
 Status: geparkt (24.10.2026). Abgleich der Präsentation mit unserem Stand. Alles hier ist nicht beschlossen. Details zum Stand der Level stehen in `docs/LEVELS_STATUS.md`.
 
 ### 3a. Gänge und Docks auflösen ("Aisle 4 is blocked. Fastest route to dock B?")
@@ -157,7 +157,7 @@ Status: geparkt (24.10.2026). Abgleich der Präsentation mit unserem Stand. Alle
 3. Ereignisprotokoll (3b), falls Make-things-move als Extra gewählt wird.
 4. Mehrnutzer und Spielkarte (3e) nur, wenn noch Zeit bleibt. Scan und AR (3d) nicht.
 
-## 4. Zutrittsrechte: "Wo darf ich überhaupt hin?" (Idee von Jennifer, 24.10.2026)
+## 5. Zutrittsrechte: "Wo darf ich überhaupt hin?" (Idee von Jennifer, 24.10.2026)
 Status: geparkt. Passt zu den Personas (Facility Manager, Servicetechniker, neue Mitarbeitende) und ist im Alltag sehr realistisch: Nicht jeder darf überall hin.
 
 ### Idee
@@ -189,7 +189,7 @@ Wir sagen immer ehrlich: "Das ist eine Beispielregel, kein echtes Berechtigungss
 - Frage an Synera: Gibt es Berechtigungen in den Sonntagsdaten oder Fragen dazu? (vermutlich nein)
 - Einordnung für das Ideation-Gate: Starke Alltagsgeschichte und billig auf unserem Routing, aber **keine Rubrik der Jury nennt sie**. Als Creativity-Extra neben Accessibility und 3D denkbar, nicht als Ersatz.
 
-## 5. "Wir haben weitergedacht": Roadmap-Geschichte für Pitch und Technik-Text
+## 6. "Wir haben weitergedacht": Roadmap-Geschichte für Pitch und Technik-Text
 Status: geparkt, Nutzung beim Schreiben von Pitch, Video und Technik-Text (`docs/submission/`). Gedanke von Jennifer: Nicht alles muss gebaut sein. Die Jury bewertet auch, was wir **nicht gefragt wurden** ("what did you add that we did not ask for"). Eine ehrlich beschriebene Roadmap zeigt Tiefe, solange wir klar trennen zwischen **gebaut und gemessen**, **als Spec oder Prototyp vorbereitet** und **nur Idee**.
 
 ### Aussage in einem Satz
@@ -213,3 +213,40 @@ Status: geparkt, Nutzung beim Schreiben von Pitch, Video und Technik-Text (`docs
 - `docs/submission/TECHNICAL_EXPLANATION.md`: Abschnitt "Where this goes next" (englisch, 6 bis 8 Zeilen, dieselben drei Spalten, nur Belegtes in der ersten Spalte).
 - `docs/submission/DEMO_SCRIPT.md`: Schlussbild des Videos (5 Sekunden Roadmap-Folie) und eine Antwort in den Q&A ("What would you build next?").
 - Optional als Mini-Demo, wenn Zeit bleibt: eine Rollen-Auswahl in der Seite, die nur zeigt, welche Räume mit der Regel "Beispielregel" gesperrt wären (kein Routing). Nur wenn Idee 4 Phase 1 nicht gebaut wird und klar als Beispiel gekennzeichnet.
+
+## 7. Wo bin ich, und was bewegt sich? Heute schon, ohne 6G
+Status: geparkt (Leonie, 24.10.2026). Gedanke für die Story: 6G soll Gebäude selbst "sehen" lassen (Sensing, cm-genaue Ortung, Echtzeit-Zwilling). Vieles davon lässt sich heute mit Handy und Laptop nachbauen. Unser Agent ist die Schnittstelle, egal woher die Daten kommen: "heute Gespräch, QR und Foto, morgen 6G".
+
+| Idee | Heute echt oder simuliert | Aufwand | Einschätzung |
+|---|---|---|---|
+| 7a QR-Code an jeder Tür (aus den Daten generiert): Scan = "du stehst an Tür 0.12" | echt | klein | verlässlich, Rückfallebene |
+| 7b **Foto-Ortung**: Foto von Türschild oder Maschine, Claude-Vision liest Raumnummer oder Maschinentyp, Abgleich mit unseren Daten | echt | mittel | Wow-Moment ohne Infrastruktur |
+| 7c Blauer Punkt zwischen QR-Codes (Schritte und Kompass im Browser, rastet an der Route ein) | echt, ungenau | mittel | parken (Risiko) |
+| 7d "Das ist jetzt hier": Maschine per Code umziehen, Karte und Einbring-Check rechnen neu | echt | klein bis mittel | Level 5 "Make things move" |
+| 7e Positions-Schnittstelle `/api/position` plus simulierter Stapler-Feed (heute UWB-Tags, morgen 6G), Live-Hotspots Mensch und Stapler | Schnittstelle echt, Daten simuliert | mittel | Brücke zu 6G und zu Idee 3b |
+| 7f Mehrere Menschen: Einchecken per QR, "wer ist am nächsten an Presse 2?" | echt | mittel | nur mit klarem Zweck (siehe unten) |
+| 7g Ereignis-Eingang aus Systemen ("Aufzug 1: Störung"), sperrt und routet automatisch | Eingang echt, Meldung simuliert | klein | nutzt vorhandene Sperren |
+
+### 7b Foto-Ortung: reichen die Daten? (gezählt über alle 280 Gebäude)
+- Türschilder: jeder Raum hat eine Nummer (`ref`), eindeutig pro Gebäude bei procedural, Swiss und ResPlan zu 100 %, bei OSM zu 95 % (Rückfrage bei Doppelten).
+- Maschinen: 853, nur in Fabriken, nur 100 davon sind die einzige ihres Typs im Gebäude. Ortung über die Maschine also nur mit Rückfrage über Nachbarn ("was steht links neben dir?"), Positionen und Nachbarn haben wir.
+- Möbel taugen nicht (zu viele gleiche).
+- Es gibt keine echten Fotos der Gebäude. Demo: Türschild aus den Daten ausdrucken und fotografieren.
+
+### 7f Mehrere Menschen: für wen?
+- Evakuierung und Sammelplatz-Kontrolle ("wer ist noch drin, wo?", Rettungsweg für Rollstuhl): stärkster Fall, echter Pflichtprozess.
+- Instandhaltungs-Disponent ("wer ist am nächsten an Presse 2?"): spart Stillstandszeit, passt zu 3d.
+- Empfang und Besucher: mittel. Kollegen finden: schwach.
+- Datenschutz: freiwillig, nur Raumebene, nur für die Schicht.
+
+### 7h. Evakuierung und Sammelplatz-Kontrolle (aus 7f), spannend (Leonie)
+- Wer: Sicherheitsbeauftragter, Brandschutzhelfer. Echter Pflichtprozess in jeder Fabrik, heute oft Listen auf Papier.
+- Ablauf: Alarm. Alle Eingecheckten (QR, Foto-Ortung, später 6G) erscheinen auf der Karte. Jeder bekommt seinen Fluchtweg zum nächsten Ausgang, Aufzüge gesperrt, Rollstuhlnutzer bekommen einen stufenfreien Weg oder einen sicheren Wartebereich. Am Sammelplatz abhaken. Der Beauftragte fragt: "Wer ist noch drin, und wo?" und bekommt Räume und Namen.
+- Daten: Eingänge (`outside`), Sperren, stufenfreies Routing vorhanden. Fehlt: Fluchtwege und Sammelplätze als eigene Angabe (Annahme: Eingänge = Ausgänge, Sammelplatz im Gespräch festlegen).
+- Ehrlich: kein Ersatz für die Brandschutzordnung, nur Hilfe. Datenschutz: nur für die Dauer des Alarms.
+
+### 7i. Nächster Techniker bei einer Störung (aus 7f), spannend (Leonie)
+- Wer: Schichtleiter oder Instandhaltungs-Disponent. Spart Stillstandszeit.
+- Ablauf: "Presse 2 steht." Der Agent kennt die Positionen der eingecheckten Techniker, rechnet echte Laufwege (nicht Luftlinie, über Treppen und Aufzüge) und schlägt den nächsten vor: "Max ist 40 m entfernt, Lena 120 m über die Treppe." Auf Ja bekommt Max die Route, optional mit Werkzeug-Abholung (3d Störungs-Modus).
+- Daten: Routing, `errand`-Logik, Maschinenpositionen vorhanden. Fehlt: Qualifikation der Techniker (im Gespräch angeben oder simulieren).
+- Passt zu Syneras Präsentation (Mehrnutzer-Karte auf der Schlussfolie).
