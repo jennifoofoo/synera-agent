@@ -11,3 +11,5 @@ Short list first. Details below each item if they ask.
 7. **Compass words.** Are directions such as "the east lift" used in questions? What is east in the plan (+x)?
 8. **Voice.** Does browser speech recognition count as "voice in" or do you expect ElevenLabs in both directions? Which browser and network will the demo use?
 9. **Process.** Exact code-freeze time, time limit per question when you run `BENCHMARK.md`, and which ElevenLabs quota we have.
+10. **Aisles and docks.** In the data, aisles are named "Main aisle H-C1" and no space has "dock" in its name. How are "Aisle 4" and "dock B" meant in the Sunday questions (names, numbering, which spaces)?
+11. **Time and deliveries.** The deck mentions "Where is the steel drum delivered yesterday?". Will Sunday contain questions about history or deliveries (the data has no timestamps)?

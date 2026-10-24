@@ -120,3 +120,39 @@ Status: 3a und 3b **gesetzt** (Leonie, 24.10.2026), 3c geparkt. Gedanke: 3D nich
 - An der Maschine die Zugangsseite markieren (die Seite, die nicht an Wand oder Nachbarmaschine steht, aus `footprint` und Nachbarn).
 - Wegbeschreibung per Sprache in kurzen Schritten mit Landmarken.
 - Unterschied zur normalen Route: Der Agent denkt den Auftrag mit (holen, wo anpacken), nicht nur den Weg. Näher an "üblich" als 3a und 3b.
+
+## 3. Funde aus der Synera-Präsentation ("Industrial Agents Hackathon.pdf")
+Status: geparkt (24.10.2026). Abgleich der Präsentation mit unserem Stand. Alles hier ist nicht beschlossen. Details zum Stand der Level stehen in `docs/LEVELS_STATUS.md`.
+
+### 3a. Gänge und Docks auflösen ("Aisle 4 is blocked. Fastest route to dock B?")
+- Befund: Gänge heißen in den Daten nur "Main aisle H-C1" (112 Räume, keine Nummer 4). Räume mit "Dock" im Namen gibt es nicht. "Aisle 4" und "dock B" lassen sich nicht eindeutig auflösen.
+- Idee: Der Agent listet die Gänge der Halle auf und fragt, welchen die Person meint. "Dock B" wird auf Eingänge der Halle (Öffnungen mit 3 m oder mehr zum Außenbereich) oder auf Bereiche abgebildet, die der Person angeboten werden. Eine Zuordnung per Zähler ("aisle 4" gleich vierter Gang nach Name sortiert) nur als Vorschlag mit Bestätigung, wie bei "line 4".
+- Frage an Synera: Wie heißen Gänge und Docks am Sonntag? Zählen Gabelstapler-Regeln wirklich?
+- Aufwand: klein (1 bis 2 Stunden), Tests mit Fabrik-Gebäuden. Teil des Gabelstapler-Pakets W-L2b.
+
+### 3b. Ereignisprotokoll und Zeit ("Where is the steel drum delivered yesterday?")
+- Befund: Wir haben keinen Zeitverlauf. Es gibt `move_asset`, `add_asset` und Undo, aber keine Zeitstempel, keine Lieferungen und keine Abfrage "wo war X gestern". In den Daten gibt es kein Fass (nur Palettenregale und Hubwagen).
+- Idee ("Make things move"): Ein Ereignisprotokoll `events.jsonl` pro Gebäude (Zeit, Art, Asset, von, nach, wer). Werkzeuge: `where_was(asset, when)`, `what_changed_since(when)`, `record_delivery(type, room)` (neues Asset mit Eingangszeit, Karte und Ja). Eine Zeitleiste in der Seite (Schieberegler "Stand von gestern").
+- Auch gut für die Demo: "Der Hubwagen stand heute früh in Halle A, jetzt in Halle B".
+- Aufwand: etwa 2 bis 3 Stunden ohne Seite, 2 Stunden Seite (Leonie). Kann auf dem Undo-Stapel und `moved_assets` aufbauen.
+
+### 3c. Rollstuhl-Persona vollständig ("step-free and wide doors, every time, without asking twice")
+- Befund: Stufenfrei ja. Türbreite und das Merken des Profils im Gespräch fehlen. Das ist ein direkter Punkt in ihrer Rubrik.
+- Idee: Accessibility-Modus (siehe Idee 1 oben). Mindestumfang für den Score: Profil Rollstuhl mit wählbarer Türbreite (0,9, 1,0, 1,1 m), merkt sich das Profil für das ganze Gespräch, alle Routen, Wegbeschreibungen und Zielvorschläge halten es ein, Hinweis, wenn kein Weg existiert, Umweg ehrlich nennen. Die Bausteine existieren: `step_free`, `min_width` in `wide_delivery_count`, Filter im Routing.
+- Empfehlung: Als erstes Extra bauen (billig, direkter Bezug zur Jury).
+
+### 3d. Live-Update per Scan, AR auf dem Handy
+- Befund: Die Präsentation nennt "Live updates from a scan" und "AR on the phone" unter "possible today". Wir haben nichts dafür geplant.
+- Einschätzung: Hoher Aufwand, geringer Gewinn. Ein Scan-Update ließe sich als "Plan nachladen und Unterschiede zeigen" (Level-4-Pipeline plus Vergleich zweier Gebäude) vereinfachen. AR braucht Standortbestimmung (QR-Codes an Türen). Nur wenn Zeit bleibt.
+
+### 3e. Darstellung und Mehrnutzer (Schlussfolie)
+- Befund: Die Schlussfolie zeigt eine isometrische 3D-Etage über dem 2D-Plan, eine Spielkarte (Mario), eine Among-Us-Karte mit mehreren Figuren und eine Kartenroute (Tacto als Ziel). Das deutet auf Erwartungen an Darstellung (stilisierte, spielerische Karte) und mehrere Personen hin.
+- Idee Mehrnutzer: Mehrere Personen sehen dasselbe Gebäude, jede Person hat eine Figur und eine Farbe, Änderungen eines Facility Managers erscheinen live bei allen (Server-Ereignisse per Polling oder Server-Sent Events). Passt zu "Several users" im README (Level 5) und zu 3b.
+- Idee Spielkarte: eine optionale, stilisierte Ansicht (Pixel-Optik) als Gag für die Demo, nur wenn die 3D-Ansicht steht.
+- Aufwand Mehrnutzer: 3 bis 4 Stunden (Server-Ereignisse, Figuren auf dem Plan). Risiko: Zeitaufwand ohne Punkte aus der Rubrik, außer unter Creativity.
+
+### Reihenfolge-Empfehlung für das Ideation-Gate
+1. Accessibility-Modus mit Türbreite (3c) und die Gabelstapler-Auflösung (3a).
+2. 3D mit Agentensteuerung (Idee 2).
+3. Ereignisprotokoll (3b), falls Make-things-move als Extra gewählt wird.
+4. Mehrnutzer und Spielkarte (3e) nur, wenn noch Zeit bleibt. Scan und AR (3d) nicht.
