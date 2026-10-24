@@ -341,7 +341,15 @@ function campusBackLabel(): string | null {
   return null;
 }
 
-useTwin.setState({ campusHook: { routeHere: routeHereAcross, clearRoute: clearCampusRoute, back: campusBack, backLabel: campusBackLabel } });
+function campusHereName(): string | null {
+  const campus = useCampus.getState();
+  if (campus.mode !== "building" || !campus.here || campus.here.building_id === campus.current) return null;
+  return buildingOf(campus.view, campus.here.building_id)?.name ?? null;
+}
+
+useTwin.setState({
+  campusHook: { routeHere: routeHereAcross, clearRoute: clearCampusRoute, back: campusBack, backLabel: campusBackLabel, hereName: campusHereName },
+});
 useCampus.subscribe((campus) => {
   const on = campus.mode !== "off" && !!campus.route?.ok;
   if (useTwin.getState().campusRoute !== on) useTwin.setState({ campusRoute: on });
