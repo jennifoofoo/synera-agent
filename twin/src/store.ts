@@ -152,7 +152,15 @@ interface TwinState {
   handsFreeHeard: string;
   /** Why hands-free switched itself off (no mic permission, unsupported browser); null otherwise. */
   handsFreeNotice: string | null;
+  /** Something was said to Wanda since hands-free went on: the "Say Hey Wanda" hint is not shown again. */
+  handsFreeSpoken: boolean;
   setHandsFree: (on: boolean) => void;
+  /** Setting "Follow-up listening" (default on, localStorage twin.followUp): after a spoken reply the mic stays open
+   * a few seconds for the next question, no wake word or button. Change it with setFollowUpPref (handsFree.ts). */
+  followUp: boolean;
+  /** The follow-up window is open right now ("listening…"), and what was heard in it so far. */
+  followUpOpen: boolean;
+  followUpHeard: string;
 
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
@@ -267,6 +275,16 @@ export const useTwin = create<TwinState>((set, get) => ({
   handsFreeStatus: "listening",
   handsFreeHeard: "",
   handsFreeNotice: null,
+  handsFreeSpoken: false,
+  followUp: (() => {
+    try {
+      return localStorage.getItem("twin.followUp") !== "off";
+    } catch {
+      return true;
+    }
+  })(),
+  followUpOpen: false,
+  followUpHeard: "",
 
   async loadBuildings() {
     try {
@@ -442,7 +460,7 @@ export const useTwin = create<TwinState>((set, get) => ({
     if (get().handsFree) get().setHandsFree(false);
   },
   setHandsFree(handsFree) {
-    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null });
+    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null, handsFreeSpoken: false });
   },
 
   async route(start, destination, stepFree = false) {
