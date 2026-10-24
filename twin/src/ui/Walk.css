@@ -2,7 +2,7 @@
 .card-walk { --walk-blue: var(--signal); }
 .card-walk button.primary:hover { background: var(--signal-dark); border-color: var(--signal-dark); }
 .card-walk .walk-end { flex: none; min-height: 30px; padding: 4px 10px; font-size: 13px; }
-.worker .card-walk .walk-end { min-height: 40px; font-size: 14px; }
+.worker .card-walk .walk-end { min-height: 44px; min-width: 44px; font-size: 14px; }
 .card-walk .walk-now { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
 .card-walk .walk-now p { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600; }
 .card-walk .walk-icon { flex: none; color: var(--walk-blue); }

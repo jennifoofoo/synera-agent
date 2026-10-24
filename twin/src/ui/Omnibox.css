@@ -113,5 +113,5 @@
   background: var(--surface); color: var(--text); font-size: 13px; box-shadow: var(--shadow-float);
 }
 .ob-chip:hover { background: var(--paper-2); }
-.worker .ob-chip { min-height: 40px; font-size: 15px; }
+.worker .ob-chip { min-height: 44px; font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }
