@@ -3,18 +3,23 @@
 Deterministic, no API. Odd input becomes Findings and dropped parts; only unusable input raises ConvertError
 (no floors, scale zero/negative/NaN, nothing left to build)."""
 
+import dataclasses
+import functools
 import itertools
 import math
+import re
 import statistics
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from shapely.affinity import translate
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.ops import linemerge, nearest_points, unary_union
 
 from building_agent.geometry import repaired
 from building_agent.level4.schema import DOOR_KINDS, OUTSIDE, ROOM_TYPES, Extraction, Findings, Scale
+from building_agent.level4.segment import SegmentResult
 from building_agent.level4.validate import OUTER_WALL_TOLERANCE_M, Collector, outer_boundary, room_label
 from starter_agent.building_map import ADJACENT_DISTANCE_M
 
@@ -34,8 +39,21 @@ ENTRANCE_ROOM_REACH_M = 0.15
 ENTRANCE_LIMIT_MIN = 8
 ENTRANCE_LIMIT_ROOM_SHARE = 3
 FLOOR_HEIGHT_M = 3.0
-MIN_STAIR_OVERLAP = 0.3
+MIN_STAIR_OVERLAP = 0.3  # of the smaller room
 CONNECTOR_KIND = {"stair": "stairs", "lift": "lift"}
+MANUAL_ID_MARK = "-VM"
+# Rules that make a room a stair or a lift, only when the draft has several floors (checked in this order):
+# 1. the model type says stair or lift (also on one floor); 2. its room_type is stairwell or lift; 3. a plain room
+# (model type room, generic room_type) whose whole name or ref is only these words, numbers and letters, so
+# 'Staircase 2' and 'Stairs and Lift' count but 'Elevator lobby', 'Lift motor room' and 'Lifting' do not; 4. no name,
+# a plain room and the kit plan colour: orange fill = stairs, purple fill = lift (see segment.PALETTE).
+STAIR_WORDS = ("stair", "stairs", "staircase", "stairwell", "treppe", "treppen", "treppenhaus", "treppenraum")
+LIFT_WORDS = ("lift", "lifts", "elevator", "elevators", "aufzug", "aufzuege", "fahrstuhl")
+FILL_KIND = {"orange": "stair", "purple": "lift"}
+LABEL_FILLER = {"and", "und", "or", "oder", "main", "no", "nr"}
+STAIR_RE = re.compile(r"\b(" + "|".join(STAIR_WORDS) + r")\b", re.IGNORECASE)
+LIFT_RE = re.compile(r"\b(" + "|".join(LIFT_WORDS) + r")\b", re.IGNORECASE)
+DEFAULT_NAME = re.compile(r"^room\b", re.IGNORECASE)
 TYPE_ROOM_TYPE = {"stair": "stairwell", "lift": "lift", "corridor": "corridor", "hall": "lobby"}
 
 
@@ -58,6 +76,75 @@ class _Room:
     type: str
     given_name: str | None
     polygon: Polygon
+
+
+# ---------- stairs and lifts: typing ----------
+
+
+def _words(*parts: object) -> str:
+    return " ".join(str(part).replace("_", " ") for part in parts if part not in (None, ""))
+
+
+def _connector_label(text: str | None) -> str | None:
+    """'stair' or 'lift' when the whole label is only connector words, numbers and letters ('Staircase 2', 'Stairs and
+    Lift', 'Treppenhaus'), else None ('Elevator lobby', 'Lift motor room', 'Lifting room')."""
+    words = re.findall(r"[^\W\d_]+", _words(text).lower())
+    kinds = set()
+    for word in words:
+        if word in STAIR_WORDS:
+            kinds.add("stair")
+        elif word in LIFT_WORDS:
+            kinds.add("lift")
+        elif word not in LABEL_FILLER and len(word) > 1:
+            return None
+    return "stair" if "stair" in kinds else ("lift" if kinds else None)
+
+
+def detect_connector(
+    model_type: str,
+    room_type: str | None,
+    name: str | None,
+    ref: str | None,
+    fill: str | None = None,
+    several_floors: bool = True,
+) -> tuple[str | None, str]:
+    """('stair' | 'lift' | None, why) for one room, by the rules at STAIR_WORDS. why is 'model', 'words' or 'fill'.
+    Only the model type counts on a single floor. Name and ref count only for a plain room (never a lobby, hall or
+    corridor) whose whole label is a connector word."""
+    if model_type in CONNECTOR_KIND:
+        return model_type, "model"
+    if not several_floors:
+        return None, ""
+    given_type = (room_type or "").strip().lower()
+    if given_type == "stairwell":
+        return "stair", "words"
+    if given_type == "lift":
+        return "lift", "words"
+    plain = model_type == "room" and given_type in ("", "generic_room")
+    if plain:
+        for label in (name, ref):
+            kind = _connector_label(label)
+            if kind:
+                return kind, "words"
+        if not name and fill in FILL_KIND:
+            return FILL_KIND[fill], "fill"  # type: ignore[index]
+    return None, ""
+
+
+def tag_fills(extraction: Extraction, segment: SegmentResult) -> Extraction:
+    """Remember the plan colour at every room (the region that holds its middle), for detect_connector."""
+    if not segment.usable:
+        return extraction
+    shapes = [(region.shape.buffer(0), region.colour_name) for region in segment.regions]
+    rooms = []
+    for room in extraction.rooms:
+        ring = _ring(room)
+        fill = None
+        if ring is not None:
+            point = Polygon(ring).buffer(0).representative_point()
+            fill = next((name for shape, name in shapes if shape.contains(point)), None)
+        rooms.append(dataclasses.replace(room, fill=fill))
+    return dataclasses.replace(extraction, rooms=rooms)
 
 
 # ---------- scale ----------
@@ -267,7 +354,7 @@ def _door_width(width_px: object, scale: float) -> float:
 
 
 def _convert_floor(
-    floor_input: FloorInput, floor_id: str, found: Collector
+    floor_input: FloorInput, floor_id: str, found: Collector, several_floors: bool = True
 ) -> tuple[list[dict], list[dict], list[_Room]]:
     extraction, scale = floor_input.extraction, floor_input.scale.metres_per_px
     raw_rooms = list(extraction.rooms or [])
@@ -312,6 +399,10 @@ def _convert_floor(
         kind = room.type if room.type in ROOM_TYPES else "room"  # type: ignore[attr-defined]
         ref = str(room.ref).strip() if room.ref not in (None, "") else None  # type: ignore[attr-defined]
         given = str(room.name).strip() if room.name not in (None, "") else None  # type: ignore[attr-defined]
+        detected, _ = detect_connector(kind, room.room_type, given, ref, getattr(room, "fill", None), several_floors)  # type: ignore[attr-defined]
+        if detected and kind not in CONNECTOR_KIND:
+            kind = detected
+            found.add("connector_typed_by_hint", ref or given or f"{floor_id}-S{number:03d}")
         name = given or (f"Room {ref}" if ref else f"Room {number}")
         given_type = (room.room_type or "").strip()  # type: ignore[attr-defined]
         if kind in ("stair", "lift"):
@@ -426,56 +517,138 @@ def _limit_entrances(openings: list[dict], room_count: int, found: Collector) ->
     return [o for o in openings if id(o) not in drop]
 
 
-# ---------- stairs and lifts ----------
+# ---------- stairs and lifts: linking ----------
 
 
-def _link_connectors(
-    levels: list[int], floor_ids: dict[int, str], rooms: dict[int, list[_Room]], building_id: str
-) -> tuple[list[dict], set[str]]:
-    parent: dict[str, str] = {}
+@dataclass
+class _Stop:
+    space_id: str
+    label: str
+    ref: str | None
+    name: str
+    polygon: Polygon
+    kinds: set[str]
 
-    def find(item: str) -> str:
-        while parent.setdefault(item, item) != item:
-            parent[item] = parent[parent[item]]
-            item = parent[item]
-        return item
 
-    for low, high in itertools.pairwise(levels):
-        pairs = []
-        for first in (room for room in rooms[low] if room.type in CONNECTOR_KIND):
-            for second in (room for room in rooms[high] if room.type == first.type):
-                same_key = any(
-                    a and b and a.lower() == b.lower()
-                    for a, b in ((first.ref, second.ref), (first.given_name, second.given_name))
-                )
-                union = first.polygon.union(second.polygon).area
-                overlap = first.polygon.intersection(second.polygon).area / union if union else 0.0
-                if same_key or overlap >= MIN_STAIR_OVERLAP:
-                    pairs.append((same_key, overlap, first.space_id, second.space_id))
-        used: set[str] = set()
-        for _, _, first_id, second_id in sorted(pairs, reverse=True):
-            if first_id not in used and second_id not in used:
+def space_kinds(space: dict) -> set[str]:
+    """'stair' and/or 'lift' for a built space: its type, plus the other one when its name also says so."""
+    kind = space.get("type")
+    if kind not in CONNECTOR_KIND:
+        return set()
+    kinds = {kind}
+    text = _words(space.get("name"), space.get("ref"))
+    other, pattern = ("lift", LIFT_RE) if kind == "stair" else ("stair", STAIR_RE)
+    if pattern.search(text):
+        kinds.add(other)
+    return kinds
+
+
+def _frame_centre(polygons: list[Polygon]) -> tuple[float, float]:
+    box = unary_union(polygons).bounds if polygons else (0.0, 0.0, 0.0, 0.0)
+    return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+
+
+def _overlap(first: Polygon, second: Polygon) -> float:
+    smaller = min(first.area, second.area)
+    return first.intersection(second).area / smaller if smaller > 0 else 0.0
+
+
+def _same_key(first: _Stop, second: _Stop) -> bool:
+    keys = (
+        (first.ref, second.ref),
+        (
+            None if DEFAULT_NAME.match(first.name) else first.name,
+            None if DEFAULT_NAME.match(second.name) else second.name,
+        ),
+    )
+    return any(a and b and a.lower() == b.lower() for a, b in keys)
+
+
+def _find(parent: dict[str, str], item: str) -> str:
+    while parent.setdefault(item, item) != item:
+        parent[item] = parent[parent[item]]
+        item = parent[item]
+    return item
+
+
+def _manual_covered(building: dict) -> tuple[list[dict], set[tuple[str, str]]]:
+    manual = [c for c in building["vertical_connectors"] if MANUAL_ID_MARK in str(c.get("id"))]
+    return manual, {(c["kind"], sid) for c in manual for sid in c["space_ids"]}
+
+
+def relink_connectors(building: dict, found: Collector) -> None:
+    """Rebuild the automatic stairs and lifts of `building` from the space types (in place). Connectors made by hand
+    (id contains MANUAL_ID_MARK) stay and their rooms are not matched again."""
+    levels = {floor["id"]: floor["level"] for floor in building["floors"]}
+    floor_ids = {level: floor_id for floor_id, level in levels.items()}
+    ordered = sorted(floor_ids)
+    manual, covered = _manual_covered(building)
+    stops: dict[int, list[_Stop]] = {level: [] for level in ordered}
+    frames: dict[int, list[Polygon]] = {level: [] for level in ordered}
+    for space in building["spaces"]:
+        level = levels.get(space["floor_id"])
+        try:
+            polygon = Polygon(space["polygon"])
+        except (TypeError, ValueError):
+            continue
+        if level is None or not polygon.is_valid or polygon.is_empty:
+            continue
+        frames[level].append(polygon)
+        kinds = space_kinds(space)
+        if kinds:
+            ref = space.get("ref")
+            stops[level].append(_Stop(space["id"], room_label(space), ref, space.get("name") or "", polygon, kinds))
+    centres = {level: _frame_centre(polygons) for level, polygons in frames.items()}
+    by_id = {stop.space_id: (level, stop) for level, items in stops.items() for stop in items}
+
+    groups: list[tuple[str, list[str]]] = []
+    for kind, word in CONNECTOR_KIND.items():
+        parent: dict[str, str] = {}
+        find = functools.partial(_find, parent)
+
+        for low, high in itertools.pairwise(ordered):
+            lows = [s for s in stops[low] if kind in s.kinds and (word, s.space_id) not in covered]
+            highs = [s for s in stops[high] if kind in s.kinds and (word, s.space_id) not in covered]
+            shift = (centres[low][0] - centres[high][0], centres[low][1] - centres[high][1])
+            pairs = []
+            for first in lows:
+                for second in highs:
+                    same = _same_key(first, second)
+                    raw = _overlap(first.polygon, second.polygon)
+                    moved = _overlap(first.polygon, translate(second.polygon, *shift))
+                    aligned = raw < MIN_STAIR_OVERLAP <= moved
+                    best = moved if aligned else raw
+                    if same or raw >= MIN_STAIR_OVERLAP or aligned:
+                        pairs.append((same, best, first.space_id, second.space_id, aligned))
+            used: set[str] = set()
+            for same, _, first_id, second_id, aligned in sorted(pairs, reverse=True):
+                if first_id in used or second_id in used:
+                    continue
                 used.update((first_id, second_id))
                 parent[find(second_id)] = find(first_id)
+                if aligned and not same:
+                    found.add("connector_aligned_by_centre", f"{by_id[first_id][1].label}/{by_id[second_id][1].label}")
+            left_low = [s for s in lows if s.space_id not in used]
+            left_high = [s for s in highs if s.space_id not in used]
+            if len(lows) == len(highs) == 1 and left_low and left_high:
+                first, second = left_low[0], left_high[0]
+                parent[find(second.space_id)] = find(first.space_id)
+                found.add("connector_linked_by_order", f"{first.label}/{second.label}")
+        members: dict[str, list[str]] = defaultdict(list)
+        for space_id in [space_id for space_id in list(parent) if space_id in by_id]:
+            members[find(space_id)].append(space_id)
+        groups += [(kind, sorted(group, key=lambda sid: by_id[sid][0])) for group in members.values() if len(group) > 1]
 
-    by_id = {room.space_id: (level, room) for level in levels for room in rooms[level]}
-    groups: dict[str, list[str]] = defaultdict(list)
-    for space_id in [space_id for space_id in parent if space_id in by_id]:
-        groups[find(space_id)].append(space_id)
-    connectors = []
-    linked: set[str] = set()
-    ordered = sorted(
-        (sorted(group, key=lambda sid: by_id[sid][0]) for group in groups.values() if len(group) > 1),
-        key=lambda g: (by_id[g[0]][0], g[0]),
-    )
-    for number, group in enumerate(ordered, start=1):
-        first_room = by_id[group[0]][1]
-        kind = CONNECTOR_KIND[first_room.type]
+    groups.sort(key=lambda item: (by_id[item[1][0]][0], item[0], item[1][0]))
+    building_id = building["building"]["id"]
+    connectors = list(manual)
+    linked = {sid for c in manual for sid in c["space_ids"]}
+    for number, (kind, group) in enumerate(groups, start=1):
         connectors.append(
             {
                 "id": f"{building_id}-V{number:02d}",
-                "kind": kind,
-                "name": first_room.name,
+                "kind": CONNECTOR_KIND[kind],
+                "name": by_id[group[0]][1].name,
                 "floor_ids": [floor_ids[by_id[sid][0]] for sid in group],
                 "space_ids": group,
                 "step_free": kind == "lift",
@@ -483,7 +656,12 @@ def _link_connectors(
             }
         )
         linked.update(group)
-    return connectors, linked
+    building["vertical_connectors"] = connectors
+    if len(ordered) > 1:
+        for level in ordered:
+            for stop in stops[level]:
+                if stop.space_id not in linked:
+                    found.add("connector_single_floor", stop.label)
 
 
 # ---------- entry points ----------
@@ -516,7 +694,9 @@ def convert_floors_with_findings(
     openings: list[dict] = []
     rooms: dict[int, list[_Room]] = {}
     for floor in ordered:
-        floor_spaces, floor_openings, floor_rooms = _convert_floor(floor, floor_ids[floor.level], found)
+        floor_spaces, floor_openings, floor_rooms = _convert_floor(
+            floor, floor_ids[floor.level], found, len(ordered) > 1
+        )
         spaces += floor_spaces
         openings += floor_openings
         rooms[floor.level] = floor_rooms
@@ -524,15 +704,6 @@ def convert_floors_with_findings(
             found.add("floor_empty", f"floor {floor.level}")
     if not spaces:
         raise ConvertError("No usable room was found in the plan.")
-
-    connectors, linked = _link_connectors(levels, floor_ids, rooms, building_id)
-    if len(levels) > 1:
-        for level in levels:
-            for room in rooms[level]:
-                if room.type in CONNECTOR_KIND and room.space_id not in linked:
-                    found.add(
-                        "connector_single_floor", room_label({"id": room.space_id, "ref": room.ref, "name": room.name})
-                    )
 
     floor_dicts = [
         {
@@ -558,9 +729,10 @@ def convert_floors_with_findings(
         "floors": floor_dicts,
         "spaces": spaces,
         "openings": openings,
-        "vertical_connectors": connectors,
+        "vertical_connectors": [],
         "assets": [],
     }
+    relink_connectors(building, found)
     return building, Findings(found.findings())
 
 

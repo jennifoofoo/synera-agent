@@ -20,27 +20,44 @@ from shapely.strtree import STRtree
 
 from building_agent.guide_tools import NO, YES, GuideState
 from building_agent.level4.convert import (
+    CONNECTOR_KIND,
+    MANUAL_ID_MARK,
     ConvertError,
     FloorInput,
     convert_floors_with_findings,
     exterior_wall,
     pixel_to_metres,
     point_on_wall,
+    relink_connectors,
     scale_from_bar,
     scale_from_known_length,
+    tag_fills,
 )
 from building_agent.level4.extract import DEFAULT_ALLOWED_ROOT, ExtractError, ExtractResult, extract_floor
 from building_agent.level4.markers import detect_markers, merge_markers
 from building_agent.level4.schema import OUTSIDE, Extraction, Findings, Scale
 from building_agent.level4.segment import match_to_extraction, segment_rooms
 from building_agent.level4.suggest import apply_suggestions, describe_suggestions, suggest_doors
-from building_agent.level4.validate import describe, validate
+from building_agent.level4.validate import Collector, describe, validate
 from starter_agent.building_map import NEW_DOOR_WIDTH_M, BuildingMap, MapError
 from starter_agent.tools import as_json
 
 BUILDINGS_ROOT = Path("agent_output") / "buildings"
 ALONG = ("building_width", "room", "door")
-FIX_ACTIONS = ("add_door", "remove_door", "add_entrance", "set_room_type", "set_scale", "accept_suggestions")
+FIX_ACTIONS = (
+    "add_door",
+    "remove_door",
+    "add_entrance",
+    "set_room_type",
+    "set_scale",
+    "accept_suggestions",
+    "link_floors",
+)
+STAIR_TYPES = {"stairwell", "stair", "stairs", "staircase"}
+LIFT_TYPES = {"lift", "elevator"}
+LINK_KINDS = {"stairs": "stair", "stair": "stair", "lift": "lift", "elevator": "lift"}
+CONNECTOR_CODES = {"connector_single_floor", "connector_linked_by_order", "connector_aligned_by_centre"}
+MAX_STAIR_HALL_M2 = 60.0
 SIDES = {"north": (0, 1), "south": (0, -1), "east": (1, 0), "west": (-1, 0)}
 MAX_CANDIDATES = 5
 ENTRANCE_ROOM_TYPES = {"lobby", "hall"}
@@ -200,7 +217,19 @@ def apply_fix(building: dict, fix: tuple, to_metres=None) -> str:
         _, reference, room_type, level = fix
         space = resolve_ref(building, reference, level)
         space["room_type"] = room_type
-        return f"{_label(space)} is now a {room_type.replace('_', ' ')}."
+        if room_type in STAIR_TYPES | LIFT_TYPES:
+            kind = "stair" if room_type in STAIR_TYPES else "lift"
+            space["type"], space["room_type"] = kind, "stairwell" if kind == "stair" else "lift"
+        elif space.get("type") in CONNECTOR_KIND:
+            space["type"] = "room"
+        before = len(building["vertical_connectors"])
+        relink_connectors(building, Collector())
+        done = f"{_label(space)} is now a {space['room_type'].replace('_', ' ')}."
+        if space["type"] in CONNECTOR_KIND or before != len(building["vertical_connectors"]):
+            done += f" Stairs and lifts linked between the floors: {len(building['vertical_connectors'])}."
+        return done
+    if action == "link_floors":
+        return _link_floors(building, fix)
     first, second = resolve_ref(building, fix[1], fix[3]), resolve_ref(building, fix[2], fix[3])
     pair = {first["id"], second["id"]}
     if first["id"] == second["id"]:
@@ -220,6 +249,101 @@ def apply_fix(building: dict, fix: tuple, to_metres=None) -> str:
     if len(building["openings"]) == before:
         raise ToolError(f"There is no door between {_label(first)} and {_label(second)}.")
     return f"Door removed between {_label(first)} and {_label(second)}."
+
+
+def _link_floors(building: dict, fix: tuple) -> str:
+    _, reference, other_reference, kind_word, level, other_level = fix
+    kind = LINK_KINDS.get(str(kind_word).strip().lower())
+    if kind is None:
+        raise ToolError("kind must be 'stairs' or 'lift'.")
+    first, second = resolve_ref(building, reference, level), resolve_ref(building, other_reference, other_level)
+    levels = {floor["id"]: floor["level"] for floor in building["floors"]}
+    if first["floor_id"] == second["floor_id"]:
+        raise ToolError("The two rooms are on the same floor. A stair or lift joins two different floors.")
+    ordered = sorted(levels.values())
+    low, high = sorted((levels[first["floor_id"]], levels[second["floor_id"]]))
+    if ordered.index(high) - ordered.index(low) != 1:
+        raise ToolError(f"Floors {low} and {high} are not neighbours. Link each pair of neighbouring floors.")
+    first, second = (first, second) if levels[first["floor_id"]] < levels[second["floor_id"]] else (second, first)
+    word = CONNECTOR_KIND[kind]
+    pair = {first["id"], second["id"]}
+    if any(c["kind"] == word and pair <= set(c["space_ids"]) for c in building["vertical_connectors"]):
+        raise ToolError(f"{_label(first)} and {_label(second)} are already linked as {word}.")
+    for space in (first, second):
+        if space.get("type") not in CONNECTOR_KIND:  # a stair hall that also holds a lift keeps its type
+            space["type"], space["room_type"] = kind, "stairwell" if kind == "stair" else "lift"
+    building_id = building["building"]["id"]
+    number = 1 + sum(MANUAL_ID_MARK in str(c["id"]) for c in building["vertical_connectors"])
+    building["vertical_connectors"].append(
+        {
+            "id": f"{building_id}{MANUAL_ID_MARK}{number:02d}",
+            "kind": word,
+            "name": first["name"],
+            "floor_ids": [first["floor_id"], second["floor_id"]],
+            "space_ids": [first["id"], second["id"]],
+            "step_free": kind == "lift",
+            "synthetic": False,
+        }
+    )
+    relink_connectors(building, Collector())
+    return f"{_label(first)} (floor {low}) and {_label(second)} (floor {high}) are now linked by a {word.replace('stairs', 'stair')}."
+
+
+def _relinked(building: dict, items: list) -> list:
+    """The conversion findings with the stair and lift findings replaced by the ones of a fresh linking."""
+    found = Collector()
+    relink_connectors(building, found)
+    return [item for item in items if item.code not in CONNECTOR_CODES] + found.findings()
+
+
+def connector_candidates(building: dict) -> dict[int, list[str]]:
+    """Per floor up to 5 rooms that may be stairs or lifts: unlinked ones typed so, then small halls and corridors."""
+    levels = {floor["id"]: floor["level"] for floor in building["floors"]}
+    linked = {sid for c in building["vertical_connectors"] for sid in c["space_ids"]}
+    ranked: dict[int, list[tuple]] = {level: [] for level in levels.values()}
+    for space in building["spaces"]:
+        try:
+            size = Polygon(space["polygon"]).area
+        except (TypeError, ValueError):
+            continue
+        if space.get("type") in CONNECTOR_KIND and space["id"] not in linked:
+            ranked[levels[space["floor_id"]]].append((0, -size, _label(space)))
+        elif space.get("type") in ("hall", "corridor") and size <= MAX_STAIR_HALL_M2:
+            ranked[levels[space["floor_id"]]].append((1 if space["type"] == "hall" else 2, -size, _label(space)))
+    return {level: [label for _, _, label in sorted(items)[:MAX_CANDIDATES]] for level, items in ranked.items()}
+
+
+def connector_question(building: dict) -> str | None:
+    """A plain question when the draft has several floors but no stairs or lifts (or no lift), else None."""
+    if len(building["floors"]) < 2:
+        return None
+    connectors = building["vertical_connectors"]
+    if connectors:
+        if any(c["kind"] == "lift" for c in connectors):
+            return None
+        return (
+            "lift_not_found: no lift was found between the floors, so there is no step-free way up. Ask whether the "
+            "building has a lift and which rooms it is, then call fix_draft with action link_floors and kind lift."
+        )
+    text = (
+        f"The plan has {len(building['floors'])} floors but no stairs or lifts between them were found. Ask the "
+        "person which rooms are the stairs and lifts, then call fix_draft with set_room_type (stairwell or lift) for "
+        "each room, or action link_floors (ref, other_ref, kind stairs or lift, level, other_level) when the numbers "
+        "differ per floor."
+    )
+    candidates = {level: labels for level, labels in connector_candidates(building).items() if labels}
+    if candidates:
+        text += (
+            " Possible rooms: "
+            + "; ".join(f"floor {level}: {', '.join(l)}" for level, l in sorted(candidates.items()))
+            + "."
+        )
+    return text
+
+
+def questions(building: dict) -> str | None:
+    found = [text for text in (entrance_question(building), connector_question(building)) if text]
+    return " ".join(found) or None
 
 
 def entrance_candidates(building: dict) -> list[str]:
@@ -283,6 +407,14 @@ def _to_metres(draft: "Level4Draft"):
     return convert
 
 
+def _trusted_scale(draft: Level4Draft) -> bool:
+    """True when every floor got its scale from a length the person gave (not a printed bar or a door width)."""
+    return all(
+        src.scale.source == "known_length" and src.scale_args.get("along", "building_width") != "door"
+        for src in draft.floors.values()
+    )
+
+
 def _rebuild(draft: Level4Draft) -> None:
     """Convert all stored floors, replay the fixes, validate. Raises ToolError when nothing usable results."""
     inputs = [FloorInput(level, src.extraction, src.scale) for level, src in sorted(draft.floors.items())]
@@ -294,7 +426,8 @@ def _rebuild(draft: Level4Draft) -> None:
                 apply_fix(building, fix, _to_metres(draft))
             except ToolError as error:
                 notes.append(f"An earlier fix ({fix[0]}) no longer applies: {error}")
-        checked = validate(building)
+        converted.items = _relinked(building, converted.items)
+        checked = validate(building, _trusted_scale(draft))
     except ConvertError as error:
         raise ToolError(str(error)) from error
     except (ValueError, ArithmeticError, TypeError, KeyError, IndexError):
@@ -366,8 +499,10 @@ def make_level4_tools(
         extraction = result.extraction
         seg_warnings: list[str] = []
         try:  # room outlines from the flat colour regions of the plan; a failed read keeps the model polygons
-            extraction, seg_warnings = match_to_extraction(extraction, segment_rooms(path))
+            found_segments = segment_rooms(path)
+            extraction, seg_warnings = match_to_extraction(extraction, found_segments)
             draft.marker_notes = seg_warnings[:10]
+            extraction = tag_fills(extraction, found_segments)
         except Exception as error:  # noqa: BLE001 - optional step, the model result stays valid
             draft.marker_notes = [f"Room outline detection was skipped ({type(error).__name__})."]
         try:  # door, opening and entrance markers found by colour; a failed read keeps the model-only result
@@ -405,7 +540,7 @@ def make_level4_tools(
             "problems": describe(draft.findings),
             "next": "Draft only, nothing saved. Call preview_draft to show the person the card.",
         }
-        question = entrance_question(draft.building)
+        question = questions(draft.building)
         if question:
             summary["question"] = question
         if fresh:
@@ -427,6 +562,8 @@ def make_level4_tools(
         side: str | None = None,
         point_px: list[float] | None = None,
         steps: bool = False,
+        kind: str | None = None,
+        other_level: int | None = None,
     ) -> str:
         """Correct the draft deterministically, then show the card again with preview_draft.
         If the plan shows no entrance, ask which room it is in and call fix_draft add_entrance.
@@ -435,7 +572,10 @@ def make_level4_tools(
             action: "add_door" (ref, other_ref), "remove_door" (ref, other_ref), "add_entrance" (ref, optional
                 side or point_px, optional steps), "set_room_type" (ref, room_type) or "set_scale"
                 (known_length_m, along, optional level) or "accept_suggestions" (no other arguments: add the
-                doors proposed in the last card; only after the person said yes to the proposal).
+                doors proposed in the last card; only after the person said yes to the proposal) or "link_floors"
+                (ref on one floor, other_ref on the neighbouring floor, kind "stairs" or "lift", and level and
+                other_level when the room numbers are not unique). set_room_type with stairwell or lift also
+                makes the room a stair or lift and links it to the same stair or lift on the next floor.
             side: For add_entrance: "north", "south", "east" or "west" wall of the room (default: its longest
                 outside wall).
             point_px: For add_entrance: [x, y] in image pixels, the entrance goes to the outside wall nearest to it.
@@ -446,6 +586,8 @@ def make_level4_tools(
             known_length_m: For set_scale, a length in metres the person knows.
             along: For set_scale: "building_width", "room" (ref is that room) or "door".
             level: Floor to disambiguate a room number, or the floor whose scale is set (default: last built).
+            kind: For link_floors: "stairs" or "lift".
+            other_level: For link_floors: the floor of other_ref.
         """
         building = need_draft()
         if action not in FIX_ACTIONS:
@@ -464,7 +606,9 @@ def make_level4_tools(
             except ConvertError as error:
                 raise ToolError(str(error)) from error
             old = draft.floors[target]
-            draft.floors[target] = FloorSource(source.extraction, scale, {"known_length_m": known_length_m})
+            draft.floors[target] = FloorSource(
+                source.extraction, scale, {"known_length_m": known_length_m, "along": along}
+            )
             try:
                 _rebuild(draft)
             except ToolError:
@@ -487,6 +631,10 @@ def make_level4_tools(
                 except (TypeError, ValueError, IndexError):
                     raise ToolError("point_px must be [x, y] in image pixels.") from None
             fix = ("add_entrance", ref, level, side, point, not steps)
+        elif action == "link_floors":
+            if not ref or not other_ref or not kind:
+                raise ToolError("link_floors needs ref, other_ref (rooms on neighbouring floors) and kind.")
+            fix = ("link_floors", ref, other_ref, kind, level, other_level)
         elif action == "set_room_type":
             normal = (room_type or "").strip().lower().replace(" ", "_")
             if not ref or not ROOM_TYPE.match(normal):
@@ -500,11 +648,12 @@ def make_level4_tools(
         done = apply_fix(candidate, fix, _to_metres(draft))
         draft.fixes.append(fix)
         draft.building = candidate
-        draft.findings = Findings(draft.convert_items + validate(candidate).items)
+        draft.convert_items = _relinked(candidate, draft.convert_items)
+        draft.findings = Findings(draft.convert_items + validate(candidate, _trusted_scale(draft)).items)
         draft.version += 1
         draft.card_turn = None
         reply = {"done": done, "problems": describe(draft.findings)}
-        question = entrance_question(candidate)
+        question = questions(candidate)
         if question:
             reply["question"] = question
         return as_json(reply)
@@ -541,7 +690,9 @@ def make_level4_tools(
                 "There are problems that normally block saving. Fix them, or the person must say clearly they want "
                 "to save anyway ('trotzdem speichern' or 'save it anyway')."
             )
-        question = entrance_question(building)
+            if any(error.code == "no_vertical_connectors" for error in errors.items):
+                card["saving blocked"] += " Without stairs or lifts the floors stay separate buildings for routing."
+        question = questions(building)
         if question:
             card["question"] = question
         suggestions = suggest_doors(building)

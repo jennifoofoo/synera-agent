@@ -18,6 +18,7 @@ class ExtractedRoom:
     name: str | None = None
     type: str = "room"  # one of ROOM_TYPES
     room_type: str = "generic_room"  # office, kitchen, toilet, ... (see README section 3)
+    fill: str | None = None  # palette name of the plan fill at this room (set from the colour segmentation)
 
 
 @dataclass
