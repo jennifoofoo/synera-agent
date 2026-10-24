@@ -570,3 +570,43 @@ a clear message.
    flat-colour segmentation for this style, then the same match-to-model step. Doors from gaps in the wall mask plus swing arcs.
 7. Rotated buildings: let the model report the plan rotation, or deskew by the dominant wall angle before extraction
    (swiss-31 at 25 degrees is the worst clean case, door recall 0.19).
+
+## Graph score
+
+Blueprint-Bench 2 style connectivity score (`building_agent/level4/graph_score.py`): rooms (type room, hall, corridor)
+plus the outside are nodes, doors are edges, built and true rooms are matched by polygon overlap (greedy IoU >= 0.3).
+Composite = 50% edge Jaccard, 20% degree similarity, 10% density similarity, 10% room count ratio, 5% door count ratio,
+divided by 0.95: the 5% orientation part is left out because the true frame is used, no rotation or reflection is
+searched. Unmatched built rooms and missing true rooms count as wrong or missed edges and as degree similarity 0. A
+built room that best matches a true stair, lift or balcony is ignored (a typing difference, not an extra room).
+Cached extractions only, no API spend. Whether Synera scores Level 4 this way is still open.
+
+Clean sources, `scripts/eval_level4.py` (model reading of the plain plan, scale from the true width):
+
+| Floor | Graph Jaccard | Graph composite | Room recall | Door recall |
+|---|---|---|---|---|
+| proc-campus-dev-000:0 | 1.00 | 1.00 | 1.00 | 1.00 |
+| proc-campus-dev-001:0 | 1.00 | 1.00 | 1.00 | 1.00 |
+| proc-factory-dev-003:0 | 0.96 | 0.97 | 1.00 | 0.96 |
+| resplan-439:0 | 1.00 | 1.00 | 1.00 | 1.00 |
+| resplan-1465:0 | 0.86 | 0.85 | 1.00 | 1.00 |
+| swiss-31:0 | 0.29 | 0.43 | 0.80 | 0.35 |
+| swiss-203:0 | 0.22 | 0.37 | 0.78 | 0.26 |
+| osm-way27326387:0 | 0.57 | 0.61 | 0.86 | 0.67 |
+
+Drawing styles, `scripts/level4_style_eval.py` (graph Jaccard / composite; `lowres` has no cached extraction, so it is
+not scored; `scan` is measured on main before the scan guard fix, segmentation still fires on the speckle):
+
+| Building | lines | hatched | dims | scan |
+|---|---|---|---|---|
+| proc-campus-dev-000 | 0.96 / 0.97 | 0.65 / 0.70 | 0.96 / 0.97 | 0.00 / 0.01 |
+| proc-factory-dev-003 | 0.56 / 0.62 | 0.56 / 0.69 | 0.58 / 0.64 | 0.00 / 0.12 |
+| resplan-439 | 0.50 / 0.58 | 0.83 / 0.88 | 0.67 / 0.72 | 0.11 / 0.14 |
+| resplan-1465 | 0.43 / 0.53 | 0.57 / 0.64 | 0.57 / 0.63 | 0.00 / 0.04 |
+| swiss-31 | 0.09 / 0.20 | 0.17 / 0.32 | 0.09 / 0.25 | 0.00 / 0.03 |
+| osm-way27326387 | 0.91 / 0.91 | 0.76 / 0.78 | 0.82 / 0.88 | 0.18 / 0.16 |
+| Mean | 0.57 / 0.64 | 0.59 / 0.67 | 0.61 / 0.68 | 0.05 / 0.08 |
+
+Weakest on edge Jaccard: by source Swiss (0.22 and 0.29 on plain plans, 0.09 to 0.17 in styles), by style `scan`
+(0.05), and without `scan` `lines` (0.57). Swiss loses edges because doors are missing in the reading (door recall
+0.2 to 0.35), proc-factory and resplan lose them in the styled plans for the same reason.

@@ -26,6 +26,7 @@ from building_agent.level4 import extract as extract_module
 from building_agent.level4 import tools as level4_tools
 from building_agent.level4.convert import scale_from_bar
 from building_agent.level4.extract import ExtractError, ExtractResult, extract_floor
+from building_agent.level4.graph_score import graph_score
 from building_agent.level4.markers import detect_markers
 from building_agent.level4.schema import ExtractedDoor, ExtractedRoom, Extraction, Scale
 from building_agent.level4.segment import segment_rooms
@@ -200,6 +201,7 @@ def score(made: Render, extraction: Extraction, converted: dict) -> dict:
     metrics = measure(case, converted)
     true_rooms = len(case.truth["spaces"])
     found, true = entrance_counts(converted, case.truth)
+    graph = graph_score(converted, case.truth, offset=case.offset)
     return {
         "rooms_true": true_rooms,
         "rooms_found": metrics["rooms_found"],
@@ -208,6 +210,8 @@ def score(made: Render, extraction: Extraction, converted: dict) -> dict:
         "precision": round(metrics["rooms_matched"] / metrics["rooms_found"], 3) if metrics["rooms_found"] else 0.0,
         "door_recall": round(metrics["door_recall"], 3),
         "area_err_median": round(metrics["area_err_median"], 3),
+        "graph_jaccard": round(graph.jaccard, 3),
+        "graph_composite": round(graph.composite, 3),
         "judge": judge_summary(metrics),
         "entrances": [found, true],
     }
@@ -239,19 +243,20 @@ def markdown(rows: list[dict]) -> str:
             f"**{style}**",
             "",
             (
-                "| building | rooms found/true | recall | precision | door recall | entrances | area err | judge full/pairs "
-                "(invalid, no route) | seg regions/markers | cost | s |"
+                "| building | rooms found/true | recall | precision | door recall | graph jaccard | graph composite "
+                "| entrances | area err | judge full/pairs (invalid, no route) | seg regions/markers | cost | s |"
             ),
-            "|---|---|---|---|---|---|---|---|---|---|---|",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         for r in [r for r in rows if r["style"] == style]:
             if "error" in r:
-                lines.append(f"| {r['building']} | refused: {r['error'][:90]} | | | | | | | | | |")
+                lines.append(f"| {r['building']} | refused: {r['error'][:90]} | | | | | | | | | | | |")
                 continue
             j = r["judge"]
             lines.append(
                 f"| {r['building']} | {r['rooms_found']}/{r['rooms_true']} | {r['recall']:.2f} | {r['precision']:.2f} "
-                f"| {r['door_recall']:.2f} | {r['entrances'][0]}/{r['entrances'][1]} | {r['area_err_median']:.2f} "
+                f"| {r['door_recall']:.2f} | {r['graph_jaccard']:.2f} | {r['graph_composite']:.2f} "
+                f"| {r['entrances'][0]}/{r['entrances'][1]} | {r['area_err_median']:.2f} "
                 f"| {j['full']}/{j['pairs']} ({j['invalid']}, {j['no_route']}) "
                 f"| {r['seg_regions']}/{r['markers_found']} | ${r['model_cost_usd']:.3f} | {r['model_seconds']} |"
             )

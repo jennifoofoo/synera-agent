@@ -153,3 +153,21 @@ def test_describe_singular_and_summary(building):
     findings = validate(building)
     assert describe(findings) == "1 room has no way out, doors are probably missing: 0.03."
     assert findings.summary() == "1 room has no way out, doors are probably missing."
+
+
+def test_door_less_room_outside_the_unreachable_report_gets_the_soft_finding(building):
+    building["openings"] = []  # no entrance: the biggest group is one room, the others are unreachable
+    found = {finding.code: finding for finding in validate(building).items}
+    assert found["low_connectivity"].level == "warning"
+    flagged = set(found["low_connectivity"].items)
+    assert flagged and flagged.isdisjoint(found["room_unreachable"].items)
+    assert "no door in the plan" in found["low_connectivity"].message
+
+
+def test_room_with_one_door_or_already_unreachable_is_not_low_connectivity(building):
+    assert "low_connectivity" not in codes(building)
+    building["openings"] = [o for o in building["openings"] if "outside" in o["space_ids"]]
+    findings = {finding.code: finding for finding in validate(building).items}
+    assert "room_unreachable" in findings
+    flagged = findings["low_connectivity"].items if "low_connectivity" in findings else []
+    assert set(flagged).isdisjoint(findings["room_unreachable"].items)
