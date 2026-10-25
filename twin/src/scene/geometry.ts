@@ -184,6 +184,8 @@ class Builder {
     solid.setAttribute("wall", new THREE.Float32BufferAttribute(this.walls, 1));
     solid.setAttribute("roomGroup", new THREE.Float32BufferAttribute(this.groups, 1));
     solid.setAttribute("spaceIndex", new THREE.Float32BufferAttribute(this.spaceIndices, 1));
+    // Focus mode (FloorMesh.tsx): 1 = the room is on the shown route (or no route), 0 = it fades toward the paper.
+    solid.setAttribute("focus", new THREE.Float32BufferAttribute(new Float32Array(this.spaceIndices.length).fill(1), 1));
     solid.setIndex(this.indices);
     solid.computeBoundingSphere();
     solid.computeBoundsTree();
@@ -475,16 +477,28 @@ export function outlineGeometry(polygon: Point[], y: number): THREE.BufferGeomet
 
 export const FLAT_WALL_HEIGHT = 0.05;
 
-/** Injects the dollhouse cutaway (outer walls facing the camera lowered to CUTAWAY_HEIGHT) and the 2D plan
- * (uFlat = 1: every wall lowered to FLAT_WALL_HEIGHT, so the wall-top edge lines become the plan's wall lines). */
+/** Share of the paper tone an off-route room takes in focus mode (it reads at about 40 % strength). */
+export const FOCUS_FADE = 0.6;
+
+/** Injects the dollhouse cutaway (outer walls facing the camera lowered to CUTAWAY_HEIGHT), the 2D plan
+ * (uFlat = 1: every wall lowered to FLAT_WALL_HEIGHT, so the wall-top edge lines become the plan's wall lines) and
+ * focus mode (uFocus = 1 while a route is shown: vertices with `focus` 0 blend FOCUS_FADE toward uPaper). */
 export function withCutaway<T extends THREE.Material>(
   material: T,
-  uniforms: { uCamDir: { value: THREE.Vector2 }; uCut: { value: number }; uFlat: { value: number } },
+  uniforms: {
+    uCamDir: { value: THREE.Vector2 };
+    uCut: { value: number };
+    uFlat: { value: number };
+    uFocus: { value: number };
+    uPaper: { value: THREE.Color };
+  },
 ): T {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uCamDir = uniforms.uCamDir;
     shader.uniforms.uCut = uniforms.uCut;
     shader.uniforms.uFlat = uniforms.uFlat;
+    shader.uniforms.uFocus = uniforms.uFocus;
+    shader.uniforms.uPaper = uniforms.uPaper;
     shader.vertexShader = shader.vertexShader
       .replace(
         "#include <common>",
@@ -492,9 +506,12 @@ export function withCutaway<T extends THREE.Material>(
         attribute vec2 wallNormal;
         attribute float wall;
         attribute float roomGroup;
+        attribute float focus;
         uniform vec2 uCamDir;
         uniform float uCut;
-        uniform float uFlat;`,
+        uniform float uFlat;
+        uniform float uFocus;
+        uniform vec3 uPaper;`,
       )
       .replace(
         "#include <color_vertex>",
@@ -504,6 +521,8 @@ export function withCutaway<T extends THREE.Material>(
           // 2D plan: map colours like a street map. Corridors white, rooms near-white, the sought-after groups keep
           // their pale hue, walls grey (palette.ts PLAN_GLSL).${PLAN_GLSL}
           vColor.rgb = mix(vColor.rgb, plan, uFlat);
+          // Focus mode: rooms off the route step back toward the paper, slab and walls together.
+          vColor.rgb = mix(vColor.rgb, uPaper, uFocus * (1.0 - focus) * ${FOCUS_FADE.toFixed(2)});
         }
         #endif`,
       )

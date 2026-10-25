@@ -54,6 +54,9 @@ const shadowMap = shadowTexture();
 
 const temp = new THREE.Object3D();
 const colour = new THREE.Color();
+const paper = new THREE.Color(COLOURS.groundInner);
+/** Focus mode: things in rooms off the route take this share of the paper tone (as their rooms, geometry.ts). */
+const FOCUS_FADE = 0.6;
 
 /** 2D plan shapes: one quiet grey just darker than the floor; fainter while a route is shown, landmarks stronger. */
 const PLAN_THING = COLOURS.planThing;
@@ -101,6 +104,9 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
   const landmarks = useLandmarks();
   // While a route is shown or walked the task is the route: shapes step back, its landmarks step forward.
   const routeShown = useTwin((s) => !!s.state?.route?.ok || !!s.state?.guide?.active);
+  // Focus mode: with a route, things in rooms off the route fade like their rooms (FloorMesh.tsx); landmarks never.
+  const pathKey = state?.route?.ok ? (state.route.space_path ?? []).join("|") : "";
+  const onRoute = useMemo(() => (pathKey ? new Set(pathKey.split("|")) : null), [pathKey]);
   // 2D: a shape is drawn once its larger side covers MIN_SHAPE_PX on screen (per scale bucket, so cheap); far away
   // the machines form the pattern of the building and chairs vanish on their own. Landmarks always.
   const assets = useMemo(
@@ -139,10 +145,15 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       temp.updateMatrix();
     };
     const planColour = (asset: Asset) => (landmarks.has(asset.id) ? PLAN_LANDMARK : routeShown ? PLAN_THING_FAINT : PLAN_THING);
+    const focus = (asset: Asset) => {
+      if (onRoute && !landmarks.has(asset.id) && !onRoute.has(asset.space_id)) colour.lerp(paper, FOCUS_FADE);
+      return colour;
+    };
     split.slab.forEach((asset, index) => {
       place(asset, flat ? PLAN_HEIGHT : FOOTPRINT_HEIGHT);
       slab.setMatrixAt(index, temp.matrix);
-      slab.setColorAt(index, colour.set(flat ? planColour(asset) : COLOURS.footprint));
+      colour.set(flat ? planColour(asset) : COLOURS.footprint);
+      slab.setColorAt(index, focus(asset));
     });
     slab.count = split.slab.length;
     slab.instanceMatrix.needsUpdate = true;
@@ -153,7 +164,8 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
         const [, fullHeight] = assetSize(asset);
         place(asset, fullHeight);
         body.setMatrixAt(index, temp.matrix);
-        body.setColorAt(index, colour.set(assetColour(asset)));
+        colour.set(assetColour(asset));
+        body.setColorAt(index, focus(asset));
         place(asset, 1, SHADOW_PAD_M, 0.012);
         shadow.setMatrixAt(index, temp.matrix);
       });
@@ -165,7 +177,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       body.computeBoundingSphere();
       shadow.computeBoundingSphere();
     }
-  }, [split, moved, flat, landmarks, routeShown]);
+  }, [split, moved, flat, landmarks, routeShown, onRoute]);
 
   const onClick = (list: Asset[]) => (event: ThreeEvent<MouseEvent>) => {
     // 2D: a tap on a shape only selects the thing when zoomed in; farther out it goes to the room below.
