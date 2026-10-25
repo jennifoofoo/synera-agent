@@ -57,6 +57,31 @@ export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: {
   return <group ref={group}>{children}</group>;
 }
 
+/** Like Pulse, but only `times` beats on arrival, then still at scale 1: no frame requests after that (a find with
+ * many hits must not keep the scene redrawing). */
+export function PulseFew({ children, reducedMotion, times = 3, speed = 1.2, amount = 0.2 }: { children: ReactNode; reducedMotion: boolean; times?: number; speed?: number; amount?: number }) {
+  const group = useRef<THREE.Group>(null);
+  const start = useRef<number | null>(null);
+  const done = useRef(false);
+  useFrame(({ clock, invalidate }) => {
+    const g = group.current;
+    if (!g || done.current) return;
+    if (start.current === null) start.current = clock.elapsedTime;
+    const t = clock.elapsedTime - start.current;
+    // one beat = one period of the sine below (2 / speed seconds), starting and ending at scale 1
+    if (reducedMotion || t >= (times * 2) / speed) {
+      done.current = true;
+      g.scale.set(1, 1, 1);
+      invalidate();
+      return;
+    }
+    invalidate();
+    const s = 1 + amount * (0.5 - 0.5 * Math.cos(t * speed * Math.PI));
+    g.scale.set(s, 1, s);
+  });
+  return <group ref={group}>{children}</group>;
+}
+
 /** Children are authored in px on the floor plane (x/z); the group scales them so they keep that size on screen.
  * The y axis stays in metres, so the small lifts above the floor stay the same. With `uniform` the y axis is in px
  * too (for markers authored on a camera-facing plane, such as the destination pin). */
