@@ -11,10 +11,12 @@ import { useTwin, walkSteps } from "../store";
 import { isSpeaking, speak, speechPending } from "../voice";
 import { metresLeft, readable } from "../walkInfo";
 import { normalizeSpeech } from "../wake";
-import { useRound } from "../round/round";
+import { prettyType } from "../model/palette";
+import { endRound, useRound, type RoundStop } from "../round/round";
 import { isCurrent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
 
-export const AUTHORS = ["Klaus", "Tom"] as const;
+/** The name notes are signed with until the person types their own (remembered per device). */
+export const DEFAULT_AUTHOR = "Technician";
 const AUTHOR_PREF = "twin.noteAuthor";
 /** A guidance shorter than this without notes ends quietly (no report for a route started by mistake). */
 const MIN_JOB_MS = 10_000;
@@ -47,6 +49,22 @@ export interface Job {
   noteIds: string[];
   /** Notes shown on the way (left by others before). */
   seenIds: string[];
+  /** An inspection round: one job over all its legs (null for a single route). */
+  round: RoundJob | null;
+}
+
+/** What a round job records besides the common fields. lengthM of the job is the round's planned length. */
+export interface RoundJob {
+  stops: { spaceId: string; name: string }[];
+  /** Stops checked (space ids), in the order they were checked. */
+  checked: string[];
+  /** The leg being walked now (one route): where it goes, how long it is, how far the walker got on it. */
+  legTo: string | null;
+  legLengthM: number;
+  legMaxStep: number;
+  legWalkedM: number;
+  /** Metres of the legs before this one. */
+  walkedBeforeM: number;
 }
 
 interface NotesState {
@@ -95,9 +113,9 @@ export function setLayer(layer: boolean): void {
 
 function loadAuthor(): string {
   try {
-    return localStorage.getItem(AUTHOR_PREF) || AUTHORS[0];
+    return localStorage.getItem(AUTHOR_PREF)?.trim() || DEFAULT_AUTHOR;
   } catch {
-    return AUTHORS[0];
+    return DEFAULT_AUTHOR;
   }
 }
 
@@ -119,7 +137,8 @@ export const useNotes = create<NotesState>(() => ({
   dismissed: [],
 }));
 
-export function setAuthor(author: string): void {
+export function setAuthor(name: string): void {
+  const author = name.trim() || DEFAULT_AUTHOR;
   useNotes.setState({ author });
   try {
     localStorage.setItem(AUTHOR_PREF, author);
@@ -141,6 +160,15 @@ export function placeName(model: BuildingModel, spaceId: string, assetId: string
 export function currentPlace(): NotePlace | null {
   const { model, selection, state } = useTwin.getState();
   if (!model) return null;
+  // In an inspection round the note is about the stop's device (so the next round reads it at that stop), unless
+  // something else than the stop's room was tapped.
+  const stop = currentStop();
+  const tappedElsewhere = selection && !(selection.kind === "space" && selection.id === stop?.spaceId) && !(selection.kind === "asset" && stop?.assetIds.includes(selection.id));
+  if (stop && !tappedElsewhere) {
+    const asset = stopAsset(model, stop, selection?.kind === "asset" ? selection.id : null);
+    const space = model.spaceById.get(stop.spaceId);
+    if (space) return { spaceId: space.id, floorId: space.floor_id, assetId: asset?.id ?? null, elementId: null, point: asset?.position ?? space.anchor, name: placeName(model, space.id, asset?.id ?? null) };
+  }
   if (selection) {
     if (selection.kind === "asset") {
       const asset = model.assetById.get(selection.id);
@@ -167,21 +195,41 @@ export function currentPlace(): NotePlace | null {
   return null;
 }
 
-/** Notes and issues valid now in a room (including those on its machines and doors), newest first. Closures show on
- * the map's closure marks, not as notes. */
-/** Only what matters to the walker, no noise: in an inspection round, notes on the round's own devices (shown at that
- * stop); on a normal route, notes at the destination. Everything else on the way stays quiet. */
+/** The round stop being walked to (or stood at), or null outside a round and on the way back to the start. */
+export function currentStop(): RoundStop | null {
+  const { plan, guiding, returning, index } = useRound.getState();
+  if (!plan || !guiding || returning || plan.building !== useTwin.getState().buildingKey) return null;
+  return plan.stops[index] ?? null;
+}
+
+/** The stop's device a note is about: the one tapped, else the one nearest to where the walker is, else the first. */
+function stopAsset(model: BuildingModel, stop: RoundStop, tapped: string | null) {
+  const assets = stop.assetIds.map((id) => model.assetById.get(id)).filter((asset) => !!asset);
+  const chosen = tapped ? assets.find((asset) => asset.id === tapped) : undefined;
+  if (chosen || assets.length < 2) return chosen ?? assets[0];
+  const at = useTwin.getState().state?.position?.point;
+  if (!at) return assets[0];
+  const away = (p: Point | null | undefined) => (p ? Math.hypot(p[0] - at[0], p[1] - at[1]) : Infinity);
+  return assets.reduce((best, asset) => (away(asset.position) < away(best.position) ? asset : best));
+}
+
+/** Only what matters to the walker, no noise: in an inspection round, notes on the stop's devices (or on the stop's
+ * room without a device), shown at that stop; on a normal route, notes at the destination. Everything else on the way
+ * stays quiet. */
 export function relevantNotes(notes: Note[]): Note[] {
-  const { plan, guiding, index } = useRound.getState();
+  const { plan, guiding } = useRound.getState();
   if (plan && guiding) {
-    const stop = plan.stops[index];
-    const assets = new Set(stop ? stop.assetIds : []);
-    return notes.filter((note) => !!note.anchor.asset_id && assets.has(note.anchor.asset_id));
+    const stop = currentStop();
+    if (!stop) return [];
+    const assets = new Set(stop.assetIds);
+    return notes.filter((note) => (note.anchor.asset_id ? assets.has(note.anchor.asset_id) : note.anchor.space_id === stop.spaceId));
   }
   const destination = useTwin.getState().state?.route?.destination;
   return notes.filter((note) => note.anchor.space_id === destination);
 }
 
+/** Notes and issues valid now in a room (including those on its machines and doors), newest first. Closures show on
+ * the map's closure marks, not as notes. */
 export function notesIn(spaceIds: Iterable<string>): Note[] {
   const ids = new Set(spaceIds);
   const now = Date.now();
@@ -249,6 +297,7 @@ export async function addNote(input: { text: string; photo?: Blob | null; place?
     return null;
   }
   applyServerState(state);
+  savedHere.add(note.id);
   const job = useNotes.getState().job ?? newJob(null);
   // A new note shows on the map at once, even with the layer off until now.
   useNotes.setState((s) => ({ notes: [note, ...s.notes.filter((n) => n.id !== note.id)], error: null, job: { ...job, noteIds: [...job.noteIds, note.id] } }));
@@ -265,9 +314,12 @@ function applyServerState(state: unknown): void {
 /** Undo is only for a note just made (typos); later a note is resolved, never deleted (spec). */
 export const UNDO_MS = 2 * 60_000;
 
+/** Notes saved from this page (this tab): only these can be undone here. */
+const savedHere = new Set<string>();
+
 export function canUndo(note: Note): boolean {
   const { storage, notes } = useNotes.getState();
-  if (!storage?.undo || Date.now() - Date.parse(note.created_at) >= UNDO_MS) return false;
+  if (!storage?.undo || !savedHere.has(note.id) || Date.now() - Date.parse(note.created_at) >= UNDO_MS) return false;
   // The server undoes only the building's newest fact.
   return storage.kind !== "server" || [...notes].sort(newestFirst)[0]?.id === note.id;
 }
@@ -279,11 +331,22 @@ export function canResolve(note: Note): boolean {
 export async function undoNote(id: string): Promise<void> {
   const { buildingKey, storage } = useNotes.getState();
   if (!buildingKey || !storage?.undo) return;
+  let undoneId: string | undefined;
   try {
     const reply = await storage.undo(buildingKey, id);
     if (reply) applyServerState(reply.state);
+    undoneId = reply ? reply.undoneId : undefined;
   } catch (error) {
     useNotes.setState({ error: error instanceof Error && storage.kind === "server" ? `${error.message}` : "Could not undo that note." });
+    return;
+  }
+  if (undoneId && undoneId !== id) {
+    // Someone saved a note between our check and the undo: the server removed theirs, ours stays.
+    const other = useNotes.getState().notes.find((note) => note.id === undoneId);
+    useNotes.setState((s) => ({
+      notes: s.notes.filter((note) => note.id !== undoneId),
+      error: `Warning: the server removed a different note${other ? ` (${other.author ?? "someone"}: “${other.text}”)` : ""}, not yours. Please tell the team.`,
+    }));
     return;
   }
   useNotes.setState((s) => ({ notes: s.notes.filter((note) => note.id !== id), job: s.job ? { ...s.job, noteIds: s.job.noteIds.filter((n) => n !== id) } : s.job }));
@@ -333,7 +396,57 @@ function newJob(route: Route | null): Job {
     closures: route?.ok && model ? closedOnRoute(model, route, state?.closed ?? []) : [],
     noteIds: [],
     seenIds: [],
+    round: null,
   };
+}
+
+/** "Inspection round · Fire extinguisher · 5 stops" */
+export function roundTitle(type: string, stops: number): string {
+  return `Inspection round · ${prettyType(type)} · ${stops} ${stops === 1 ? "stop" : "stops"}`;
+}
+
+/** The leg now on the map (state.route), or a leg of 0 m when the stop is in the room the walker is in. */
+function legNow(): Pick<RoundJob, "legTo" | "legLengthM" | "legMaxStep" | "legWalkedM"> {
+  const route = useTwin.getState().state?.route;
+  const ok = route?.ok && typeof route.length_m === "number";
+  return { legTo: ok ? (route.destination ?? null) : (currentStop()?.spaceId ?? null), legLengthM: ok ? Math.round(route.length_m as number) : 0, legMaxStep: 0, legWalkedM: 0 };
+}
+
+function legClosures(): string[] {
+  const { model, state } = useTwin.getState();
+  const route = state?.route;
+  return route?.ok && model ? closedOnRoute(model, route, state?.closed ?? []) : [];
+}
+
+/** A round starts guidance: one job for the whole round. A job started just before (notes, or "guide me" on the
+ * whole round) is taken over. */
+function startRoundJob(): void {
+  const { plan, checked } = useRound.getState();
+  if (!plan) return;
+  const previous = useNotes.getState().job;
+  const carried = previous && !previous.round ? previous : null;
+  const job: Job = {
+    ...newJob(null),
+    ...(carried ? { startedAt: carried.startedAt, noteIds: carried.noteIds, seenIds: carried.seenIds } : {}),
+    title: roundTitle(plan.type, plan.stops.length),
+    lengthM: plan.lengthM ? Math.round(plan.lengthM) : null,
+    walkedM: 0,
+    closures: legClosures(),
+    round: { stops: plan.stops.map((stop) => ({ spaceId: stop.spaceId, name: stop.name })), checked: [...checked], walkedBeforeM: 0, ...legNow() },
+  };
+  useNotes.setState({ job, dismissed: [], guide: null });
+}
+
+/** The round went on to its next leg (next stop, or back to the start): the leg before counts in full when its stop
+ * was checked, else as far as the walker got. The job goes on. */
+function nextLeg(): void {
+  const job = useNotes.getState().job;
+  if (!job?.round) return;
+  const before = job.round;
+  const done = !!before.legTo && useRound.getState().checked.includes(before.legTo);
+  const walkedBeforeM = before.walkedBeforeM + (done ? before.legLengthM : before.legWalkedM);
+  const closures = [...new Set([...job.closures, ...legClosures()])];
+  useNotes.setState({ job: { ...job, closures, walkedM: walkedBeforeM, round: { ...before, ...legNow(), walkedBeforeM } } });
 }
 
 function startJob(): void {
@@ -345,17 +458,23 @@ function startJob(): void {
   useNotes.setState({ job, dismissed: [], guide: null });
 }
 
-/** End the job and show its report. Returns the report, or null when there was nothing to report. */
-function endJob(quietIfShort: boolean): Job | null {
+/** End the job and show its report. Returns the report, or null when there was nothing to report. A round that was
+ * completed counts its last leg in full. */
+function endJob(quietIfShort: boolean, roundComplete = false): Job | null {
   const job = useNotes.getState().job;
   if (!job) return null;
   const endedAt = Date.now();
   let walkedM = job.walkedM;
-  if (job.lengthM !== null) {
+  let arrived = job.arrived;
+  if (job.round) {
+    const { walkedBeforeM, legLengthM, legWalkedM } = job.round;
+    walkedM = walkedBeforeM + (roundComplete ? legLengthM : legWalkedM);
+    arrived = roundComplete;
+  } else if (job.lengthM !== null) {
     if (job.arrived) walkedM = job.lengthM;
     else if (walkedM === null) walkedM = 0;
   }
-  const report = { ...job, endedAt, walkedM };
+  const report = { ...job, endedAt, walkedM, arrived };
   const short = endedAt - job.startedAt < MIN_JOB_MS && !job.noteIds.length;
   useNotes.setState({ job: null, guide: null, report: quietIfShort && short ? null : report });
   return quietIfShort && short ? null : report;
@@ -370,6 +489,13 @@ function trackStep(step: number): void {
   const job = useNotes.getState().job;
   if (!job) return;
   const lines = walkSteps().map(readable);
+  if (job.round) {
+    const legMaxStep = Math.max(job.round.legMaxStep, step);
+    const left = metresLeft(lines, legMaxStep, job.round.legLengthM);
+    const legWalkedM = left !== null ? Math.max(0, job.round.legLengthM - left) : job.round.legWalkedM;
+    useNotes.setState({ job: { ...job, walkedM: job.round.walkedBeforeM + legWalkedM, round: { ...job.round, legMaxStep, legWalkedM } } });
+    return;
+  }
   const maxStep = Math.max(job.maxStep, step);
   const left = job.lengthM !== null ? metresLeft(lines, maxStep, job.lengthM) : null;
   const walkedM = left !== null && job.lengthM !== null ? Math.max(0, job.lengthM - left) : job.walkedM;
@@ -414,11 +540,13 @@ export function spacesAtStep(step: number): string[] {
 
 let spokenFor = "";
 function updateGuide(step: number | null): void {
-  if (step === null) {
+  // A round stop in the room the walker is already in has no step sheet: the stop's notes show all the same.
+  const stop = step === null ? currentStop() : null;
+  if (step === null && !stop) {
     useNotes.setState({ guide: null });
     return;
   }
-  const spaces = spacesAtStep(step);
+  const spaces = step === null ? [stop!.spaceId] : spacesAtStep(step);
   const own = new Set(useNotes.getState().job?.noteIds ?? []);
   const notes = relevantNotes(notesIn(spaces)).filter((note) => !own.has(note.id)); // not the walker's own notes from this job
   const stepKey = `${step}:${spaces.join(",")}`;
@@ -480,11 +608,24 @@ export function installNotes(): () => void {
       void loadNotes(now.buildingKey);
     }
     if (now.walkStep !== before.walkStep) {
-      if (before.walkStep === null && now.walkStep !== null) startJob();
+      // A round's legs come and go inside one job (the round's own subscription below starts and ends it).
+      const inRound = !!useNotes.getState().job?.round || useRound.getState().guiding;
+      if (!inRound && before.walkStep === null && now.walkStep !== null) startJob();
       if (now.walkStep !== null) trackStep(now.walkStep);
-      if (before.walkStep !== null && now.walkStep === null) endJob(true);
+      if (!inRound && before.walkStep !== null && now.walkStep === null) endJob(true);
       updateGuide(now.walkStep);
     }
+  });
+  // The round: guidance starts the job, each new stop (or the way back) is a new leg, the end shows the report.
+  const unsubscribeRound = useRound.subscribe((now, before) => {
+    if (now.guiding && !before.guiding) startRoundJob();
+    else if (now.guiding && (now.index !== before.index || now.returning !== before.returning)) nextLeg();
+    if (now.checked !== before.checked) {
+      const job = useNotes.getState().job;
+      if (job?.round) useNotes.setState({ job: { ...job, round: { ...job.round, checked: [...now.checked] } } });
+    }
+    if (!now.guiding && before.guiding && useNotes.getState().job?.round) endJob(!now.finished, now.finished);
+    if (now.index !== before.index && useTwin.getState().walkStep === null) updateGuide(null);
   });
   // The server sends the facts valid now with every state (state.facts): take them, and re-read the history when
   // they change (a fact resolved through the chat leaves state.facts).
@@ -501,6 +642,7 @@ export function installNotes(): () => void {
   return () => {
     installed = false;
     unsubscribe();
+    unsubscribeRound();
     unsubscribeFacts();
     unsubscribeNotes();
   };
@@ -532,6 +674,13 @@ export function notesHere(): string {
 export function finishJob(): string {
   closeNotes();
   const twin = useTwin.getState();
+  if (useNotes.getState().job?.round) {
+    if (twin.walkStep !== null) trackStep(twin.walkStep);
+    const { plan, checked } = useRound.getState();
+    const report = endJob(false, !!plan && checked.length >= plan.stops.length);
+    endRound(); // the round's subscription sees no job any more and stays quiet
+    return report ? reportSpeech(report) : "Done.";
+  }
   if (twin.walkStep !== null) {
     trackStep(twin.walkStep);
     const report = endJob(false);
@@ -551,7 +700,7 @@ function showEmptyReport(): Job {
 
 function reportSpeech(job: Job): string {
   const notes = job.noteIds.length;
-  const parts = ["Job finished."];
+  const parts = [job.round ? `Round finished: ${job.round.checked.length} of ${job.round.stops.length} stops checked.` : "Job finished."];
   if (job.walkedM) parts.push(`${job.walkedM} metres walked.`);
   if (notes) parts.push(`${notes} note${notes === 1 ? "" : "s"} saved.`);
   return parts.join(" ");
