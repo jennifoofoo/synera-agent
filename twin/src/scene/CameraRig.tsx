@@ -148,7 +148,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.touches.two = flat ? A.NONE : A.TOUCH_DOLLY_ROTATE;
     if (flat) void c.rotateTo(c.azimuthAngle, PLAN_TILT, false);
     // Light damping: camera-controls smooths critically (no overshoot, no drift after release).
-    c.smoothTime = 0.13;
+    c.smoothTime = profile === "worker" ? 0.13 : 0.18; // fly-tos glide a touch longer on the laptop
     c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
@@ -159,7 +159,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
   }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height]);
 
-  // Entering 2D or changing the floor in 2D frames the focused floor.
+  // Entering 2D or changing the floor in 2D frames the focused floor, north up (the plan is axis-aligned; the
+  // label layout in Labels.tsx assumes it too). Q/E and a right drag may still turn it, Home turns it back.
   useEffect(() => {
     const c = controls.current;
     if (!c || !flat || !focusedFloorId) return;
@@ -167,6 +168,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     if (!floor) return;
     const y = floorY(floor.id);
     const box = new THREE.Box3(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+    void c.rotateTo(0, PLAN_TILT, !reducedMotion);
     fitBox(c, box, !reducedMotion, 0.9);
     invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
