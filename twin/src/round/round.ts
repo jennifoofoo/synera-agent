@@ -14,7 +14,7 @@ import type { AgentRound, Building, BuildingState, Route, Space } from "../api/t
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { walkMinutes } from "../walkInfo";
-import { areaOptions, entranceRoom, inArea, normType, orderRound, straightLine, typeMatches } from "./order";
+import { areaOptions, entranceRoom, inArea, orderRound, straightLine, typeMatches } from "./order";
 
 /** Up to this many route calls the matrix is measured on real routes; above it, straight lines. */
 const MAX_ROUTE_PAIRS = 231; // 21 stops + start
@@ -38,6 +38,11 @@ export interface RoundPlan {
   /** "route": distances from /api/route; "straight": straight-line stand-in (too many stops). */
   measured: "route" | "straight";
   unreachable: string[];
+  /** The round ends back at the start: after the last stop, "Done" guides the way back as a final leg. */
+  returnToStart: boolean;
+  /** Metres of each leg: legsM[i] from the stop before (or the start) to stop i; one more for the way back. Filled
+   * after planning (route lengths, cached); null until then. */
+  legsM?: number[] | null;
 }
 
 export interface WhatIf {
@@ -59,18 +64,24 @@ interface RoundState {
   area: string;
   /** null: start where I am (or at the entrance). */
   startId: string | null;
+  /** Plan the round back to the start (planner choice "End: back at the start"). */
+  returnToStart: boolean;
   busy: string | null;
   error: string | null;
   plan: RoundPlan | null;
   guiding: boolean;
   index: number;
   checked: string[];
+  /** Walking the final leg from the last stop back to the start. */
+  returning: boolean;
   finished: boolean;
   whatIf: WhatIf | null;
   /** Tap two rooms for "What if a door here?": the first one picked so far. */
   picking: { first: string | null } | null;
   /** A door suggested from outside (URL hash or integrator): two room ids. */
   suggestion: [string, string] | null;
+  /** A what-if door waiting for a yes: nothing is changed in the building before roundConfirmDoor(). */
+  pendingDoor: [string, string] | null;
 }
 
 export const useRound = create<RoundState>(() => ({
@@ -78,16 +89,19 @@ export const useRound = create<RoundState>(() => ({
   type: "",
   area: "Whole building",
   startId: null,
+  returnToStart: false,
   busy: null,
   error: null,
   plan: null,
   guiding: false,
   index: 0,
   checked: [],
+  returning: false,
   finished: false,
   whatIf: null,
   picking: null,
   suggestion: null,
+  pendingDoor: null,
 }));
 
 // ---------- distances ----------
@@ -142,8 +156,12 @@ function startRoom(building: Building, chosen: string | null): string | null {
 /** Plan the round for the current choices: stops, order, drawn route. Draws it on the map. */
 export async function planRound(): Promise<RoundPlan | null> {
   const { buildingKey, building, model } = useTwin.getState();
-  const { type, area, startId } = useRound.getState();
+  const { type, area, startId, returnToStart } = useRound.getState();
   if (!buildingKey || !building || !model) return null;
+  if (!type) {
+    useRound.setState({ plan: null, error: null });
+    return null;
+  }
   const stops = stopsFor(building, type, area);
   const start = startRoom(building, startId);
   if (!stops.length || !start) {
@@ -178,7 +196,8 @@ export async function planRound(): Promise<RoundPlan | null> {
     return null;
   }
   const last = order[order.length - 1];
-  const result = await api.route(buildingKey, start, last.spaceId, false, order.slice(0, -1).map((stop) => stop.spaceId));
+  const ids = order.map((stop) => stop.spaceId);
+  const result = returnToStart ? await api.route(buildingKey, start, start, false, ids) : await api.route(buildingKey, start, last.spaceId, false, ids.slice(0, -1));
   if (!result.route.ok || typeof result.route.length_m !== "number") {
     useRound.setState({ plan: null, error: result.route.message ?? result.route.error ?? "No route for this round." });
     return null;
@@ -194,8 +213,10 @@ export async function planRound(): Promise<RoundPlan | null> {
     lengthM: result.route.length_m,
     measured,
     unreachable,
+    returnToStart,
   };
   useRound.setState({ plan, error: null });
+  void measureLegs(plan);
   showStops(plan, null);
   useTwin.getState().requestCamera({ kind: "object", ids: [start, ...order.map((stop) => stop.spaceId)] });
   return plan;
@@ -225,11 +246,11 @@ async function busy<T>(note: string, run: () => Promise<T>): Promise<T | null> {
 /** Open the panel, optionally with a type and an area ("fire extinguisher", "Ground floor"), and plan at once. */
 export async function openRound(type?: string, area?: string): Promise<void> {
   const building = useTwin.getState().building;
-  const fallbackType = building?.assets.some((asset) => normType(asset.type) === "fire extinguisher") ? "fire_extinguisher" : (building?.assets[0]?.type ?? "");
+  // No type asked for: the panel opens with "What" empty (or the one chosen before), the person picks.
   const known = type ? building?.assets.find((asset) => typeMatches(asset, type))?.type : undefined;
   useRound.setState({
     open: true,
-    type: known ?? (useRound.getState().type || fallbackType),
+    type: known ?? useRound.getState().type,
     ...(area ? { area } : {}),
     guiding: false,
     finished: false,
@@ -241,18 +262,22 @@ export async function openRound(type?: string, area?: string): Promise<void> {
 export function closeRound(): void {
   const { guiding } = useRound.getState();
   if (guiding) endRound();
-  useRound.setState({ open: false, plan: null, whatIf: null, picking: null, error: null });
+  useRound.setState({ open: false, plan: null, whatIf: null, picking: null, pendingDoor: null, error: null });
   useTwin.getState().setHighlight("round", null);
   useTwin.getState().setHighlight("round-door", null);
   if (useTwin.getState().state?.route) void useTwin.getState().clearRoute();
 }
 
-export async function setRoundChoice(choice: Partial<Pick<RoundState, "type" | "area" | "startId">>): Promise<void> {
+export async function setRoundChoice(choice: Partial<Pick<RoundState, "type" | "area" | "startId" | "returnToStart">>): Promise<void> {
   useRound.setState({ ...choice, whatIf: null, finished: false, checked: [], index: 0 });
   await busy("Planning the round…", planRound);
 }
 
-let switching = false;
+/** Held while guidance is switched on purpose (a leg loads, a round ends), so the watchers below do not take the
+ * closing step sheet for the walker leaving. A counter: one switch may start while another is still settling. */
+let switching = 0;
+/** A leg (next stop, or the way back) is loading: further Done taps and "done" are ignored until it is in. */
+let legLoading = false;
 
 /** Route from the previous stop (or the start) to stop `index` and start the step sheet. */
 async function goToStop(index: number): Promise<void> {
@@ -261,12 +286,12 @@ async function goToStop(index: number): Promise<void> {
   if (!plan || !key) return;
   const from = index === 0 ? plan.startId : plan.stops[index - 1].spaceId;
   const to = plan.stops[index].spaceId;
-  switching = true;
+  switching++;
   try {
     const result = from === to ? null : await api.route(key, from, to, false);
     if (result?.route.ok) {
       useTwin.getState().applyState(result.state);
-      useRound.setState({ index, guiding: true });
+      useRound.setState({ index, guiding: true, returning: false });
       useTwin.getState().startWalk();
     } else {
       // Already in the room (two stops in one place) or no route: show the stop, the step sheet stays closed.
@@ -274,12 +299,12 @@ async function goToStop(index: number): Promise<void> {
       useTwin.getState().stopWalk();
       if (listening) useTwin.getState().setHandsFree(true); // "Hey Wanda, done" still checks this stop
       if (useTwin.getState().state?.route) await useTwin.getState().clearRoute();
-      useRound.setState({ index, guiding: true });
+      useRound.setState({ index, guiding: true, returning: false });
       useTwin.getState().flyTo(plan.stops[index].assetIds[0] ?? to);
     }
     showStops(plan, index);
   } finally {
-    switching = false;
+    switching--;
   }
 }
 
@@ -290,23 +315,62 @@ export async function startRound(): Promise<void> {
   // A finished round starts over; a paused one goes on at the first stop not checked yet.
   const checked = finished || useRound.getState().checked.length >= plan.stops.length ? [] : useRound.getState().checked;
   const first = plan.stops.findIndex((stop) => !checked.includes(stop.spaceId));
-  useRound.setState({ finished: false, checked });
+  useRound.setState({ finished: false, returning: false, checked });
   await busy("Starting…", () => goToStop(first < 0 ? 0 : first));
+}
+
+/** The final leg: from the last stop back to the start. Returns false when there is no way to walk (already there). */
+async function goBack(): Promise<boolean> {
+  const { plan, index } = useRound.getState();
+  const key = useTwin.getState().buildingKey;
+  if (!plan || !key) return false;
+  const from = plan.stops[index].spaceId;
+  if (from === plan.startId) return false;
+  switching++;
+  try {
+    const result = await api.route(key, from, plan.startId, false);
+    if (!result.route.ok) return false;
+    useTwin.getState().applyState(result.state);
+    useRound.setState({ returning: true, guiding: true });
+    useTwin.getState().startWalk();
+    useTwin.getState().setHighlight("round", null);
+    return true;
+  } finally {
+    switching--;
+  }
+}
+
+function finishRound(): string {
+  const { plan, checked } = useRound.getState();
+  // finished before guiding ends, so whoever watches the end of guidance sees a completed round.
+  useRound.setState({ finished: true });
+  endRound();
+  useTwin.getState().setHighlight("round", null);
+  return `Round complete: ${checked.length} of ${plan?.stops.length ?? 0} stops checked.`;
 }
 
 /** "Done": the current stop is checked; go on to the next stop, or finish the round. Returns what to say. */
 export async function roundDone(): Promise<string> {
-  const { plan, index, checked, guiding } = useRound.getState();
+  if (legLoading || useRound.getState().busy) return "One moment, the next stop is loading.";
+  legLoading = true;
+  try {
+    return await checkStop();
+  } finally {
+    legLoading = false;
+  }
+}
+
+async function checkStop(): Promise<string> {
+  const { plan, index, checked, guiding, returning } = useRound.getState();
   if (!plan || !guiding) return "No inspection round is running.";
+  if (returning) return finishRound();
   const stop = plan.stops[index];
   const nowChecked = checked.includes(stop.spaceId) ? checked : [...checked, stop.spaceId];
   useRound.setState({ checked: nowChecked });
   const next = plan.stops.findIndex((candidate, i) => i > index && !nowChecked.includes(candidate.spaceId));
   if (next < 0) {
-    endRound();
-    useRound.setState({ finished: true });
-    useTwin.getState().setHighlight("round", null);
-    return `Round complete: ${nowChecked.length} of ${plan.stops.length} stops checked.`;
+    if (plan.returnToStart && (await busy("Back to the start…", goBack))) return roundStatus().text;
+    return finishRound();
   }
   await busy("Next stop…", () => goToStop(next));
   return roundStatus().text;
@@ -319,11 +383,47 @@ export function inRound(): boolean {
 
 /** Leave guidance (the plan and the checks stay). */
 export function endRound(): void {
-  switching = true;
-  useRound.setState({ guiding: false });
-  useTwin.getState().stopWalk();
-  void useTwin.getState().clearRoute();
-  switching = false;
+  switching++;
+  try {
+    useRound.setState({ guiding: false, returning: false });
+    useTwin.getState().stopWalk();
+  } catch (error) {
+    switching--;
+    throw error;
+  }
+  void useTwin
+    .getState()
+    .clearRoute()
+    .catch(() => {})
+    .finally(() => switching--);
+}
+
+/** The legs' lengths, for "how far" (route lengths through the same cache as planning). */
+async function measureLegs(plan: RoundPlan): Promise<void> {
+  const graph = graphKey(useTwin.getState().state);
+  const points = [plan.startId, ...plan.stops.map((stop) => stop.spaceId), ...(plan.returnToStart ? [plan.startId] : [])];
+  try {
+    const legs: number[] = [];
+    for (let i = 1; i < points.length; i++) legs.push(await routeLength(plan.building, graph, points[i - 1], points[i], false));
+    if (useRound.getState().plan === plan) plan.legsM = legs.map((m) => (isFinite(m) ? m : 0));
+  } catch {
+    /* no "left in the round" then */
+  }
+}
+
+/** "How far" in a round: to the next stop and for the whole rest of the round. legLeftM: metres left on the leg
+ * being walked (null: not known, e.g. the stop is in the room you are in). */
+export function roundHowFar(legLeftM: number | null): string {
+  const { plan, index, checked, guiding, returning } = useRound.getState();
+  if (!plan || !guiding) return "No inspection round is running.";
+  const leg = Math.round(legLeftM ?? 0);
+  if (returning) return `${leg} metres back to the start.`;
+  const legs = plan.legsM;
+  const later = legs
+    ? plan.stops.reduce((sum, stop, i) => (i > index && !checked.includes(stop.spaceId) ? sum + legs[i] : sum), 0) + (plan.returnToStart ? (legs[plan.stops.length] ?? 0) : 0)
+    : null;
+  const toStop = legLeftM === null ? `You are at stop ${index + 1}` : `${leg} metres to the next stop`;
+  return later === null ? `${toStop}.` : `${toStop}, ${Math.round(leg + later)} metres left in the round.`;
 }
 
 export interface RoundStatus {
@@ -332,22 +432,29 @@ export interface RoundStatus {
   total: number;
   left: number;
   checked: number;
+  /** On the final leg back to the start. */
+  returning: boolean;
   label: string;
   text: string;
 }
 
 /** Where the round stands, for the header and for "how many left". */
 export function roundStatus(): RoundStatus {
-  const { plan, index, checked, guiding } = useRound.getState();
-  if (!plan) return { active: false, stop: 0, total: 0, left: 0, checked: 0, label: "", text: "No inspection round is planned." };
+  const { plan, index, checked, guiding, returning } = useRound.getState();
+  if (!plan) return { active: false, stop: 0, total: 0, left: 0, checked: 0, returning: false, label: "", text: "No inspection round is planned." };
   const total = plan.stops.length;
   const left = total - checked.length;
+  if (guiding && returning) {
+    const route = useTwin.getState().state?.route;
+    const metres = route?.ok && typeof route.length_m === "number" ? ` · ${Math.round(route.length_m)} m` : "";
+    return { active: true, stop: total, total, left, checked: checked.length, returning: true, label: `Back to the start${metres}`, text: `All stops done. Back to the start, ${plan.startName}${metres ? `, ${metres.slice(3)}` : ""}.` };
+  }
   const stop = plan.stops[index];
   const label = assetLabel(plan.type, stop?.assetIds.length ?? 1);
   const text = guiding
     ? `Stop ${index + 1} of ${total}: ${label} in ${stop.name}. ${left} ${left === 1 ? "stop" : "stops"} left.`
     : `${checked.length} of ${total} stops checked, ${left} left.`;
-  return { active: guiding, stop: index + 1, total, left, checked: checked.length, label, text };
+  return { active: guiding, stop: index + 1, total, left, checked: checked.length, returning: false, label, text };
 }
 
 export function assetLabel(type: string, count: number): string {
@@ -399,8 +506,10 @@ export function adoptRound(round: AgentRound, lengthM: number | null): RoundPlan
     lengthM: lengthM ?? 0,
     measured: "route",
     unreachable: [],
+    returnToStart: !!round.return_to_start,
   };
-  useRound.setState({ open: true, type, area, startId: round.start, plan, guiding: false, index: 0, checked: [], finished: false, whatIf: null, picking: null, error: null, busy: null });
+  void measureLegs(plan);
+  useRound.setState({ open: true, type, area, startId: round.start, returnToStart: plan.returnToStart, plan, guiding: false, returning: false, index: 0, checked: [], finished: false, whatIf: null, picking: null, error: null, busy: null });
   showStops(plan, null);
   return plan;
 }
@@ -410,6 +519,7 @@ function isWholeRound(route: Route | null | undefined, plan: RoundPlan): boolean
   if (!route?.ok) return false;
   if (route.round) return true;
   const ids = plan.stops.map((stop) => stop.spaceId);
+  if (plan.returnToStart) return route.start === plan.startId && route.destination === plan.startId && JSON.stringify(route.via ?? []) === JSON.stringify(ids);
   return route.start === plan.startId && route.destination === ids[ids.length - 1] && JSON.stringify(route.via ?? []) === JSON.stringify(ids.slice(0, -1));
 }
 
@@ -471,6 +581,22 @@ export function whatIfLine(whatIf: WhatIf): string {
   return `Round length unchanged (${before} m)`;
 }
 
+/** "What if a door here?" only asks first: the panel shows "Add a door between A and B? This changes the building."
+ * and nothing is sent to the server before roundConfirmDoor(). */
+export function proposeDoor(first: string, second: string): void {
+  useRound.setState({ pendingDoor: [first, second], picking: null });
+}
+
+export async function roundConfirmDoor(): Promise<WhatIf | null> {
+  const pending = useRound.getState().pendingDoor;
+  useRound.setState({ pendingDoor: null });
+  return pending ? roundWhatIfDoor(pending[0], pending[1]) : null;
+}
+
+export function cancelDoor(): void {
+  useRound.setState({ pendingDoor: null });
+}
+
 /** Tap two rooms on the map: arm picking; the panel watches the selection. */
 export function pickDoorRooms(on: boolean): void {
   useRound.setState({ picking: on ? { first: null } : null });
@@ -488,7 +614,7 @@ if (typeof window !== "undefined") {
   useTwin.subscribe((now, before) => {
     if (now.buildingKey !== before.buildingKey) adoptedKey = "";
     if (now.buildingKey !== before.buildingKey && useRound.getState().plan) {
-      useRound.setState({ plan: null, whatIf: null, guiding: false, checked: [], index: 0, picking: null });
+      useRound.setState({ plan: null, whatIf: null, guiding: false, returning: false, checked: [], index: 0, picking: null, pendingDoor: null });
     }
   });
   // The chat agent planned a round (state.route.round): open it here once, with its stops in its order.
@@ -514,10 +640,9 @@ if (typeof window !== "undefined") {
     if (!picking.first) useRound.setState({ picking: { first: spaceId } });
     else if (spaceId !== picking.first) {
       const first = picking.first;
-      useRound.setState({ picking: null });
       useTwin.getState().select(null);
-      void roundWhatIfDoor(first, spaceId);
+      proposeDoor(first, spaceId);
     }
   });
-  (window as unknown as { __round: unknown }).__round = { useRound, adoptRound, openRound, planRound, startRound, roundDone, roundStatus, roundWhatIfDoor, roundUndoDoor, endRound, pickDoorRooms, closeRound };
+  (window as unknown as { __round: unknown }).__round = { useRound, adoptRound, openRound, planRound, startRound, roundDone, roundStatus, roundHowFar, roundWhatIfDoor, proposeDoor, roundConfirmDoor, roundUndoDoor, endRound, pickDoorRooms, closeRound };
 }

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { downscalePhoto, endedLabel, sinceLabel, type Note } from "../notes/notes";
 import {
-  AUTHORS,
+  DEFAULT_AUTHOR,
   addNote,
   canResolve,
   canUndo,
@@ -176,13 +176,21 @@ export function NotesButton() {
 
 function AuthorSwitch() {
   const author = useNotes((s) => s.author);
+  const [name, setName] = useState(author === DEFAULT_AUTHOR ? "" : author);
+  // Free name, remembered on this device; empty signs as "Technician".
   return (
-    <div className="note-author" role="radiogroup" aria-label="Notes by">
-      {AUTHORS.map((name) => (
-        <button key={name} role="radio" aria-checked={author === name} className={author === name ? "on" : ""} onClick={() => setAuthor(name)}>
-          {name}
-        </button>
-      ))}
+    <div className="note-author">
+      <input
+        value={name}
+        onChange={(event) => {
+          setName(event.target.value);
+          setAuthor(event.target.value);
+        }}
+        placeholder={DEFAULT_AUTHOR}
+        aria-label="Notes by (your name)"
+        autoComplete="name"
+        size={12}
+      />
     </div>
   );
 }
