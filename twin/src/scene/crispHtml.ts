@@ -22,7 +22,7 @@ export function crispCentre(el: HTMLElement, above: boolean, liftPx: number): ()
   };
   place();
   const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(place);
-  observer?.observe(el);
+  observer?.observe(el, { box: "border-box" }); // padding changes with the role (selected, destination) too
   return () => {
     observer?.disconnect();
     el.style.transform = ""; // drei's `center` takes over again

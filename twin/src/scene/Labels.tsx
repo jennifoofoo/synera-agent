@@ -686,6 +686,8 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
         data-label-space={item.space.id}
         data-zoom-kind="room"
         data-label-class={labelClass}
+        // right from the first paint (Declutter may measure before the effect snaps it to whole pixels)
+        style={crisp ? { transform: above ? `translate(-50%, calc(-100% - ${lift}px))` : "translate(-50%, -50%)" } : undefined}
       >
         <NameWithNumber name={item.space.name} />
       </div>
