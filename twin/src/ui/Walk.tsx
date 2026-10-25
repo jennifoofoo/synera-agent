@@ -10,6 +10,8 @@ import { metresLeft, readable, walkMinutes } from "../walkInfo";
 import { honestLine, toggleWalkWithMe, useWalkMotion } from "../walkWithMe";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
+import { RoundBar } from "./Round";
+import { inRound, roundDone } from "../round/round";
 import "./Walk.css";
 
 export { walkMinutes };
@@ -96,6 +98,7 @@ export function Walk() {
   return (
     <PhoneSheet open label="Directions" tall={list} onClose={() => setList(false)} onToggle={() => setList(!list)}>
       <section className="card card-walk" aria-label="Directions">
+        <RoundBar />
         <div className="card-head">
           <span className="card-kicker">
             Step {step + 1} of {steps.length}
@@ -122,7 +125,7 @@ export function Walk() {
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back
           </button>
-          <button className="primary" onClick={last ? end : () => setWalkStep(step + 1)}>
+          <button className="primary" onClick={last ? (inRound() ? () => void roundDone() : end) : () => setWalkStep(step + 1)}>
             {last ? "Done" : "Next"}
           </button>
         </div>
