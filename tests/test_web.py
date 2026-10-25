@@ -449,3 +449,15 @@ def test_no_route_message_for_the_page_names_closures_without_ids():
     message = readable_error(bm, text)
     assert "[" not in message and "proc-factory" not in message
     assert "because of closures: Office staircase" in message
+
+
+def test_tunnel_origin_is_allowed_only_when_switched_on_and_same_origin(monkeypatch):
+    from web import server
+
+    monkeypatch.setattr(server, "TUNNEL_SUFFIXES", ())
+    assert not server.tunnel_origin("https://a-b.trycloudflare.com", "a-b.trycloudflare.com")
+    monkeypatch.setattr(server, "TUNNEL_SUFFIXES", (".trycloudflare.com",))
+    assert server.tunnel_origin("https://a-b.trycloudflare.com", "a-b.trycloudflare.com")
+    assert not server.tunnel_origin("https://a-b.trycloudflare.com", "evil.example.com")
+    assert not server.tunnel_origin("http://a-b.trycloudflare.com", "a-b.trycloudflare.com")
+    assert not server.tunnel_origin("https://evil.example.com", "evil.example.com")

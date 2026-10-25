@@ -13,7 +13,7 @@ if ! command -v cloudflared >/dev/null; then
   exit 1
 fi
 
-uv run python -m web --host 127.0.0.1 --port "$PORT" "$@" &
+TWIN_TUNNEL_SUFFIXES=".trycloudflare.com" uv run python -m web --host 127.0.0.1 --port "$PORT" "$@" &
 server_pid=$!
 trap 'kill "$server_pid" 2>/dev/null || true' EXIT
 sleep 3
