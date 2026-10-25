@@ -38,7 +38,10 @@ export interface Job {
   maxStep: number;
   arrived: boolean;
   closures: string[];
+  /** Notes saved during the job. */
   noteIds: string[];
+  /** Notes shown on the way (left by others before). */
+  seenIds: string[];
 }
 
 interface NotesState {
@@ -217,6 +220,7 @@ function newJob(route: Route | null): Job {
     arrived: false,
     closures: route?.ok && model ? closedOnRoute(model, route, state?.closed ?? []) : [],
     noteIds: [],
+    seenIds: [],
   };
 }
 
@@ -309,7 +313,9 @@ function updateGuide(step: number | null): void {
     useNotes.setState({ guide: null });
     return;
   }
-  useNotes.setState({ guide: { stepKey, notes } });
+  const job = useNotes.getState().job;
+  const seen = job ? notes.map((note) => note.id).filter((id) => !job.seenIds.includes(id) && !job.noteIds.includes(id)) : [];
+  useNotes.setState({ guide: { stepKey, notes }, ...(job && seen.length ? { job: { ...job, seenIds: [...job.seenIds, ...seen] } } : {}) });
   if (spokenFor !== stepKey) {
     spokenFor = stepKey;
     void speakAfterStep(noteSpeech(notes));
@@ -395,6 +401,7 @@ export function notesHere(): string {
 
 /** "Hey Wanda, finished" — ends guidance (if any) and shows the job report. Returns the sentence to speak. */
 export function finishJob(): string {
+  closeNotes();
   const twin = useTwin.getState();
   if (twin.walkStep !== null) {
     trackStep(twin.walkStep);

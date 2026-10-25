@@ -9,9 +9,9 @@ import { useTwin } from "../store";
 import { NoteThumb } from "./Notes";
 import { PhoneSheet } from "./PhoneSheet";
 
-function reportNotes(job: Job, notes: Note[]): Note[] {
-  const ids = new Set(job.noteIds);
-  return notes.filter((note) => ids.has(note.id));
+function notesWith(ids: string[], notes: Note[]): Note[] {
+  const wanted = new Set(ids);
+  return notes.filter((note) => wanted.has(note.id));
 }
 
 function walkedLine(job: Job): string | null {
@@ -21,7 +21,8 @@ function walkedLine(job: Job): string | null {
 }
 
 /** The report as plain text (Copy, Share). */
-export function reportText(job: Job, notes: Note[], model: BuildingModel | null, building: string | null): string {
+export function reportText(job: Job, notes: Note[], seen: Note[], model: BuildingModel | null, building: string | null): string {
+  const where = (note: Note) => (model ? placeName(model, note.spaceId, note.assetId) : note.spaceId);
   const lines = [`Job report${building ? ` · ${building}` : ""}`];
   if (job.title) lines.push(`${job.title.startsWith("Round") ? "Round" : "Destination"}: ${job.title}${job.arrived ? " (arrived)" : job.lengthM !== null ? " (ended early)" : ""}`);
   const end = job.endedAt ?? Date.now();
@@ -31,11 +32,12 @@ export function reportText(job: Job, notes: Note[], model: BuildingModel | null,
   lines.push(`Closures: ${job.closures.length ? job.closures.join(", ") : "none on the way"}`);
   if (notes.length) {
     lines.push(`Notes (${notes.length}):`);
-    for (const note of notes) {
-      const where = model ? placeName(model, note.spaceId, note.assetId) : note.spaceId;
-      lines.push(`- ${clockLabel(note.createdAt)} ${note.author} at ${where}: ${note.text || "(photo)"}${note.photo && note.text ? " (photo)" : ""}`);
-    }
+    for (const note of notes) lines.push(`- ${clockLabel(note.createdAt)} ${note.author} at ${where(note)}: ${note.text || "(photo)"}${note.photo && note.text ? " (photo)" : ""}`);
   } else lines.push("Notes: none");
+  if (seen.length) {
+    lines.push(`Notes read on the way (${seen.length}):`);
+    for (const note of seen) lines.push(`- ${note.author} at ${where(note)}: ${note.text || "(photo)"}`);
+  }
   return lines.join("\n");
 }
 
@@ -46,8 +48,9 @@ export function Report() {
   const building = useTwin((s) => s.building?.name ?? null);
   const [done, setDone] = useState<string | null>(null);
   if (!report) return null;
-  const notes = reportNotes(report, all);
-  const text = reportText(report, notes, model, building);
+  const notes = notesWith(report.noteIds, all);
+  const seen = notesWith(report.seenIds, all);
+  const text = reportText(report, notes, seen, model, building);
   const end = report.endedAt ?? Date.now();
   const walked = walkedLine(report);
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
@@ -130,6 +133,11 @@ export function Report() {
               </li>
             ))}
           </ul>
+        )}
+        {seen.length > 0 && (
+          <p className="card-line report-seen">
+            Read on the way: {seen.map((note) => `${note.author} at ${model ? placeName(model, note.spaceId, note.assetId) : note.spaceId}`).join(", ")}
+          </p>
         )}
         <div className="card-actions">
           <button onClick={() => void copy()}>{done ?? "Copy as text"}</button>

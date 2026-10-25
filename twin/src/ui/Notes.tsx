@@ -83,6 +83,7 @@ function NoteGlyph({ size = 18 }: { size?: number }) {
 function NoteRow({ note, onRemove }: { note: Note; onRemove?: () => void }) {
   const model = useTwin((s) => s.model);
   const asset = note.assetId ? model?.assetById.get(note.assetId)?.name : null;
+  const [confirm, setConfirm] = useState(false);
   return (
     <li className="note-row">
       <NoteThumb photo={note.photo} />
@@ -94,8 +95,9 @@ function NoteRow({ note, onRemove }: { note: Note; onRemove?: () => void }) {
         {note.text && <p className="note-text">{note.text}</p>}
       </div>
       {onRemove && (
-        <button className="x note-remove" onClick={onRemove} aria-label="Delete note" title="Delete note">
-          ×
+        // Two taps: a note is someone's knowledge, it should not go with a stray tap.
+        <button className={`link note-remove ${confirm ? "armed" : ""}`} onClick={() => (confirm ? onRemove() : setConfirm(true))} onBlur={() => setConfirm(false)}>
+          {confirm ? "Delete?" : "Delete"}
         </button>
       )}
     </li>
@@ -314,7 +316,7 @@ export function GuideNote() {
           <span className="note-badge small">
             <NoteGlyph size={13} />
           </span>
-          <strong>{note.author} left a note here</strong> · {whenLabel(note.createdAt)}
+          <strong>{note.author} left a note here</strong> · <span className="nowrap">{whenLabel(note.createdAt)}</span>
         </div>
         {note.text && <p className="note-text">{note.text}</p>}
         {more.length > 0 && (
