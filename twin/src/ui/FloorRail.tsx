@@ -1,4 +1,5 @@
 import { useKeyHelp } from "../scene/controlsTable";
+import { routeStackKey } from "../scene/floorVisibility";
 import { useTwin } from "../store";
 import { Compass } from "./Compass";
 
@@ -17,8 +18,21 @@ export function FloorRail() {
   const profile = useTwin((s) => s.profile);
   const topInset = useTwin((s) => s.topInset);
   const directionsOpen = useTwin((s) => s.directions !== null);
+  const routeStackOff = useTwin((s) => s.routeStackOff);
+  const setRouteStackOff = useTwin((s) => s.setRouteStackOff);
   if (!model) return null;
   const flat = viewMode === "2d";
+  // 3D, a route over several floors: its floors are stacked apart until a floor is picked here (only that floor then,
+  // guidance still moves it along); "all floors" stacks the route again.
+  const stackKey = flat ? "" : routeStackKey(state?.route);
+  const routeStacked = !!stackKey && routeStackOff !== stackKey;
+  const allFloors = floorMode === "exploded" || routeStacked;
+  const toggleAllFloors = () => {
+    if (routeStacked) setRouteStackOff(stackKey);
+    else if (floorMode === "exploded") setFloorMode("single");
+    else if (stackKey) setRouteStackOff(null);
+    else setFloorMode("exploded");
+  };
   const routeFloors = new Set(state?.route?.ok ? state.route.floors : []);
   return (
     <div
@@ -35,11 +49,11 @@ export function FloorRail() {
       </button>
       {!flat && model.floors.length > 1 && (
         <button
-          className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
-          onClick={() => setFloorMode(floorMode === "exploded" ? "single" : "exploded")}
-          title={floorMode === "exploded" ? "Show only this floor" : "Show all floors"}
+          className={`rail-toggle ${allFloors ? "active" : ""}`}
+          onClick={toggleAllFloors}
+          title={allFloors ? "Show only this floor" : stackKey ? "Show all floors of the route" : "Show all floors"}
           aria-label="All floors"
-          aria-pressed={floorMode === "exploded"}
+          aria-pressed={allFloors}
         >
           <AllFloorsIcon />
         </button>
@@ -53,7 +67,10 @@ export function FloorRail() {
             aria-checked={active}
             className={`rail-floor ${active ? "active" : ""} ${active && floorMode === "single" ? "single" : ""}`}
             onClick={() => {
-              if (active) {
+              if (routeStacked) {
+                setRouteStackOff(stackKey); // only this floor, the route on the other floors is hidden
+                focusFloor(floor.id);
+              } else if (active) {
                 if (!flat) setFloorMode(floorMode === "single" ? "stacked" : "single");
               } else {
                 focusFloor(floor.id);
