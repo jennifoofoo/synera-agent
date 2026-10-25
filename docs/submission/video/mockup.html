@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wanda device mockups</title>
+<!--
+  Device mockups for the video (storyboard §1, §6): the app recordings play inside an iPhone / MacBook frame.
+  1. Open in Chrome. Drag the clips onto the dashed boxes (camera clip left, phone screen recording into the phone,
+     laptop recording into the laptop). Clips stay on this computer, nothing is uploaded.
+  2. Pick the layout with 1 (split: camera + phone), 2 (phone only), 3 (laptop only).
+  3. Full screen (Cmd+Ctrl+F), start the screen recording, press Space: all clips start together. R rewinds.
+  Sync: ← / → shifts the phone clip by 0.1 s against the camera (shown top left until playback starts).
+  Use 1080p clips, 4K makes Chrome stutter while recording.
+-->
+<style>
+  :root {
+    --signal: #004fab;
+    --signal-soft: #ebf1ff;
+    --ink: #1d1d1f;
+    --muted: #6e6e73;
+    --bg-a: #f5f8ff;
+    --bg-b: #dfe8fb;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; overflow: hidden; background: #fff; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; color: var(--ink); }
+  .playing, .playing * { cursor: none !important; }
+
+  .stage {
+    width: 1920px; height: 1080px; position: absolute; left: 50%; top: 50%; overflow: hidden;
+    background: radial-gradient(1200px 800px at 70% 40%, var(--bg-a), var(--bg-b));
+  }
+
+  video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .drop { position: relative; }
+  .drop .empty {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+    color: var(--muted); font-size: 24px; font-weight: 600; border: 3px dashed #b8c4dc; border-radius: inherit; padding: 20px; background: rgba(255,255,255,0.6);
+  }
+  .drop.has .empty { display: none; }
+  .drop.over .empty { border-color: var(--signal); color: var(--signal); }
+  .playing .drop .empty { display: none; }
+
+  /* camera half (split layout) */
+  #cam { position: absolute; left: 0; top: 0; width: 960px; height: 1080px; display: none; border-radius: 0; }
+
+  /* iPhone 15 Pro: screen 1179×2556, rounded corners, thin titanium edge, dynamic island */
+  .iphone {
+    position: absolute; width: 470px; height: 966px; border-radius: 78px; padding: 16px;
+    background: linear-gradient(145deg, #3a3a3c, #1c1c1e 40%, #2c2c2e);
+    box-shadow: 0 0 0 2px #8e8e93 inset, 0 50px 100px rgba(0, 36, 120, 0.25), 0 18px 36px rgba(0, 0, 0, 0.18);
+  }
+  .iphone::before, .iphone::after { content: ""; position: absolute; width: 5px; border-radius: 3px; background: #48484a; }
+  .iphone::before { left: -5px; top: 200px; height: 90px; box-shadow: 0 120px 0 #48484a; }
+  .iphone::after { right: -5px; top: 260px; height: 130px; }
+  .iphone .screen { width: 100%; height: 100%; border-radius: 62px; overflow: hidden; position: relative; background: #000; }
+  .iphone .island { position: absolute; top: 14px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 2; }
+  .iphone video { object-fit: cover; }
+
+  /* MacBook: 16:10 screen, black bezel, aluminium base */
+  .macbook { position: absolute; left: 50%; top: 80px; width: 1320px; margin-left: -660px; display: none; }
+  .macbook .lid { background: #0d0d0f; border-radius: 34px 34px 0 0; padding: 30px 30px 40px; box-shadow: 0 0 0 3px #b9bcc2 inset, 0 40px 90px rgba(0, 36, 120, 0.22); }
+  .macbook .screen { aspect-ratio: 16 / 10; border-radius: 8px; overflow: hidden; position: relative; background: #000; }
+  .macbook .screen video { object-fit: contain; }
+  .macbook .base { height: 30px; margin: 0 -90px; background: linear-gradient(#e3e5e9, #b9bcc2); border-radius: 0 0 26px 26px; position: relative; box-shadow: 0 24px 40px rgba(0, 0, 0, 0.15); }
+  .macbook .base::before { content: ""; position: absolute; left: 50%; top: 0; width: 220px; height: 12px; margin-left: -110px; background: #c9ccd1; border-radius: 0 0 12px 12px; }
+
+  /* layouts */
+  .layout-split #cam { display: block; }
+  .layout-split .iphone { left: calc(960px + 480px - 235px); top: 57px; }
+  .layout-phone .iphone { left: calc(50% - 235px); top: 57px; }
+  .layout-laptop .iphone { display: none; }
+  .layout-laptop .macbook { display: block; }
+
+  .caption { position: absolute; left: 0; right: 0; bottom: 60px; text-align: center; font-size: 40px; font-weight: 700; letter-spacing: -0.01em; color: var(--ink); text-shadow: 0 2px 12px rgba(255,255,255,0.7); }
+  .layout-split .caption { left: 960px; }
+
+  .hud { position: fixed; top: 12px; left: 12px; font: 13px/1.5 ui-monospace, Menlo, monospace; color: var(--muted); background: rgba(255,255,255,0.85); padding: 8px 12px; border-radius: 8px; z-index: 10; }
+  .playing .hud { display: none; }
+</style>
+</head>
+<body class="layout-split">
+<div class="stage" id="stage">
+  <div class="drop" id="cam"><video muted playsinline></video><div class="empty">Camera clip<br>(drop here)</div></div>
+
+  <div class="iphone">
+    <div class="screen drop" id="phone"><div class="island"></div><video playsinline></video><div class="empty">Phone screen recording<br>(drop here)</div></div>
+  </div>
+
+  <div class="macbook">
+    <div class="lid"><div class="screen drop" id="laptop"><video playsinline></video><div class="empty">Laptop recording (drop here)</div></div></div>
+    <div class="base"></div>
+  </div>
+
+  <div class="caption" id="caption" contenteditable="true" spellcheck="false"></div>
+</div>
+
+<div class="hud" id="hud"></div>
+
+<script>
+  const stage = document.getElementById("stage");
+  const fit = () => stage.style.transform = `translate(-50%, -50%) scale(${Math.min(innerWidth / 1920, innerHeight / 1080)})`;
+  addEventListener("resize", fit); fit();
+
+  const q = new URLSearchParams(location.search);
+  if (q.get("caption")) document.getElementById("caption").textContent = q.get("caption");
+
+  let layout = "split";
+  let offset = 0; // seconds the phone clip is shifted against the camera clip
+  const zones = ["cam", "phone", "laptop"].map((id) => document.getElementById(id));
+  const vid = (id) => document.querySelector(`#${id} video`);
+
+  const hud = () => {
+    document.getElementById("hud").innerHTML =
+      `layout: ${layout} (1 split · 2 phone · 3 laptop)<br>phone offset: ${offset.toFixed(1)} s (← →)<br>Space play · R rewind · click the caption to type`;
+  };
+  hud();
+
+  for (const zone of zones) {
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault(); zone.classList.remove("over");
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const v = zone.querySelector("video");
+      v.src = URL.createObjectURL(file);
+      v.load();
+      zone.classList.add("has");
+    });
+  }
+  // A drop anywhere else must not open the file in the tab.
+  addEventListener("dragover", (e) => e.preventDefault());
+  addEventListener("drop", (e) => e.preventDefault());
+
+  const setLayout = (name) => { layout = name; document.body.className = `layout-${name}`; hud(); };
+
+  // The phone clip starts `offset` seconds later (positive) or earlier (negative) than the camera clip.
+  const rewind = () => {
+    document.body.classList.remove("playing");
+    for (const id of ["cam", "phone", "laptop"]) { const v = vid(id); v.pause(); if (v.src) v.currentTime = 0; }
+    if (offset < 0 && vid("phone").src) vid("phone").currentTime = -offset;
+  };
+  const play = () => {
+    rewind();
+    document.body.classList.add("playing");
+    document.body.className = `layout-${layout} playing`;
+    if (vid("cam").src) vid("cam").play();
+    if (vid("laptop").src) vid("laptop").play();
+    if (vid("phone").src) {
+      if (offset > 0) setTimeout(() => vid("phone").play(), offset * 1000);
+      else vid("phone").play();
+    }
+  };
+
+  addEventListener("keydown", (e) => {
+    if (document.activeElement?.id === "caption") { if (e.key === "Escape") document.activeElement.blur(); return; }
+    if (e.code === "Space") { e.preventDefault(); play(); }
+    else if (e.key === "r" || e.key === "R") { rewind(); document.body.className = `layout-${layout}`; }
+    else if (e.key === "1") setLayout("split");
+    else if (e.key === "2") setLayout("phone");
+    else if (e.key === "3") setLayout("laptop");
+    else if (e.key === "ArrowRight") { offset += 0.1; hud(); }
+    else if (e.key === "ArrowLeft") { offset -= 0.1; hud(); }
+  });
+</script>
+</body>
+</html>

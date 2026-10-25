@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wanda architecture beat</title>
+<!--
+  Video beat 1:32–1:47 (storyboard §1, §6): slide A "Facts from code" (10 s) + card B "145 answers" (5 s).
+  Record: open in Chrome, full screen (Cmd+Ctrl+F), start the screen recording, press Space. R restarts.
+  The stage is 1920×1080 and scales to the window; record the whole screen at 1080p.
+-->
+<style>
+  :root {
+    --signal: #004fab;
+    --signal-soft: #ebf1ff;
+    --signal-dark: #002478;
+    --ink: #1d1d1f;
+    --muted: #6e6e73;
+    --line: #d2d2d7;
+    --bg: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); overflow: hidden; cursor: none; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif; color: var(--ink); }
+  .stage { width: 1920px; height: 1080px; position: absolute; left: 50%; top: 50%; transform-origin: center; }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+
+  /* hidden until Space; every element below animates only under .play */
+  .hint { position: fixed; bottom: 24px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 15px; }
+  .play .hint { display: none; }
+
+  /* ---------- Slide A ---------- */
+  .title { position: absolute; top: 150px; left: 0; right: 0; text-align: center; font-size: 76px; font-weight: 700; letter-spacing: -0.02em; opacity: 0; }
+  .title b { color: var(--signal); font-weight: 700; }
+  .box {
+    position: absolute; top: 440px; height: 190px; border-radius: 28px; background: var(--bg);
+    border: 3px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 0 20px; opacity: 0; transform: translateY(24px) scale(0.96);
+    box-shadow: 0 12px 40px rgba(0, 36, 120, 0.08);
+  }
+  .box .name { font-size: 38px; font-weight: 650; letter-spacing: -0.01em; }
+  .box .sub { font-size: 23px; color: var(--muted); margin-top: 10px; line-height: 1.3; }
+  .box.wanda { border-color: var(--signal); background: var(--signal-soft); }
+  .box.wanda .name { color: var(--signal-dark); }
+  .box svg.icon { width: 64px; height: 64px; margin-bottom: 8px; color: var(--signal); }
+
+  #voice { left: 90px; width: 300px; }
+  #wanda { left: 520px; width: 380px; }
+  #tools { left: 1030px; width: 380px; border-style: solid; }
+  #graph { left: 1540px; width: 300px; }
+
+  .chips { display: flex; gap: 10px; margin-top: 14px; }
+  .chip { font-size: 21px; font-weight: 600; color: var(--signal-dark); background: var(--signal-soft); border-radius: 999px; padding: 6px 14px; }
+  .tag { position: absolute; top: 392px; font-size: 22px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; opacity: 0; text-align: center; }
+  #tag-llm { left: 520px; width: 380px; }
+  #tag-code { left: 1030px; width: 810px; }
+
+  svg.wires { position: absolute; inset: 0; overflow: visible; }
+  .wire { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+  .wire.back { stroke: var(--signal); stroke-width: 5; }
+  .arrowhead { fill: var(--ink); opacity: 0; }
+  .arrowhead.back { fill: var(--signal); }
+  .facts { position: absolute; left: 0; right: 0; top: 860px; text-align: center; opacity: 0; }
+  .facts .label { font-size: 26px; font-weight: 700; color: var(--signal); letter-spacing: 0.06em; text-transform: uppercase; }
+  .json {
+    display: inline-block; margin-top: 12px; font: 600 30px/1.2 ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--signal-dark); background: var(--signal-soft); border: 2px solid var(--signal); border-radius: 14px; padding: 12px 24px;
+  }
+
+  /* ---------- Card B ---------- */
+  .card { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .big { font-size: 260px; font-weight: 800; letter-spacing: -0.04em; color: var(--signal); line-height: 1; opacity: 0; transform: scale(0.9); }
+  .line1 { font-size: 64px; font-weight: 700; letter-spacing: -0.02em; margin-top: 24px; opacity: 0; }
+  .line2 { font-size: 44px; font-weight: 500; color: var(--muted); margin-top: 22px; opacity: 0; }
+  .line2 b { color: var(--ink); font-weight: 700; }
+
+  /* ---------- timeline (seconds from Space) ---------- */
+  @keyframes in    { to { opacity: 1; transform: none; } }
+  @keyframes show  { to { opacity: 1; } }
+  @keyframes hide  { to { opacity: 0; } }
+  @keyframes draw  { to { stroke-dashoffset: 0; } }
+  @keyframes flash { 0% { opacity: 0; transform: translateY(10px); } 15%, 100% { opacity: 1; transform: none; } }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 12px 40px rgba(0, 36, 120, 0.08); } 50% { box-shadow: 0 0 0 10px rgba(0, 79, 171, 0.18), 0 12px 40px rgba(0, 36, 120, 0.12); } }
+
+  .play #A { animation: show 0.01s 0s forwards, hide 0.5s 9.8s forwards; }
+  .play #voice  { animation: in 0.6s cubic-bezier(.2,.8,.2,1) 0.3s forwards; }
+  .play #w1     { animation: draw 0.5s ease-out 1.3s forwards; }
+  .play #h1     { animation: show 0.1s 1.75s forwards; }
+  .play #wanda  { animation: in 0.6s cubic-bezier(.2,.8,.2,1) 1.6s forwards; }
+  .play #tag-llm{ animation: show 0.5s 2.2s forwards; }
+  .play #w2     { animation: draw 0.5s ease-out 3.0s forwards; }
+  .play #h2     { animation: show 0.1s 3.45s forwards; }
+  .play #tools  { animation: in 0.6s cubic-bezier(.2,.8,.2,1) 3.3s forwards; }
+  .play #w3     { animation: draw 0.5s ease-out 4.7s forwards; }
+  .play #h3     { animation: show 0.1s 5.15s forwards; }
+  .play #graph  { animation: in 0.6s cubic-bezier(.2,.8,.2,1) 5.0s forwards; }
+  .play #tag-code { animation: show 0.5s 5.6s forwards; }
+  .play #wb     { animation: draw 1.0s ease-in-out 6.4s forwards; }
+  .play #hb     { animation: show 0.1s 7.35s forwards; }
+  .play .facts  { animation: flash 0.6s ease-out 6.9s forwards; }
+  .play #wanda.box { animation: in 0.6s cubic-bezier(.2,.8,.2,1) 1.6s forwards, pulse 0.9s ease-in-out 7.4s 1; }
+  .play .title  { animation: in 0.7s cubic-bezier(.2,.8,.2,1) 8.0s forwards; }
+
+  .play #B      { animation: show 0.5s 10.0s forwards; }
+  .play .big    { animation: in 0.7s cubic-bezier(.2,.8,.2,1) 10.3s forwards; }
+  .play .line1  { animation: show 0.6s 11.2s forwards; }
+  .play .line2  { animation: show 0.6s 12.4s forwards; }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- Slide A, 0–10 s: voice → Wanda (Claude) → deterministic tools → building graph, facts flow back -->
+  <section class="scene" id="A">
+    <div class="title">Facts from <b>code</b>. Language from the model.</div>
+
+    <svg class="wires" viewBox="0 0 1920 1080" aria-hidden="true">
+      <path id="w1" class="wire" d="M 400 535 L 505 535" />
+      <polygon id="h1" class="arrowhead" points="512,535 498,526 498,544" />
+      <path id="w2" class="wire" d="M 910 535 L 1015 535" />
+      <polygon id="h2" class="arrowhead" points="1022,535 1008,526 1008,544" />
+      <path id="w3" class="wire" d="M 1420 535 L 1525 535" />
+      <polygon id="h3" class="arrowhead" points="1532,535 1518,526 1518,544" />
+      <path id="wb" class="wire back" d="M 1690 640 C 1690 800, 710 800, 710 650" />
+      <polygon id="hb" class="arrowhead back" points="710,640 700,658 720,658" />
+    </svg>
+
+    <div class="box" id="voice">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <div class="name">Gisela's voice</div>
+    </div>
+    <div class="box wanda" id="wanda">
+      <div class="name">Wanda (Claude)</div>
+      <div class="sub">picks a tool,<br>phrases the answer</div>
+    </div>
+    <div class="box" id="tools">
+      <div class="name">Deterministic tools</div>
+      <div class="chips"><span class="chip">route</span><span class="chip">round</span><span class="chip">notes</span></div>
+      <div class="sub">Python, on Synera's route model</div>
+    </div>
+    <div class="box" id="graph">
+      <div class="name">Building graph</div>
+      <div class="sub">rooms, doors, stairs,<br>lifts, devices</div>
+    </div>
+
+    <div class="tag" id="tag-llm">Language model</div>
+    <div class="tag" id="tag-code">Code · same input, same answer</div>
+
+    <div class="facts">
+      <div class="label">facts</div>
+      <!-- numbers as on the round panel on shoot day (Floor 3, per room, from Main Stairs) -->
+      <div class="json" id="json">{"stops": 5, "total_m": 127.9}</div>
+    </div>
+  </section>
+
+  <!-- Card B, 10–15 s -->
+  <section class="scene card" id="B">
+    <div class="big">145</div>
+    <div class="line1">benchmark answers. All computed by code.</div>
+    <div class="line2"><b>Reproducible</b>: same question, same answer.</div>
+  </section>
+</div>
+
+<div class="hint">Space: play · R: restart · ?stops=6&amp;m=106.7 sets the JSON numbers</div>
+
+<script>
+  // Fit the 1920×1080 stage into the window.
+  const stage = document.getElementById("stage");
+  const fit = () => stage.style.transform = `translate(-50%, -50%) scale(${Math.min(innerWidth / 1920, innerHeight / 1080)})`;
+  addEventListener("resize", fit); fit();
+
+  // Numbers from the URL, so the JSON matches the panel on shoot day without editing the file.
+  const q = new URLSearchParams(location.search);
+  if (q.get("stops") || q.get("m")) {
+    document.getElementById("json").textContent = `{"stops": ${q.get("stops") ?? 5}, "total_m": ${q.get("m") ?? 127.9}}`;
+  }
+
+  const play = () => { document.body.classList.remove("play"); void document.body.offsetWidth; document.body.classList.add("play"); };
+  addEventListener("keydown", (e) => {
+    if (e.code === "Space" || e.key === "r" || e.key === "R") { e.preventDefault(); play(); }
+  });
+  if (q.has("autoplay")) play();
+</script>
+</body>
+</html>
