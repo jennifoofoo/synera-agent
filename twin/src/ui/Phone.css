@@ -175,3 +175,12 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
   .worker .dock .ob-chips { display: none; }
   .worker .dock > .phone-sheet { max-height: calc(var(--vvh, 100dvh) * 0.6); }
 }
+
+/* A sheet or card is open on the phone: the bar is only the orb and a short neutral line, never the last reply
+   (one text at a time). Listening and thinking still say what happens. */
+.app.worker .dock:has(.phone-sheet) .wanda-bar:is(.idle, .reply, .speaking) .wb-kicker,
+.app.worker .dock:has(.phone-sheet) .wanda-bar:is(.idle, .reply, .speaking) .wb-text { display: none; }
+.app.worker .dock:has(.phone-sheet) .wanda-bar:is(.idle, .reply, .speaking) .wb-caption::after {
+  content: "Tap Wanda to talk";
+  color: var(--muted);
+}

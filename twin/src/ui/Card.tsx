@@ -158,6 +158,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const ask = useTwin((s) => s.ask);
   const openDirections = useTwin((s) => s.openDirections);
   const busy = useTwin((s) => s.chatBusy);
+  const routeShown = useTwin((s) => !!s.state?.route?.ok); // the drawn route already says where it starts
 
   const space = model.spaceById.get(selection.kind === "space" ? selection.id : (selection.space_id ?? ""));
   const asset = selection.kind === "asset" ? model.assetById.get(selection.id) : undefined;
@@ -212,11 +213,13 @@ function SelectionCard({ model }: { model: BuildingModel }) {
       </div>
       {equipment && equipment.items.length > 0 && (
         <div className="card-line card-equipment" data-testid="card-equipment">
-          {equipment.items.join(", ")}
-          {equipment.more > 0 ? `, +${equipment.more} more` : ""}
+          {/* Calm on a phone: two things by name, otherwise the first and a count. */}
+          {equipment.items.length + equipment.more <= 2
+            ? equipment.items.join(", ")
+            : `${equipment.items[0]}, +${equipment.items.length + equipment.more - 1} things`}
         </div>
       )}
-      {position && !hereAlready && (
+      {position && !hereAlready && !routeShown && (
         <div className="card-line card-from" data-testid="card-from">
           <span className="here-dot" aria-hidden />
           From: {spaceName(model, position.space_id)}
