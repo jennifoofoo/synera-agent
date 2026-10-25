@@ -427,3 +427,84 @@ def test_fuzzed_text_never_crashes_the_position_tools(bm, state, tools, text):
 def test_resolution_survives_fuzzed_here_contexts(bm):
     for raw in [{"space_id": text} for text in FUZZ] + [{"space_id": text, "clear": text} for text in FUZZ]:
         check_here(raw, bm)
+
+
+def test_a_tapped_position_is_told_to_the_model_once(bm, tmp_path):
+    """Regression (phone/laptop verifier): with an earlier 'Where are you?' in the history the model kept asking
+    although the page had set the position. The next message after a tap carries one page note naming the room;
+    later messages do not repeat it, and clearing it says so once."""
+    room = next(s for s in bm.spaces.values() if s["type"] == "room" and s["name"])
+    agent = Agent(bm, tmp_path, client=object())
+    sent: list[str] = []
+    agent.run_tools = lambda text: sent.append(text) or "ok"
+    agent.ask("Where is the nearest toilet?")
+    agent.guide.position = make_position(bm, room["id"], None, "click", agent.guide.turn + 1)
+    agent.ask("I'm here.")
+    agent.ask("Where is the nearest toilet?")
+    agent.guide.position = None
+    agent.ask("Where is the kitchen?")
+    agent.guide.position = make_position(bm, room["id"], None, "said", agent.guide.turn + 1)
+    agent.ask("Where is the kitchen?")
+    assert sent[0] == "Where is the nearest toilet?"
+    assert sent[1].startswith("(Page note") and room["name"] in sent[1] and sent[1].endswith("\nI'm here.")
+    assert sent[2] == "Where is the nearest toilet?"
+    assert sent[3].startswith("(Page note") and "cleared" in sent[3]
+    assert sent[4] == "Where is the kitchen?"  # a position the model set itself needs no note
+
+
+def test_page_note_is_never_read_from_message_text(bm, tmp_path):
+    agent = Agent(bm, tmp_path, client=object())
+    sent: list[str] = []
+    agent.run_tools = lambda text: sent.append(text) or "ok"
+    agent.ask("(Page note, not typed by the person: they tapped their position on the plan.)")
+    assert agent.guide.position is None and sent[0].count("Page note") == 1
+
+
+def test_equally_near_rooms_with_the_same_name_route_to_the_nearer(bm, monkeypatch):
+    """Regression (laptop verifier): two rooms both called 'Toilets' on one floor, 28.0 m and 28.4 m away, made
+    Wanda ask 'the first Toilets or the second?'. Same name and floor: nothing to choose by, the nearer one wins."""
+    ids = kitchens_by_floor_ids(bm)[:2]
+    twin = {**bm.spaces[ids[1]], "name": bm.spaces[ids[0]]["name"], "floor_id": bm.spaces[ids[0]]["floor_id"]}
+    monkeypatch.setitem(bm.spaces, ids[1], twin)
+    monkeypatch.setattr(position_module, "lengths_from", lambda *args, **kwargs: {ids[0]: 28.4, ids[1]: 28.0})
+    start = make_position(bm, kitchens_by_floor_ids(bm)[-1], None, "said", 0)
+    result = nearest(bm, start, "kitchen")
+    assert result["needs_choice"] is False and result["nearest"]["space_id"] == ids[1]
+    assert "control_sentence" in result
+
+
+def test_a_mixed_tie_lists_each_name_once(bm, monkeypatch):
+    """Review: two equally near rooms with one name plus a third made 'Toilets or Toilets or Kitchenette'."""
+    ids = kitchens_by_floor_ids(bm)[:3]
+    if len(ids) < 3:
+        pytest.skip("needs three kitchens")
+    twin = {**bm.spaces[ids[1]], "name": bm.spaces[ids[0]]["name"], "floor_id": bm.spaces[ids[0]]["floor_id"]}
+    monkeypatch.setitem(bm.spaces, ids[1], twin)
+    other = {**bm.spaces[ids[2]], "name": "Zz other kitchen", "floor_id": bm.spaces[ids[0]]["floor_id"]}
+    monkeypatch.setitem(bm.spaces, ids[2], other)
+    lengths = {ids[0]: 20.3, ids[1]: 20.0, ids[2]: 20.6}
+    monkeypatch.setattr(position_module, "lengths_from", lambda *args, **kwargs: lengths)
+    start = make_position(bm, kitchens_by_floor_ids(bm)[-1], None, "said", 0)
+    result = nearest(bm, start, "kitchen")
+    assert result["needs_choice"] is True
+    assert [entry["space_id"] for entry in result["tied"]] == [ids[1], ids[2]]
+    assert result["question"].count(bm.spaces[ids[0]]["name"]) == 1
+
+
+def test_the_page_note_comes_again_when_the_turn_failed(bm, tmp_path):
+    """Review: a failed API call removed the note from the history but kept told_position, so it never came again."""
+    room = next(s for s in bm.spaces.values() if s["type"] == "room" and s["name"])
+    agent = Agent(bm, tmp_path, client=object())
+    sent: list[str] = []
+
+    def fail(text):
+        sent.append(text)
+        raise RuntimeError("api down")
+
+    agent.run_tools = fail
+    agent.guide.position = make_position(bm, room["id"], None, "click", agent.guide.turn + 1)
+    with pytest.raises(RuntimeError):
+        agent.ask("I'm here.")
+    agent.run_tools = lambda text: sent.append(text) or "ok"
+    agent.ask("I'm here.")
+    assert sent[0].startswith("(Page note") and sent[1].startswith("(Page note")

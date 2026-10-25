@@ -42,7 +42,7 @@ export function App() {
   const docked = sidebar && !collapsed;
   useReframeOnColumn(docked);
   useEffect(() => {
-    void loadBuildings();
+    void loadBuildings({ fresh: true }); // the page load: start without an old position, route or chat
   }, [loadBuildings]);
   useEffect(installHandsFree, []);
   return (

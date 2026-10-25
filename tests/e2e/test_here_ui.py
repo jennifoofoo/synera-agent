@@ -322,8 +322,11 @@ def test_labels_clear_of_markers(page, server):
     assert pair, "no routable pair of rooms on the ground floor"
     start, end = pair
     here = {"space_id": start["id"], "floor_id": start["floor_id"]}
-    post_json(f"{server}/api/chat", {"building": key, "message": "I'm here.", "context": {"here": here}})
-    page.reload()
+    # A reload starts fresh (POST /api/fresh drops position and route), so both are set from the page itself.
+    page.evaluate(
+        "([here, end]) => { const s = window.__twinAudit.store.getState(); s.setHere(here); return s.route(here.space_id, end); }",
+        [here, end["id"]],
+    )
     page.wait_for_function("window.__twinScene && window.__twinScene.getObjectByName('route-end')", timeout=20000)
     page.wait_for_timeout(1500)
     for view in ["3d", "2d"] if page.kind == "desktop" else ["2d"]:

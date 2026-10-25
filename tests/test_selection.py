@@ -203,3 +203,23 @@ def test_state_view_move_shows_the_new_spot(building_path):
         pytest.skip("no room fits the asset")
     moved = api.state_view(session)["moved_assets"][asset["id"]]
     assert moved["space_id"] == target and moved["position"] == api.rounded(asset["position"])
+
+
+def test_get_selection_right_after_a_tapped_position_returns_that_room(bm, room):
+    """Regression (preview): "I'm here." after a tap made the model call get_selection, get 'Nothing is selected'
+    and reply "I can't tell where here is". In the turn the tap set the position, that room is the answer; a turn
+    later, or a position the model set itself, is still nothing selected."""
+    from building_agent.position import make_position
+
+    state = GuideState()
+    (tool,) = make_selection_tools(bm, state)
+    state.begin_turn()
+    state.position = make_position(bm, room["id"], None, "click", state.turn)
+    result = json.loads(tool())
+    assert result["position_tapped"] is True and result["space_id"] == room["id"]
+    state.begin_turn()
+    with pytest.raises(ToolError, match="Nothing is selected"):
+        tool()
+    state.position = make_position(bm, room["id"], None, "said", state.turn)
+    with pytest.raises(ToolError, match="Nothing is selected"):
+        tool()
