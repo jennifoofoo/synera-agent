@@ -5,6 +5,7 @@ import { api } from "./api/client";
 import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point, Route } from "./api/types";
 import { buildModel, type BuildingModel } from "./model/model";
 import { waitsForPlace } from "./asksWhere";
+import { FORGET_HERE_REPLY, isForgetHere } from "./forgetHere";
 
 export type FloorMode = "stacked" | "exploded" | "single";
 export type Profile = "planner" | "worker";
@@ -579,6 +580,22 @@ export const useTwin = create<TwinState>((set, get) => ({
     }
     if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
       get().startWalk(); // the drawn route already has its steps; no agent call
+      return null;
+    }
+    if (isForgetHere(message)) {
+      // Like the chip's ×: the server forgets the position, no agent turn, no "Where are you now?" question.
+      set((s) => ({
+        chat: [...s.chat, { id: ++messageId, role: "user", text: message }, { id: ++messageId, role: "agent", text: FORGET_HERE_REPLY }],
+        pendingHere: null,
+        hereArmed: false,
+        awaitingPlace: null,
+      }));
+      try {
+        const { state } = await api.clearHere(buildingKey);
+        set({ state });
+      } catch {
+        set((s) => ({ state: s.state ? { ...s.state, position: null } : s.state }));
+      }
       return null;
     }
     if (NEW_BUILDING_COMMAND.test(message.trim())) {
