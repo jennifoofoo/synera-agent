@@ -138,3 +138,10 @@ export function decide<T>(
   }
   return out;
 }
+
+/** A room's name as the map shows it: without a numbered suffix in brackets ("Kitchen 0.27 (apartment 6)" becomes
+ * "Kitchen 0.27"), which only crowds the map; the room card and the list keep the full name. A bracket without a
+ * number is part of the name and stays ("Café (Gastraum)"). */
+export function mapRoomName(name: string): string {
+  return name.replace(/\s*\([^()]*\d[^()]*\)\s*$/, "").trim() || name;
+}

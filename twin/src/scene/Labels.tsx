@@ -14,7 +14,7 @@ import { closedConnectorStops } from "../model/closures";
 import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
-import { blocked, capped, densityBudget, rankOfClass, type LabelClass } from "./labelRules";
+import { blocked, capped, densityBudget, mapRoomName, rankOfClass, type LabelClass } from "./labelRules";
 import { useRound } from "../round/round";
 import { labelDecision } from "./Declutter";
 import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
@@ -426,7 +426,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       // marked rooms are pills in both views
       const mark = marks.get(item.id)!;
       const dest = mark.kind === "end";
-      const chars = item.kind === "room" ? item.space.name.length * (dest ? DEST_CHAR_PX : CHAR_PX) : 0;
+      const chars = item.kind === "room" ? mapRoomName(item.space.name).length * (dest ? DEST_CHAR_PX : CHAR_PX) : 0;
       const box = boxOf(item.point, chars / 2 + (dest ? DEST_PAD_PX : PILL_PAD_PX), (dest ? DEST_H_PX : PILL_H_PX) / 2, mark.lift);
       if (!free(box, `room-${item.id}`)) continue;
       kept.push(box);
@@ -484,7 +484,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       if (!tagsDone && !(item.kind === "poi" && item.closed)) placeTags();
       if (item.kind === "door" || item.kind === "tag") continue; // doors after the second lines, below
       if ((marks.has(item.id) && !(item.kind === "poi" && item.closed)) || replaced.has(item.id)) continue; // a closed glyph always shows
-      const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
+      const text = item.kind === "room" ? mapRoomName(item.space.name) : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
       // Halo text in both views (3D keeps a 2 px margin for the halo); 3D symbols are a dot or a badge with a name.
       const pillPad = flat || item.kind === "poi" ? 0 : HALO_PAD_PX;
       const poi3d = !flat && item.kind === "poi" ? poiLayout3d(item, tier) : null;
@@ -670,7 +670,7 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
         data-label-class={labelClass}
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
-        <NameWithNumber name={item.space.name} />
+        <NameWithNumber name={mapRoomName(item.space.name)} />
       </div>
     </Html>
   );
@@ -697,7 +697,7 @@ function NameWithNumber({ name }: { name: string }) {
 function poiLayout3d(item: Extract<Item, { kind: "poi" }>, tier: MapTier): { size: number; text: string; halfW: number; shift: number } {
   const badge = tier !== "far" || item.closed;
   const size = badge ? POI_BADGE_3D_PX : POI_DOT_PX;
-  const text = badge && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title ? item.title : "";
+  const text = badge && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title ? mapRoomName(item.title) : "";
   const textW = text ? POI_TEXT_GAP_PX + text.length * CHAR_PX : 0;
   return { size, text, halfW: (size + textW) / 2, shift: textW / 2 };
 }
