@@ -6,6 +6,11 @@
   /* surfaces */
   --paper: #f6f5f2; /* app and 3D background, warm off-white (scene) */
   --paper-2: #edebe6; /* inset fields, hover, ground (scene) */
+  /* 3D studio backdrop behind the transparent canvas: cool white at the top, a light lavender grey below (the fog
+   * colour, scene), a soft vignette toward the corners, and 1.5 % film grain against banding */
+  --studio-top: #f6f7fa; /* scene */
+  --studio-bottom: #e8e9ef; /* scene: fog */
+  --studio-vignette: rgba(52, 58, 84, 0.10);
   --surface: #ffffff; /* solid cards, inputs */
   --ink: #1d2430; /* text, graphite */
   --ink-2: #5a626d; /* secondary text (5.9:1 on --surface) */

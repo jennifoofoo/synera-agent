@@ -79,14 +79,20 @@ export const COLOURS = {
   edge: "#9aa0a8", // wall top edges: a thin, light, crisp line on off-white walls
   edgeGhost: "#c4c8ce",
   ghost: "#9aa0a8",
-  ground: "#eeedea", // the ground plane beyond the gradient (same as groundOuter), token --paper-2
+  ground: "#eeedea", // the campus ground (CampusSite3D.tsx), token --paper-2
   background: "#f6f5f2", // token --paper
   plan: "#f6f5f2", // 2D map background, token --paper
-  // 3D ground (GroundGrid.tsx): a soft radial gradient with a faint dot lattice that fades with distance
-  groundInner: "#f8f7f4",
-  groundOuter: "#eeedea",
-  dot: "#cfd3d8",
-  // lights (Scene.tsx) and the ambient occlusion tint (Effects.tsx): neutral, never a grey wash
+  // 3D studio (Studio.tsx, Scene.tsx): the canvas is transparent over a CSS backdrop (tokens --studio-*); the fog fades
+  // into its lower tone. The model stands on a plinth a touch darker than the walls.
+  studioTop: "#f6f7fa", // token --studio-top
+  studioBottom: "#e8e9ef", // token --studio-bottom, also the fog
+  plinth: "#dcdde2",
+  shadowTint: "#2b2f38", // soft shadows: neutral ink, never black
+  studioDome: "#b4b7be", // the environment's even grey dome (ambient light from every side)
+  studioKey: "#ffffff", // softbox above the front
+  studioRim: "#f3f5fb", // rim light behind
+  studioFill: "#eef0f6", // weak fill from the side
+  // lights for the phone profile (no environment map) and the ambient occlusion tint (Effects.tsx)
   sky: "#ffffff",
   groundLight: "#dcd9d3",
   fill: "#eef1f5",
@@ -97,10 +103,6 @@ export const COLOURS = {
   planThing: "#dedcd6",
   planThingFaint: "#e7e5e0",
   planLandmark: "#8f8a80",
-  // view cube (planner, 3D)
-  gizmoFace: "#ffffff",
-  gizmoHover: "#f0efec",
-  gizmoStroke: "#c9ccd2",
   signal: "#004fab", // token --signal
   mapBlue: "#004fab", // 2D route line (the signal colour; the name is historic)
   mapBlueDark: "#002478", // 2D route casing
