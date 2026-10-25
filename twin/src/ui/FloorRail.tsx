@@ -151,6 +151,15 @@ function MoreMenu({ items }: { items: MoreItem[] }) {
     if (open) menu.current?.querySelector<HTMLButtonElement>("button")?.focus();
     else setPlace({ visibility: "hidden" });
   }, [open]);
+  if (items.length === 1) {
+    // A menu with one row is an extra tap for nothing: show that tool itself in the "…" slot (phone 2D: north up).
+    const [only] = items;
+    return (
+      <button className="rail-toggle rail-more" data-testid={only.id} onClick={only.run} title={only.label} aria-label={only.label}>
+        {only.icon}
+      </button>
+    );
+  }
   return (
     <>
       <button
