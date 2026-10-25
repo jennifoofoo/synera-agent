@@ -1,10 +1,11 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { AccumulativeShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import { boundsOf, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
+import { useTwin } from "../store";
 import { SLAB_THICKNESS } from "./geometry";
 
 /** The plinth: a thin slab under the ground floor, this much larger than the building on each side (m). */
@@ -15,9 +16,9 @@ const BAKE_DELAY_MS = 750;
 /** The shadow catcher sits this far above the floor slab (no z-fighting, below furniture tops and the route). */
 const SHADOW_LIFT_M = 0.02;
 
-/** Top of the plinth: the underside of the lowest floor slab, so the building stands on it. */
-export function plinthTop(model: BuildingModel): number {
-  return Math.min(...model.floors.map((floor) => floor.elevation_m)) - SLAB_THICKNESS;
+/** Top of the plinth: the underside of the lowest drawn floor's slab (scene heights), so that floor stands on it. */
+export function plinthTop(floorYs: readonly number[]): number {
+  return Math.min(...floorYs) - SLAB_THICKNESS;
 }
 
 type Pt = readonly [number, number];
@@ -40,11 +41,14 @@ function hullOf(points: Pt[]): Pt[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** The plinth's rectangle in plan coordinates: the smallest rectangle around the indoor spaces of all floors (turned
+/** The plinth's rectangle in plan coordinates: the smallest rectangle around the indoor spaces of the given floors (all
+ * floors when none are given) (turned
  * with the building when it is not axis-aligned), plus the margin. Outdoor areas (yards, site) are left out. */
-function plinthRect(model: BuildingModel) {
-  const indoor = model.building.spaces.filter((space) => space.type !== "outdoor");
-  const points: Pt[] = (indoor.length ? indoor : model.building.spaces).flatMap((space) => space.polygon as Pt[]);
+function plinthRect(model: BuildingModel, floorIds?: readonly string[]) {
+  const picked = floorIds?.length ? model.building.spaces.filter((space) => floorIds.includes(space.floor_id)) : model.building.spaces;
+  const spaces = picked.length ? picked : model.building.spaces;
+  const indoor = spaces.filter((space) => space.type !== "outdoor");
+  const points: Pt[] = (indoor.length ? indoor : spaces).flatMap((space) => space.polygon as Pt[]);
   const hull = hullOf(points);
   const fit = (angle: number) => {
     const c = Math.cos(angle);
@@ -97,19 +101,41 @@ function softRectTexture(w: number, d: number): THREE.CanvasTexture {
   return texture;
 }
 
+/** How fast the plinth follows the active floor (1/s, exponential approach). */
+const PLINTH_FOLLOW = 9;
+
 /** The thin bevelled base the model stands on, like an architectural model on a table (3D only), with its own soft
- * shadow on the backdrop. */
-export function Plinth({ model }: { model: BuildingModel }) {
-  const { w, d, cx, cy, angle } = useMemo(() => plinthRect(model), [model]);
+ * shadow on the backdrop. It sits right under the drawn floors (`floorIds`: the active floor, or a route's floors),
+ * sized to them, with its top at `top` (plinthTop), and glides there when the active floor changes. */
+export function Plinth({ model, floorIds, top }: { model: BuildingModel; floorIds: readonly string[]; top: number }) {
+  const key = floorIds.join("|");
+  const { w, d, cx, cy, angle } = useMemo(() => plinthRect(model, key ? key.split("|") : undefined), [model, key]);
   const geometry = useMemo(() => new RoundedBoxGeometry(w, PLINTH_THICKNESS_M, d, 3, 0.12), [w, d]);
   const shadow = useMemo(() => softRectTexture(w, d), [w, d]);
   useEffect(() => () => {
     geometry.dispose();
     shadow.dispose();
   }, [geometry, shadow]);
-  const top = plinthTop(model);
+  const reducedMotion = useTwin((s) => s.reducedMotion);
+  const invalidate = useThree((s) => s.invalidate);
+  const group = useRef<THREE.Group>(null);
+  const placed = useRef(false);
+  useLayoutEffect(() => {
+    if (!group.current) return;
+    if (!placed.current || reducedMotion) group.current.position.y = top;
+    placed.current = true;
+    invalidate();
+  }, [top, reducedMotion, invalidate]);
+  useFrame((_, delta) => {
+    const g = group.current;
+    if (!g || g.position.y === top) return;
+    const dy = top - g.position.y;
+    g.position.y = Math.abs(dy) < 0.005 ? top : g.position.y + dy * (1 - Math.exp(-PLINTH_FOLLOW * Math.min(delta, 0.1)));
+    invalidate();
+  });
+  // position-y is set imperatively (glides); React only places x/z.
   return (
-    <group position={[cx, top, -cy]} rotation-y={angle}>
+    <group ref={group} position-x={cx} position-z={-cy} rotation-y={angle}>
       <mesh geometry={geometry} position-y={-PLINTH_THICKNESS_M / 2 - 0.004} castShadow raycast={() => null}>
         <meshStandardMaterial color={COLOURS.plinth} roughness={0.9} metalness={0} />
       </mesh>
