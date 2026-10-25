@@ -57,20 +57,20 @@
    "ref": null,
    "polygon": [
     [
-     0.859,
+     6.583,
+     22.899
+    ],
+    [
+     -4.8,
+     22.899
+    ],
+    [
+     -4.8,
      32.202
     ],
     [
      6.583,
      32.202
-    ],
-    [
-     6.583,
-     22.899
-    ],
-    [
-     0.859,
-     22.899
     ]
    ],
    "synthetic": false
@@ -290,10 +290,6 @@
    "polygon": [
     [
      8.6,
-     5.0
-    ],
-    [
-     8.6,
      11.879
     ],
     [
@@ -310,6 +306,14 @@
     ],
     [
      0.52,
+     11.879
+    ],
+    [
+     -7.2,
+     11.879
+    ],
+    [
+     -7.2,
      17.5
     ],
     [
@@ -390,6 +394,10 @@
     ],
     [
      21.3,
+     5.0
+    ],
+    [
+     8.6,
      5.0
     ]
    ],
@@ -3341,6 +3349,168 @@
    "room_type": "office",
    "ref": null,
    "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-S024",
+   "floor_id": "plan-89323a15-F0",
+   "type": "room",
+   "name": "Hazardous Materials Store",
+   "polygon": [
+    [
+     -4.8,
+     17.5
+    ],
+    [
+     -7.2,
+     17.5
+    ],
+    [
+     -7.2,
+     22.899
+    ],
+    [
+     -4.8,
+     22.899
+    ]
+   ],
+   "room_type": "storage",
+   "ref": null,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-S025",
+   "floor_id": "plan-89323a15-F0",
+   "type": "room",
+   "name": "Toilets",
+   "polygon": [
+    [
+     -2.4,
+     17.5
+    ],
+    [
+     -4.8,
+     17.5
+    ],
+    [
+     -4.8,
+     22.899
+    ],
+    [
+     -2.4,
+     22.899
+    ]
+   ],
+   "room_type": "toilet",
+   "ref": null,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-S026",
+   "floor_id": "plan-89323a15-F0",
+   "type": "room",
+   "name": "Hand Wash Room",
+   "polygon": [
+    [
+     -0.5,
+     17.5
+    ],
+    [
+     -2.4,
+     17.5
+    ],
+    [
+     -2.4,
+     22.899
+    ],
+    [
+     -0.5,
+     22.899
+    ]
+   ],
+   "room_type": "toilet",
+   "ref": null,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-S027",
+   "floor_id": "plan-89323a15-F0",
+   "type": "room",
+   "name": "Toilets",
+   "polygon": [
+    [
+     1.145,
+     17.5
+    ],
+    [
+     -0.5,
+     17.5
+    ],
+    [
+     -0.5,
+     22.899
+    ],
+    [
+     1.145,
+     22.899
+    ]
+   ],
+   "room_type": "toilet",
+   "ref": null,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-S028",
+   "floor_id": "plan-89323a15-F0",
+   "type": "stair",
+   "name": "North-West Stairs",
+   "polygon": [
+    [
+     -4.8,
+     22.899
+    ],
+    [
+     -7.2,
+     22.899
+    ],
+    [
+     -7.2,
+     32.202
+    ],
+    [
+     -4.8,
+     32.202
+    ]
+   ],
+   "room_type": "stairwell",
+   "ref": null,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-S029",
+   "floor_id": "plan-89323a15-F0",
+   "type": "corridor",
+   "name": "West Exit Corridor",
+   "polygon": [
+    [
+     -7.2,
+     14.1
+    ],
+    [
+     -9.3,
+     14.1
+    ],
+    [
+     -9.3,
+     23.5
+    ],
+    [
+     -7.2,
+     23.5
+    ]
+   ],
+   "room_type": "corridor",
+   "ref": null,
+   "synthetic": false
   }
  ],
  "openings": [
@@ -5247,6 +5417,150 @@
    "width_m": 0.9,
    "step_free": true,
    "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0110",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S025",
+    "plan-89323a15-F0-S009"
+   ],
+   "kind": "door",
+   "position": [
+    -3.0,
+    17.5
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0111",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S026",
+    "plan-89323a15-F0-S009"
+   ],
+   "kind": "door",
+   "position": [
+    -1.3,
+    17.5
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0112",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S027",
+    "plan-89323a15-F0-S009"
+   ],
+   "kind": "door",
+   "position": [
+    0.3,
+    17.5
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0113",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S024",
+    "plan-89323a15-F0-S029"
+   ],
+   "kind": "door",
+   "position": [
+    -7.2,
+    21.5
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0114",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S028",
+    "plan-89323a15-F0-S029"
+   ],
+   "kind": "door",
+   "position": [
+    -7.2,
+    23.2
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0115",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S029",
+    "plan-89323a15-F0-S009"
+   ],
+   "kind": "door",
+   "position": [
+    -7.2,
+    16.0
+   ],
+   "width_m": 1.6,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0116",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S029",
+    "outside"
+   ],
+   "kind": "entrance",
+   "position": [
+    -9.3,
+    21.6
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0117",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S029",
+    "outside"
+   ],
+   "kind": "entrance",
+   "position": [
+    -9.3,
+    15.5
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
+  },
+  {
+   "id": "plan-89323a15-F0-O0118",
+   "floor_id": "plan-89323a15-F0",
+   "space_ids": [
+    "plan-89323a15-F0-S028",
+    "outside"
+   ],
+   "kind": "entrance",
+   "position": [
+    -6.0,
+    32.202
+   ],
+   "width_m": 1.0,
+   "step_free": true,
+   "synthetic": false
   }
  ],
  "vertical_connectors": [
@@ -6060,6 +6374,132 @@
    "footprint": {
     "width_m": 0.4,
     "depth_m": 0.2,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00044",
+   "name": "Fire extinguisher 0.09",
+   "category": "equipment",
+   "type": "fire_extinguisher",
+   "space_id": "plan-89323a15-F0-S001",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    3.3,
+    32.0
+   ],
+   "footprint": {
+    "width_m": 0.3,
+    "depth_m": 0.3,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00045",
+   "name": "Fire alarm call point 0.06",
+   "category": "equipment",
+   "type": "manual_call_point",
+   "space_id": "plan-89323a15-F0-S001",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    4.8,
+    32.0
+   ],
+   "footprint": {
+    "width_m": 0.15,
+    "depth_m": 0.1,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00046",
+   "name": "Fire alarm call point 0.07",
+   "category": "equipment",
+   "type": "manual_call_point",
+   "space_id": "plan-89323a15-F0-S028",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    -6.4,
+    29.6
+   ],
+   "footprint": {
+    "width_m": 0.15,
+    "depth_m": 0.1,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00047",
+   "name": "Fire extinguisher 0.10",
+   "category": "equipment",
+   "type": "fire_extinguisher",
+   "space_id": "plan-89323a15-F0-S029",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    -7.6,
+    22.4
+   ],
+   "footprint": {
+    "width_m": 0.3,
+    "depth_m": 0.3,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00048",
+   "name": "Fire extinguisher 0.11",
+   "category": "equipment",
+   "type": "fire_extinguisher",
+   "space_id": "plan-89323a15-F0-S009",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    -7.0,
+    13.3
+   ],
+   "footprint": {
+    "width_m": 0.3,
+    "depth_m": 0.3,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00049",
+   "name": "Fire extinguisher 0.12",
+   "category": "equipment",
+   "type": "fire_extinguisher",
+   "space_id": "plan-89323a15-F0-S009",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    -3.9,
+    12.0
+   ],
+   "footprint": {
+    "width_m": 0.3,
+    "depth_m": 0.3,
+    "rotation_deg": 0.0
+   },
+   "source": "evacuation_plan"
+  },
+  {
+   "id": "plan-89323a15-A00050",
+   "name": "Fire alarm call point 0.08",
+   "category": "equipment",
+   "type": "manual_call_point",
+   "space_id": "plan-89323a15-F0-S009",
+   "floor_id": "plan-89323a15-F0",
+   "position": [
+    -3.0,
+    12.0
+   ],
+   "footprint": {
+    "width_m": 0.15,
+    "depth_m": 0.1,
     "rotation_deg": 0.0
    },
    "source": "evacuation_plan"
