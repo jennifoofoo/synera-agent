@@ -73,8 +73,19 @@ button.x:hover { color: var(--text); background: transparent; }
 .rail-floor.active, .rail-toggle.active { background: var(--ink); color: var(--surface); }
 .rail-floor.active:hover { background: var(--ink); }
 .rail-floor.single { box-shadow: inset 0 0 0 2px var(--signal); }
-.rail-compass { color: var(--text); touch-action: none; cursor: grab; }
-.rail-compass:active { cursor: grabbing; }
+/* "…" popover beside the rail (FloorRail.tsx MoreMenu, portal on body) */
+.rail-menu {
+  position: fixed; z-index: 30; min-width: 184px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--surface); box-shadow: var(--shadow-float); border-radius: var(--radius);
+}
+.rail-menu button {
+  display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 10px; border: 0; border-radius: calc(var(--radius) - 2px);
+  background: transparent; color: var(--text); font-size: 13px; text-align: left; cursor: pointer;
+}
+.rail-menu button:hover, .rail-menu button:focus-visible { background: var(--hairline); outline: none; }
+.rail-menu button.pressed { font-weight: 600; }
+.rail-menu-icon { width: 16px; display: inline-flex; justify-content: center; color: var(--muted); }
+@media (pointer: coarse) { .rail-menu button { min-height: 44px; font-size: 15px; } }
 .tilt-hint {
   position: absolute; left: 60px; top: 64px; z-index: 5; max-width: 260px; padding: 8px 12px; border-radius: var(--radius);
   background: var(--ink); color: var(--surface); font-size: 13px; box-shadow: var(--shadow-float); cursor: pointer;

@@ -1,10 +1,13 @@
 import { useKeyHelp } from "../scene/controlsTable";
 import { routeStackKey } from "../scene/floorVisibility";
 import { useTwin } from "../store";
-import { Compass } from "./Compass";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { CompassIcon, resetNorth, tilt, TiltIcon } from "./Compass";
 
-/** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
- * again = only this floor; the ⇕ toggle pulls the floors apart. Floors on the route carry a dot. */
+/** The floor rail: 2D/3D, one small number per floor, home (laptop) and "…" for the rarer view tools (all floors,
+ * north up, tilt, help). Tap a floor = focus it (others become glass); tap the active one again = only this floor.
+ * Floors on the route carry a dot. */
 export function FloorRail() {
   const model = useTwin((s) => s.model);
   const focusedFloorId = useTwin((s) => s.focusedFloorId);
@@ -51,17 +54,6 @@ export function FloorRail() {
           {flat ? "3D" : "2D"}
         </button>
       )}
-      {!flat && !walking && model.floors.length > 1 && (
-        <button
-          className={`rail-toggle ${allFloors ? "active" : ""}`}
-          onClick={toggleAllFloors}
-          title={allFloors ? "Show only this floor" : stackKey ? "Show all floors of the route" : "Show all floors"}
-          aria-label="All floors"
-          aria-pressed={allFloors}
-        >
-          <AllFloorsIcon />
-        </button>
-      )}
       {model.floors.length > 1 && [...model.floors].reverse().map((floor) => {
         const active = floor.id === focusedFloorId;
         return (
@@ -93,13 +85,128 @@ export function FloorRail() {
           <ResetViewIcon />
         </button>
       )}
-      {profile !== "worker" && (
-        <button className="rail-toggle rail-help" onClick={() => useKeyHelp.getState().setOpen(true)} title="Help: controls and map symbols (?)" aria-label="Help: controls and map symbols">
-          ?
-        </button>
-      )}
-      <Compass />
+      <MoreMenu
+        items={[
+          ...(!flat && !walking && model.floors.length > 1
+            ? [{ id: "all-floors", icon: <AllFloorsIcon />, label: allFloors ? "Only this floor" : "All floors", pressed: allFloors, run: toggleAllFloors }]
+            : []),
+          { id: "compass", icon: <CompassIcon />, label: "North up", run: resetNorth },
+          ...(!flat
+            ? [
+                { id: "tilt-flatter", icon: <TiltIcon flatter />, label: "Tilt flatter", run: () => tilt(true) },
+                { id: "tilt-steeper", icon: <TiltIcon />, label: "Tilt steeper", run: () => tilt(false) },
+              ]
+            : []),
+          ...(profile !== "worker"
+            ? [{ id: "help", icon: <HelpIcon />, label: "Help and map symbols", run: () => useKeyHelp.getState().setOpen(true) }]
+            : []),
+        ]}
+      />
     </div>
+  );
+}
+
+interface MoreItem {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  pressed?: boolean;
+  run: () => void;
+}
+
+/** "…" at the end of the rail: the rarely used view tools as labelled rows. Closes on pick, Esc or a click outside.
+ * The popover lives in a portal (the rail clips its children) and opens away from the screen edge the rail sits on. */
+function MoreMenu({ items }: { items: MoreItem[] }) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState<React.CSSProperties>({ visibility: "hidden" });
+  useLayoutEffect(() => {
+    if (!open || !button.current || !menu.current) return;
+    const r = button.current.getBoundingClientRect();
+    const h = menu.current.offsetHeight;
+    const top = Math.max(8, Math.min(r.top, window.innerHeight - h - 8));
+    setPlace(r.left > window.innerWidth / 2 ? { top, right: window.innerWidth - r.left + 8 } : { top, left: r.right + 8 });
+  }, [open, items.length]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpen(false);
+      button.current?.focus();
+    };
+    const onDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!menu.current?.contains(target) && !button.current?.contains(target)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    window.addEventListener("pointerdown", onDown, { capture: true });
+    return () => {
+      window.removeEventListener("keydown", onKey, { capture: true });
+      window.removeEventListener("pointerdown", onDown, { capture: true });
+    };
+  }, [open]);
+  useEffect(() => {
+    if (open) menu.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    else setPlace({ visibility: "hidden" });
+  }, [open]);
+  return (
+    <>
+      <button
+        ref={button}
+        className={`rail-toggle rail-more ${open ? "active" : ""}`}
+        data-testid="rail-more"
+        onClick={() => setOpen(!open)}
+        title="More view tools"
+        aria-label="More view tools"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <MoreIcon />
+      </button>
+      {open &&
+        createPortal(
+          <div className="rail-menu" role="menu" aria-label="View tools" ref={menu} style={place}>
+            {items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="menuitem"
+                data-testid={item.id}
+                className={item.pressed ? "pressed" : undefined}
+                onClick={() => {
+                  setOpen(false);
+                  item.run();
+                }}
+              >
+                <span className="rail-menu-icon">{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
+    </svg>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg {...railIcon}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17h.01" />
+    </svg>
   );
 }
 

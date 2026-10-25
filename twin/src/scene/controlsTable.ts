@@ -27,7 +27,7 @@ export const MOUSE_CONTROLS: ControlRow[] = [
   { keys: "Pinch, mouse wheel", does: "Zoom towards the pointer" },
   { keys: "Option / Alt + two-finger swipe or wheel", does: "Sideways rotates, up / down tilts (3D)" },
   { keys: "Two-finger twist (Safari)", does: "Rotate" },
-  { keys: "Compass (under the floors)", does: "Click: north up, straight down. Drag: rotate. Arrows below it tilt (3D)" },
+  { keys: "… beside the floors", does: "All floors, north up, tilt (3D) and this help" },
   { keys: "Click, double click", does: "Select a room, fly to it (3D) or zoom in (2D)" },
   { keys: "One finger / two fingers", does: "Move the map / pinch to zoom (3D: twist rotates, up or down tilts)" },
 ];
