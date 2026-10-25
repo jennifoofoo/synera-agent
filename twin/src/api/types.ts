@@ -111,6 +111,33 @@ export interface AgentRound {
   step_free?: boolean;
 }
 
+/** One stop of a round planned by POST /api/round (plan_round's own result). */
+export interface PlannedStop {
+  n: number;
+  room: string;
+  space_id: string;
+  floor: string;
+  devices: string[];
+  /** Metres from the stop before (or the start). */
+  leg_m: number;
+}
+
+/** POST /api/round: plan_round for the page (same order and metres as the chat agent), drawn as state.route.round. */
+export type PlannedRound =
+  | {
+      ok: true;
+      device_type: string;
+      start: string;
+      stops: PlannedStop[];
+      total_m: number;
+      back_to_start_m?: number;
+      /** Rooms no route reaches, already described for people, left out of the round. */
+      unreachable?: string[];
+      info: AgentRound;
+      route: Route;
+    }
+  | { ok: false; error?: string; needs_choice?: boolean; question?: string };
+
 export interface Position {
   space_id: string;
   floor_id: string;

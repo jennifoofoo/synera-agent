@@ -1,4 +1,4 @@
-import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Route, Status } from "./types";
+import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, PlannedRound, Route, Status } from "./types";
 
 async function getJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
@@ -35,6 +35,16 @@ export const api = {
       step_free: stepFree,
       via,
       ...points,
+    }),
+  /** Plan an inspection round on the server (plan_round) and draw it; area: "Whole building", a floor, "Hall A", ... */
+  round: (building: string, type: string, options: { area?: string; start?: string | null; returnToStart?: boolean; stepFree?: boolean } = {}) =>
+    postJson<{ round: PlannedRound; state: BuildingState }>("/api/round", {
+      building,
+      type,
+      ...(options.area ? { area: options.area } : {}),
+      ...(options.start ? { start: options.start } : {}),
+      return_to_start: !!options.returnToStart,
+      step_free: !!options.stepFree,
     }),
   clearRoute: (building: string) => postJson<{ state: BuildingState }>("/api/route/clear", { building }),
   close: (building: string, element: string, closed: boolean) =>
