@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCampus } from "../campus/campusStore";
 import { spaceGroup } from "../model/palette";
+import { useRound } from "../round/round";
 import { useTwin } from "../store";
 import "./Welcome.css";
 
@@ -12,6 +13,8 @@ export function Welcome() {
   const routed = useTwin((s) => !!s.state?.route?.ok);
   const selected = useTwin((s) => s.selection !== null);
   const onSite = useCampus((s) => s.mode === "site");
+  // An open round panel (e.g. a #round= demo link) is the task: the card would cover it, so it goes like after a tap.
+  const roundOpen = useRound((s) => s.open);
   const [phase, setPhase] = useState<"open" | "leaving" | "gone">("open");
 
   const chips = useMemo(() => {
@@ -30,8 +33,8 @@ export function Welcome() {
   }, [model]);
 
   useEffect(() => {
-    if (chatCount > 0 || routed || selected) setPhase((p) => (p === "open" ? "leaving" : p));
-  }, [chatCount, routed, selected]);
+    if (chatCount > 0 || routed || selected || roundOpen) setPhase((p) => (p === "open" ? "leaving" : p));
+  }, [chatCount, routed, selected, roundOpen]);
   useEffect(() => {
     if (phase !== "open") return;
     const dismiss = () => setPhase((p) => (p === "open" ? "leaving" : p));
@@ -56,7 +59,7 @@ export function Welcome() {
     return () => window.clearTimeout(timer);
   }, [phase]);
 
-  if (!model || phase === "gone" || onSite || chips.length === 0) return null;
+  if (!model || phase === "gone" || onSite || roundOpen || chips.length === 0) return null;
   return (
     <div className={`welcome ${phase === "leaving" ? "leaving" : ""}`}>
       <div className="welcome-card" role="dialog" aria-label="Welcome">
