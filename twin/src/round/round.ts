@@ -280,11 +280,12 @@ let switching = 0;
 /** A leg (next stop, or the way back) is loading: further Done taps and "done" are ignored until it is in. */
 let legLoading = false;
 
-/** Where leg `index` starts: the previous device, or for the first leg the person's dot (else the start). */
+/** Where leg `index` starts: the previous device, or for the first leg the start (the person's dot when it is in the
+ * start room, so a "From" room picked in the panel is kept). */
 function legStart(plan: RoundPlan, index: number): { spaceId: string; point: [number, number] | null } {
   if (index > 0) return { spaceId: plan.stops[index - 1].spaceId, point: plan.stops[index - 1].position };
   const position = useTwin.getState().state?.position;
-  if (position && useTwin.getState().model?.spaceById.has(position.space_id)) return { spaceId: position.space_id, point: position.point ?? null };
+  if (position && position.space_id === plan.startId && position.point) return { spaceId: plan.startId, point: position.point };
   return { spaceId: plan.startId, point: plan.startPoint };
 }
 

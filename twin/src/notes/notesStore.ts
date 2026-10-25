@@ -410,7 +410,10 @@ export function roundTitle(type: string, stops: number): string {
 function legNow(): Pick<RoundJob, "legTo" | "legLengthM" | "legMaxStep" | "legWalkedM"> {
   const route = useTwin.getState().state?.route;
   const ok = route?.ok && typeof route.length_m === "number";
-  return { legTo: currentStop()?.key ?? (ok ? (route.destination ?? null) : null), legLengthM: ok ? Math.round(route.length_m as number) : 0, legMaxStep: 0, legWalkedM: 0 };
+  // No route: the next device is in the room the walker is in; the planned leg (a few metres along the wall) counts.
+  const { plan, index } = useRound.getState();
+  const planned = currentStop() ? Math.round(plan?.legsM?.[index] ?? 0) : 0;
+  return { legTo: currentStop()?.key ?? (ok ? (route.destination ?? null) : null), legLengthM: ok ? Math.round(route.length_m as number) : planned, legMaxStep: 0, legWalkedM: 0 };
 }
 
 function legClosures(): string[] {
