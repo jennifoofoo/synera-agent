@@ -13,7 +13,7 @@ from shapely.geometry import Polygon
 
 from building_agent import routing
 from starter_agent.building_map import OUTSIDE, BuildingMap, MapError
-from web import route_draw
+from web import knowledge_api, route_draw
 
 COORD_DIGITS = 2
 KEPT_ROUTE_REQUESTS = 8
@@ -91,6 +91,7 @@ class Session:
     guide_info: dict | None = None  # the leg being guided (rooms), from the chat; state_view draws it
     route_version: int = 0  # bumped by every route the page asks for or clears; newer page routes win
     campus: object | None = None  # web.campus_api.CampusService (shared by all sessions), or None
+    knowledge: object | None = None  # building_agent.knowledge.KnowledgeStore (shared), or None
     original_opening_ids: set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
@@ -273,6 +274,7 @@ def state_view(session: Session) -> dict:
         "guide": guide_view(session),
         "campus": campus_state(session),
         **edit_state(bm),
+        **knowledge_api.state_part(session.knowledge, bm, session.key),  # facts, closed_until
     }
 
 
@@ -709,6 +711,8 @@ def trim_big_room_ends(bm: BuildingMap, path: list[tuple]) -> list[tuple]:
 
 def set_closed(session: Session, element: str, closed: bool) -> dict:
     element_id = session.map.set_closed(element, closed)
+    if not closed:  # opening on the page ends a timed closure fact, or the next request would close it again
+        knowledge_api.reopen(session.knowledge, session.map, element_id)
     return {"element": element_id, "closed": closed, "state": state_view(session)}
 
 

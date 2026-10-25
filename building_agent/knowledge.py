@@ -132,7 +132,7 @@ def is_active(fact: Fact, at: datetime) -> bool:
 
 def building_of(building: "BuildingMap | str") -> str:
     """The store key of a building: its id from building.json (or the id string itself)."""
-    name = building.data["building"]["id"] if isinstance(building, BuildingMap) else building
+    name = (building.data.get("building") or {}).get("id") if isinstance(building, BuildingMap) else building
     if not isinstance(name, str) or not BUILDING_ID.fullmatch(name):
         raise KnowledgeError("Unknown building.", 404)
     return name
