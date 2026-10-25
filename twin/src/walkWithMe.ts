@@ -279,8 +279,8 @@ function instance(): WalkWithMe {
   walk.on("arrived", () => {
     useWalkMotion.setState({ arrived: true });
     showNotice(ABOUT_THERE);
-    const { handsFree, speechAvailable } = useTwin.getState();
-    if (handsFree) setTimeout(() => void speak(ABOUT_THERE, speechAvailable), 1500); // after the step line
+    const { voiceOut, handsFree, speechAvailable } = useTwin.getState();
+    if (voiceOut || handsFree) setTimeout(() => void speak(ABOUT_THERE, speechAvailable), 1500); // after the step line
   });
   walk.on("status", (status) => {
     if (simulating || simForced) return; // the desktop demo / e2e feeds its own steps, whatever the sensors say
