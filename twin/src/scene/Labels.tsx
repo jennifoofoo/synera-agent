@@ -292,6 +292,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const tapPoint = useTwin((s) => (s.selection?.point && s.selection.kind !== "asset" && s.selection.kind !== "opening" ? s.selection.point : null));
   // The stop of the round being walked to (notesStore.ts currentStop): its name ranks just below the marked rooms.
   const buildingKey = useTwin((s) => s.buildingKey);
+  // While walking the map shows names only, no second lines ("Lobby · 309 m²").
+  const walking = useTwin((s) => s.walkStep !== null);
   const roundStopId = useRound((s) => (s.plan && s.guiding && !s.returning && s.plan.building === buildingKey ? (s.plan.stops[s.index]?.spaceId ?? null) : null));
   // What the last decision showed (keys `${kind}-${id}`), for the overlap hysteresis (labelRules.ts).
   const lastShown = useRef<ReadonlySet<string>>(new Set());
@@ -518,7 +520,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     if (!tagsDone) placeTags();
     // Near, 2D: a second line under the room names shown ("Kitchen · 24 m²"), if it fits in the room and is free.
-    if (flat && tier === "near") {
+    if (flat && tier === "near" && !walking) {
       for (const item of [...result]) {
         if (item.kind !== "room") continue;
         const space = item.space;
@@ -548,7 +550,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     lastShown.current = new Set(classes.keys());
     return { shown: result, pins, classes };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId, walking]);
 
   return (
     <group position-y={y + 0.5}>

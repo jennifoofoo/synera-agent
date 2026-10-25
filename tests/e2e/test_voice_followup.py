@@ -277,6 +277,9 @@ def test_hands_free_control_shown_once(twin):
     # While walking the bar's caption never repeats the step: only that Wanda listens or speaks, or nothing.
     caption = page.evaluate("() => document.querySelector('.wb-text')?.textContent ?? ''")
     assert caption in ("", "Listening…", "Speaking…"), caption
+    # While walking the map stays free: no Notes / On map buttons, no 2D/3D switch, no second label lines.
+    for selector in (".notes-fab", ".notes-layer", ".rail-view", ".label-sub"):
+        assert page.evaluate(VISIBLE_COUNT, selector) == 0, selector
 
     # After something was said, the hint does not come back.
     assert page.evaluate("(t) => window.__say(t)", "hey wanda repeat")
