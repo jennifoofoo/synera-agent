@@ -177,6 +177,27 @@ def test_tick_in_german_is_asked_in_german(guided):
     assert run(guided, "", "ask", True).startswith("Bereit für Schritt")
 
 
+def test_yes_to_the_overview_offer_gives_step_one_with_its_duration(case, model, tmp_path):
+    """'yes please' after the overview: the model calls walk(yes), the same walk switches to guided at step 0.
+    That is a newly spoken step and carries its duration (live test_pace saw it missing)."""
+    building, start, end = case
+    agent = Agent(BuildingMap.load(building), tmp_path, client=object())
+    tools = {tool.name: tool for tool in agent.tools}
+    tools["give_directions"](start=start, destination=end)
+    assert agent.guide.walk.mode == "overview"
+    model_ask = model.ask
+
+    def says_yes(agent_, text):
+        if text == "yes please":
+            return "model: " + json.loads(tools["walk"](said=text))["step"]
+        return model_ask(agent_, text)
+
+    model.ask = says_yes
+    reply = run(agent, "yes please", "ask")
+    assert agent.guide.walk.mode == "guided" and agent.guide.walk.index == 0
+    assert "about" in reply
+
+
 def test_yes_after_the_question_advances_one_step(guided, model):
     settled(guided)
     index = guided.guide.walk.index

@@ -243,9 +243,11 @@ def user_turn(agent, text: str, pace: GuidePace, voice: bool) -> str:
             send = "next"
     elif was_awaiting and guided(guide) and not card_open and parse_yes(text):
         send = "next"
-    before = (guide.walk, guide.walk.index if guide.walk is not None else None)
+    before = (guide.walk, guide.walk.index if guide.walk is not None else None, guided(guide))
     reply = ask_model(agent, send, voice, True)
-    spoke_new_step = guided(guide) and (guide.walk is not before[0] or guide.walk.index != before[1])
+    # A new step was spoken: another walk, another step, or guiding just started (a yes to the overview's offer
+    # keeps the same walk at step 0 and only switches it to guided).
+    spoke_new_step = guided(guide) and (guide.walk is not before[0] or guide.walk.index != before[1] or not before[2])
     settle(bm, guide, pace)
     if spoke_new_step and not pace.paused:
         reply = f"{reply} {duration_sentence(safe_leg(bm, guide.walk, guide.walk.index), lang)}"
