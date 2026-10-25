@@ -6,6 +6,7 @@
 // floats above closed lifts and floor changes in 3D, which no layout sees. So after every frame that moved the
 // camera (at most every THROTTLE_MS) this pass measures every drei <Html> element on the map and hides the lower
 // ranked one of any pair that touches, and any label on a marker drawn in three.js (here dot, route ends, tap pin).
+// The tap pin itself yields to the here dot and the route ends.
 // Hiding is only `visibility` on drei's wrapper; nothing about the look changes. Ties keep what is already shown,
 // so labels do not flicker while the camera moves.
 
@@ -52,7 +53,7 @@ function touches(a: Box, b: Box): boolean {
 const v = new THREE.Vector3();
 
 /** Screen boxes (client px) of the markers drawn in three.js at a constant size on screen (markerLayout.tsx). */
-function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): Box[] {
+function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): { fixed: Box[]; taps: { obj: THREE.Object3D; boxes: Box[] }[] } {
   const ortho = (camera as THREE.OrthographicCamera).isOrthographicCamera;
   const project = (x: number, y: number, z: number): [number, number] => {
     v.set(x, y, z).project(camera);
@@ -73,12 +74,22 @@ function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): B
     const pts = [project(x + r, y, z), project(x - r, y, z), project(x, y, z + r), project(x, y, z - r)];
     return { x0: Math.min(...pts.map((p) => p[0])), x1: Math.max(...pts.map((p) => p[0])), y0: Math.min(...pts.map((p) => p[1])), y1: Math.max(...pts.map((p) => p[1])) };
   };
-  const boxes: Box[] = [];
+  const fixed: Box[] = [];
+  const taps: { obj: THREE.Object3D; boxes: Box[] }[] = [];
   const at = new THREE.Vector3();
-  scene.traverseVisible((obj) => {
+  // the tap pin may be hidden by an earlier pass (below): it still counts, so it can come back once there is room
+  const shown = (obj: THREE.Object3D) => {
+    if (!obj.visible && !(obj.userData.declutterHidden && obj.name === "tap-pin")) return false;
+    for (let p = obj.parent; p; p = p.parent) if (!p.visible) return false;
+    return true;
+  };
+  scene.traverse((obj) => {
     if (!obj.name) return;
     const name = obj.name;
     if (name !== "here-dot" && name !== "walk-estimate" && name !== "route-start" && name !== "route-end" && name !== "tap-pin") return;
+    if (!shown(obj)) return;
+    const boxes = name === "tap-pin" ? [] : fixed;
+    if (name === "tap-pin") taps.push({ obj, boxes });
     obj.getWorldPosition(at);
     const { x, y, z } = at;
     if (name === "here-dot" || name === "walk-estimate") boxes.push(disc(x, y, z, HERE_RIM_PX));
@@ -97,13 +108,14 @@ function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): B
       }
     }
   });
-  return boxes;
+  return { fixed, taps };
 }
 
 /** Mounted once inside the Canvas. */
 export function Declutter() {
   const gl = useThree((s) => s.gl);
   const events = useThree((s) => s.events);
+  const invalidate = useThree((s) => s.invalidate);
   const last = useRef(0);
   const pending = useRef<number | null>(null);
   const state = useThree((s) => s.get);
@@ -139,7 +151,19 @@ export function Declutter() {
       items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom } });
     }
     items.sort((a, b) => a.rank - b.rank || Number(b.shown) - Number(a.shown) || a.order - b.order);
-    const kept = markerBoxes(scene, camera, rect);
+    const { fixed, taps } = markerBoxes(scene, camera, rect);
+    const kept = fixed;
+    // The tap pin yields to the "You are here" dot and the route ends (zoomed out they can fall on one spot); the
+    // tapped room stays named in its card. Hidden through three.js visibility, nothing about its look changes.
+    for (const { obj, boxes } of taps) {
+      const hide = boxes.some((box) => fixed.some((other) => touches(box, other)));
+      if (!hide) kept.push(...boxes);
+      if (hide !== Boolean(obj.userData.declutterHidden)) {
+        obj.userData.declutterHidden = hide;
+        obj.visible = !hide;
+        invalidate(); // phones render on demand
+      }
+    }
     for (const item of items) {
       const hide = kept.some((other) => touches(item.box, other));
       if (!hide) kept.push(item.box);
