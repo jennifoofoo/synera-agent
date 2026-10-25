@@ -317,7 +317,7 @@ function HereList() {
   return (
     <>
       {!place ? (
-        <p className="note-empty">Tap a room or machine on the map, or set “You are here”, to see and leave notes there.</p>
+        <BuildingNotes />
       ) : notes.length ? (
         <ul className="note-list">
           {notes.map((note) => (
@@ -341,10 +341,47 @@ function HereList() {
       )}
       <div className="card-actions">
         {job && !walking && job.noteIds.length > 0 && <button onClick={() => (closeNotes(), finishJob())}>Finish job</button>}
-        <button className="primary" disabled={!place} onClick={() => openNotes("add")}>
-          Add note
-        </button>
+        {place && (
+          <button className="primary" onClick={() => openNotes("add")}>
+            Add note
+          </button>
+        )}
       </div>
+    </>
+  );
+}
+
+/** Notes without a place: the building's current notes, newest first, each row names its place; a tap selects it. */
+function BuildingNotes() {
+  const model = useTwin((s) => s.model);
+  const all = useNotes((s) => s.notes);
+  const list = model ? notesIn([...model.spaceById.keys()]) : [];
+  void all;
+  if (!model || list.length === 0) return <p className="note-empty">No notes yet. Tap a room to add one.</p>;
+  const open = (spaceId: string) => {
+    const space = model.spaceById.get(spaceId);
+    if (!space) return;
+    closeNotes();
+    useTwin.getState().select({ kind: "space", id: spaceId, floor_id: space.floor_id });
+    openNotes("here");
+  };
+  return (
+    <>
+      <ul className="note-list note-building">
+        {list.map((note) => (
+          <li key={note.id}>
+            <button className="note-place-row" onClick={() => open(note.anchor.space_id)}>
+              <span className="note-place">{model.spaceById.get(note.anchor.space_id)?.name ?? "Somewhere"}</span>
+              <span className="note-meta">
+                {note.kind === "issue" && <span className="note-kind">Problem</span>}
+                <strong>{note.author || "Someone"}</strong> · {sinceLabel(note, false)}
+              </span>
+              {note.text && <span className="note-text">{note.text}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="note-tip">Tap a room to add a note</p>
     </>
   );
 }
@@ -400,8 +437,8 @@ export function NotesSheet() {
               <NoteGlyph size={16} />
             </span>
             <div className="note-title">
-              <span className="card-kicker">{sheet === "add" ? "New note" : "What's here?"}</span>
-              <strong>{place?.name ?? "No place yet"}</strong>
+              <span className="card-kicker">{sheet === "add" ? "New note" : place ? "What's here?" : "Notes"}</span>
+              <strong>{place?.name ?? "In this building"}</strong>
             </div>
           </div>
           <button className="x" onClick={closeNotes} aria-label="Close notes">
