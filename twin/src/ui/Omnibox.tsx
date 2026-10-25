@@ -390,7 +390,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
   } else if (!chatAvailable && !walking) {
     caption = "Search rooms and things";
   } else {
-    caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Say “Wanda” or tap the mic";
+    caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Tap Wanda to talk"; // the wake word only listens in hands-free mode (Chrome)
   }
   const stops = speaking && !listening;
   const orbLabel = listening ? "Stop and send" : stops ? "Stop" : walking ? (handsFreeOn ? "Mute Wanda" : "Unmute Wanda") : voiceOut ? "Talk" : "Talk (spoken replies off)";
