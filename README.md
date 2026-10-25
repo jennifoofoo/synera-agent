@@ -1,3 +1,15 @@
+# Wanda – the building that talks back (Team Synera: Jennifer Nikolovic, Leonie Merkl)
+
+Our entry for Track 01 of the Industrial Agents Hackathon 2026. Facts from code, language from the model.
+
+- **Benchmark answers and the run command for a new building:** [`SUBMISSION/BENCHMARK.md`](SUBMISSION/BENCHMARK.md), answers in [`SUBMISSION/answers.json`](SUBMISSION/answers.json)
+- **How it works:** [`docs/submission/TECHNICAL_EXPLANATION.md`](docs/submission/TECHNICAL_EXPLANATION.md)
+- **How to run the app (chat, 2D/3D map, voice):** [`docs/submission/README.md`](docs/submission/README.md)
+
+Everything below this line is the organisers' kit README, unchanged.
+
+---
+
 # Track 01 — Google Maps for Every Building: student kit
 
 Build a conversational agent that knows a building as well as its facility manager does. You give it a building, and people just ask it things:
