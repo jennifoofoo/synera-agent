@@ -136,7 +136,7 @@ export function Report() {
         )}
         {seen.length > 0 && (
           <p className="card-line report-seen">
-            Read on the way: {seen.map((note) => `${note.author} at ${model ? placeName(model, note.spaceId, note.assetId) : note.spaceId}`).join(", ")}
+            Read on the way: {[...new Set(seen.map((note) => `${note.author} at ${model ? placeName(model, note.spaceId, note.assetId) : note.spaceId}`))].join(", ")}
           </p>
         )}
         <div className="card-actions">
