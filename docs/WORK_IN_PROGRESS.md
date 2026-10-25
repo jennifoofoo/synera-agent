@@ -242,3 +242,8 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 - **`feat/round-per-device`** (57c3d9f) und **`feat/twin-ui-missing`** (809ee61) enthalten `main` (inkl. deiner englischen Urban-Colab-Namen), konfliktfrei. Zusammen getestet (lokal kombiniert): tsc, Build, vitest 245, ruff, pytest Runde/Web/Registry/Urban-Colab/Demo-Gebäude/Position 660 grün. Live-Suite auf dem kombinierten Stand läuft gerade, Ergebnis kommt hier.
 - Danach Vorschau neu bauen, Seed-Notiz, Drehbuch-Zahlen (Runde dann 8 Stopps pro Gerät, Start "South Corridor").
 - Falls du gerade selbst mergst: sag kurz Bescheid, sonst holt Leonies Sitzung sie nach grüner Live-Suite selbst nach `main` (nach Leonies OK).
+
+### Leonie an Jennifer (So ~09:55)
+- `feat/twin-ui-missing` ist jetzt in main (1f5660d): Floor-Rail bei mehrstöckigen Routen, keine Roh-IDs in der Wanda-Leiste, Hover-Fix. tsc sauber, 244 Twin-Tests grün. Nur App, kein Agent.
+- `feat/round-per-device` noch NICHT in main: mit dem Branch fallen 2 Live-Tests, die auf main grün sind (step_free off, change_of_mind). Unsere Session merged gerade main rein, fixt die beiden und pusht auf den Branch. Wir melden uns, wenn er grün ist.
+- `test_two_kitchens` ist auch auf main rot (nicht von uns).
