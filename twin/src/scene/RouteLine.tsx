@@ -57,6 +57,24 @@ function toPoints(segments: RouteSegment[], floorY: (id: string) => number, only
   return points;
 }
 
+/** The runs between floors of a stacked route (3D, all its floors drawn): from the last point on one floor to the
+ * first on the next, as pairs [from, to, from, to, ...] for one LineSegments. */
+export function floorRuns(segments: RouteSegment[], floorY: (id: string) => number): THREE.Vector3[] {
+  const runs: THREE.Vector3[] = [];
+  for (let i = 1; i < segments.length; i++) {
+    const a = segments[i - 1];
+    const b = segments[i];
+    if (a.floor_id === b.floor_id || !a.points.length || !b.points.length) continue;
+    const [ax, az] = a.points[a.points.length - 1];
+    const [bx, bz] = b.points[0];
+    runs.push(new THREE.Vector3(ax, floorY(a.floor_id) + LIFT, -az), new THREE.Vector3(bx, floorY(b.floor_id) + LIFT, -bz));
+  }
+  return runs;
+}
+/** The run at the stairs reads as dashed: white gaps (m) laid over the blue line. */
+const RUN_DASH_M = 1.1;
+const RUN_GAP_M = 1.1;
+
 const closest = new THREE.Vector3();
 const segment = new THREE.Line3();
 
@@ -104,6 +122,8 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     return cumulative;
   }, [points]);
   const total = lengths[lengths.length - 1] ?? 0;
+  // 3D with every floor of the route drawn (stacked apart): the vertical runs at stairs and lifts, dashed.
+  const runs = useMemo(() => (!flat && !onlyFloor && route?.ok && route.segments ? floorRuns(route.segments, floorY) : []), [flat, onlyFloor, route, floorY]);
   const legPoints = useMemo(() => {
     if (!guideSegments || points.length < 2) return null;
     const leg = toPoints(guideSegments, floorY, onlyFloor);
@@ -118,6 +138,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
   const casing = useRef<Line2>(null);
   const line = useRef<Line2>(null);
   const flow = useRef<Line2>(null);
+  const runGaps = useRef<Line2>(null);
   const started = useRef(0);
   // The previous line, kept as a ghost while it dissolves (only when the route itself changed, not on a floor switch).
   const [ghost, setGhost] = useState<THREE.Vector3[] | null>(null);
@@ -159,6 +180,8 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       const material = ref.current?.material as (THREE.ShaderMaterial & { dashOffset: number }) | undefined;
       if (material) material.dashOffset = total * (1 - drawn);
     }
+    const runMaterial = runGaps.current?.material as THREE.ShaderMaterial | undefined;
+    if (runMaterial) runMaterial.opacity = THREE.MathUtils.clamp((drawn - 0.6) / 0.4, 0, 1); // once the line got there
     const flowMaterial = flow.current?.material as (THREE.ShaderMaterial & { dashOffset: number; opacity: number }) | undefined;
     if (flowMaterial) {
       // fades in as the draw-in ends, so the two dash patterns never fight
@@ -240,6 +263,10 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       />
       {/* flow: thin white dashes travelling along the line at walking pace (opacity set per frame above) */}
       <Line ref={flow} points={points} color={COLOURS.routeGlow} lineWidth={FLOW_PX} transparent opacity={0} dashed dashSize={FLOW_DASH_M} gapSize={FLOW_GAP_M} {...depth} renderOrder={21.5} />
+      {/* the run between two floors: white gaps over the blue make it a dashed line (the "↑ 1" badge sits at its foot) */}
+      {runs.length >= 2 && (
+        <Line ref={runGaps} name="route-floor-run" points={runs} segments color={COLOURS.routeGlow} lineWidth={lineWidth + 0.5} transparent opacity={0} dashed dashSize={RUN_GAP_M} gapSize={RUN_DASH_M} {...depth} renderOrder={21.6} />
+      )}
       {legPoints && (
         <>
           <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} transparent {...depth} renderOrder={22} />

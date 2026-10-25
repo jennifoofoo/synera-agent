@@ -9,6 +9,7 @@ import { useCameraKeys } from "./cameraKeys";
 import { useCameraMouse } from "./cameraMouse";
 import { controlsRef, cutawayUniforms } from "./FloorMesh";
 import { orthoZoomToDistance } from "./twoFinger";
+import { STACK_POLAR, useRouteFloorsKey } from "./floorVisibility";
 
 interface Props {
   model: BuildingModel;
@@ -62,6 +63,7 @@ function fitHome(
   animate: boolean,
   points?: THREE.Vector3[],
   planner = false,
+  covered?: { top: number; bottom: number },
 ) {
   if (!(camera as THREE.PerspectiveCamera).isPerspectiveCamera || view.width < 1 || view.height < 1) {
     void c.rotateTo(azimuth, polar, animate);
@@ -71,7 +73,16 @@ function fitHome(
   const probe = (camera as THREE.PerspectiveCamera).clone();
   // Phone chrome only on the phone profile: on the laptop a narrow map (next to the chat column) still has the
   // floor rail on the right and the buttons on top.
-  const chrome = view.width < 700 && !planner ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
+  const base = view.width < 700 && !planner ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
+  // A sheet over the bottom (and the directions card on top) cover the map too; the voice bar sits just above the
+  // sheet. Same caps as applyFrame.
+  const chrome = covered
+    ? {
+        ...base,
+        top: Math.max(base.top, Math.min(covered.top, view.height * 0.4) + 12),
+        bottom: Math.max(base.bottom, Math.min(covered.bottom, view.height * 0.6) + (covered.bottom > 0 ? 76 : 0)),
+      }
+    : base;
   const lo = new THREE.Vector2(-1 + (2 * chrome.left) / view.width, -1 + (2 * chrome.bottom) / view.height);
   const hi = new THREE.Vector2(1 - (2 * chrome.right) / view.width, 1 - (2 * chrome.top) / view.height);
   const direction = new THREE.Vector3().setFromSpherical(new THREE.Spherical(1, polar, azimuth));
@@ -103,7 +114,7 @@ function fitHome(
   for (let pass = 0; pass < 3; pass++) {
     // the smallest distance at which the box fits the free area (its width and height; centring follows)
     let near = Math.max(1, radius * 0.6);
-    let far = radius * 12;
+    let far = radius * 30; // a tall stack of route floors on a narrow phone under a sheet needs to go far out
     for (let i = 0; i < 28; i++) {
       const mid = (near + far) / 2;
       const { min, max } = extent(mid);
@@ -149,6 +160,9 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const directionsOpen = useTwin((s) => s.directions !== null);
   const viewMode = useTwin((s) => s.viewMode);
   const focusedFloorId = useTwin((s) => s.focusedFloorId);
+  const walking = useTwin((s) => s.walkStep !== null);
+  // A route over several floors stacked apart (floorVisibility.tsx): framed as a stack below, not per route.
+  const routeFloorsKey = useRouteFloorsKey();
   const invalidate = useThree((s) => s.invalidate);
   const flat = viewMode === "2d";
   const { bounds } = model;
@@ -200,7 +214,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const routeKey = route?.ok ? `${route.start}|${route.destination}|${route.length_m}` : null;
   useEffect(() => {
     const c = controls.current;
-    if (!c || !routeKey || !directionsOpen || !route?.segments || useTwin.getState().viewHandover) return;
+    if (!c || !routeKey || !directionsOpen || !route?.segments || routeFloorsKey || useTwin.getState().viewHandover) return;
     const box = new THREE.Box3();
     for (const segment of route.segments) {
       if (flat && segment.floor_id !== focusedFloorId) continue;
@@ -219,7 +233,9 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const c = controls.current;
     if (!c) return;
     c.minDistance = Math.max(2, size * 0.04);
-    c.maxDistance = size * 3; // the building never shrinks below about a third of the view
+    // The building never shrinks below about a third of the view; a stack of route floors (taller, framed whole on a
+    // narrow phone) may go further out.
+    c.maxDistance = size * (routeFloorsKey ? 12 : 3);
     // Plan: px per metre that fits the largest floor. The plan never gets smaller than 35 percent of that (it used to
     // go down to 0.2 px/m: the floor was a few pixels in a blank grey plane).
     const largest = Math.max(1, ...model.floors.map((floor) => floor.bounds.size));
@@ -257,7 +273,39 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.boundaryFriction = 0.2;
     invalidate();
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
-  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height, profile]);
+  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height, profile, routeFloorsKey]);
+
+  // A route over several floors: its floors stand apart (floorVisibility.routeStackElevations) and the camera frames
+  // all of them at once, from the tilt the gap was laid out for, so each floor's plan and its part of the route read on
+  // their own (floor 0 part, the dashed run at the stairs, floor 1 part). Runs when the stack appears (a new route, or
+  // "all floors" again in the rail); walking hands the camera to FollowCam.
+  const frameStack = useCallback(
+    (animate: boolean) => {
+      const c = controls.current;
+      if (!c || !routeFloorsKey) return;
+      const points: THREE.Vector3[] = [];
+      for (const id of routeFloorsKey.split("|")) {
+        const floor = model.floorById.get(id);
+        if (!floor) continue;
+        const y = floorY(id);
+        for (const space of floor.spaces) {
+          if (space.type === "outdoor") continue;
+          for (const [x, z] of space.polygon) points.push(new THREE.Vector3(x, y, -z), new THREE.Vector3(x, y + 1.2, -z));
+        }
+      }
+      if (!points.length) return;
+      const box = new THREE.Box3().setFromPoints(points);
+      const { topInset: top, bottomInset: bottom } = useTwin.getState();
+      fitHome(c, camera, box, c.azimuthAngle, STACK_POLAR, viewport, animate, points, profile === "planner", { top, bottom });
+      invalidate();
+    },
+    [routeFloorsKey, model, floorY, camera, viewport, profile, invalidate],
+  );
+  useEffect(() => {
+    if (flat || walking || !routeFloorsKey || useTwin.getState().viewHandover) return;
+    frameStack(!reducedMotion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeFloorsKey, routeKey, flat, walking, camera]);
 
   // Entering 2D or changing the floor in 2D frames the focused floor, north up (the plan is axis-aligned; the
   // label layout in Labels.tsx assumes it too). Q/E and a right drag may still turn it, Home turns it back.
@@ -282,7 +330,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const previous = lastFloor.current;
     lastFloor.current = focusedFloorId;
     const c = controls.current;
-    if (!c || flat || !previous || !focusedFloorId || previous === focusedFloorId || floorMode === "exploded") return;
+    // A stack of route floors stays framed as a whole (FollowCam moves along it while walking).
+    if (!c || flat || !previous || !focusedFloorId || previous === focusedFloorId || floorMode === "exploded" || routeFloorsKey) return;
     const dy = floorY(focusedFloorId) - floorY(previous);
     if (Math.abs(dy) < 0.01) return;
     const target = c.getTarget(new THREE.Vector3());
@@ -312,6 +361,11 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
         void c.rotateTo(0, PLAN_TILT, animate);
         fitPlan(c, camera, box, viewport, animate);
+        return;
+      }
+      // A route stacked over several floors: home is the whole stack.
+      if (routeFloorsKey) {
+        frameStack(animate);
         return;
       }
       const polar = profile === "worker" ? Math.PI / 5 : HOME_POLAR;
@@ -357,6 +411,12 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       return;
     }
     if (request.kind === "object" && request.ids?.length) {
+      // Things on several floors of a stacked route (a round's stops): the stack framing shows them all, readably.
+      const floorsAsked = new Set(request.ids.map((id) => model.spaceById.get(id)?.floor_id ?? model.assetById.get(id)?.floor_id).filter(Boolean));
+      if (!flat && routeFloorsKey && floorsAsked.size >= 2) {
+        frameStack(animate);
+        return;
+      }
       box.makeEmpty();
       for (const id of request.ids) {
         const space = model.spaceById.get(id);

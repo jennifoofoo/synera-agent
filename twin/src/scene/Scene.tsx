@@ -168,6 +168,7 @@ export function Scene() {
   const profile = useTwin((s) => s.profile);
   const ao = useTwin((s) => s.ao);
   const viewMode = useTwin((s) => s.viewMode);
+  const stacked = useRouteFloorsKey() !== "";
   const worker = profile === "worker";
   const flat = viewMode === "2d";
   const size = model?.bounds.size ?? 60;
@@ -195,10 +196,11 @@ export function Scene() {
       {flat ? (
         <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} />
       ) : (
-        <PerspectiveCamera makeDefault fov={32} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
+        <PerspectiveCamera makeDefault fov={32} near={0.5} far={size * 30} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
       {flat && <color attach="background" args={[COLOURS.plan]} />}
-      {!flat && <fog attach="fog" args={[COLOURS.studioBottom, size * 3, size * 10]} />}
+      {/* a stack of route floors is framed from further out (CameraRig): the fog starts further away then */}
+      {!flat && <fog attach="fog" args={[COLOURS.studioBottom, size * (stacked ? 10 : 3), size * (stacked ? 24 : 10)]} />}
       <Lights studio={!flat && !worker} centre={centre} size={size} />
       <PerformanceMonitor
         flipflops={4}
