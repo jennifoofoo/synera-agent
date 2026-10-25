@@ -37,6 +37,7 @@ export function Card() {
   if (!model || draft) return null; // a Level 4 draft has its own ids; Route/I'm here would hit the API with them
 
   let card: ReactNode = null;
+  const placeCard = !directions && !!selection;
   if (directions) card = <DirectionsCard model={model} />;
   else if (selection) card = <SelectionCard key={selection.id} model={model} />;
   else if (guide?.active) card = <GuideCard model={model} />;
@@ -46,7 +47,8 @@ export function Card() {
 
   return (
     <>
-      <HereChip />
+      {/* A place card names the position itself ("From: …"), so the pill does not cover the plan meanwhile. */}
+      {!placeCard && <HereChip />}
       <TapWhereHint />
       {directions && <DirectionsPanel model={model} />}
       {card}
@@ -203,6 +205,12 @@ function SelectionCard({ model }: { model: BuildingModel }) {
         <div className="card-line card-equipment" data-testid="card-equipment">
           {equipment.items.join(", ")}
           {equipment.more > 0 ? `, +${equipment.more} more` : ""}
+        </div>
+      )}
+      {position && !hereAlready && (
+        <div className="card-line card-from" data-testid="card-from">
+          <span className="here-dot" aria-hidden />
+          From: {spaceName(model, position.space_id)}
         </div>
       )}
       {roomId && (

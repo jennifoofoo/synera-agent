@@ -107,3 +107,7 @@
 .card button.link:hover { background: transparent; text-decoration: underline; }
 .card button.link:focus:not(:focus-visible) { outline: none; }
 .card button.link:focus-visible { outline-offset: 2px; }
+
+/* "From: Main aisle H-B3" in a place card: the "You are here" pill hides while the card is open */
+.card-from { display: flex; align-items: center; gap: 7px; }
+.card-from .here-dot { flex: none; width: 7px; height: 7px; }
