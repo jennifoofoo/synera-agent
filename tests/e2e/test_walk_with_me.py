@@ -267,7 +267,8 @@ def _start_guide(page) -> None:
     if not page.evaluate(FIND_ROUTE):
         pytest.skip("no route across floors in the picked building")
     page.evaluate("() => window.__twinStore.getState().startWalk()")
-    page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
+    # generous: the laptop page renders 3D every frame, which is slow headless on a loaded machine
+    page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=20000)
 
 
 def _restart_guide(page) -> None:
