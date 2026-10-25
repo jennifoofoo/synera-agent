@@ -12,6 +12,7 @@ import { COLOURS } from "../model/palette";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
+import { ClosedGlyph } from "./Labels";
 import { Pulse } from "./markerLayout";
 import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
@@ -100,9 +101,27 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
   );
 }
 
+/** The rooms a closure covers (closed rooms, and the stops of a closed stairs or lift), for the red tint. */
+export function closedSpaces(model: BuildingModel, closed: string[]): { id: string; floor_id: string; polygon: Point[] }[] {
+  const spaces: { id: string; floor_id: string; polygon: Point[] }[] = [];
+  for (const id of closed) {
+    const space = model.spaceById.get(id);
+    const connector = model.connectorById.get(id);
+    if (space) spaces.push({ id: space.id, floor_id: space.floor_id, polygon: space.polygon });
+    else if (connector) {
+      for (const spaceId of connector.space_ids) {
+        const stop = model.spaceById.get(spaceId);
+        if (stop) spaces.push({ id: `${id}:${stop.id}`, floor_id: stop.floor_id, polygon: stop.polygon });
+      }
+    }
+  }
+  return spaces;
+}
+
 export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
   const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
+  const closedRooms = useMemo(() => closedSpaces(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
   const chip = (text: string, kind: string) => (
@@ -139,19 +158,32 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           ) : null,
         )}
 
-      {/* disruptions: red circles, radius ~ sqrt(n), pulsing ring and a "⚠" chip (2D: Labels.tsx lays the chip out) */}
+      {/* closures: the closed room (or the stops of a closed lift / stairs) gets a red tint with an outline ... */}
+      {closedRooms
+        .filter((room) => shown(room.floor_id))
+        .map((room) => (
+          <group key={room.id} name="closed-room" position-y={floorY(room.floor_id)}>
+            <SpaceOverlay polygon={room.polygon} height={0.12} colour={COLOURS.danger} opacity={0.1} outline />
+          </group>
+        ))}
+      {/* ... and a small flat disc with a "Closed · name" badge on the spot (2D: Labels.tsx lays the badge out) */}
       {disruptions
         .filter((d) => shown(d.floor_id))
         .map((d, index) => {
-          const radius = 1.6 * Math.sqrt(d.names.length) + 0.6;
-          const label = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
+          const label = d.names.length === 1 ? `Closed · ${d.names[0]}` : `${d.names.length} closed`;
           return (
             <group key={index} name="closed-marker" userData={{ count: d.names.length }} position={at(d.floor_id, d.point)}>
-              <Disc radius={radius} colour={COLOURS.danger} opacity={0.28} through />
-              <Pulse reducedMotion={reducedMotion}>
-                <Ring radius={radius} colour={COLOURS.danger} width={0.2} through />
-              </Pulse>
-              {!flat && <group position-y={1.6}>{chip(`⚠ ${label}`, "danger")}</group>}
+              <Disc radius={0.9} colour={COLOURS.danger} opacity={0.14} through />
+              {!flat && (
+                <group position-y={1.6}>
+                  <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                    <div className="chip chip-danger chip-closed">
+                      <ClosedGlyph />
+                      {label}
+                    </div>
+                  </Html>
+                </group>
+              )}
             </group>
           );
         })}

@@ -23,9 +23,11 @@ interface Props {
 /** Room names shown at every tier: the largest rooms (the zones of the floor). */
 const ZONE_COUNT = 6;
 const FIT_OVERFLOW = 1.15; // a name may run 15 % past its room's width
-const CHAR_PX = 6.8; // average glyph width of the 12 px label font
+const CHAR_PX = 7.0; // average glyph width of the 12 px semibold label font (Inter)
 const LABEL_H_PX = 16;
-const GAP_PX = 4; // free space kept around every label and badge
+const PILL_PAD_PX = 8; // horizontal padding of a pill label (each side); 3D labels and marked rooms are pills
+const PILL_H_PX = 20; // a pill's height (16 px line plus 2 px padding above and below)
+const GAP_PX = 6; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
 const FOUND_NAMES = 3; // found things whose name is shown (in the agent's order); the selected one always tries too
@@ -314,9 +316,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       kept.push(dot.box);
       pins.push(dot.pin);
     }
-    // 4. Closures: "⚠ Kitchen 0.28" on the red circle (or just above / below it), else a bare "⚠" badge, if free.
+    // 4. Closures: "Closed · Kitchen 0.28" on the closed element (or just above / below it), else a bare badge, if free.
     closed.forEach((d, index) => {
-      const text = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
+      const text = d.names.length === 1 ? `Closed · ${d.names[0]}` : `${d.names.length} closed`;
       const title = `Closed: ${d.names.join(", ")}`;
       const [cx, cy] = px(d.point);
       const halfW = (text.length * CHIP_CHAR_PX + 30) / 2; // text, icon and padding
@@ -356,7 +358,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
     const result: Item[] = [];
     for (const item of markedItems) {
-      const box = boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2, LABEL_H_PX / 2, marks.get(item.id)!.lift);
+      // marked rooms are pills in both views
+      const box = boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2 + PILL_PAD_PX, PILL_H_PX / 2, marks.get(item.id)!.lift);
       if (kept.some((other) => overlaps(box, other))) continue;
       kept.push(box);
       result.push(item);
@@ -374,8 +377,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       if (item.kind === "door") continue; // after the second lines, below
       if (marks.has(item.id) || replaced.has(item.id)) continue;
       const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
-      const halfW = item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2;
-      const halfH = item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 : LABEL_H_PX / 2;
+      // 3D: every label is a pill (padding and a taller box); 2D: plain halo text on the plan
+      const pillPad = flat || item.kind === "poi" ? 0 : PILL_PAD_PX;
+      const halfW = (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
+      const halfH = item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 + (flat ? 0 : 2) : flat ? LABEL_H_PX / 2 : PILL_H_PX / 2;
       // An area name may also move up or down a little (inside the area) to make way for a symbol.
       const shifts = item.kind === "area" ? [0, AREA_SHIFT_PX, -AREA_SHIFT_PX] : [0];
       for (const shift of shifts) {
@@ -429,8 +434,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
           ) : pin.kind === "found" ? (
             <FoundDot count={pin.ids.length} title={pin.title} />
           ) : pin.kind === "closed" ? (
-            <div className="chip chip-danger" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
-              ⚠{pin.text ? ` ${pin.text}` : ""}
+            <div className="chip chip-danger chip-closed" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
+              <ClosedGlyph />
+              {pin.text}
             </div>
           ) : (
             <div className="label label-halo label-plan found-name" style={{ transform: `translate(${pin.dx}px, ${pin.dy}px)` }}>
@@ -478,6 +484,16 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   );
 }
 
+/** "No entry" glyph of the closed badge: a circle with a bar. */
+export function ClosedGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.4" />
+      <path d="M7 12h10" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean }) {
   return (
     <Html
@@ -487,7 +503,7 @@ function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind:
       style={{ pointerEvents: "none" }}
     >
       <div
-        className={`label label-halo ${flat ? "label-plan" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
+        className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}

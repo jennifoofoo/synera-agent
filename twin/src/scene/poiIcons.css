@@ -1,7 +1,8 @@
-/* Point-of-interest badges on the 2D map (22 px, see POI_PX): a small paper square with a hairline edge and a thin
-   dark icon, the same family as the square buttons (no dark discs, no shadow). */
+/* Point-of-interest badges (22 px, see POI_PX): a small round white chip with a soft shadow and a thin dark glyph,
+   the same family as the pill labels. */
 .poi-badge {
-  width: 22px; height: 22px; border-radius: 4px; background: var(--surface, #fbfaf8); border: 1px solid var(--hairline-strong, rgba(29, 36, 48, 0.35));
+  width: 22px; height: 22px; border-radius: 50%; background: var(--glass-strong, rgba(255, 255, 255, 0.92)); border: 0;
+  box-shadow: 0 1px 2px rgba(29, 36, 48, 0.18), 0 0 0 1px rgba(29, 36, 48, 0.05);
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; color: var(--ink, #1d2430);
 }
 .poi-badge svg { width: 15px; height: 15px; fill: currentColor; }
@@ -10,7 +11,7 @@
 
 /* Floor change on the route: a blue pill with the stairs/lift glyph and "↑ 1" (22 px tall, see FLOOR_BADGE_H_PX). */
 .floor-badge {
-  height: 22px; padding: 0 6px 0 3px; border-radius: 11px; background: var(--signal, #004fab); border: 1.5px solid var(--surface, #fff);
+  height: 22px; padding: 0 7px 0 4px; border-radius: 11px; background: var(--signal, #004fab); border: 0;
   box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; color: #fff; white-space: nowrap;
   font: 700 12px/1 var(--font, system-ui, sans-serif); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
@@ -29,8 +30,8 @@
 
 /* Safety symbols in their norm colours (ISO 7010 / ISO 3864): fire extinguisher red, first aid / defibrillator /
    eyewash green. Icons only, never room fills (DESIGN.md tokens --safety-red / --safety-green). */
-.poi-badge.poi-extinguisher { background: var(--safety-red, #a52019); }
-.poi-badge.poi-firstaid { background: var(--safety-green, #237f52); }
+.poi-badge.poi-extinguisher { background: var(--safety-red, #a52019); color: #fff; }
+.poi-badge.poi-firstaid { background: var(--safety-green, #237f52); color: #fff; }
 
 /* Semantic zoom: what enters a zoom tier fades in (150-200 ms), never pops; no animation with reduced motion. */
 @keyframes zoom-fade-in { from { opacity: 0; } }
