@@ -74,6 +74,7 @@ def test_building_view_has_everything_the_page_draws(app, key):
         "added_doors": [],
         "route": None,
         "position": None,
+        "step_free": False,
         "guide": None,
         "campus": {"loaded": False, "key": None, "name": None, "route": None, "closed_links": []},
         "facts": [],
@@ -147,6 +148,7 @@ def test_added_door_is_drawn_and_used_then_reset_clears_everything(app, key):
         "added_doors": [],
         "route": None,
         "position": None,
+        "step_free": False,
         "guide": None,
     }
     assert all(not o["added"] for o in reset["openings"])
@@ -295,6 +297,7 @@ def test_reset_during_chat_returns_the_fresh_building(app, key, monkeypatch):
         "added_doors": [],
         "route": None,
         "position": None,
+        "step_free": False,
         "guide": None,
     }
 
