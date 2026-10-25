@@ -46,6 +46,8 @@ export const api = {
       return_to_start: !!options.returnToStart,
       step_free: !!options.stepFree,
     }),
+  /** A fresh page load: the server drops the position, route and conversation an earlier load or tab left. */
+  fresh: (building: string) => postJson<{ state: BuildingState }>("/api/fresh", { building }),
   clearRoute: (building: string) => postJson<{ state: BuildingState }>("/api/route/clear", { building }),
   setStepFree: (building: string, enabled: boolean) =>
     postJson<{ state: BuildingState }>("/api/step_free", { building, enabled }),

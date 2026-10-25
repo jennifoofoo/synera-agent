@@ -236,6 +236,8 @@ export function setHandsFreeMuted(muted: boolean): void {
 }
 
 let messageId = 0;
+/** Buildings opened since this page loaded (see openBuilding: the first open starts fresh on the server). */
+const freshKeys = new Set<string>();
 let cameraNonce = 0;
 
 const prefersReducedMotion =
@@ -334,6 +336,16 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null, walkStep: null, awaitingPlace: null });
     try {
       const building = await api.building(key);
+      if (!freshKeys.has(key)) {
+        // First open in this page load: the server forgets the position, route and conversation that an earlier
+        // load or another tab left (the demo never starts with "You are here: Toilets" from before).
+        freshKeys.add(key);
+        try {
+          building.state = (await api.fresh(key)).state;
+        } catch {
+          /* an older server without /api/fresh: keep its state */
+        }
+      }
       const model = buildModel(building);
       localStorage.setItem("twin.building", key);
       set({

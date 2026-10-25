@@ -9,6 +9,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   GET  /api/building?key=dev/...        floors, spaces, openings, connectors, assets, state
   POST /api/route    {start, destination, step_free, via: [], start_point?: {x, y, floor_id?}, destination_point?: {x, y}}
   POST /api/route/clear
+  POST /api/fresh    {building}   a fresh page load: drops position, route and the chat conversation (edits stay)
   POST /api/step_free {building, enabled}  step-free mode on/off (the page chip's ×); state.step_free, see docs/specs/step-free-mode.md
   POST /api/close    {element, closed: true|false}       lift/stairs/door/room id or name
   POST /api/door     {first, second, step_free}
@@ -403,6 +404,10 @@ class App:
                     view = {"ok": False, "error": str(error)}
                 return 200, {"round": view, "state": api.state_view(session)}
             if path == "/api/route/clear":
+                return 200, api.clear_route(session)
+            if path == "/api/fresh":  # a fresh page load: nothing from an earlier load or another tab carries over
+                self.chats.pop(key, None)  # new conversation: no old position, walk or 'Where are you?' history
+                session.position = session.guide_info = None
                 return 200, api.clear_route(session)
             if path == "/api/step_free":
                 enabled = body.get("enabled") is True

@@ -86,3 +86,33 @@ def test_chat_reply_says_needs_position_when_a_tool_asked_for_the_unknown_positi
     assert "needs_position" not in reply
     guide.last_user_text = "Route from 0.12 to the exit. Answer:"
     assert "never ask" in no_position_error(guide) and not guide.asked_position  # benchmark: nobody can answer
+
+
+def test_a_fresh_page_load_starts_without_position_route_or_conversation(monkeypatch):
+    """Regression (phone and laptop verifiers): a new page load showed "You are here: Toilets" and a Foyer->Café
+    route from an earlier load or another tab. POST /api/fresh (sent once per building and page load) drops both
+    and starts a new conversation; the building's edits stay."""
+    app, key = App(DATA), multi_floor_building_with_lift()
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+
+    def ask(adapter, text: str, selection=None, here=None) -> dict:
+        if here is not None and here.ok:
+            adapter.session = SimpleNamespace(guide=GuideState(), map=adapter.map)
+            adapter.apply_here(here)
+        return {"reply": "ok", "backend": "fake"}
+
+    monkeypatch.setattr("web.chat.ChatAdapter.ask", ask)
+    rooms = [s for s in app.session(key).map.spaces.values() if s["type"] == "room"]
+    app.post("/api/chat", {"building": key, "message": "hi", "context": {"here": {"space_id": rooms[0]["id"]}}})
+    old_chat = app.chat(key)
+    for other in rooms[1:]:
+        status, routed = app.post("/api/route", {"building": key, "start": rooms[0]["id"], "destination": other["id"]})
+        if routed["route"]["ok"]:
+            break
+    assert routed["state"]["position"] and routed["state"]["route"]
+    status, fresh = app.post("/api/fresh", {"building": key})
+    assert status == 200 and fresh["state"]["position"] is None and fresh["state"]["route"] is None
+    assert app.chat(key) is not old_chat
+    _, building = app.get("/api/building", {"key": [key]})
+    assert building["state"]["position"] is None and building["state"]["route"] is None
