@@ -1,13 +1,16 @@
-// Inspection round panel (owner: round session). A "Round" button top left opens it: what (asset type), where
-// (floor, hall or the whole building), from where; then "14 stops · 230 m · ~4 min", the stops in order, Start, and
-// "What if a door here?". While walking, RoundBar sits on top of the step sheet (Walk.tsx): "Stop 3 of 14 · …" + Done.
+// Inspection round card (owner: round session). A "Round" button top left opens it; the card itself sits in the dock
+// (App.tsx): in the chat column on the laptop like the route card, a bottom sheet on the phone. Voice first: what
+// (chips with counts), where (segments), from (here, tap the map to change), end (switch). Every choice plans at once:
+// "14 stops · 230 m · about 4 min", the stops in order, Start, and "What if a door here?".
+// While walking, RoundBar sits on top of the step sheet (Walk.tsx): "Stop 3 of 14 · …" + Done.
 // URL trigger: #round=fire%20extinguisher&area=Ground%20floor[&building=<key>][&door=<room id>,<room id>].
 // All facts from round.ts (POST /api/round: the same plan_round the chat agent uses).
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
-import { areaOptions, assetInArea } from "../round/choices";
+import { walkMinutes } from "../walkInfo";
+import { areaOptions, assetInArea, entranceRoom } from "../round/choices";
 import {
   assetLabel,
   cancelDoor,
@@ -22,24 +25,49 @@ import {
   roundUndoDoor,
   setRoundChoice,
   startRound,
-  summary,
   useRound,
   whatIfLine,
 } from "../round/round";
+import { PhoneSheet } from "./PhoneSheet";
 import "./Round.css";
 
+/** The "Round" button over the map (and the #round= trigger). The card is RoundCard, in the dock. */
 export function Round() {
   const model = useTwin((s) => s.model);
   const walking = useTwin((s) => s.walkStep !== null);
-  const hasPosition = useTwin((s) => !!s.state?.position);
-  const round = useRound();
+  const shown = useRound((s) => s.open || (s.guiding && !!s.plan));
   useHashTrigger();
-  const panelRef = usePhoneTopInset(round.open && !walking, round.guiding);
+  if (!model || walking || shown) return null;
+  return (
+    <button className="round-toggle" onClick={() => void openRound()} title="Plan an inspection round" aria-label="Inspection round">
+      <RoundIcon /> Round
+    </button>
+  );
+}
+
+/** "Fire extinguishers", "Defibrillator": the chip names. */
+function plural(name: string, count: number): string {
+  if (count === 1) return name;
+  return /(s|x|ch|sh)$/i.test(name) ? `${name}es` : `${name}s`;
+}
+
+/** "7 stops · 82 m · about 2 min" */
+function roundSummary(stops: number, metres: number): string {
+  return `${stops} ${stops === 1 ? "stop" : "stops"} · ${Math.round(metres)} m · about ${walkMinutes(metres)} min`;
+}
+
+/** The inspection round card. Each change plans right away (setRoundChoice); the only primary button is Start. */
+export function RoundCard() {
+  const model = useTwin((s) => s.model);
+  const walking = useTwin((s) => s.walkStep !== null);
+  const hereId = useTwin((s) => s.state?.position?.space_id ?? null);
+  const round = useRound();
+  const [pickStart, setPickStart] = useState(false);
 
   const types = useMemo(() => {
     if (!model) return [];
-    // The count in brackets is for the chosen area (Hall A, a floor), not the whole building; types with none there
-    // drop out of the list, except the one already chosen.
+    // The count is for the chosen area (a floor, Hall A), not the whole building; types with none there drop out,
+    // except the one already chosen.
     const counts = new Map<string, number>();
     const spaceName = (id: string) => model.spaceById.get(id)?.name ?? "";
     for (const asset of model.building.assets) {
@@ -47,168 +75,278 @@ export function Round() {
       counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
     }
     for (const asset of model.building.assets) if (asset.type === round.type && !counts.has(asset.type)) counts.set(asset.type, 0);
-    return [...counts.entries()].sort((a, b) => prettyType(a[0]).localeCompare(prettyType(b[0])));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || prettyType(a[0]).localeCompare(prettyType(b[0])));
   }, [model, round.area, round.type]);
-  const areas = useMemo(() => (model ? areaOptions(model.building.floors, model.building.spaces) : []), [model]);
+
+  const areas = useMemo(() => {
+    if (!model) return [];
+    const all = areaOptions(model.building.floors, model.building.spaces);
+    // Halls only when the choices are few: the segments stay one row.
+    const shown = all.length <= 4 ? all : all.filter((area) => !/^Hall [A-Z]$/.test(area));
+    return shown.includes(round.area) ? shown : [...shown, round.area];
+  }, [model, round.area]);
+
+  // "Tap the map to change": the next room tapped becomes the start.
+  useEffect(() => {
+    if (!pickStart) return;
+    return useTwin.subscribe((now, before) => {
+      if (now.selection === before.selection || !now.selection) return;
+      const spaceId = now.selection.kind === "space" ? now.selection.id : now.selection.kind === "point" ? now.selection.space_id : undefined;
+      if (!spaceId) return;
+      useTwin.getState().select(null);
+      setPickStart(false);
+      void setRoundChoice({ startId: spaceId });
+    });
+  }, [pickStart]);
+  useEffect(() => {
+    if (!round.open) setPickStart(false);
+  }, [round.open]);
 
   if (!model || walking) return null;
-  // Guiding without a step sheet: the stop is in the room you are already in (or no route to it).
+  const name = (id: string) => model.spaceById.get(id)?.name ?? id;
+
+  // Guiding without a step sheet: the stop is in the room you are already in (or there is no route to it).
   if (round.guiding && round.plan) {
     const stop = round.plan.stops[round.index];
     return (
-      <section className="round-panel round-panel-here" aria-label="Inspection round" ref={panelRef}>
-        <RoundBar />
-        <p className="round-note">
-          You are in {stop.name}. Check it, then tap Done.
-        </p>
-      </section>
+      <PhoneSheet open onClose={endRound} label="Inspection round">
+        <section className="card round-panel round-panel-here" aria-label="Inspection round">
+          <RoundBar />
+          <p className="round-note">You are in {stop.name}. Check it, then tap Done.</p>
+        </section>
+      </PhoneSheet>
     );
   }
-  if (!round.open) {
-    return (
-      <button className="round-toggle" onClick={() => void openRound()} title="Plan an inspection round" aria-label="Inspection round">
-        <RoundIcon /> Round
-      </button>
-    );
-  }
+  if (!round.open) return null;
+
   const { plan, whatIf, picking, busy, error, checked, finished, suggestion, pendingDoor } = round;
-  const name = (id: string) => model.spaceById.get(id)?.name ?? id;
+  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings);
+  const startKind = round.startId ? null : hereId ? "Here" : "Entrance";
+  const hintType = round.type || types[0]?.[0] || "fire_extinguisher";
+  const hintArea = round.area && round.area !== "Whole building" ? ` on the ${round.area.toLowerCase()}` : "";
+  const resume = !!plan && checked.length > 0 && !finished;
   return (
-    <section className="round-panel" aria-label="Inspection round" ref={panelRef}>
-      <div className="round-head">
-        <h2>Inspection round</h2>
-        <button className="x" onClick={closeRound} aria-label="Close" title="Close">
-          ×
-        </button>
-      </div>
-      <div className="round-fields">
-        <label>
-          <span className="tiny-label">What</span>
-          <select value={round.type} onChange={(event) => void setRoundChoice({ type: event.target.value })}>
-            {!round.type && <option value="">Choose what to check…</option>}
+    <PhoneSheet open onClose={closeRound} label="Inspection round">
+      <section className="card round-panel" aria-label="Inspection round">
+        <div className="round-head">
+          <h2>
+            <RoundIcon /> Inspection round
+          </h2>
+          <button className="x" onClick={closeRound} aria-label="Close" title="Close">
+            ×
+          </button>
+        </div>
+
+        <div className="round-field">
+          <span className="tiny-label" id="round-what">
+            What
+          </span>
+          <div className="round-chips" role="group" aria-labelledby="round-what">
             {types.map(([type, count]) => (
-              <option key={type} value={type}>
-                {prettyType(type)} ({count})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="tiny-label">Where</span>
-          <select value={areas.includes(round.area) ? round.area : ""} onChange={(event) => void setRoundChoice({ area: event.target.value })}>
-            {!areas.includes(round.area) && <option value="">{round.area}</option>}
-            {areas.map((area) => (
-              <option key={area} value={area}>
-                {area}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="tiny-label">From</span>
-          <select value={round.startId ?? ""} onChange={(event) => void setRoundChoice({ startId: event.target.value || null })}>
-            <option value="">{hasPosition ? "My location" : "Entrance"}</option>
-            {plan && plan.stops.map((stop) => (
-              <option key={stop.spaceId} value={stop.spaceId}>
-                {stop.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className="tiny-label">End</span>
-          <select value={round.returnToStart ? "start" : "last"} onChange={(event) => void setRoundChoice({ returnToStart: event.target.value === "start" })}>
-            <option value="last">At the last stop</option>
-            <option value="start">Back at the start</option>
-          </select>
-        </label>
-      </div>
-
-      {!plan && !busy && !error && (
-        <button className="primary round-wide" onClick={() => void setRoundChoice({})} disabled={!round.type}>
-          Plan round
-        </button>
-      )}
-      {busy && <p className="round-note" role="status">{busy}</p>}
-      {error && <p className="round-note round-error" role="alert">{error}</p>}
-
-      {plan && (
-        <>
-          <p className="round-summary">
-            <strong>{summary(plan)}</strong>
-          </p>
-          {whatIf && (
-            <div className="round-whatif" role="status">
-              <strong>{whatIfLine(whatIf)}</strong>
-              <span>
-                New door: {whatIf.firstName} ↔ {whatIf.secondName}
-              </span>
-              <button className="link" onClick={() => void roundUndoDoor()} disabled={!!busy}>
-                Undo
+              <button
+                key={type}
+                type="button"
+                className={`round-chip${type === round.type ? " active" : ""}`}
+                aria-pressed={type === round.type}
+                onClick={() => type !== round.type && void setRoundChoice({ type })}
+              >
+                {plural(prettyType(type), count)} <span className="round-count">{count}</span>
               </button>
-            </div>
-          )}
-          {finished && <p className="round-done-note">Round complete · {checked.length} of {plan.stops.length} stops checked</p>}
-          {plan.unreachable.length > 0 && <p className="round-note">Not reachable, left out: {plan.unreachable.join(", ")}</p>}
-          <ol className="round-stops">
-            <li className="round-start">
-              <span className="round-num">●</span>
-              <span>Start: {plan.startName}</span>
-            </li>
-            {plan.stops.map((stop, index) => {
-              const done = checked.includes(stop.spaceId);
-              return (
-                <li key={stop.spaceId} className={done ? "done" : ""}>
-                  <button className="round-stop" onClick={() => useTwin.getState().flyTo(stop.assetIds[0] ?? stop.spaceId)}>
-                    <span className="round-num">{done ? "✓" : index + 1}</span>
-                    <span className="round-stop-name">{stop.name}</span>
-                    <span className="round-muted">{assetLabel(plan.type, stop.assetIds.length)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-          <div className="round-actions">
-            <button className="primary" onClick={() => void startRound()} disabled={!!busy}>
-              {checked.length && !finished ? `Resume (${checked.length} of ${plan.stops.length} done)` : "Start round"}
-            </button>
-            {picking ? (
-              <button onClick={() => pickDoorRooms(false)}>Cancel</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="round-field">
+          <span className="tiny-label" id="round-where">
+            Where
+          </span>
+          <div className="round-seg" role="radiogroup" aria-labelledby="round-where">
+            {areas.map((area) => (
+              <button
+                key={area}
+                type="button"
+                role="radio"
+                aria-checked={area === round.area}
+                className={area === round.area ? "on" : ""}
+                onClick={() => area !== round.area && void setRoundChoice({ area })}
+              >
+                {area}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="round-row">
+          <div className="round-from">
+            <span className="tiny-label">From</span>
+            <span className="round-from-name">
+              {startKind && <b>{startKind}</b>}
+              {startKind && startId && " · "}
+              {startId ? name(startId) : ""}
+            </span>
+            {pickStart ? (
+              <span className="round-from-hint" role="status">
+                Tap a room on the map ·{" "}
+                <button className="link" onClick={() => setPickStart(false)}>
+                  Cancel
+                </button>
+              </span>
             ) : (
-              <button onClick={() => pickDoorRooms(true)} disabled={!!busy} title="Tap two neighbouring rooms on the map">
-                What if a door here?
+              <span className="round-from-hint">
+                <button
+                  className="link"
+                  onClick={() => {
+                    pickDoorRooms(false);
+                    setPickStart(true);
+                  }}
+                >
+                  Tap the map to change
+                </button>
+                {round.startId && hereId && (
+                  <>
+                    {" · "}
+                    <button className="link" onClick={() => void setRoundChoice({ startId: null })}>
+                      Start here
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="round-switch">
+            <span id="round-back">Back to start</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={round.returnToStart}
+              aria-labelledby="round-back"
+              className={round.returnToStart ? "on" : ""}
+              onClick={() => void setRoundChoice({ returnToStart: !round.returnToStart })}
+            >
+              <i aria-hidden />
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <p className="round-note round-error" role="alert">
+            {error}
+          </p>
+        )}
+        {!plan && !error && (
+          <p className={`round-note${busy ? "" : " round-choose"}`} role="status">
+            {busy ?? (round.type ? "" : "Choose what to check.")}
+          </p>
+        )}
+
+        {plan && (
+          <>
+            <p className="round-summary" role="status">
+              <strong>{roundSummary(plan.stops.length, plan.lengthM)}</strong>
+              {busy && <span className="round-muted"> · {busy}</span>}
+            </p>
+            {whatIf && (
+              <div className="round-whatif" role="status">
+                <strong>{whatIfLine(whatIf)}</strong>
+                <span>
+                  New door: {whatIf.firstName} ↔ {whatIf.secondName}
+                </span>
+                <button className="link" onClick={() => void roundUndoDoor()} disabled={!!busy}>
+                  Undo
+                </button>
+              </div>
+            )}
+            {finished && (
+              <p className="round-done-note">
+                Round complete · {checked.length} of {plan.stops.length} stops checked
+              </p>
+            )}
+            {plan.unreachable.length > 0 && <p className="round-note">Not reachable, left out: {plan.unreachable.join(", ")}</p>}
+            <ol className="round-stops">
+              <li className="round-start">
+                <span className="round-num">●</span>
+                <span>Start: {plan.startName}</span>
+              </li>
+              {plan.stops.map((stop, index) => {
+                const done = checked.includes(stop.spaceId);
+                return (
+                  <li key={stop.spaceId} className={done ? "done" : ""}>
+                    <button className="round-stop" onClick={() => useTwin.getState().flyTo(stop.assetIds[0] ?? stop.spaceId)}>
+                      <span className="round-num">{done ? "✓" : index + 1}</span>
+                      <span className="round-stop-name">{stop.name}</span>
+                      <span className="round-muted">{assetLabel(plan.type, stop.assetIds.length)}</span>
+                    </button>
+                  </li>
+                );
+              })}
+              {plan.returnToStart && (
+                <li className="round-start">
+                  <span className="round-num">●</span>
+                  <span>Back to {plan.startName}</span>
+                </li>
+              )}
+            </ol>
+          </>
+        )}
+
+        <button className="primary round-go" onClick={() => void startRound()} disabled={!plan || !!busy}>
+          {resume && plan ? `Resume (${checked.length} of ${plan.stops.length} done)` : "Start round"}
+        </button>
+
+        {plan && picking && (
+          <p className="round-note" role="status">
+            {picking.first ? `${name(picking.first)}: now tap the room next to it.` : "Tap the first room on the map."}{" "}
+            <button className="link" onClick={() => pickDoorRooms(false)}>
+              Cancel
+            </button>
+          </p>
+        )}
+        {plan && !picking && !pendingDoor && (
+          <div className="round-links">
+            <button
+              className="link"
+              onClick={() => {
+                setPickStart(false);
+                pickDoorRooms(true);
+              }}
+              disabled={!!busy}
+              title="Tap two neighbouring rooms on the map"
+            >
+              What if a door here?
+            </button>
+            {suggestion && !whatIf && (
+              <button className="link" onClick={() => proposeDoor(suggestion[0], suggestion[1])} disabled={!!busy}>
+                Try a door: {name(suggestion[0])} ↔ {name(suggestion[1])}
               </button>
             )}
           </div>
-          {picking && (
-            <p className="round-note" role="status">
-              {picking.first ? `${name(picking.first)} — now tap the room next to it.` : "Tap the first room on the map."}
-            </p>
-          )}
-          {pendingDoor && (
-            <div className="round-whatif" role="alertdialog" aria-label="Add a door?">
-              <strong>
-                Add a door between {name(pendingDoor[0])} and {name(pendingDoor[1])}?
-              </strong>
-              <span>This changes the building.</span>
-              <div>
-                <button className="link" onClick={() => void roundConfirmDoor()} disabled={!!busy}>
-                  Yes
-                </button>
-                <button className="link" onClick={cancelDoor}>
-                  Cancel
-                </button>
-              </div>
+        )}
+        {plan && pendingDoor && (
+          <div className="round-whatif" role="alertdialog" aria-label="Add a door?">
+            <strong>
+              Add a door between {name(pendingDoor[0])} and {name(pendingDoor[1])}?
+            </strong>
+            <span>This changes the building.</span>
+            <div>
+              <button className="link" onClick={() => void roundConfirmDoor()} disabled={!!busy}>
+                Yes
+              </button>
+              <button className="link" onClick={cancelDoor}>
+                Cancel
+              </button>
             </div>
-          )}
-          {suggestion && !whatIf && !picking && !pendingDoor && (
-            <button className="link round-suggest" onClick={() => proposeDoor(suggestion[0], suggestion[1])} disabled={!!busy}>
-              Try a door: {name(suggestion[0])} ↔ {name(suggestion[1])}
-            </button>
-          )}
-        </>
-      )}
-    </section>
+          </div>
+        )}
+
+        <p className="round-hint">
+          <MicIcon />
+          <span>
+            Say “Wanda, check all {plural(prettyType(hintType), 2).toLowerCase()}
+            {hintArea}”
+          </span>
+        </p>
+      </section>
+    </PhoneSheet>
   );
 }
 
@@ -250,25 +388,16 @@ function RoundIcon() {
   );
 }
 
-/** Phone: the panel covers the top of the map, so the camera frames below it (like the directions sheet). */
-function usePhoneTopInset(open: boolean, variant: boolean) {
-  const ref = useRef<HTMLElement>(null);
-  const worker = useTwin((s) => s.profile === "worker");
-  useEffect(() => {
-    const element = ref.current;
-    if (!open || !worker || !element) return;
-    const { setTopInset } = useTwin.getState();
-    const observer = new ResizeObserver(() => setTopInset(Math.round(element.getBoundingClientRect().bottom)));
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      useTwin.getState().setTopInset(0);
-    };
-  }, [open, worker, variant]);
-  return ref;
+function MicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </svg>
+  );
 }
 
-/** #round=<type>&area=<area>[&building=<key>][&door=<id>,<id>] opens the panel and plans at once. */
+/** #round=<type>&area=<area>[&building=<key>][&door=<id>,<id>] opens the card and plans at once. */
 function useHashTrigger() {
   const model = useTwin((s) => s.model);
   const buildingKey = useTwin((s) => s.buildingKey);
