@@ -16,9 +16,9 @@ from zoneinfo import ZoneInfo
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
-from building_agent.find_tools import find_asset, words_of
 from building_agent.find_space import find_space
-from building_agent.time_words import names_a_time, when_is_later
+from building_agent.find_tools import find_asset, words_of
+from building_agent.time_words import names_a_time, until_time, when_is_later
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
@@ -116,8 +116,10 @@ UNTIL_PATTERNS = [  # (kind, regex); the first that matches wins, so longer phra
     ("tonight", rf"\b{UNTIL_WORD} (?:tonight|this evening|heute abend)\b"),
     (
         "shift",
-        rf"\b(?:{UNTIL_WORD} (?:the )?(?:end of (?:the |my |this )?(?:day|shift)|feierabend|schichtende|"
-        r"dienstschluss|schicht(?:ende)?)|for the rest of the day|den rest des tages)\b",
+        (
+            rf"\b(?:{UNTIL_WORD} (?:the )?(?:end of (?:the |my |this )?(?:day|shift)|feierabend|schichtende|"
+            r"dienstschluss|schicht(?:ende)?)|for the rest of the day|den rest des tages)\b"
+        ),
     ),
     ("noon", rf"\b{UNTIL_WORD} (?:noon|midday|mittag)\b"),
     ("midnight", rf"\b{UNTIL_WORD} (?:midnight|mitternacht)\b"),
@@ -125,9 +127,11 @@ UNTIL_PATTERNS = [  # (kind, regex); the first that matches wins, so longer phra
     ("span", rf"\b{FOR_WORD} (\d+|{_COUNTS}|half an?|eine halbe) ?({_UNITS})\b"),
     (
         "unclear",
-        rf"\b(?:{UNTIL_WORD} (?:later|next \w+|nächste\w* \w+|naechste\w* \w+|später|spaeter|soon|bald|whenever|"
-        rf"irgendwann|then|dann)|{FOR_WORD} (?:a while|some time|a bit|eine weile|einige zeit|a few \w+|"
-        r"ein paar \w+))\b",
+        (
+            rf"\b(?:{UNTIL_WORD} (?:later|next \w+|nächste\w* \w+|naechste\w* \w+|später|spaeter|soon|bald|"
+            rf"whenever|irgendwann|then|dann)|{FOR_WORD} (?:a while|some time|a bit|eine weile|einige zeit|"
+            r"a few \w+|ein paar \w+))\b"
+        ),
     ),
 ]
 UNTIL_RES = [(kind, re.compile(pattern, re.IGNORECASE)) for kind, pattern in UNTIL_PATTERNS]
@@ -148,7 +152,10 @@ def at_clock(day: datetime, clock: time) -> datetime:
 
 
 def parse_until(text: str | None, current: datetime) -> Until | None:
-    """The end time in `text` ('bis morgen', 'until 14:00', 'for two hours'), or None if it names none."""
+    """The end time in `text` ('bis morgen', 'until 14:00', 'for two hours'), or None if it names none.
+
+    The phrase is found here; its time comes from time_words.until_time (the store's rules), with a fallback for
+    the shift words it does not know ('bis Feierabend', 'until noon')."""
     text = " ".join(str(text or "").split())[:2000]
     for kind, pattern in UNTIL_RES:
         match = pattern.search(text)
@@ -159,41 +166,24 @@ def parse_until(text: str | None, current: datetime) -> Until | None:
             return Until(phrase)
         if kind == "unclear":
             return Until(phrase, unclear=True)
-        if kind == "plus2":
-            return Until(phrase, at_clock(current + timedelta(days=2), SHIFT_END))
-        if kind.startswith("tomorrow"):
-            clock = {"tomorrow_morning": time(8, 0), "tomorrow_noon": time(12, 0)}.get(kind, SHIFT_END)
-            return Until(phrase, at_clock(current + timedelta(days=1), clock))
-        if kind == "weekday":
-            ahead = (WEEKDAY[match.group(1).lower()] - current.weekday()) % 7
-            end = at_clock(current + timedelta(days=ahead), SHIFT_END)
-            return Until(phrase, end if end > current else end + timedelta(days=7))
-        if kind in ("tonight", "shift", "noon"):
-            clock = {"tonight": time(22, 0), "noon": time(12, 0)}.get(kind, SHIFT_END)
-            end = at_clock(current, clock)
-            return Until(phrase, end) if end > current else Until(phrase, unclear=True)
-        if kind == "midnight":
-            return Until(phrase, at_clock(current + timedelta(days=1), time(0, 0)))
-        if kind == "clock":
-            hour, minute, suffix = int(match.group(1)), int(match.group(2) or 0), (match.group(3) or "").lower()
-            if not suffix and match.group(2) is None:  # 'bis 3' alone could be a room or a count
-                return Until(phrase, unclear=True)
-            if suffix == "pm" and hour < 12:
-                hour += 12
-            elif suffix == "am" and hour == 12:
-                hour = 0
-            if hour > 23 or minute > 59:
-                return Until(phrase, unclear=True)
-            end = at_clock(current, time(hour, minute))
-            return Until(phrase, end if end > current else end + timedelta(days=1))
-        if kind == "span":
-            amount = match.group(1).lower()
-            number = 0.5 if "hal" in amount else int(amount) if amount.isdigit() else COUNT[amount]
-            unit = UNIT[match.group(2).lower()]
-            if number <= 0:
-                return Until(phrase, unclear=True)
-            return Until(phrase, current + timedelta(**{unit: number}))
+        shared = until_time(phrase, current)
+        if shared is not None:
+            return Until(phrase, shared)
+        return own_until(kind, phrase, current)
     return None
+
+
+def own_until(kind: str, phrase: str, current: datetime) -> Until:
+    """Shift words time_words.until_time does not read ('bis Feierabend', 'until noon'). Anything else it could not
+    read, or a time that is not in the future, is unclear and asked back."""
+    if kind == "midnight":
+        return Until(phrase, at_clock(current + timedelta(days=1), time(0, 0)))
+    if kind in ("tonight", "shift", "noon"):
+        clock = {"tonight": time(22, 0), "noon": time(12, 0)}.get(kind, SHIFT_END)
+        end = at_clock(current, clock)
+        if end > current:
+            return Until(phrase, end)
+    return Until(phrase, unclear=True)
 
 
 @dataclass
@@ -261,7 +251,7 @@ def period_bounds(text: str | None, current: datetime) -> tuple[datetime, dateti
 def as_time(value) -> datetime | None:
     if value is None or value == "":
         return None
-    moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    moment = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
     return (moment if moment.tzinfo else moment.replace(tzinfo=TZ)).astimezone(TZ)
 
 
@@ -436,6 +426,13 @@ def resolve_anchor(bm: BuildingMap, state, place: str | None) -> Anchor:
         return element_anchor(bm, place, state)
     if place in bm.spaces:
         return space_anchor(bm, place)
+    lowered = place.lower()
+    rooms = [s["id"] for s in bm.spaces.values() if lowered in (s["name"].lower(), str(s.get("ref") or "").lower())]
+    if len(rooms) == 1:  # an exact room name or number wins over a word search in the assets
+        return space_anchor(bm, rooms[0])
+    exact = [a["id"] for a in bm.assets.values() if a["name"].lower() == lowered]
+    if len(exact) == 1:
+        return asset_anchor(bm, exact[0])
     words = words_of(place)
     if any(word in ELEMENT_WORDS for word in words):
         english = " ".join(GERMAN_ELEMENTS.get(word, word) for word in words)
@@ -475,11 +472,22 @@ def resolve_anchor(bm: BuildingMap, state, place: str | None) -> Anchor:
 
 def building_key(bm: BuildingMap) -> str:
     """The key the store files facts under (the same function the web API uses)."""
-    from building_agent import knowledge
+    from building_agent.knowledge import building_of
 
-    if hasattr(knowledge, "building_key"):
-        return knowledge.building_key(bm)
-    return bm.data["building"]["id"]
+    return building_of(bm)
+
+
+def node_id(anchor: "Anchor") -> str:
+    """The one id the store's `related` takes for a place: the asset, else the element, else the room."""
+    return anchor.asset_id or anchor.element_id or anchor.space_id
+
+
+def stored(call):
+    """Run a store call; a refusal of the store (KnowledgeError, a ValueError) becomes a ToolError to read out."""
+    try:
+        return call()
+    except ValueError as error:
+        raise ToolError(f"Not stored: {error}") from error
 
 
 def store_of(state):
@@ -569,8 +577,8 @@ def apply_pending(bm: BuildingMap, state, pending) -> dict:
     extra = pending.extra or {}
     current = now()
     if pending.action == "remember":
-        fact = fact_dict(
-            store.add(
+        fact = stored(
+            lambda: store.add(
                 bm,
                 kind=extra["kind"],
                 anchor=extra["anchor"],
@@ -583,18 +591,22 @@ def apply_pending(bm: BuildingMap, state, pending) -> dict:
                 photo_bytes=None,
                 now=current,
             )
-        )
+        ).to_dict()
         state.last_fact = {"id": fact.get("id"), "at": current, "building": building_key(bm)}
         return {"stored": True, "fact": spoken_fact(bm, fact, current), "say": "Say in one short sentence it is noted."}
-    fact = fact_dict(
-        store.resolve(
-            bm, fact_id=extra["fact_id"], text=extra.get("text") or "resolved", author=author_of(state), now=current
+    stored(
+        lambda: store.resolve(
+            bm, extra["fact_id"], text=extra.get("text") or "resolved", author=author_of(state), now=current
         )
     )
     state.last_fact = None
+    if extra.get("kind") == "closure":  # the element opens again for routes right now
+        from building_agent.knowledge import apply_timed_closures
+
+        apply_timed_closures(bm, store, current)
     return {
         "resolved": True,
-        "fact": spoken_fact(bm, fact, current),
+        "fact": {"text": extra.get("old_text"), "place": extra.get("place"), "resolved": "now"},
         "say": "Say in one short sentence it is marked fixed.",
     }
 
@@ -606,8 +618,9 @@ def store_closure(bm: BuildingMap, state, element_id: str, until: datetime, reas
     anchor = element_anchor(bm, element_id, state) if element_id not in bm.spaces else space_anchor(bm, element_id)
     data = anchor.as_dict()
     data["element_id"] = element_id
-    fact = fact_dict(
-        store.add(
+    data["point"] = None
+    fact = stored(
+        lambda: store.add(
             bm,
             kind="closure",
             anchor=data,
@@ -620,8 +633,10 @@ def store_closure(bm: BuildingMap, state, element_id: str, until: datetime, reas
             photo_bytes=None,
             now=current,
         )
-    )
+    ).to_dict()
     state.last_fact = {"id": fact.get("id"), "at": current, "building": building_key(bm)}
+    # closed by apply_change already; mark it as a fact closure so apply_timed_closures reopens it at the end
+    bm.fact_closed = set(getattr(bm, "fact_closed", set())) | {element_id}
     return fact
 
 
@@ -632,9 +647,9 @@ def end_closures(bm: BuildingMap, state, element_id: str) -> int:
         return 0
     current = now()
     ended = 0
-    for fact in [fact_dict(f) for f in store.active_closures(building_key(bm), at=current)]:
-        if (fact.get("anchor") or {}).get("element_id") == element_id:
-            store.resolve(bm, fact_id=fact["id"], text="reopened", author=author_of(state), now=current)
+    for fact in store.query(bm, element_id=element_id, at=current):
+        if fact.kind == "closure" and (fact.anchor or {}).get("element_id") == element_id:
+            stored(lambda f=fact: store.resolve(bm, f.id, text="reopened", author=author_of(state), now=current))
             ended += 1
     return ended
 
@@ -731,7 +746,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
                 "anchor": anchor.as_dict(),
                 "text": clean,
                 "valid_to": valid_to,
-                "related": [other.as_dict() for other in others],
+                "related": [node_id(other) for other in others],
                 "utterance": str(state.last_user_text)[:MAX_TEXT],
             },
         )
@@ -792,7 +807,13 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             card,
             state.turn,
             building_signature(bm),
-            extra={"fact_id": fact.get("id"), "text": " ".join(str(text or "resolved").split())[:MAX_TEXT]},
+            extra={
+                "fact_id": fact.get("id"),
+                "text": " ".join(str(text or "resolved").split())[:MAX_TEXT],
+                "kind": fact.get("kind"),
+                "old_text": fact.get("text"),
+                "place": anchor_label(bm, fact.get("anchor")),
+            },
         )
         return as_json(card)
 
@@ -833,7 +854,9 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
         store = store_of(state)
         current = now()
         if closed_now:
-            facts = [fact_dict(f) for f in store.active_closures(building_key(bm), at=current)]
+            facts = [
+                fact_dict(f) for f in store.query(bm, at=current) if f.kind == "closure" and f.anchor.get("element_id")
+            ]
             timed = {(f.get("anchor") or {}).get("element_id") for f in facts}
             lines = [spoken_fact(bm, f, current) for f in facts]
             lines += [
@@ -846,7 +869,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             ]
             bm.found_facts = facts
             return as_json({"closed": lines, "count": len(lines), "say": "Name each with its until, briefly."})
-        filters: dict = {"at": current, "history": bool(history or period or status in ("resolved", "expired"))}
+        filters: dict = {"at": current, "history": bool(history or (period and not status))}
         scope = "whole building"
         if place and str(place).strip().lower() not in ("all", "alle", "everything", "überall", "building"):
             try:
@@ -892,7 +915,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             "say": "Nothing is noted there; say so." if not lines else "Say at most three, short, with since and by.",
         }
         if show_photo:
-            photos = [line["photo"] for line in lines if line.get("photo")]
+            photos = [{"fact_id": line["id"], "photo": line["photo"]} for line in lines if line.get("photo")]
             bm.open_photo = photos[0] if photos else None
             result["photo"] = bm.open_photo
             result["say"] = "Say the photo is on screen." if photos else "Say there is no photo there."
