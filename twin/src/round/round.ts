@@ -197,6 +197,7 @@ export async function planRound(): Promise<RoundPlan | null> {
   };
   useRound.setState({ plan, error: null });
   showStops(plan, null);
+  useTwin.getState().requestCamera({ kind: "object", ids: [start, ...order.map((stop) => stop.spaceId)] });
   return plan;
 }
 
@@ -282,10 +283,12 @@ async function goToStop(index: number): Promise<void> {
 
 /** Start guidance at the first stop not checked yet. */
 export async function startRound(): Promise<void> {
-  const { plan, checked } = useRound.getState();
+  const { plan, finished } = useRound.getState();
   if (!plan) return;
+  // A finished round starts over; a paused one goes on at the first stop not checked yet.
+  const checked = finished || useRound.getState().checked.length >= plan.stops.length ? [] : useRound.getState().checked;
   const first = plan.stops.findIndex((stop) => !checked.includes(stop.spaceId));
-  useRound.setState({ finished: false });
+  useRound.setState({ finished: false, checked });
   await busy("Starting…", () => goToStop(first < 0 ? 0 : first));
 }
 
@@ -384,6 +387,7 @@ export async function roundWhatIfDoor(first: string, second: string): Promise<Wh
     };
     useRound.setState({ whatIf, picking: null, checked: [], index: 0 });
     useTwin.getState().setHighlight("round-door", { ids: [first, second], colour: ROUND_BLUE });
+    if (door.position) useTwin.getState().requestCamera({ kind: "point", point: door.position, floorId: door.floor_id, radius: 18 });
     return whatIf;
   });
 }
@@ -446,5 +450,5 @@ if (typeof window !== "undefined") {
       void roundWhatIfDoor(first, spaceId);
     }
   });
-  (window as unknown as { __round: unknown }).__round = { useRound, openRound, planRound, startRound, roundDone, roundStatus, roundWhatIfDoor, roundUndoDoor, endRound };
+  (window as unknown as { __round: unknown }).__round = { useRound, openRound, planRound, startRound, roundDone, roundStatus, roundWhatIfDoor, roundUndoDoor, endRound, pickDoorRooms, closeRound };
 }

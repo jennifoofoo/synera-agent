@@ -4,7 +4,7 @@
 // URL trigger: #round=fire%20extinguisher&area=Ground%20floor[&building=<key>][&door=<room id>,<room id>].
 // All facts from round.ts (model + /api/route), nothing from the agent.
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { areaOptions } from "../round/order";
@@ -32,6 +32,7 @@ export function Round() {
   const hasPosition = useTwin((s) => !!s.state?.position);
   const round = useRound();
   useHashTrigger();
+  const panelRef = usePhoneTopInset(round.open && !walking, round.guiding);
 
   const types = useMemo(() => {
     if (!model) return [];
@@ -46,7 +47,7 @@ export function Round() {
   if (round.guiding && round.plan) {
     const stop = round.plan.stops[round.index];
     return (
-      <section className="round-panel round-panel-here" aria-label="Inspection round">
+      <section className="round-panel round-panel-here" aria-label="Inspection round" ref={panelRef}>
         <RoundBar />
         <p className="round-note">
           You are in {stop.name}. Check it, then tap Done.
@@ -56,7 +57,7 @@ export function Round() {
   }
   if (!round.open) {
     return (
-      <button className="round-toggle" onClick={() => void openRound()} title="Plan an inspection round">
+      <button className="round-toggle" onClick={() => void openRound()} title="Plan an inspection round" aria-label="Inspection round">
         <RoundIcon /> Round
       </button>
     );
@@ -64,7 +65,7 @@ export function Round() {
   const { plan, whatIf, picking, busy, error, checked, finished, suggestion } = round;
   const name = (id: string) => model.spaceById.get(id)?.name ?? id;
   return (
-    <section className="round-panel" aria-label="Inspection round">
+    <section className="round-panel" aria-label="Inspection round" ref={panelRef}>
       <div className="round-head">
         <h2>Inspection round</h2>
         <button className="x" onClick={closeRound} aria-label="Close" title="Close">
@@ -209,6 +210,24 @@ function RoundIcon() {
       <path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />
     </svg>
   );
+}
+
+/** Phone: the panel covers the top of the map, so the camera frames below it (like the directions sheet). */
+function usePhoneTopInset(open: boolean, variant: boolean) {
+  const ref = useRef<HTMLElement>(null);
+  const worker = useTwin((s) => s.profile === "worker");
+  useEffect(() => {
+    const element = ref.current;
+    if (!open || !worker || !element) return;
+    const { setTopInset } = useTwin.getState();
+    const observer = new ResizeObserver(() => setTopInset(Math.round(element.getBoundingClientRect().bottom)));
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      useTwin.getState().setTopInset(0);
+    };
+  }, [open, worker, variant]);
+  return ref;
 }
 
 /** #round=<type>&area=<area>[&building=<key>][&door=<id>,<id>] opens the panel and plans at once. */

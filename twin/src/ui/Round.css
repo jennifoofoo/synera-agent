@@ -69,8 +69,13 @@
 .worker .round-bar-exit { min-height: 44px; }
 
 /* Phones: full width under the top bar, above the dock */
-.app.worker .round-toggle { top: 12px; left: 10px; min-height: 40px; }
+/* Phones: compact, under the top bar, the map stays visible (the stops are numbered on the map and walked one by one) */
+/* left of the centred building name: an icon-only 44 px button (the changes pill sits under it) */
+.app.worker .round-toggle { top: 8px; left: 8px; width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; font-size: 0; }
+.app.worker .round-toggle svg { width: 20px; height: 20px; }
 .app.worker .round-panel {
-  left: 10px; right: 10px; width: auto; top: 58px;
-  max-height: calc(var(--vvh, 100dvh) - 58px - var(--dock-h, 90px) - var(--safe-b, 0px) - 16px);
+  left: 10px; right: 10px; width: auto; top: 60px; gap: 8px; padding: 10px 12px 12px;
+  max-height: min(52vh, calc(var(--vvh, 100dvh) - 60px - var(--dock-h, 90px) - var(--safe-b, 0px) - 16px));
 }
+.app.worker .round-stops { display: none; }
+.app.worker .round-actions button { min-height: 44px; }
