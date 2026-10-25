@@ -59,3 +59,30 @@ def test_forged_here_is_ignored_with_a_reason(monkeypatch):
         assert "selection_ignored" not in reply
     app.post("/api/chat", {"building": key, "message": "no context"})
     assert seen[-1] == (None, None)
+
+
+def test_chat_reply_says_needs_position_when_a_tool_asked_for_the_unknown_position(monkeypatch):
+    """The page's next tap answers Wanda's "Where are you?" (twin/src/asksWhere.ts waitsForPlace): the flag comes
+    from no_position_error during the turn, not from the reply text."""
+    from building_agent.position import no_position_error
+
+    app, key = App(DATA), multi_floor_building_with_lift()
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.backend_name", lambda: "building_agent")
+    guide = GuideState()
+
+    def turn(adapter, text, *_args) -> str:
+        adapter.session = SimpleNamespace(guide=guide, map=adapter.map)
+        guide.asked_position = False  # what the real ask_building_agent does at the start of a turn
+        if "toilet" in text:
+            no_position_error(guide)  # find_nearest without a position
+        return "Could you tap the room you're in on the plan?"
+
+    monkeypatch.setattr("web.chat.ChatAdapter.ask_building_agent", turn)
+    status, reply = app.post("/api/chat", {"building": key, "message": "Where is the nearest toilet?"})
+    assert status == 200 and reply["needs_position"] is True
+    status, reply = app.post("/api/chat", {"building": key, "message": "hello"})
+    assert "needs_position" not in reply
+    guide.last_user_text = "Route from 0.12 to the exit. Answer:"
+    assert "never ask" in no_position_error(guide) and not guide.asked_position  # benchmark: nobody can answer

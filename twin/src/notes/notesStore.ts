@@ -138,6 +138,15 @@ export const useNotes = create<NotesState>(() => ({
   dismissed: [],
 }));
 
+/** True once a name was saved on this device (the add form asks for it only before that). */
+export function authorRemembered(): boolean {
+  try {
+    return localStorage.getItem(AUTHOR_PREF) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function setAuthor(name: string): void {
   const author = name.trim() || DEFAULT_AUTHOR;
   useNotes.setState({ author });
@@ -640,6 +649,8 @@ export function installNotes(): () => void {
     const { storage, buildingKey } = useNotes.getState();
     if (storage?.kind === "server" && buildingKey) void storage.list(buildingKey).then((notes) => useNotes.setState({ notes: mergeStateFacts(notes) }), () => {});
   });
+  // The sheet never opens by itself when the position changes (it would cover a pending question or a reply card):
+  // it opens on a tap on Notes, on "what's here?" by voice, and as the guidance note card while walking.
   const unsubscribeNotes = useNotes.subscribe((now, before) => {
     if (now.notes !== before.notes) updateGuide(useTwin.getState().walkStep);
   });

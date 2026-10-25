@@ -77,6 +77,7 @@ class GuideState:
     last_fact: dict | None = None  # the fact stored last in this conversation (for undo)
     facts_lookup: object | None = None  # rooms -> short lines of facts valid now; walk.py reads it while guiding
     step_free: bool = False  # the person said they cannot take stairs (set_step_free): every route avoids steps
+    asked_position: bool = False  # this turn a tool needed the position and it is unknown (reset per chat turn)
 
     def begin_turn(self) -> None:
         """A card can only be answered in the very next message; later it is stale and dropped."""

@@ -232,6 +232,8 @@ export interface ChatReply {
   selection_ignored?: string;
   here_ignored?: string;
   here_note?: string;
+  /** The agent needed the person's position this turn and it is unknown: Wanda waits for a place. */
+  needs_position?: boolean;
   opened?: string;
   stale?: boolean;
 }

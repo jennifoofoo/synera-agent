@@ -202,3 +202,38 @@ Vorschlag für den Merge nach `main`: alles auf einmal (Basis + UI-Fixes + Runde
 
 ## Entschieden (Leonie, Sonntag ~07:45): Produktname
 **"Wanda – the building that talks back"** (so schon in `docs/submission/FORM_TECH_TEXT.md` und als Claim im Video). Bitte überall gleich verwenden: Video-Titel und Abspann, Formular, Pitch-Folie, ggf. Seitentitel.
+
+## Jennifer an Leonie (Sonntag 08:20): Urban Colab wird geometrisch aufgeräumt, bitte `building.json` gerade nicht anfassen
+Jennifers Sitzung arbeitet auf **`fix/mucl-geometry`** an `demo/buildings/plan-89323a15/building.json` (nur diese Datei plus ein Test):
+- Überlappungen weg (EG 9 Raumpaare, z. B. Flur Süd mit Lager und Treppe, Foyer mit Auditorium; 1. OG 8, z. B. Flur mit Terrasse). Flure werden Rechtecke, Räume werden aus ihnen herausgeschnitten.
+- Schräge Kanten und das Fünfeck an Flur Nord gerade gezogen.
+- Ausgänge nach dem Fluchtplan ergänzt (heute 2, auf dem Plan 8: 5 nach Süden, 2 nach Norden, 1 Nordost).
+- Türen gegen die Plan-Fotos geprüft, auch deine zwei Funde (Flur West → Treppe durch ELT/EDV/Umkleide, Project Room → Foyer 55 m).
+- **Alle Raum-, Tür- und Geräte-IDs bleiben gleich** (`demo_seed.py`, `test_demo_urban_colab.py`). Die Längen der Runde und der Routen ändern sich (kürzer, gerader), bitte Zahlen im Drehbuch danach neu nehmen.
+Fertig etwa 09:15, dann Preflight plus Routen-Check und Merge nach `main`; Meldung hier.
+
+## Leonie an Jennifer (Sonntag 08:30): Antwort auf deine Übergabe, bitte nicht doppelt bauen
+- **`POST /api/round` ohne `start` (500): ist schon gefixt** auf Leonies **`feat/round-per-device`** (e6c2b83: nimmt den Standort, sonst `needs_start` mit den Eingängen, plus Web-Test). Bitte nicht in `fix/twin-start-and-bugs` nochmal bauen.
+- **`feat/round-per-device`** (lokal fertig, Live-Suite auf dem mit `main` zusammengeführten Stand läuft gerade, danach Push): **eine Station pro Gerät** statt pro Raum (zwei Feuerlöscher in einem Raum = zwei Stationen, deine Tabelle "8 Geräte, 7 Stopps" wird dann 8 Stopps), Etappen von Gerät zu Gerät mit `start_point`/`destination_point`, "Stop n of m · <Gerät>", `leg_m` je Etappe für "how far". Dein `clear_position` und die Regel "nie über Werkzeuge reden" aus `main` sind übernommen, unsere eigenen Versionen fallen weg. Berührt `building_agent/round_tools.py`, `agent.py` (nur Merge), `tools.py`, `web/api.py`, `twin/src/round/round.ts`, `handsFree.ts`. Bitte nach dem Push mit nach `main` holen; danach die finale Prüfung.
+- **Drehbuch und Pitch-Zahlen** nimmt Leonies Sitzung neu, sobald `fix/mucl-geometry` und `feat/round-per-device` in `main` sind.
+
+## Leonie an Jennifer (Sonntag ~08:40): `feat/round-per-device` ist gepusht (9a576ab), bitte nach `main` holen
+Mit `main` 32fcca3 zusammengeführt (dein `clear_position` und die Werkzeug-Regel behalten, in `web/api.py` beides: unser No-Start-Fix und dein Stufenlos-Modus). Geprüft: Runde/Web/Position/Clear-Position/Urban-Colab/Tools/Agent 108 grün, Twin vitest 222, Build ok; Review-Agent ohne Blocker.
+Live-Suite auf dem zusammengeführten Stand: 69 grün, 2 rot. **`test_voice::test_two_kitchens_on_one_floor_get_one_short_question` scheitert auch auf sauberem `origin/main`** (Modell nimmt die nähere Küche, nennt die andere, endet aber nicht mit der erwarteten Frage) – vermutlich seit 2ab429c (Persona am Ende des Prompts), bitte bei dir prüfen. `test_position::test_4_nearest_coffee…` ist wackelig (Wortlaut), grün bei Wiederholung.
+Zahlen pro Gerät (Feuerlöscher, EG): train-015 ab Main aisle H-B3 5 Stopps 111,9 m; dev-003 ab H-B5 6 Stopps 167,0 m; Urban Colab (alte Geometrie) ab Flur West 8 Stopps 108,5 m. Länger als vorher, weil jede Etappe bis zum Gerät an der Wand geht. Mit deiner neuen Geometrie nehmen wir die Urban-Colab-Zahl neu.
+Bekannte Grenzen: "guide me" im Chat führt noch Raum für Raum (nur die Seite führt Gerät für Gerät); die gezeichnete Rundenlinie geht durch Raummitten, ihre Länge weicht von `total_m` ab.
+
+## Leonie an Jennifer (Sonntag ~08:40): `feat/twin-ui-fixes` war bis eben leer – jetzt richtig gepusht
+Unser Branch `feat/twin-ui-fixes` zeigte auf GitHub nur die Basis (a3976bc), die 8 Commits lagen lokal. Jetzt gepusht (000e799). Du hast inzwischen eigene Versionen gebaut (ruhige Fundstücke, ganze Pixel), darum **Konflikte mit `main`**. Vorschlag: deine Versionen behalten und nur übernehmen, was in `main` noch fehlt:
+- `5861e9a` Etagenleiste: Klick zeigt bei einer Route über mehrere Etagen nur diese Etage, "alle Etagen" stapelt wieder (`floorVisibility.tsx`).
+- `95d5e2a` keine rohen IDs im Untertitel der Wanda-Leiste (`Omnibox.tsx`).
+- `2f86769` keine Willkommenskarte, solange das Runden-Panel offen ist.
+- `9cf723c` Hover am eingeschalteten Sprachknopf (falls es den Knopf nach deinem Umbau noch gibt, sonst weg).
+Der Rest (`3cbcd85`, `ec25974`, `000e799` scharfe Labels; `8401008` ruhige Fundstücke) ist durch deine Commits abgedeckt.
+
+## Leonie (Sonntag ~08:55): fehlende UI-Stücke selbst nachgezogen, `feat/twin-ui-missing` (auf aktuellem `main`, gepusht)
+Nur was in `main` noch fehlte, deine Versionen bleiben: (1) Etagenleiste: bei einer Route über mehrere Etagen zeigt ein Klick nur diese Etage, "alle Etagen" stapelt wieder (beim Gehen bleibt dein Verhalten ohne "alle Etagen"); (2) keine rohen IDs im Untertitel der Wanda-Leiste (`withoutIds` in `voice.ts`, Test); (3) Hover am eingeschalteten Sprachknopf (harmlos, falls der Knopf weg ist). Willkommenskarte bei offener Runde hattest du schon. tsc, Build, vitest 230 grün. `feat/twin-ui-fixes` bitte nicht mehr mergen, ist hiermit erledigt.
+
+## Jennifer an Leonie (Sonntag 09:15): Urban Colab fertig auf `main`, englische Raumnamen
+Geometrie aufgeräumt und Raumnamen auf Englisch, IDs unverändert. Details, neue Zahlen und die Namensliste: `docs/HANDOVER_JENNIFER_TO_LEONIE.md`. Wichtig fürs Drehbuch: Start der Runde heißt jetzt **"South Corridor"** (war Flur Süd). Runde EG 8 Feuerlöscher, 7 Stopps, 81,6 m (war 106 m); Project Room → Foyer 17,5 m (war 55,8 m). Dein `tests/test_demo_urban_colab.py` grün. Bereits installierte Kopien neu installieren: `rm -rf agent_output/buildings/plan-89323a15 && scripts/install_demo_buildings.sh`.
+Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus building.json), neues Gebäude, ähnliche Fragen, Prüfung auf Overfitting. Siehe Handover Abschnitt 5.

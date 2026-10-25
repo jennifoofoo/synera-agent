@@ -53,7 +53,7 @@ def seeded(server):  # noqa: F811 - pytest fixture injection
     return server, lathe, forklift
 
 
-def open_panel(playwright_instance, url: str, viewport: dict):
+def open_panel(playwright_instance, url: str, viewport: dict, planner: bool = False):
     try:
         browser = playwright_instance.chromium.launch()
     except Exception as error:  # noqa: BLE001 - missing browser binary
@@ -65,6 +65,8 @@ def open_panel(playwright_instance, url: str, viewport: dict):
     page.route("**/api/speak", lambda route: route.fulfill(status=503, body="no voice"))
     page.goto(f"{url}/?building={DEMO}")
     page.wait_for_function("() => !!window.__twinStore?.getState().model", timeout=30000)
+    if planner:  # a narrow window forced to the laptop profile (the phone profile has no Knowledge button)
+        page.evaluate("() => window.__twinStore.getState().setProfile('planner')")
     page.evaluate(
         "([id, floor_id]) => window.__twinStore.getState().select({ kind: 'space', id, floor_id })", [ROOM, FLOOR]
     )
@@ -133,7 +135,7 @@ def test_panel_slider_and_aas(seeded, playwright_instance):
 
 def test_panel_fits_phone(seeded, playwright_instance):
     url, _, _ = seeded
-    browser, page = open_panel(playwright_instance, url, {"width": 390, "height": 844})
+    browser, page = open_panel(playwright_instance, url, {"width": 390, "height": 844}, planner=True)
     try:
         box = page.get_by_test_id("knowledge-panel").bounding_box()
         assert box["x"] >= 0 and box["x"] + box["width"] <= 390 + 0.5, box
@@ -141,5 +143,68 @@ def test_panel_fits_phone(seeded, playwright_instance):
         svg = page.get_by_test_id("knowledge-svg").bounding_box()
         assert svg["width"] <= 390, svg
         assert page.errors == [], page.errors
+    finally:
+        browser.close()
+
+
+def test_more_node_expands_as_text_and_labels_are_not_cut(seeded, playwright_instance):
+    url, _, _ = seeded
+    browser, page = open_panel(playwright_instance, url, {"width": 390, "height": 844}, planner=True)
+    try:
+        assert "\u2026" not in page.get_by_test_id("knowledge-svg").text_content()
+        assert page.get_by_test_id("knowledge-more-list").count() == 0
+        more = page.locator("[data-testid=knowledge-svg] g.kg-node.more")
+        dot = more.locator("circle.kg-hit")
+        if more.count():  # one node for the rest, which opens as plain text below the graph
+            dot.click()
+            assert page.get_by_test_id("knowledge-more-list").inner_text().startswith("Also here")
+            dot.click()
+            assert page.get_by_test_id("knowledge-more-list").count() == 0
+        assert page.evaluate("() => document.documentElement.scrollWidth") <= 390
+        assert page.errors == [], page.errors
+    finally:
+        browser.close()
+
+
+def select_room(page, room: str, floor: str) -> None:
+    page.evaluate(
+        "([id, floor_id]) => window.__twinStore.getState().select({ kind: 'space', id, floor_id })", [room, floor]
+    )
+
+
+def open_page(playwright_instance, url: str, viewport: dict):
+    try:
+        browser = playwright_instance.chromium.launch()
+    except Exception as error:  # noqa: BLE001 - missing browser binary
+        pytest.skip(f"chromium not installed: {str(error)[:80]}")
+    page = browser.new_context(viewport=viewport).new_page()
+    page.route("**/api/speak", lambda route: route.fulfill(status=503, body="no voice"))
+    page.goto(f"{url}/?building={DEMO}")
+    page.wait_for_function("() => !!window.__twinStore?.getState().model", timeout=30000)
+    return browser, page
+
+
+def test_button_only_for_planner_and_rooms_with_notes(seeded, playwright_instance):
+    url, _, _ = seeded
+    other = "proc-factory-train-015-F0-S003"  # a room without notes
+    browser, page = open_page(playwright_instance, url, {"width": 1280, "height": 860})
+    try:
+        select_room(page, ROOM, FLOOR)
+        page.wait_for_selector("[data-testid=knowledge-open]", timeout=15000)
+        select_room(page, other, FLOOR)
+        page.wait_for_selector("text=Route", timeout=15000)
+        assert page.get_by_test_id("knowledge-open").count() == 0
+    finally:
+        browser.close()
+
+
+def test_no_button_on_the_phone(seeded, playwright_instance):
+    url, _, _ = seeded
+    browser, page = open_page(playwright_instance, url, {"width": 390, "height": 844})
+    try:
+        select_room(page, ROOM, FLOOR)
+        page.wait_for_selector("text=Route", timeout=15000)
+        page.wait_for_timeout(1000)  # notes are loaded by now; the room has some
+        assert page.get_by_test_id("knowledge-open").count() == 0
     finally:
         browser.close()

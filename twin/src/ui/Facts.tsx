@@ -8,6 +8,7 @@ import { downscalePhoto, endedLabel, sinceLabel, type Note } from "../notes/note
 import {
   DEFAULT_AUTHOR,
   addNote,
+  authorRemembered,
   canResolve,
   canUndo,
   closeNotes,
@@ -144,8 +145,10 @@ export function NotesButton() {
   const draft = useTwin((s) => s.draft);
   const selection = useTwin((s) => s.selection);
   const position = useTwin((s) => s.state?.position ?? null);
+  // While walking the map stays free: notes surface on their own at the destination or a round stop.
+  const walking = useTwin((s) => s.walkStep !== null);
   useEffect(installNotes, []);
-  if (!model || draft || sheet !== "closed") return null;
+  if (!model || draft || walking || sheet !== "closed") return null;
   void notes; // re-render on changes
   const spaceId = selection?.kind === "asset" ? model.assetById.get(selection.id)?.space_id : selection?.kind === "space" ? selection.id : (selection?.space_id ?? position?.space_id);
   const here = spaceId ? notesIn([spaceId]).length : 0;
@@ -175,32 +178,14 @@ export function NotesButton() {
 
 // ---- the sheet ----
 
-function AuthorSwitch() {
-  const author = useNotes((s) => s.author);
-  const [name, setName] = useState(author === DEFAULT_AUTHOR ? "" : author);
-  // Free name, remembered on this device; empty signs as "Technician".
-  return (
-    <label className="note-author">
-      <span>Signed</span>
-      <input
-        value={name}
-        onChange={(event) => {
-          setName(event.target.value);
-          setAuthor(event.target.value);
-        }}
-        placeholder={DEFAULT_AUTHOR}
-        aria-label="Notes by (your name)"
-        autoComplete="name"
-        size={10}
-      />
-    </label>
-  );
-}
-
 function AddForm() {
   const place = useNotes((s) => s.place);
   const draft = useNotes((s) => s.draft);
   const storageLabel = useNotes((s) => s.storageLabel);
+  const author = useNotes((s) => s.author);
+  // The name is asked once, with the first note saved by tap; after that it is remembered on this device.
+  const [askName] = useState(() => !authorRemembered());
+  const [name, setName] = useState(author);
   const [text, setText] = useState(draft);
   const [issue, setIssue] = useState(false);
   const [photo, setPhoto] = useState<Blob | null>(null);
@@ -241,6 +226,7 @@ function AddForm() {
   };
   const save = async () => {
     setBusy(true);
+    if (askName) setAuthor(name);
     const note = await addNote({ text, photo, place, kind: issue ? "issue" : "note", source: "tap" });
     setBusy(false);
     if (note) openNotes("here");
@@ -291,7 +277,14 @@ function AddForm() {
           It's a problem
         </label>
       </div>
+      {askName && (
+        <label className="note-name">
+          <span>Your name, optional (remembered here)</span>
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder={DEFAULT_AUTHOR} aria-label="Your name" autoComplete="name" maxLength={40} />
+        </label>
+      )}
       {problem && <p className="note-problem">{problem}</p>}
+      <p className="note-tip">Tip: say “Wanda, note: …” anywhere.</p>
       <div className="card-actions">
         <button onClick={() => openNotes("here")}>Cancel</button>
         <button className="primary" onClick={() => void save()} disabled={busy || (!text.trim() && !photo)}>
@@ -322,9 +315,7 @@ function HereList() {
             <NoteRow key={note.id} note={note} />
           ))}
         </ul>
-      ) : (
-        <p className="note-empty">No notes here right now. Leave one for the next shift.</p>
-      )}
+      ) : null}
       {past.length > 0 && (
         <>
           <button className="link note-history-toggle" onClick={() => setHistory(!history)} aria-expanded={history}>
@@ -349,10 +340,48 @@ function HereList() {
   );
 }
 
+/** A place without notes: one quiet line, since notes are mostly said by voice. "+ Note" opens the add form. */
+function EmptyRow() {
+  const job = useNotes((s) => s.job);
+  const walking = useTwin((s) => s.walkStep !== null);
+  return (
+    <section className="card card-notes-empty" aria-label="What's here">
+      <div className="note-empty-row">
+        <span className="note-badge small">
+          <NoteGlyph size={13} />
+        </span>
+        <span className="note-empty-text">
+          No notes here <span aria-hidden>·</span> Say “Wanda, note: …”
+        </span>
+        {job && !walking && job.noteIds.length > 0 && (
+          <button className="link note-empty-finish" onClick={() => (closeNotes(), finishJob())}>
+            Finish job
+          </button>
+        )}
+        <button className="note-empty-add" onClick={() => openNotes("add")}>
+          + Note
+        </button>
+        <button className="x" onClick={closeNotes} aria-label="Close notes">
+          ×
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function NotesSheet() {
   const sheet = useNotes((s) => s.sheet);
   const place = useNotes((s) => s.place);
+  const all = useNotes((s) => s.notes);
+  void all; // re-render on changes
   if (sheet === "closed") return null;
+  const empty = sheet === "here" && !!place && notesIn([place.spaceId]).length === 0 && historyIn([place.spaceId]).length === 0;
+  if (empty)
+    return (
+      <PhoneSheet open label="Notes" onClose={closeNotes}>
+        <EmptyRow />
+      </PhoneSheet>
+    );
   return (
     <PhoneSheet open label="Notes" onClose={closeNotes}>
       <section className="card card-notes" aria-label={sheet === "add" ? "New note" : "What's here"}>
@@ -366,7 +395,6 @@ export function NotesSheet() {
               <strong>{place?.name ?? "No place yet"}</strong>
             </div>
           </div>
-          <AuthorSwitch />
           <button className="x" onClick={closeNotes} aria-label="Close notes">
             ×
           </button>

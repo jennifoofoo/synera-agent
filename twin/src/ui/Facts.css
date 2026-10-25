@@ -146,3 +146,22 @@
 .note-pin-pop .note-text { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .note-pin-pop .note-meta { font-size: 12px; }
 .note-meta .nowrap { white-space: nowrap; }
+
+/* a place without notes: one slim line, notes are mostly said by voice */
+.card-notes-empty { padding: 6px 8px 6px 12px; }
+.note-empty-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.note-empty-row .note-badge.small { margin: 0; vertical-align: 0; flex: none; }
+.note-empty-text { flex: 1; min-width: 0; font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-empty-add { flex: none; min-height: 36px; padding: 0 12px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.note-empty-finish { flex: none; min-height: 36px; padding: 0 4px; font-size: 13px; }
+.note-empty-row .x { flex: none; width: 32px; min-width: 32px; height: 36px; min-height: 36px; padding: 0; }
+
+/* the name, asked once inside the add form */
+.note-name { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--ink-2); }
+.note-name span { flex: 1; min-width: 0; }
+.note-name input {
+  flex: none; width: 9em; box-sizing: border-box; min-height: 34px; padding: 4px 8px; font: inherit; font-size: 16px; color: var(--ink);
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.note-name input:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+.note-tip { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-2); }
