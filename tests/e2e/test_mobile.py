@@ -269,12 +269,10 @@ def test_route_flow(open_page):
     )
     rail = box(page, ".floorrail")
     floors = page.evaluate("() => window.__twinStore.getState().model.floors.length")
-    if floors > 1:
-        assert rail and rail["top"] >= top["bottom"] and rail["height"] >= 44, (
-            f"floor rail {rail} under or squeezed by the directions sheet"
-        )
-    else:
-        assert rail is None, f"one floor: the rail should be hidden, not an empty box {rail}"
+    # The rail always holds the 2D/3D toggle (also on phones), so it shows even for one floor.
+    assert rail and rail["top"] >= top["bottom"] and rail["height"] >= 44, (
+        f"floor rail {rail} under or squeezed by the directions sheet ({floors} floors)"
+    )
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
     page.get_by_role("button", name="Close directions").tap()
     page.wait_for_timeout(500)
