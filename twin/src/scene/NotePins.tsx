@@ -1,7 +1,7 @@
 // Note pins on the map (owner: notes session): one small blue tag per room with notes, in the room's top-right
 // corner so the centred room name stays readable (a machine note: just above the machine). Tap: the newest note with its photo; tap that: the list.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Html } from "@react-three/drei";
 import type { Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
@@ -54,10 +54,24 @@ function inside(point: Point, polygon: Point[]): boolean {
 
 export function NotePins({ model, floorY, visibleFloors }: Props) {
   const notes = useNotes((s) => s.notes);
+  const guide = useNotes((s) => s.guide);
+  const walkStep = useTwin((s) => s.walkStep);
   const [open, setOpen] = useState<string | null>(null);
+  // The preview closes on any tap elsewhere and when the guidance moves on.
+  useEffect(() => setOpen(null), [walkStep]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!(event.target as HTMLElement | null)?.closest?.(".note-pin")) setOpen(null);
+    };
+    window.addEventListener("pointerdown", close, true);
+    return () => window.removeEventListener("pointerdown", close, true);
+  }, [open]);
+  // During guidance the note card already shows these notes: no second marker next to the destination pin.
+  const shown = new Set(guide?.notes.map((note) => note.spaceId) ?? []);
   const bySpace = new Map<string, Note[]>();
   for (const note of notes) {
-    if (!visibleFloors.has(note.floorId) || !model.spaceById.has(note.spaceId)) continue;
+    if (!visibleFloors.has(note.floorId) || !model.spaceById.has(note.spaceId) || shown.has(note.spaceId)) continue;
     bySpace.set(note.spaceId, [...(bySpace.get(note.spaceId) ?? []), note]);
   }
   return (

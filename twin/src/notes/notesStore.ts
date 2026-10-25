@@ -106,7 +106,8 @@ export function placeName(model: BuildingModel, spaceId: string, assetId: string
   return asset ? `${asset} · ${space}` : space;
 }
 
-/** The place "here": the tapped room or asset (or tapped point in a room), else "You are here". */
+/** The place "here": the tapped room or asset (or tapped point in a room), else the place of the current guidance
+ * step, else "You are here". */
 export function currentPlace(): NotePlace | null {
   const { model, selection, state } = useTwin.getState();
   if (!model) return null;
@@ -119,6 +120,11 @@ export function currentPlace(): NotePlace | null {
     const space = spaceId ? model.spaceById.get(spaceId) : undefined;
     if (space) return { spaceId: space.id, floorId: space.floor_id, assetId: null, point: selection.point ?? space.anchor, name: placeName(model, space.id) };
   }
+  // Guiding: the place the walker reached with the current step ("You are here" still shows the start).
+  const walkStep = useTwin.getState().walkStep;
+  const atStep = walkStep !== null ? spacesAtStep(walkStep).at(-1) : undefined;
+  const reached = atStep ? model.spaceById.get(atStep) : undefined;
+  if (reached) return { spaceId: reached.id, floorId: reached.floor_id, assetId: null, point: reached.anchor, name: placeName(model, reached.id) };
   const position = state?.position;
   const space = position ? model.spaceById.get(position.space_id) : undefined;
   if (position && space) return { spaceId: space.id, floorId: space.floor_id, assetId: null, point: position.point ?? space.anchor, name: placeName(model, space.id) };
@@ -307,7 +313,8 @@ function updateGuide(step: number | null): void {
     return;
   }
   const spaces = spacesAtStep(step);
-  const notes = notesIn(spaces);
+  const own = new Set(useNotes.getState().job?.noteIds ?? []);
+  const notes = notesIn(spaces).filter((note) => !own.has(note.id)); // not the walker's own notes from this job
   const stepKey = `${step}:${spaces.join(",")}`;
   if (!notes.length || useNotes.getState().dismissed.includes(stepKey)) {
     useNotes.setState({ guide: null });
