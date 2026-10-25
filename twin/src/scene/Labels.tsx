@@ -596,9 +596,25 @@ function RoomLabel({ item, mark, flat, selected, y }: { item: Extract<Item, { ki
         data-zoom-kind="room"
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
-        {item.space.name}
+        <NameWithNumber name={item.space.name} />
       </div>
     </Html>
+  );
+}
+
+/** "Office 0.22" → the name, then the room number smaller and grey (the card keeps the plain name). */
+export function splitRoomNumber(name: string): [string, string] {
+  const match = /^(.*\S)\s+(\d+(?:\.\d+)+[a-z]?)$/i.exec(name.trim());
+  return match ? [match[1], match[2]] : [name, ""];
+}
+
+function NameWithNumber({ name }: { name: string }) {
+  const [text, number] = splitRoomNumber(name);
+  if (!number) return <>{name}</>;
+  return (
+    <>
+      {text} <span className="label-num">{number}</span>
+    </>
   );
 }
 
@@ -618,7 +634,11 @@ function PoiPin({ item, tier }: { item: Extract<Item, { kind: "poi" }>; tier: Ma
   return (
     <div className={`poi-pin poi-pin-${item.poi} ${size === POI_DOT_PX ? "poi-pin-dot" : ""} zoom-fade`} data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
       <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
-      {text && <span className="label label-halo poi-pin-name">{text}</span>}
+      {text && (
+        <span className="label label-halo poi-pin-name">
+          <NameWithNumber name={text} />
+        </span>
+      )}
     </div>
   );
 }
