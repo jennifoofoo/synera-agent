@@ -9,6 +9,7 @@ import { ChangesPill } from "./ui/ChangesPill";
 import { FloorRail } from "./ui/FloorRail";
 import { KeyHelp } from "./ui/KeyHelp";
 import { NewBuilding } from "./ui/NewBuilding";
+import { NotesButton, NotesDock } from "./ui/Facts";
 import { Omnibox } from "./ui/Omnibox";
 import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
@@ -50,10 +51,12 @@ export function App() {
       <Phone />
       <div className="dock">
         <CampusCard />
+        <NotesDock />
         {/* While walking: the step sheet and only the Talk button (say "next" while walking). */}
         {walking ? <Walk /> : <Card />}
         <Omnibox walking={walking} />
       </div>
+      <NotesButton />
       <NewBuilding />
       <KeyHelp />
       {loading && <div className="overlay">Loading {building?.name ?? "building"}…</div>}
