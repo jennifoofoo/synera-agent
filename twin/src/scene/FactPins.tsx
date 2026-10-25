@@ -9,7 +9,7 @@ import { Html } from "@react-three/drei";
 import type { Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { newestFirst, sinceLabel, type Note } from "../notes/notes";
-import { closeNotes, notesIn, openNotes, useNotes } from "../notes/notesStore";
+import { closeNotes, notesIn, openNotes, relevantNotes, useNotes } from "../notes/notesStore";
 import { useTwin } from "../store";
 
 interface Props {
@@ -80,7 +80,7 @@ export function FactPins({ model, floorY, visibleFloors }: Props) {
   for (const spaceId of spaces) {
     const space = model.spaceById.get(spaceId);
     if (!space || !visibleFloors.has(space.floor_id) || shown.has(spaceId)) continue;
-    const here = notesIn([spaceId]);
+    const here = layer ? notesIn([spaceId]) : relevantNotes(notesIn([spaceId])); // walking: only what matters, no noise
     if (here.length) bySpace.set(spaceId, here);
   }
   return (

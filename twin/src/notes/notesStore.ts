@@ -11,6 +11,7 @@ import { useTwin, walkSteps } from "../store";
 import { isSpeaking, speak, speechPending } from "../voice";
 import { metresLeft, readable } from "../walkInfo";
 import { normalizeSpeech } from "../wake";
+import { useRound } from "../round/round";
 import { isCurrent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
 
 export const AUTHORS = ["Klaus", "Tom"] as const;
@@ -168,6 +169,19 @@ export function currentPlace(): NotePlace | null {
 
 /** Notes and issues valid now in a room (including those on its machines and doors), newest first. Closures show on
  * the map's closure marks, not as notes. */
+/** Only what matters to the walker, no noise: in an inspection round, notes on the round's own devices (shown at that
+ * stop); on a normal route, notes at the destination. Everything else on the way stays quiet. */
+export function relevantNotes(notes: Note[]): Note[] {
+  const { plan, guiding, index } = useRound.getState();
+  if (plan && guiding) {
+    const stop = plan.stops[index];
+    const assets = new Set(stop ? stop.assetIds : []);
+    return notes.filter((note) => !!note.anchor.asset_id && assets.has(note.anchor.asset_id));
+  }
+  const destination = useTwin.getState().state?.route?.destination;
+  return notes.filter((note) => note.anchor.space_id === destination);
+}
+
 export function notesIn(spaceIds: Iterable<string>): Note[] {
   const ids = new Set(spaceIds);
   const now = Date.now();
@@ -406,7 +420,7 @@ function updateGuide(step: number | null): void {
   }
   const spaces = spacesAtStep(step);
   const own = new Set(useNotes.getState().job?.noteIds ?? []);
-  const notes = notesIn(spaces).filter((note) => !own.has(note.id)); // not the walker's own notes from this job
+  const notes = relevantNotes(notesIn(spaces)).filter((note) => !own.has(note.id)); // not the walker's own notes from this job
   const stepKey = `${step}:${spaces.join(",")}`;
   if (!notes.length || useNotes.getState().dismissed.includes(stepKey)) {
     useNotes.setState({ guide: null });
