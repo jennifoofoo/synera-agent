@@ -13,15 +13,18 @@ from building_agent.impact import copy_map
 from building_agent.kinds.what_if_door import shared_wall_midpoint
 from building_agent.position import make_position
 from building_agent.round_tools import (
+    EXACT_MAX_STOPS,
     START,
     best_order,
     device_point,
     distance_matrix,
+    held_karp,
     make_round_tools,
     nearest_neighbour,
     path_length,
     plan_round,
     point_matrix,
+    two_opt,
 )
 from starter_agent.building_map import MapError
 
@@ -140,16 +143,20 @@ def test_order_is_deterministic_whatever_the_asset_order(bm):
     assert first["total_m"] == second["total_m"]
 
 
-def test_multi_floor_round_uses_the_heuristic_and_beats_nearest_neighbour(bm):
+def test_multi_floor_round_of_ten_is_exact_and_beats_the_heuristic(bm):
+    """10 devices on two floors: Held-Karp (exact up to 16), never longer than nearest neighbour + 2-opt."""
     result = plan_round(bm, "extinguishers", "Main aisle H-B5")
     assert result["devices"] == 10 and len(result["stops"]) == 10
     assert {stop["floor"] for stop in result["stops"]} == {"Ground floor", "Floor 1"}
-    assert result["order"] == "nearest neighbour + 2-opt"
+    assert result["order"].startswith("exact")
     start_id = bm.resolve_space("Main aisle H-B5")
     devices = [stop["asset_id"] for stop in result["stops"]]
     matrix = device_matrix(bm, start_id, devices)
     greedy = path_length(matrix, START, tuple(nearest_neighbour(matrix, START, devices)), False)
-    assert result["total_m"] <= greedy + 0.06
+    heuristic = path_length(
+        matrix, START, tuple(two_opt(matrix, START, nearest_neighbour(matrix, START, devices), False)), False
+    )
+    assert result["total_m"] <= min(greedy, heuristic) + 0.06
     assert result["total_m"] == pytest.approx(sum(stop["leg_m"] for stop in result["stops"]), abs=0.5)
 
 
@@ -269,3 +276,36 @@ def test_route_with_via_points_is_the_sum_of_the_point_to_point_legs(bm):
     assert all(any(math.dist(point, p) < 1e-6 for p in drawn) for point in points)
     plain = routing.route(bm, start_id, rooms[-1], False, rooms[:-1], None, None, None, [None] * (len(rooms) - 1))
     assert plain.length_m == routing.route(bm, start_id, rooms[-1], False, rooms[:-1]).length_m
+
+
+@pytest.mark.parametrize("back", [False, True])
+def test_held_karp_equals_brute_force_on_random_rounds(back):
+    """Held-Karp gives the shortest length of all orders (brute force) for 1 to 8 stops, also back to the start,
+    and the same order every time (ties to the smaller id)."""
+    rng = random.Random(11)
+    for size in range(1, 9):
+        for _ in range(8):
+            keys = [START, *(f"A{i:02d}" for i in range(size))]
+            spots = {key: (rng.uniform(0, 60), rng.uniform(0, 60)) for key in keys}
+            matrix = {a: {b: round(math.dist(spots[a], spots[b]) + rng.uniform(0, 4), 1) for b in keys} for a in keys}
+            stops = keys[1:]
+            order = held_karp(matrix, START, stops, back)
+            best = min(path_length(matrix, START, perm, back) for perm in itertools.permutations(stops))
+            assert sorted(order) == stops
+            assert path_length(matrix, START, tuple(order), back) == pytest.approx(best, abs=1e-9)
+            assert held_karp(matrix, START, list(reversed(stops)), back) == order
+
+
+def test_held_karp_is_used_up_to_sixteen_stops_and_ties_go_to_the_smaller_id():
+    assert EXACT_MAX_STOPS == 16
+    keys = [START, "A1", "A2", "A3"]
+    matrix = {a: {b: 0.0 if a == b else 10.0 for b in keys} for a in keys}  # every order is equally long
+    assert held_karp(matrix, START, ["A3", "A1", "A2"], False) == ["A1", "A2", "A3"]
+    stops = [f"A{i:02d}" for i in range(16)]
+    keys = [START, *stops]
+    rng = random.Random(5)
+    matrix = {a: {b: rng.uniform(1, 30) for b in keys} for a in keys}
+    order, method = best_order(matrix, START, stops, False)
+    assert method.startswith("exact") and sorted(order) == stops
+    heuristic = two_opt(matrix, START, nearest_neighbour(matrix, START, stops), False)
+    assert path_length(matrix, START, tuple(order), False) <= path_length(matrix, START, tuple(heuristic), False) + 1e-9
