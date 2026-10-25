@@ -1,15 +1,16 @@
 // Point-of-interest pictograms for the 2D map: a white glyph in a small round grey badge, like a street map.
 import "./poiIcons.css";
 
-export type PoiKind = "stairs" | "lift" | "toilet" | "meeting" | "entrance" | "step" | "coffee" | "printer" | "extinguisher" | "firstaid";
+export type PoiKind = "stairs" | "lift" | "toilet" | "meeting" | "kitchen" | "entrance" | "step" | "coffee" | "printer" | "extinguisher" | "firstaid";
 
 /** What each symbol means, for the legend in the help card (ui/KeyHelp.tsx) and twin/CONTROLS.md. */
 export const POI_LEGEND: { kind: PoiKind; label: string }[] = [
   { kind: "entrance", label: "Entrance / exit" },
   { kind: "lift", label: "Lift" },
   { kind: "stairs", label: "Stairs" },
-  { kind: "toilet", label: "Toilets" },
+  { kind: "toilet", label: "Toilets and bathrooms" },
   { kind: "meeting", label: "Meeting room" },
+  { kind: "kitchen", label: "Kitchen and canteen" },
   { kind: "step", label: "Not step-free (a step or threshold)" },
   { kind: "coffee", label: "Coffee machine" },
   { kind: "printer", label: "Printer" },
@@ -28,6 +29,15 @@ export function amenityKindOf(type: string): PoiKind | null {
 
 /** Badge diameter in px (CSS below must match); used for collision boxes. */
 export const POI_PX = 22;
+
+// a cup with a handle and steam
+const COFFEE = (
+  <svg viewBox="0 0 24 24" aria-hidden>
+    <path d="M4.5 9.5h11v4.5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" />
+    <path className="stroke" d="M15.5 11h1.5a2.2 2.2 0 0 1 0 4.4h-1.5" />
+    <path className="stroke thin" d="M8 3.5v3M11.5 3.5v3" />
+  </svg>
+);
 
 const GLYPHS: Record<PoiKind, JSX.Element> = {
   // a staircase seen from the side
@@ -70,14 +80,7 @@ const GLYPHS: Record<PoiKind, JSX.Element> = {
       <path className="stroke" d="M3.5 17.5h8v-6h9" />
     </svg>
   ),
-  // a cup with a handle and steam
-  coffee: (
-    <svg viewBox="0 0 24 24" aria-hidden>
-      <path d="M4.5 9.5h11v4.5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" />
-      <path className="stroke" d="M15.5 11h1.5a2.2 2.2 0 0 1 0 4.4h-1.5" />
-      <path className="stroke thin" d="M8 3.5v3M11.5 3.5v3" />
-    </svg>
-  ),
+  coffee: COFFEE,
   // a printer with a sheet coming out
   printer: (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -106,6 +109,8 @@ const GLYPHS: Record<PoiKind, JSX.Element> = {
       <path className="stroke" d="M13 12v.01M3 21h18M5 21v-16a2 2 0 0 1 2 -2h7.5m2.5 10.5v7.5M14 7h7m-3 -3l3 3l-3 3" />
     </svg>
   ),
+  // A kitchen or canteen room carries the coffee cup (the food colour's symbol), with or without a coffee machine.
+  kitchen: COFFEE,
 };
 
 /** `closed`: the same glyph with a danger-red edge and a diagonal bar (prohibition style), for a closed lift or stairs. */

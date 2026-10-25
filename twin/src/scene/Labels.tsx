@@ -8,7 +8,7 @@ import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
 import { areasOf, type Area } from "./areas";
-import { prettyType } from "../model/palette";
+import { prettyType, spaceGroup } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
 import { closedConnectorStops } from "../model/closures";
 import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
@@ -43,7 +43,7 @@ const HALO_PAD_PX = 2; // 3D room names are halo text (no box): the halo reaches
 const POI_DOT_PX = 10;
 const POI_BADGE_3D_PX = 20;
 const POI_TEXT_GAP_PX = 4;
-const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet", "meeting"]);
+const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet", "meeting", "kitchen"]);
 const GAP_PX = 4; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
@@ -71,7 +71,7 @@ interface Box {
 }
 
 type Item =
-  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean }
+  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean; room?: boolean }
   | { kind: "tag"; id: string; point: Point; dx: number }
   | { kind: "room"; id: string; point: Point; space: Space }
   | { kind: "area"; id: string; point: Point; area: Area }
@@ -99,7 +99,7 @@ const LAYOUT_HYSTERESIS = { hold: GAP_PX / 4, reveal: 0 };
 function classOf(item: Item, zones: ReadonlySet<string>, roundStopId: string | null): LabelClass {
   switch (item.kind) {
     case "poi":
-      return item.closed ? "closure" : item.poi === "extinguisher" ? "furniture" : "poi";
+      return item.closed ? "closure" : item.room ? "roomSymbol" : item.poi === "extinguisher" ? "furniture" : "poi";
     case "tag":
       return "closure";
     case "thing":
@@ -172,14 +172,24 @@ function spanOf(polygon: Point[]): [number, number] {
   return [maxX - minX, maxY - minY];
 }
 
-const MEETING_ROOMS: ReadonlySet<string> = new Set(["meeting_room", "seminar_room", "lecture_hall", "library"]);
-
+/** The symbol of a room: every coloured room carries its colour group's symbol (never colour without a symbol), from
+ * the same mapping as the room colours (palette.ts spaceGroup): stairs or lift, toilet (toilets, bathrooms, locker
+ * rooms), the cup (kitchens, canteens, whether or not a coffee machine stands there), meeting. */
 function poiKindOf(space: Space, model: BuildingModel): PoiKind | null {
   const connector = model.connectorBySpace.get(space.id);
   if (connector) return connector.kind === "lift" ? "lift" : "stairs";
-  if (space.room_type === "toilet") return "toilet";
-  if (MEETING_ROOMS.has(space.room_type)) return "meeting";
-  return null;
+  switch (spaceGroup(space.type, space.room_type, { name: space.name })) {
+    case "vertical":
+      return space.type === "lift" || space.room_type === "lift" ? "lift" : "stairs";
+    case "sanitary":
+      return "toilet";
+    case "food":
+      return "kitchen";
+    case "meeting":
+      return "meeting";
+    default:
+      return null;
+  }
 }
 
 /** What one zoom tier shows, in priority order (earlier items win collisions). Deterministic: sorted by a fixed
@@ -201,7 +211,7 @@ function candidates(
   for (const space of floor.spaces) {
     const poi = poiKindOf(space, model);
     const closed = closedStops.has(space.id);
-    if (poi) pois.push({ kind: "poi", id: space.id, point: space.anchor, poi, title: closed ? `${space.name || closedStops.get(space.id)} (closed)` : space.name, closed });
+    if (poi) pois.push({ kind: "poi", id: space.id, point: space.anchor, poi, title: closed ? `${space.name || closedStops.get(space.id)} (closed)` : space.name, closed, room: true });
     else if (space.name && space.type !== "outdoor" && space.type !== "corridor") rooms.push(space);
   }
   for (const opening of floor.openings) {
@@ -213,11 +223,14 @@ function candidates(
   // names). Landmarks of the current directions always carry their name; machine names from near on (mapZoom.ts).
   const landmarkItems: Item[] = [];
   const machineNames: Item[] = [];
+  const kitchens = new Set(pois.flatMap((item) => (item.kind === "poi" && item.poi === "kitchen" ? [item.id] : [])));
   if (flat) {
     for (const asset of floor.assets) {
       // Fire extinguishers hang every few metres: only from near on, else they pepper the overview.
       const kind = amenityKindOf(asset.type);
-      const amenity = kind && (tier === "near" || tier === "mid") ? kind : null;
+      // A coffee machine in a kitchen: the kitchen's own cup already says it.
+      const inKitchen = kind === "coffee" && kitchens.has(asset.space_id);
+      const amenity = kind && !inKitchen && (tier === "near" || tier === "mid") ? kind : null;
       if (amenity) (amenity === "extinguisher" ? later : pois).push({ kind: "poi", id: asset.id, point: asset.position, poi: amenity, title: asset.name });
       if (landmarks.has(asset.id)) landmarkItems.push({ kind: "thing", id: asset.id, point: asset.position, asset, landmark: true });
       else if (tier === "near" && asset.category === "machine" && asset.name)
@@ -226,7 +239,7 @@ function candidates(
     landmarkItems.sort((a, b) => a.id.localeCompare(b.id));
     machineNames.sort((a, b) => a.id.localeCompare(b.id));
   }
-  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, meeting: 4, step: 5, firstaid: 6, extinguisher: 7, coffee: 8, printer: 9 };
+  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, meeting: 4, kitchen: 5, step: 6, firstaid: 7, extinguisher: 8, coffee: 9, printer: 10 };
   const rankOf = (item: Item) => (item.kind === "poi" ? poiRank[item.poi] : 0);
   pois.sort((a, b) => rankOf(a) - rankOf(b) || a.id.localeCompare(b.id));
   later.sort((a, b) => a.id.localeCompare(b.id));

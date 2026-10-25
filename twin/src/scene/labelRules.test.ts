@@ -7,7 +7,7 @@ const H = { hold: 2, reveal: 3 };
 
 describe("priority", () => {
   test("the spec's order, destination first, furniture last of the names", () => {
-    const spec: LabelClass[] = ["destination", "here", "selected", "roundStop", "landmark", "zone", "poi", "room", "machine", "furniture"];
+    const spec: LabelClass[] = ["destination", "here", "selected", "roundStop", "landmark", "roomSymbol", "zone", "poi", "room", "machine", "furniture"];
     const ranks = spec.map(rankOfClass);
     expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
     expect(rankOfClass("marker")).toBeLessThan(rankOfClass("destination"));
@@ -27,7 +27,7 @@ describe("priority", () => {
   });
 
   test("the cap never drops what the task names", () => {
-    for (const c of ["destination", "here", "selected", "roundStop", "landmark", "found", "closure", "marker"] as const) expect(capped(c)).toBe(false);
+    for (const c of ["destination", "here", "selected", "roundStop", "landmark", "found", "closure", "marker", "roomSymbol"] as const) expect(capped(c)).toBe(false);
     for (const c of ["zone", "poi", "room", "machine", "furniture", "detail"] as const) expect(capped(c)).toBe(true);
   });
 });
