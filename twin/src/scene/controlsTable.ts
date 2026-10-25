@@ -20,12 +20,16 @@ export const KEY_CONTROLS: ControlRow[] = [
 ];
 
 export const MOUSE_CONTROLS: ControlRow[] = [
-  { keys: "Left drag, middle drag", does: "Grab the map and move it (2D and 3D)" },
-  { keys: "Right drag, Ctrl or Alt + left drag", does: "Rotate (3D: also tilt, 2D: rotate only)" },
-  { keys: "Wheel, trackpad pinch", does: "Zoom towards the pointer" },
-  { keys: "Two-finger trackpad scroll", does: "Move the map (Alt + scroll zooms instead)" },
+  { keys: "Drag (mouse or trackpad click held)", does: "Grab the map and move it" },
+  { keys: "Option / Alt + drag", does: "Tilt (up / down, 3D) and rotate (sideways)" },
+  { keys: "Right drag, Ctrl + drag", does: "Rotate and tilt, like Option + drag" },
+  { keys: "Two-finger swipe", does: "Move the map (never zooms)" },
+  { keys: "Pinch, mouse wheel", does: "Zoom towards the pointer" },
+  { keys: "Option / Alt + two-finger swipe or wheel", does: "Sideways rotates, up / down tilts (3D)" },
+  { keys: "Two-finger twist (Safari)", does: "Rotate" },
+  { keys: "Compass (under the floors)", does: "Click: north up, straight down. Drag: rotate. Arrows below it tilt (3D)" },
   { keys: "Click, double click", does: "Select a room, fly to it (3D) or zoom in (2D)" },
-  { keys: "One finger / two fingers", does: "Move the map / pinch to zoom (2D: around the fingers, moving with them; 3D: twist rotates, up or down tilts)" },
+  { keys: "One finger / two fingers", does: "Move the map / pinch to zoom (3D: twist rotates, up or down tilts)" },
 ];
 
 /** Open state of the help card (a tiny store of its own, so the main store stays untouched). */
