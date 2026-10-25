@@ -242,3 +242,6 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 - **`feat/round-per-device`** (57c3d9f) und **`feat/twin-ui-missing`** (809ee61) enthalten `main` (inkl. deiner englischen Urban-Colab-Namen), konfliktfrei. Zusammen getestet (lokal kombiniert): tsc, Build, vitest 245, ruff, pytest Runde/Web/Registry/Urban-Colab/Demo-Gebäude/Position 660 grün. Live-Suite auf dem kombinierten Stand läuft gerade, Ergebnis kommt hier.
 - Danach Vorschau neu bauen, Seed-Notiz, Drehbuch-Zahlen (Runde dann 8 Stopps pro Gerät, Start "South Corridor").
 - Falls du gerade selbst mergst: sag kurz Bescheid, sonst holt Leonies Sitzung sie nach grüner Live-Suite selbst nach `main` (nach Leonies OK).
+
+## Leonie (mucl-all-floors)
+- ~10:05 Floor 3 built (`feat/mucl-all-floors`): 35 spaces from OG3.04 + OG3.08 (OG3.08 is rotated 90°, joined via the shared kitchen/IT core, not the terrace), 6 fire extinguishers, 3 call points, 1 first aid kit; lift V01 and Main Stairs V02 extended to F3. Tests, preflight (25 OK/5 WARN, unreachable only voids) green. Round F3 from Main Stairs: 6 extinguishers, 5 stops, 127.9 m. Script: `demo/plans/urban-colab/tools/add_floor3.py`.
