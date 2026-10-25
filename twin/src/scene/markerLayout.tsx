@@ -28,7 +28,7 @@ export const TAP_STALK_M = 1.35; // top of the 3D pin's head above the floor
 
 /** How far above its marker a room label's bottom edge sits (px). */
 export const LABEL_LIFT = {
-  here: HERE_RIM_PX + BADGE_GAP_PX, // just above the dot's white rim
+  here: HERE_RIM_PX + BADGE_GAP_PX + 6, // above the dot's white rim, with room for the frame the HTML label lags behind a gliding camera
   end: PIN_HEIGHT_PX + 3, // just above the destination pin's head
   start: START_DOT_PX + 12, // just above the start dot
   tap: TAP_CROSS_PX + BADGE_GAP_PX, // 2D: above the tap pin's crosshair, so no line runs through the name
@@ -36,6 +36,14 @@ export const LABEL_LIFT = {
 };
 
 const at = new THREE.Vector3();
+
+/** Width and height (px) of the frame the camera's frustum spans: when CameraRig renders only the visible window of
+ * a taller or wider virtual frame (setViewOffset, a sheet covers part of the canvas) that is the full frame, else the
+ * canvas. Metres per pixel must divide by this, or markers grow by the covered share (1.4x under a phone sheet). */
+export function frameSize(camera: THREE.Camera, width: number, height: number): [number, number] {
+  const view = (camera as THREE.PerspectiveCamera | THREE.OrthographicCamera).view;
+  return view?.enabled ? [view.fullWidth, view.fullHeight] : [width, height];
+}
 
 /** A slow breathing scale on the floor plane (markers that want attention); still under reduced motion. */
 export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
@@ -60,11 +68,11 @@ export function ScreenSized({ children, uniform = false }: { children: ReactNode
     let metresPerPixel: number;
     if ((camera as THREE.OrthographicCamera).isOrthographicCamera) {
       const ortho = camera as THREE.OrthographicCamera;
-      metresPerPixel = (ortho.top - ortho.bottom) / ortho.zoom / Math.max(1, size.height);
+      metresPerPixel = (ortho.top - ortho.bottom) / ortho.zoom / Math.max(1, frameSize(camera, size.width, size.height)[1]);
     } else {
       const perspective = camera as THREE.PerspectiveCamera;
       g.getWorldPosition(at);
-      metresPerPixel = (2 * camera.position.distanceTo(at) * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) / Math.max(1, size.height);
+      metresPerPixel = (2 * camera.position.distanceTo(at) * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) / Math.max(1, frameSize(camera, size.width, size.height)[1]);
     }
     if (Math.abs(g.scale.x - metresPerPixel) > 1e-6) g.scale.set(metresPerPixel, uniform ? metresPerPixel : 1, metresPerPixel);
   });

@@ -311,7 +311,13 @@ def check_counts(report, page, key, data):
     for a in data["assets"]:
         per_floor[a["floor_id"]] = per_floor.get(a["floor_id"], 0) + 1
     expected_assets = sum(min(n, ASSET_LIMIT) for n in per_floor.values())
-    drawn_assets = page.evaluate("window.__twinAudit.drawnThings()")
+    # One floor at a time (docs/WORK_IN_PROGRESS.md rule 2: the active floor is drawn in full, nothing above it, only
+    # an outline below), so the things are counted floor by floor.
+    drawn_assets = 0
+    for floor in data["floors"]:
+        page.evaluate("(id) => window.__twinAudit.store.getState().focusFloor(id)", floor["id"])
+        page.wait_for_timeout(300)
+        drawn_assets += page.evaluate("window.__twinAudit.drawnThings()")
     report.add(key, "assets", expected_assets, drawn_assets, drawn_assets == expected_assets)
 
     probes, meta = [], []
@@ -418,8 +424,18 @@ def check_closed(report, stack, page, key, data, pair):
         targets.append(("room", room["id"], 1))
     connector = data["connectors"][0] if data["connectors"] else None
     if connector:
-        targets.append(("connector", connector["id"], len([i for i in connector["space_ids"] if i in spaces])))
+        stops = [i for i in connector["space_ids"] if i in spaces]
+        floor = spaces[stops[0]]["floor_id"] if stops else None
+        targets.append(("connector", connector["id"], len([i for i in stops if spaces[i]["floor_id"] == floor])))
+    floor_of = {
+        "door": spaces[door["space_ids"][0]]["floor_id"] if door and door["space_ids"][0] in spaces else None,
+        "room": room["floor_id"] if room else None,
+        "connector": floor if connector else None,
+    }
     for label, element, expected in targets:
+        # only the active floor is drawn: show the element's floor (a connector: the floor of its first stop)
+        page.evaluate(f"(id) => {store}.focusFloor(id)", floor_of[label])
+        page.wait_for_timeout(300)
         page.evaluate(f"(id) => {store}.setClosed(id, true)", element)
         page.wait_for_timeout(300)
         closed = page.evaluate("window.__twinAudit.drawnClosed()")

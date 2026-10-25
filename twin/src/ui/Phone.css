@@ -89,6 +89,10 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .phone-sheet .sheet-grip { flex: none; height: 26px; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: grab; }
 .phone-sheet .sheet-handle { width: 64px; min-height: 26px; height: 26px; padding: 0; border: 0; background: transparent; position: relative; }
 .phone-sheet .sheet-handle::after { content: ""; position: absolute; left: 14px; right: 14px; top: 10px; height: 4px; border-radius: 2px; background: var(--hairline-strong); }
+/* the close button: a small grey circle (the 44 px tap target stays) */
+.phone-sheet button.x { position: relative; isolation: isolate; color: var(--ink-2); font-size: 18px; }
+.phone-sheet button.x::before { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--paper-2); z-index: -1; }
+.phone-sheet .route-dest { font-size: 22px; }
 .phone-sheet .sheet-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
 /* the card inside the sheet: the sheet is the surface */
 .phone-sheet .card { background: transparent; border: 0; box-shadow: none; padding: 0 14px 12px; border-radius: 0; }
