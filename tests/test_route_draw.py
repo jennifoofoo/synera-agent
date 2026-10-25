@@ -3,14 +3,17 @@ itself (length, rooms, steps) stays exactly what the people model says."""
 
 import itertools
 import json
+import math
 import time
 from pathlib import Path
 
+import numpy as np
 import pytest
 from shapely.geometry import LineString, Point
 
 from building_agent import routing
 from building_agent.edit_ops import asset_shape
+from starter_agent.building_map import outline
 from tests.conftest import DATA
 from tests.test_web_routing import case_request, sample, session_for
 from web import api, route_draw
@@ -157,4 +160,108 @@ def test_drawn_line_walks_round_assets(building, monkeypatch):
 
 
 def test_building_dirs_exist():
-    assert Path(LARGEST).exists() and Path(FACTORY).exists()
+    assert Path(LARGEST).exists() and Path(FACTORY).exists() and Path(CAMPUS).exists()
+
+
+# ---------- the line threads every door along its wall normal ----------
+
+CAMPUS = DATA / "dev" / "proc-campus-dev-013"  # Jennifer's 3D screenshot: Kitchen 1.09 -> Toilet 1.20
+MAX_DOOR_ANGLE_DEG = 15.0
+MIN_THREADED_SHARE = 0.9  # door sides in a wall that are threaded (a door with an asset in front keeps the turn)
+
+
+def nearest_wall_direction(polygon, point) -> np.ndarray:
+    """Unit direction of the room outline edge nearest `point` (independent of route_draw's normal)."""
+    coords = np.asarray(polygon.exterior.coords)[:, :2]
+    edges = [LineString([a, b]) for a, b in itertools.pairwise(coords) if math.dist(a, b) > 1e-9]
+    edge = min(edges, key=lambda line: line.distance(Point(point)))
+    (ax, ay), (bx, by) = edge.coords
+    return np.array([bx - ax, by - ay]) / edge.length
+
+
+def door_side_ok(bm, opening: dict, door, neighbour) -> bool | None:
+    """The drawn segment door -> neighbour is within MAX_DOOR_ANGLE_DEG of the normal of the wall the door sits in
+    (of the room on that side) and touches neither room's wall beside the doorway (outline minus the door gap).
+    None if the door is not in a wall of that room (a synthetic hand-over inside a stairwell or lift)."""
+    segment = LineString([door, neighbour])
+    heading = np.subtract(neighbour, door) / segment.length
+    gap = Point(door).buffer(opening["width_m"] / 2)
+    rooms = [outline(bm.spaces[space_id]["polygon"]) for space_id in opening["space_ids"]]
+    side = min(rooms, key=lambda polygon: polygon.distance(Point(neighbour)))
+    if side.exterior.distance(Point(door)) > route_draw.SHARED_WALL_M:
+        return None
+    if abs(float(np.dot(heading, nearest_wall_direction(side, door)))) > math.sin(math.radians(MAX_DOOR_ANGLE_DEG)):
+        return False
+    return not any(segment.intersects(polygon.exterior.difference(gap)) for polygon in rooms)
+
+
+def door_sides(bm, stops: list[str], legs: list) -> list[tuple]:
+    """(opening, door point, neighbour point) for both sides of every narrow door crossed between rooms, from the
+    drawn line (doors at the very start or end of the line have one side)."""
+    geometry = api.route_geometry(bm, stops, legs)
+    crossed = {
+        node[1]
+        for leg in legs
+        for node in leg
+        if node[0] == "o" and all(s in bm.spaces for s in bm.openings[node[1]]["space_ids"])
+    }
+    sides = []
+    for segment in geometry["segments"]:
+        points = [tuple(point) for point in segment["points"]]
+        for opening_id in crossed:
+            opening = bm.openings[opening_id]
+            if opening["floor_id"] != segment["floor_id"] or opening["width_m"] >= route_draw.WIDE_OPENING_M:
+                continue
+            door = tuple(api.rounded(opening["position"]))
+            for at in [i for i, point in enumerate(points) if point == door]:
+                sides += [(opening, door, points[i]) for i in (at - 1, at + 1) if 0 <= i < len(points)]
+    return sides
+
+
+@pytest.mark.parametrize("building", DEV_BUILDINGS)
+def test_drawn_line_crosses_doors_along_the_wall_normal(building):
+    """Every door side that got an approach point is crossed within 15 degrees of the wall normal without touching
+    the walls beside the doorway, and at least MIN_THREADED_SHARE of all narrow door sides are threaded."""
+    building_dir = DATA / "dev" / building
+    bm = api.RecordingMap.load(building_dir)
+    good = total = 0
+    for start, end, step_free, via in route_requests(building_dir):
+        stops = [bm.resolve_space(stop) for stop in [start, *via, end]]
+        legs = api.route_legs(bm, stops, step_free, [])
+        if legs is None:
+            continue
+        for opening, door, neighbour in door_sides(bm, stops, legs):
+            ok = door_side_ok(bm, opening, door, neighbour)
+            if ok is None:
+                continue  # the door is not in a wall of this room
+            approaches = {
+                tuple(api.rounded(route_draw.door_approach(bm, opening["id"], space_id)))
+                for space_id in opening["space_ids"]
+                if route_draw.door_approach(bm, opening["id"], space_id) is not None
+            }
+            assert ok or neighbour not in approaches, (building, opening["id"], door, neighbour)
+            if opening.get("synthetic") and not ok:
+                continue  # a synthetic hand-over at a stair landing's corner: no door, no jambs, keeps its turn
+            good, total = good + ok, total + 1
+    assert not total or good / total >= MIN_THREADED_SHARE, (building, good, total)
+
+
+def test_kitchen_to_toilet_threads_both_doors():
+    """Jennifer's screenshot: the line used to turn on the door centres and cut diagonally across the corridor,
+    through the jambs. Now each door is met head-on, 0.5 m out on both sides; route and length unchanged."""
+    session = session_for(str(CAMPUS))
+    bm = session.map
+    start, end = space_by_name(bm, "Kitchen 1.09"), space_by_name(bm, "Toilet 1.20")
+    page = api.route_view(session, start, end)
+    agent = routing.route(bm, start, end)
+    assert (page["length_m"], page["space_path"]) == (agent.length_m, agent.space_path)
+    points = [tuple(point) for segment in page["segments"] for point in segment["points"]]
+    legs = api.route_legs(bm, [start, end], False, [])
+    doors = [bm.openings[node[1]] for node in legs[0][::2] if node[0] == "o"]
+    assert len(doors) == 2
+    for opening in doors:
+        door = tuple(api.rounded(opening["position"]))
+        at = points.index(door)
+        for neighbour in (points[at - 1], points[at + 1]):
+            assert door_side_ok(bm, opening, door, neighbour), (door, neighbour)
+            assert math.dist(door, neighbour) == pytest.approx(0.5, abs=0.02)

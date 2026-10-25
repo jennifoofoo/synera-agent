@@ -152,7 +152,15 @@ interface TwinState {
   handsFreeHeard: string;
   /** Why hands-free switched itself off (no mic permission, unsupported browser); null otherwise. */
   handsFreeNotice: string | null;
+  /** Something was said to Wanda since hands-free went on: the "Say Hey Wanda" hint is not shown again. */
+  handsFreeSpoken: boolean;
   setHandsFree: (on: boolean) => void;
+  /** Setting "Follow-up listening" (default on, localStorage twin.followUp): after a spoken reply the mic stays open
+   * a few seconds for the next question, no wake word or button. Change it with setFollowUpPref (handsFree.ts). */
+  followUp: boolean;
+  /** The follow-up window is open right now ("listening…"), and what was heard in it so far. */
+  followUpOpen: boolean;
+  followUpHeard: string;
 
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
@@ -206,8 +214,8 @@ let cameraNonce = 0;
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-/** A real phone: coarse pointer AND a small screen. Only phones start in 2D and have no 3D toggle (3D is too heavy
- * there); tablets and narrow laptop windows use the phone layout but keep the 2D/3D toggle. */
+/** A real phone: coarse pointer AND a small screen. Phones start in 2D (lighter, easier to read while walking) but
+ * keep the 2D/3D toggle like tablets and narrow laptop windows; ambient occlusion stays off in the phone profile. */
 export function isPhone(): boolean {
   if (typeof window === "undefined") return false;
   return !!window.matchMedia?.("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 600;
@@ -267,6 +275,16 @@ export const useTwin = create<TwinState>((set, get) => ({
   handsFreeStatus: "listening",
   handsFreeHeard: "",
   handsFreeNotice: null,
+  handsFreeSpoken: false,
+  followUp: (() => {
+    try {
+      return localStorage.getItem("twin.followUp") !== "off";
+    } catch {
+      return true;
+    }
+  })(),
+  followUpOpen: false,
+  followUpHeard: "",
 
   async loadBuildings() {
     try {
@@ -309,7 +327,6 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" && isPhone() ? { viewMode: "2d" as const } : {}) });
   },
   setViewMode(viewMode) {
-    if (viewMode === "3d" && isPhone()) return; // phones are 2D only (narrow windows and tablets may use 3D)
     set({ viewMode });
   },
   setBottomInset(bottomInset) {
@@ -442,7 +459,7 @@ export const useTwin = create<TwinState>((set, get) => ({
     if (get().handsFree) get().setHandsFree(false);
   },
   setHandsFree(handsFree) {
-    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null });
+    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null, handsFreeSpoken: false });
   },
 
   async route(start, destination, stepFree = false) {

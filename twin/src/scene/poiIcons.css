@@ -33,6 +33,15 @@
 .poi-badge.poi-extinguisher { background: var(--safety-red, #a52019); color: #fff; }
 .poi-badge.poi-firstaid { background: var(--safety-green, #237f52); color: #fff; }
 
+/* Closed lift or stairs: the same glyph, danger-red edge and a diagonal bar across it (prohibition style), and a
+   "Closed" tag beside it from the mid tier on. COLOURS.danger, never the safety red. */
+.poi-badge.poi-closed { position: relative; border: 1.5px solid var(--danger, #b3382c); color: var(--ink-2, #5a626d); }
+.poi-badge.poi-closed::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 26px; height: 2px; background: var(--danger, #b3382c);
+  transform: translate(-50%, -50%) rotate(45deg); border-radius: 1px;
+}
+.label.closed-tag { color: var(--danger, #b3382c); font-weight: 600; }
+
 /* Semantic zoom: what enters a zoom tier fades in (150-200 ms), never pops; no animation with reduced motion. */
 @keyframes zoom-fade-in { from { opacity: 0; } }
 .zoom-fade { animation: zoom-fade-in 180ms ease-out; }

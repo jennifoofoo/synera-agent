@@ -7,10 +7,11 @@ import { useMapZoom, type MapTier } from "./mapZoom";
 import { areasOf, type Area } from "./areas";
 import { prettyType } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
+import { closedConnectorStops } from "../model/closures";
 import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
-import { FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
+import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
 
 interface Props {
   floor: FloorModel;
@@ -54,7 +55,8 @@ interface Box {
 }
 
 type Item =
-  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string }
+  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean }
+  | { kind: "tag"; id: string; point: Point; dx: number }
   | { kind: "room"; id: string; point: Point; space: Space }
   | { kind: "area"; id: string; point: Point; area: Area }
   | { kind: "thing"; id: string; point: Point; asset: Asset; landmark: boolean }
@@ -143,13 +145,15 @@ function candidates(
   limit: number,
   flat: boolean,
   landmarks: ReadonlySet<string>,
+  closedStops: ReadonlyMap<string, string>,
 ): Item[] {
   const pois: Item[] = [];
   const later: Item[] = []; // symbols that yield to room names (fire extinguishers: many, and not sought after)
   const rooms: Space[] = [];
   for (const space of floor.spaces) {
     const poi = poiKindOf(space, model);
-    if (poi) pois.push({ kind: "poi", id: space.id, point: space.anchor, poi, title: space.name });
+    const closed = closedStops.has(space.id);
+    if (poi) pois.push({ kind: "poi", id: space.id, point: space.anchor, poi, title: closed ? `${space.name || closedStops.get(space.id)} (closed)` : space.name, closed });
     else if (space.name && space.type !== "outdoor" && space.type !== "corridor") rooms.push(space);
   }
   for (const opening of floor.openings) {
@@ -175,7 +179,9 @@ function candidates(
     machineNames.sort((a, b) => a.id.localeCompare(b.id));
   }
   const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, step: 4, firstaid: 5, extinguisher: 6, coffee: 7, printer: 8 };
-  pois.sort((a, b) => (a.kind === "poi" && b.kind === "poi" ? poiRank[a.poi] - poiRank[b.poi] : 0) || a.id.localeCompare(b.id));
+  // Closed lifts and stairs first: they must never yield to another symbol.
+  const rankOf = (item: Item) => (item.kind === "poi" ? (item.closed ? -1 : poiRank[item.poi]) : 0);
+  pois.sort((a, b) => rankOf(a) - rankOf(b) || a.id.localeCompare(b.id));
   later.sort((a, b) => a.id.localeCompare(b.id));
   // Near, 2D: the clear width of wide doors, last (they yield to everything else).
   const doors: Item[] = [];
@@ -265,6 +271,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     () => (flat ? clusterDisruptions(model, state?.closed ?? []).filter((d) => d.floor_id === floor.id) : []),
     [flat, model, state?.closed, floor.id],
   );
+  const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
   const changes = useMemo(() => (flat && route?.ok ? (route.floor_changes ?? []).filter((change) => change.from_floor === floor.id) : []), [flat, route, floor.id]);
 
   const { shown, pins } = useMemo(() => {
@@ -372,10 +379,28 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       return routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)));
     };
     const roomBoxes = new Map<string, Box>();
-    const all = candidates(floor, model, tier, scale, limit, flat, landmarks);
+    const all = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops);
+    const showTag = tier === "mid" || tier === "near"; // "Closed" beside a closed glyph, from the mid tier on
+    // Closed lifts and stairs come first in `all`; once they are placed, each gets its "Closed" tag (right of the
+    // glyph, else left), before any other symbol or name.
+    const closedPlaced: Extract<Item, { kind: "poi" }>[] = [];
+    let tagsDone = !showTag;
+    const placeTags = () => {
+      tagsDone = true;
+      for (const item of closedPlaced) {
+        for (const dx of [POI_PX / 2 + GAP_PX + CLOSED_TAG_PX / 2, -(POI_PX / 2 + GAP_PX + CLOSED_TAG_PX / 2)]) {
+          const tagBox = boxOf([item.point[0] + dx * scale, item.point[1]], CLOSED_TAG_PX / 2, LABEL_H_PX / 2);
+          if (kept.some((other) => overlaps(tagBox, other))) continue;
+          kept.push(tagBox);
+          result.push({ kind: "tag", id: item.id, point: item.point, dx });
+          break;
+        }
+      }
+    };
     for (const item of all) {
-      if (item.kind === "door") continue; // after the second lines, below
-      if (marks.has(item.id) || replaced.has(item.id)) continue;
+      if (!tagsDone && !(item.kind === "poi" && item.closed)) placeTags();
+      if (item.kind === "door" || item.kind === "tag") continue; // doors after the second lines, below
+      if ((marks.has(item.id) && !(item.kind === "poi" && item.closed)) || replaced.has(item.id)) continue; // a closed glyph always shows
       const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
       // 3D: every label is a pill (padding and a taller box); 2D: plain halo text on the plan
       const pillPad = flat || item.kind === "poi" ? 0 : PILL_PAD_PX;
@@ -393,9 +418,11 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         kept.push(box);
         result.push(shift ? { ...item, point } : item);
         if (item.kind === "room") roomBoxes.set(item.id, box);
+        if (item.kind === "poi" && item.closed) closedPlaced.push(item);
         break;
       }
     }
+    if (!tagsDone) placeTags();
     // Near, 2D: a second line under the room names shown ("Kitchen · 24 m²"), if it fits in the room and is free.
     if (flat && tier === "near") {
       for (const item of [...result]) {
@@ -423,7 +450,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return { shown: result, pins };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, selectedId, selectedAssetId, state?.position, flat, landmarks]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks]);
 
   return (
     <group position-y={y + 0.5}>
@@ -466,6 +493,12 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
               {item.text}
             </div>
           </Html>
+        ) : item.kind === "tag" ? (
+          <Html key={`tag-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+            <div className={`label label-halo ${flat ? "label-plan" : ""} closed-tag zoom-fade`} data-zoom-kind="closed-tag" data-closed-space={item.id} style={{ transform: `translateX(${item.dx}px)` }}>
+              Closed
+            </div>
+          </Html>
         ) : item.kind === "thing" ? (
           <Html key={`thing-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
             <div className={`label label-halo label-plan label-thing ${item.landmark ? "label-landmark" : ""} zoom-fade`} data-zoom-kind="thing" data-label-asset={item.asset.id} style={{ transform: `translateY(calc(-50% - ${THING_LIFT_PX}px))` }}>
@@ -474,8 +507,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
           </Html>
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-            <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`}>
-              <PoiBadge kind={item.poi} title={item.title} />
+            <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
+              <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
             </div>
           </Html>
         ),

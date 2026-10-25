@@ -42,8 +42,8 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 - Sprache: `twin/src/handsFree.ts`, `voice.ts`, `store.ts`, `ui/HandsFree.tsx`, `ui/Omnibox.tsx`, neu `wake.ts`
 - Sperrungen sichtbar: `scene/Labels.tsx`, `scene/Markers.tsx`, `scene/poiIcons.*`, `ui/Card.tsx`, `ui/Card.css`, `ui/Directions.tsx`, `ui/KeyHelp.tsx`, `audit.ts`, `DESIGN.md`, neu `model/closures.ts`, `ui/AvoidsClosed.tsx`
 - Route gerade durch Türen (Server): `web/api.py`, `web/route_draw.py`
-Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`), neue Dateien `ui/Round.tsx`, `ui/Notes.tsx`, `ui/Report.tsx`, und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
-Server-Teile aus `docs/PLAN_SUNDAY.md` (Prüfrunde, Was-wäre-wenn, Notizen-API) sind auf Jennifers Wunsch pausiert, bis die Fixes drin sind.
+Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
+**Bis zum Freeze werden keine neuen Funktionen gebaut, nur Fehler behoben und aufgeräumt** (Entscheidung Jennifer).
 
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
@@ -76,3 +76,11 @@ Richtung wie bei Archilogic, Smplrspace, MapsIndoors 3D ("Architekturmodell" / P
 - Seite bauen und starten: `scripts/build_twin.sh`, dann `uv run python -m web`. Handy über https: `scripts/tunnel.sh`.
 - API-Schlüssel nur in `.env`.
 - Regel aus `CLAUDE.md`: Alles, was Prompt, Werkzeuge, Position, Sprache oder Chat berührt, geht erst nach grüner Live-Suite und grünem `scripts/check.sh` in `main`.
+
+## Leonie baut jetzt (Sonntag früh, mit Jennifer abgesprochen)
+| Branch | Was | Dateien |
+|---|---|---|
+| `feat/twin-round` | Prüfrunde in der App: alle Geräte eines Typs in einem Bereich, kürzeste Reihenfolge im Code, Führung Station für Station mit "Done"; Was-wäre-wenn für die Runde ("Tür hier → Runde X m kürzer") | neue Dateien `twin/src/round/*`, `ui/Round.*`, kleiner Einhänger in `ui/Walk.tsx` |
+| `feat/agent-plan-round` | **Agent-Werkzeug `plan_round`**: Gerätetyp und Bereich rein, kürzeste Reihenfolge mit Metern raus (Python, kein LLM), damit "Hey Wanda, inspection round" im Chat nicht mehr per Hand Reihenfolgen durchprobiert (heute 20 s und nicht garantiert optimal) | neue Datei unter `building_agent/`, Registrierung in den Werkzeugen (gemeinsamer Code: Review-Agent und Live-Suite vor dem Merge) |
+| `feat/twin-notes` | Ortsnotizen mit Foto und Einsatzprotokoll, erst im Browser gespeichert | neue Dateien `twin/src/notes/*`, `ui/Notes.*`, `ui/Report.*`, `scene/NotePins.tsx` |
+Nicht angefasst: Jennifers belegte Dateien (Sprache, Sperrungen, `web/api.py`, `web/route_draw.py`). Sprachbefehle ("done", "note …", "finished") hängt Leonie mit je einer Zeile an, sobald Jennifers Sprach-Fix in `main` ist.

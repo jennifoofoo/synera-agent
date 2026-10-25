@@ -35,6 +35,16 @@ export function speechInputProblem(): string | null {
   return null;
 }
 
+/** Continuous listening that works well enough for an open mic after a reply: Chrome/Edge/Android, not Safari or
+ * anything on iOS (every browser there is WebKit, and its recognition stops and starts unreliably). */
+export function continuousRecognitionLikely(): boolean {
+  if (typeof window === "undefined" || !window.isSecureContext || !recognitionCtor()) return false;
+  const ua = navigator.userAgent;
+  const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const safari = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Android/.test(ua);
+  return !iOS && !safari;
+}
+
 export interface Listener {
   /** Stop listening and send what was heard so far (within a short grace for the final words). */
   stop: () => void;
@@ -134,6 +144,12 @@ export function listenOnce(lang: string, onResult: (text: string) => void, onEnd
 // ---- voice out ----
 
 let audioUrl: string | null = null;
+let pending = 0;
+
+/** True while speak() is still fetching the server voice (the reply has not started playing yet). */
+export function speechPending(): boolean {
+  return pending > 0;
+}
 
 export function stopSpeaking(): void {
   const audio = sharedAudio();
@@ -182,6 +198,7 @@ export async function speak(text: string, serverVoice: boolean): Promise<void> {
   const spoken = spokenText(text);
   if (!spoken) return;
   if (serverVoice) {
+    pending++;
     try {
       const blob = await api.speak(spoken, "en");
       if (blob) {
@@ -193,6 +210,8 @@ export async function speak(text: string, serverVoice: boolean): Promise<void> {
       }
     } catch {
       /* fall through to the browser voice */
+    } finally {
+      pending--;
     }
   }
   if (!window.speechSynthesis) return;

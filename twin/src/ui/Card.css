@@ -92,12 +92,11 @@
 .card-actions-stack .primary { width: 100%; min-height: 44px; border-radius: var(--radius-sm); font-weight: 600; }
 .card button.ghost { background: transparent; color: var(--ink-2); min-height: 40px; }
 .card button.ghost:hover { background: var(--paper-2); color: var(--ink); }
-.card button.ghost:hover { background: transparent; color: var(--text); }
 .worker .card-actions-stack button { min-height: 46px; }
 /* "Avoids closed Lift 1": one quiet line; the closed red only on its small prohibition dash */
 .route-avoids { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
 .route-avoids::before { content: ""; width: 10px; height: 2px; background: var(--danger); transform: rotate(45deg); flex: none; }
-.worker .route-details { margin-top: 6px; font-size: 13px; color: var(--ink-2); }
+.route-details { margin-top: 6px; font-size: 13px; color: var(--ink-2); }
 /* text buttons: no box, a tight focus ring only for the keyboard (a box showed around "less") */
 .card button.link { border-radius: 2px; -webkit-tap-highlight-color: transparent; }
 .card button.link:hover { background: transparent; text-decoration: underline; }

@@ -9,6 +9,7 @@ import { useFrame } from "@react-three/fiber";
 import type { BuildingState, Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
+import { closedConnectorStops } from "../model/closures";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
@@ -36,20 +37,16 @@ export interface Disruption {
   names: string[];
 }
 
+/** Closed rooms and doors (red disc and chip). Closed lifts and stairs are not in here: their own glyph, a hatched
+ * fill and a "Closed" tag mark them (ClosedFill below, Labels.tsx; model/closures.ts). */
 export function clusterDisruptions(model: BuildingModel, closed: string[]): Disruption[] {
   const items: Disruption[] = [];
   for (const id of closed) {
+    if (model.connectorById.has(id) || model.connectorBySpace.has(id)) continue;
     const space = model.spaceById.get(id);
     const opening = model.openingById.get(id);
-    const connector = model.connectorById.get(id);
     if (space) items.push({ floor_id: space.floor_id, point: space.anchor, names: [space.name || space.id] });
     else if (opening) items.push({ floor_id: opening.floor_id, point: opening.position, names: [`Door ${opening.id.split("-").pop()}`] });
-    else if (connector) {
-      for (const spaceId of connector.space_ids) {
-        const stop = model.spaceById.get(spaceId);
-        if (stop) items.push({ floor_id: stop.floor_id, point: stop.anchor, names: [connector.name] });
-      }
-    }
   }
   const clusters: Disruption[] = [];
   for (const item of items) {
@@ -84,6 +81,58 @@ export function Disc({ radius, colour, y = 0.05, opacity = 0.22, through = false
   );
 }
 
+// Pale red hatching in world metres (stripes at 45°, every HATCH_M), anti-aliased; when the stripes get finer than a
+// pixel they fade into their mean colour, so the far tiers show a calm pale red tint instead of moiré.
+const HATCH_M = 0.7;
+const hatchVertex = `
+  varying vec3 vWorld;
+  void main() {
+    vec4 world = modelMatrix * vec4(position, 1.0);
+    vWorld = world.xyz;
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }`;
+const hatchFragment = `
+  uniform vec3 tint;
+  uniform vec3 stripe;
+  uniform float spacing;
+  uniform float opacity;
+  varying vec3 vWorld;
+  void main() {
+    float u = (vWorld.x + vWorld.z) / spacing;
+    float fw = max(fwidth(u), 1e-4);
+    float d = abs(fract(u) - 0.5);
+    float half_ = 0.18;
+    float line = 1.0 - smoothstep(half_ - fw, half_ + fw, d);
+    line = mix(line, 2.0 * half_, clamp(fw * 2.0 - 0.5, 0.0, 1.0));
+    gl_FragColor = vec4(mix(tint, stripe, line * 0.6), opacity);
+  }`;
+
+/** A closed lift or stair stop: its slab gets the pale red hatching instead of the stairs-and-lifts violet. */
+function ClosedFill({ polygon, spaceId }: { polygon: Point[]; spaceId: string }) {
+  const geometry = useMemo(() => polygonGeometry(polygon, 0.1), [polygon]);
+  const material = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        vertexShader: hatchVertex,
+        fragmentShader: hatchFragment,
+        uniforms: {
+          tint: { value: new THREE.Color("#f4dfdb") },
+          stripe: { value: new THREE.Color(COLOURS.danger) },
+          spacing: { value: HATCH_M },
+          opacity: { value: 0.92 },
+        },
+        transparent: true,
+        depthWrite: false,
+      }),
+    [],
+  );
+  return (
+    <group name="closed-fill" userData={{ count: 1, space: spaceId }}>
+      <mesh geometry={geometry} material={material} position-y={0.03} renderOrder={12} />
+    </group>
+  );
+}
+
 function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: Point[]; height: number; colour: string; opacity: number; outline: boolean }) {
   const geometry = useMemo(() => polygonGeometry(polygon, height), [polygon, height]);
   const edges = useMemo(() => outlineGeometry(polygon, height + 0.02), [polygon, height]);
@@ -101,19 +150,13 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
   );
 }
 
-/** The rooms a closure covers (closed rooms, and the stops of a closed stairs or lift), for the red tint. */
+/** Closed rooms (not lifts or stairs: their stops get the hatched fill), for the red tint of the whole room. */
 export function closedSpaces(model: BuildingModel, closed: string[]): { id: string; floor_id: string; polygon: Point[] }[] {
   const spaces: { id: string; floor_id: string; polygon: Point[] }[] = [];
   for (const id of closed) {
+    if (model.connectorById.has(id) || model.connectorBySpace.has(id)) continue;
     const space = model.spaceById.get(id);
-    const connector = model.connectorById.get(id);
     if (space) spaces.push({ id: space.id, floor_id: space.floor_id, polygon: space.polygon });
-    else if (connector) {
-      for (const spaceId of connector.space_ids) {
-        const stop = model.spaceById.get(spaceId);
-        if (stop) spaces.push({ id: `${id}:${stop.id}`, floor_id: stop.floor_id, polygon: stop.polygon });
-      }
-    }
   }
   return spaces;
 }
@@ -122,6 +165,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
   const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
   const closedRooms = useMemo(() => closedSpaces(model, state?.closed ?? []), [model, state?.closed]);
+  const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
   const chip = (text: string, kind: string) => (
@@ -158,7 +202,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           ) : null,
         )}
 
-      {/* closures: the closed room (or the stops of a closed lift / stairs) gets a red tint with an outline ... */}
+      {/* closures: a closed room gets a red tint with an outline ... */}
       {closedRooms
         .filter((room) => shown(room.floor_id))
         .map((room) => (
@@ -187,6 +231,17 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             </group>
           );
         })}
+
+      {/* closed lifts and stairs: pale red hatching on their slab (2D and 3D); the glyph and tag come from Labels.tsx */}
+      {[...closedStops.keys()].map((spaceId) => {
+        const space = model.spaceById.get(spaceId);
+        if (!space || !shown(space.floor_id)) return null;
+        return (
+          <group key={`closed-fill-${spaceId}`} position-y={floorY(space.floor_id)}>
+            <ClosedFill polygon={space.polygon} spaceId={spaceId} />
+          </group>
+        );
+      })}
 
       {/* added things: green box with a halo */}
       {Object.entries(added)
