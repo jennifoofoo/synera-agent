@@ -45,6 +45,9 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
 **Bis zum Freeze nur Fixes, mit einer Ausnahme als Wow-Effekt: Ortswissen mit Zeit** (Notizen, Probleme, Sperrungen "bis morgen" an Ort oder Gerät), Spec `docs/specs/place-knowledge.md`, wartet auf euer Okay. Leonie baut die Seite gegen den Vertrag dort.
 
+## Stil: ab jetzt nur eine Sitzung (Jennifer und Leonie, ca. 04:00)
+Visuelles Design (Farben, Panels, Schatten, POI-Symbole, 3D-Look) macht nur noch **eine** Sitzung (Jennifers zweite, Ordner `ui-polish`), mit `docs/specs/ui-feedback-akshat.md` und `docs/specs/3d-look.md` als Briefing. Alle anderen Agenten bauen nur Funktion mit den vorhandenen Bausteinen und erfinden keine eigene Optik.
+
 ## Während Leonie schläft (Jennifer, ca. 03:00): Agenten übernehmen zwei Teile
 - Seite fürs Ortswissen: Plan `docs/specs/place-knowledge-page.md`, Branch `feat/twin-knowledge-page`. Ersetzt Leonies lokale Browser-Notizen (`feat/twin-notes`): Notizen liegen auf dem Server, mit Zeit. Foto-Knopf, Protokoll und Prüfrunde kann Leonie darauf aufsetzen.
 - 3D-Look: Plan `docs/specs/3d-look.md`. Wird von Jennifers zweiter Sitzung gebaut (Ordner `ui-polish`, Licht, Boden, Wände, Möbel), nicht von einem weiteren Agenten.
