@@ -45,7 +45,7 @@ def find_floor_spot(page):
 
 def test_tap_answers_where_are_you(page, server):
     # 1. no pending question: a tap opens the room card as before
-    x, y, space_id = find_floor_spot(page)
+    x, y, _ = find_floor_spot(page)
     assert page.locator(".card-selection").count() == 1
     page.evaluate("() => window.__twinAudit.store.getState().select(null)")
     page.wait_for_timeout(200)
@@ -102,7 +102,8 @@ def test_tap_answers_where_are_you(page, server):
     page.wait_for_function("!window.__twinAudit.store.getState().chatBusy", timeout=10000)
     assert page.locator(".card-selection").count() == 0, "the answering tap must not open the room card"
     position = page.evaluate("() => window.__twinAudit.store.getState().state.position")
-    assert position and position["space_id"] == space_id
+    # The position is the room that was sent (see above: not necessarily the room of step 1).
+    assert position and position["space_id"] == here["space_id"]
     shot(page, "tap-where-answered")
 
     # 4. the question is answered: the next tap opens the card again
