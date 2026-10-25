@@ -73,9 +73,11 @@ describe("classifyTwoFinger", () => {
 
 describe("zoom and distance", () => {
   it("round trips", () => {
-    for (const zoom of [0.5, 4, 17.3, 120]) {
-      const d = orthoZoomToDistance(zoom, 915);
-      expect(distanceToOrthoZoom(d, 915)).toBeCloseTo(zoom, 9);
+    for (const fov of [32, 38]) {
+      for (const zoom of [0.5, 4, 17.3, 120]) {
+        const d = orthoZoomToDistance(zoom, 915, fov);
+        expect(distanceToOrthoZoom(d, 915, fov)).toBeCloseTo(zoom, 9);
+      }
     }
   });
 
@@ -88,7 +90,7 @@ describe("zoom and distance", () => {
   });
 
   it("zooming in brings the 3D camera closer", () => {
-    expect(orthoZoomToDistance(20, 800)).toBeLessThan(orthoZoomToDistance(10, 800));
+    expect(orthoZoomToDistance(20, 800, 32)).toBeLessThan(orthoZoomToDistance(10, 800, 32));
   });
 });
 

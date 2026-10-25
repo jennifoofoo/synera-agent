@@ -17,8 +17,6 @@ export const TURN_MAX_RAD = (15 * Math.PI) / 180;
 export const FINGER_MIN_PX = 10;
 export const MIDPOINT_DECIDE_PX = 24;
 
-/** Degrees of the perspective camera in Scene.tsx (used only where the real camera is not at hand). */
-export const PERSPECTIVE_FOV_DEG = 38;
 /** Polar angle (radians from straight down) the 3D view starts at after a swipe up from the plan. */
 export const HANDOVER_POLAR = 0.1;
 /** Radians of tilt per pixel the fingers move up after the switch (until they lift). */
@@ -47,13 +45,14 @@ export function classifyTwoFinger(start: FingerPair, now: FingerPair): TwoFinger
 }
 
 /** Distance of a perspective camera that shows the same metres per pixel in the image centre as an orthographic
- * camera at `zoom` (px per metre). `frameHeightPx` is the full frame height the projection is built for. */
-export function orthoZoomToDistance(zoom: number, frameHeightPx: number, fovDeg = PERSPECTIVE_FOV_DEG): number {
+ * camera at `zoom` (px per metre). `frameHeightPx` is the full frame height the projection is built for, `fovDeg`
+ * the perspective camera's vertical field of view (always the real camera's, Scene.tsx may change it). */
+export function orthoZoomToDistance(zoom: number, frameHeightPx: number, fovDeg: number): number {
   return frameHeightPx / (2 * zoom * Math.tan((fovDeg * Math.PI) / 360));
 }
 
 /** Inverse of orthoZoomToDistance. */
-export function distanceToOrthoZoom(distance: number, frameHeightPx: number, fovDeg = PERSPECTIVE_FOV_DEG): number {
+export function distanceToOrthoZoom(distance: number, frameHeightPx: number, fovDeg: number): number {
   return frameHeightPx / (2 * distance * Math.tan((fovDeg * Math.PI) / 360));
 }
 

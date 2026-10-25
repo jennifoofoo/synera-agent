@@ -24,20 +24,19 @@ from tests.e2e.test_here_ui import NO_AO
 
 pytestmark = pytest.mark.e2e
 
-FOV = 38  # Scene.tsx
-
-# Camera state; `scale` is px per metre in the image centre for both cameras (ortho zoom, or from the 3D distance).
-CAMERA = f"""() => {{
+# Camera state; `scale` is px per metre in the image centre for both cameras (ortho zoom, or from the 3D distance
+# and the real camera's field of view).
+CAMERA = """() => {
   const c = window.__twinControls.current;
   const cam = c.camera;
   const t = c.getTarget(new cam.position.constructor());
   const frameH = cam.view && cam.view.enabled ? cam.view.fullHeight : document.querySelector('canvas').getBoundingClientRect().height;
   const flat = !!cam.isOrthographicCamera;
-  const scale = flat ? cam.zoom : frameH / (2 * c.distance * Math.tan({FOV} * Math.PI / 360));
+  const scale = flat ? cam.zoom : frameH / (2 * c.distance * Math.tan(cam.fov * Math.PI / 360));
   const s = window.__twinStore.getState();
-  return {{ mode: s.viewMode, handover: s.viewHandover, flat, target: [t.x, t.y, t.z], polar: c.polarAngle,
-           azimuth: c.azimuthAngle, scale }};
-}}"""
+  return { mode: s.viewMode, handover: s.viewHandover, flat, target: [t.x, t.y, t.z], polar: c.polarAngle,
+           azimuth: c.azimuthAngle, scale };
+}"""
 
 # Screen position (client px) of a world point through the current scene camera.
 PROJECT = """([x, y, z]) => {
@@ -91,12 +90,28 @@ def open_twin(chromium, base_url, playwright_instance):
             timeout=30000,
         )
         page.evaluate("window.__twinStore.getState().setViewMode('2d')")
+        # The welcome card (ui/Welcome.tsx) has chips in the middle that would take the touches; any wheel closes it.
+        page.evaluate("window.dispatchEvent(new WheelEvent('wheel'))")
         page.wait_for_timeout(1500)
+        settle(page)
         return page
 
     yield _open
     for context in contexts:
         context.close()
+
+
+def settle(page, timeout_ms: int = 15000) -> dict:
+    """Wait until the camera stops moving (two reads 300 ms apart agree; slow when the machine is busy)."""
+    last = page.evaluate(CAMERA)
+    for _ in range(timeout_ms // 300):
+        page.wait_for_timeout(300)
+        now = page.evaluate(CAMERA)
+        same = now["mode"] == last["mode"] and abs(now["scale"] - last["scale"]) < 1e-3 * last["scale"]
+        if same and math.dist(now["target"], last["target"]) < 1e-3 and abs(now["polar"] - last["polar"]) < 1e-3:
+            return now
+        last = now
+    return last
 
 
 def zoom_on_floor_centre(page) -> dict:
@@ -105,8 +120,8 @@ def zoom_on_floor_centre(page) -> dict:
         """() => { const s = window.__twinStore.getState(); const f = s.model.floorById.get(s.focusedFloorId);
         s.requestCamera({ kind: 'point', floorId: f.id, point: [f.bounds.cx, f.bounds.cy], radius: 6 }); }"""
     )
-    page.wait_for_timeout(2000)
-    return page.evaluate(CAMERA)
+    page.wait_for_timeout(1000)
+    return settle(page)
 
 
 def two_finger(page, a, b, da, db, steps=16):
@@ -215,7 +230,7 @@ def test_button_switch_sets_no_handover(open_twin):
 
 def test_option_swipe_switches_on_the_mac(open_twin):
     page = open_twin("desktop")
-    before = page.evaluate(CAMERA)
+    before = zoom_on_floor_centre(page)
     assert before["mode"] == "2d", before
     page.evaluate(WHEEL, [[{"deltaY": 10.5, "altKey": True} for _ in range(30)], 640, 400])
     page.wait_for_timeout(600)
@@ -223,6 +238,7 @@ def test_option_swipe_switches_on_the_mac(open_twin):
     assert up["mode"] == "3d", up
     assert up["polar"] > 0.3, f"Option + swipe keeps tilting after the switch: {up}"
     assert math.dist(before["target"][::2], up["target"][::2]) < 0.5, (before, up)
+    assert abs(up["scale"] - before["scale"]) < 0.1 * before["scale"], f"the scale does not jump: {before} {up}"
     assert abs(math.remainder(up["azimuth"] - before["azimuth"], 2 * math.pi)) < 0.05, (
         "a swipe up does not turn the plan"
     )
