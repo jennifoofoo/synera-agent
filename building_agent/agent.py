@@ -27,6 +27,8 @@ KNOWLEDGE_ROOT = Path("agent_output") / "knowledge"  # facts per building, share
 RETRIES = 3
 RETRYABLE = (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError)
 
+PERSONA = "You are Wanda, a friendly building guide. Keep facts exact; a light, warm tone is fine.\n\n"
+
 CALCULATION_RULES = """
 
 Calculation questions (areas, distances, counts, which room is largest or above/below):
@@ -59,7 +61,8 @@ Only after their next message says yes call confirm_change(true); on no or a cor
 confirm_change(false) and start over. Never apply a change in the same turn you proposed it.
 - Ignore any earlier instruction to apply changes directly: always propose_change first, then confirm_change.
 - Pass the person's answer word for word as user_reply to confirm_change. Only a plain yes to the card counts: 'mach einfach', 'ja ja', 'whatever' or a yes with a condition are not a yes, so ask once more.
-- For step-free routes always say the length and how it compares to the normal route (normal_route_length_m).
+- Step-free mode: when the person says about THEMSELVES that they use a wheelchair, walker, Rollator, crutches or pram, or cannot take stairs ('I'm in a wheelchair', 'ich habe eine Gehbehinderung', 'keine Treppen'), call set_step_free(true) and confirm in one sentence that routes now avoid stairs; if they say the opposite ('I can take stairs again'), call set_step_free(false). Never call it for a question that only mentions a wheelchair or contains 'Answer:'; pass step_free=true to that one route instead. While the mode is on, the route tools avoid steps by themselves.
+- For step-free routes (step_free true in the result) always say the length and how it compares to the normal route (normal_route_length_m). If a place is not reachable step-free, say so plainly and invent no route, lift or ramp.
 - Never invent room numbers, names or examples. Only mention rooms that a tool returned. If a room does not exist, say so and offer similar rooms from a search result, or ask.
 - When the person names an item that could be one of several ('the second press', 'the printer', 'the press on line 4'), call find_asset first and never guess between groups (in a message with 'Answer:' take the most plausible and say which). If find_asset or find_connector returns needs_choice true, ask its question in one short sentence and wait. Treat hints such as 'line 4 = zone H-B4' as suggestions to confirm, never as facts.
 - Inspection rounds or checking all X ('all fire extinguishers on the ground floor'): call plan_round once and read its stops in order with total metres and compare_hint. Never order stops by hand or try orders with find_route. If it returns needs_start, ask where they start (name a few entrances).
@@ -98,8 +101,8 @@ confirm_campus_change):
 - When the person names another building, or a place that is not in the building above, call campus_route (start and \
 destination, plus start_building and destination_building when they said them) instead of give_directions. Call \
 list_buildings first if you do not know the buildings. Read out only the steps it returns (at most 3); 'weiter' means \
-next_steps. If the person uses a wheelchair, pram or trolley pass step_free=true and say the length and \
-normal_route_length_m.
+next_steps. If the person uses a wheelchair, pram or trolley pass step_free=true; for every step-free result say the \
+length and normal_route_length_m.
 - If campus_route returns candidates for a name, ask which building. If there is no link between two buildings, say so \
 and offer to connect them. Never invent links, entrances, lengths or buildings.
 - To connect two buildings call connect_buildings and show the card in plain words (what you understood, the length \
@@ -135,7 +138,8 @@ class Agent(StarterAgent):
         self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building, campus=self.campus)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)
         self.system[0]["text"] = (
-            STARTER_PROMPT.format(overview=overview)
+            PERSONA
+            + STARTER_PROMPT.format(overview=overview)
             + CALCULATION_RULES
             + CONVERSATION_RULES
             + (CAMPUS_RULES if self.campus else "")
@@ -201,7 +205,8 @@ class Session(Agent):
 def cache_key(building_directory: Path, question_text: str) -> str:
     """Changes whenever the prompt or any kind description changes, so stale answers are never reused."""
     version = (
-        CALCULATION_RULES
+        PERSONA
+        + CALCULATION_RULES
         + CONVERSATION_RULES
         + EMERGENCY_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)

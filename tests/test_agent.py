@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from building_agent.agent import CALCULATION_RULES, Agent
+from building_agent.agent import CALCULATION_RULES, PERSONA, Agent
 from building_agent.registry import load_kinds
 from tests.conftest import labelled_questions, load_map
 
@@ -12,6 +12,8 @@ def test_agent_wires_kind_tools_and_calculation_rules_without_api_key():
     assert set(load_kinds()) <= names
     assert "find_space" in names
     assert CALCULATION_RULES in agent.system[0]["text"]
+    assert agent.system[0]["text"].startswith(PERSONA)  # the agent knows her name (Wanda)
+    assert "set_step_free" in names
 
 
 def test_system_prompt_overview_lists_floor_ids():
