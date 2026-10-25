@@ -195,7 +195,7 @@ function AddForm() {
   const place = useNotes((s) => s.place);
   const draft = useNotes((s) => s.draft);
   const [text, setText] = useState(draft);
-  const [issue, setIssue] = useState(false);
+  const issue = false; // no "It's a problem" box: one field is enough; issues still come from the chat ("…is broken")
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -279,10 +279,6 @@ function AddForm() {
           </button>
         )}
         <input ref={file} type="file" accept="image/*" capture="environment" hidden onChange={(event) => void pick(event.target.files?.[0])} />
-        <label className="note-issue">
-          <input type="checkbox" checked={issue} onChange={() => setIssue(!issue)} />
-          It's a problem
-        </label>
       </div>
       {/* No name field: the note is signed from the profile (notesStore.noteAuthor). */}
       {problem && <p className="note-problem">{problem}</p>}
