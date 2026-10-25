@@ -587,10 +587,10 @@ export const useTwin = create<TwinState>((set, get) => ({
 }));
 
 /** "I'm here" is local until the next chat message (pendingHere): a state from another endpoint (route, close,
- * door) does not know it yet, so the position on screen is kept instead of being wiped (mobile session). */
+ * door) does not know it yet, so the position on screen (newer than the server's) is kept (mobile session). */
 function withPendingHere(next: BuildingState): BuildingState {
   const { pendingHere, state } = useTwin.getState();
-  return pendingHere && !next.position && state?.position ? { ...next, position: state.position } : next;
+  return pendingHere && state?.position ? { ...next, position: state.position } : next;
 }
 
 /** Identity of a drawn route (same ends and length = same route). */

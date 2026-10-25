@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import fixture from "./motion/__fixtures__/route-dev-osm-way22744230.json";
 import { RouteMatcher } from "./motion/routeMatcher";
 import { legsFromRoute } from "./motion/legs";
-import { buildPlan, stepFor } from "./walkWithMe";
+import { buildPlan, stepFor, stepStart } from "./walkWithMe";
 
 type ApiRoute = Parameters<typeof legsFromRoute>[0];
 const route = fixture as unknown as ApiRoute;
@@ -64,5 +64,70 @@ describe("walk with me: steps follow the estimate", () => {
       expect(step).toBeGreaterThanOrEqual(last);
       last = step;
     }
+  });
+});
+
+describe("step guide without motion: Next puts the dot at the end of the step just done", () => {
+  const legs = legsFromRoute(route);
+  const [ground, basement, top] = legs;
+  const distToLine = (p: [number, number], pts: [number, number][]) => {
+    if (pts.length === 1) return Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]);
+    let best = Infinity;
+    for (let i = 1; i < pts.length; i++) {
+      const [a, b] = [pts[i - 1], pts[i]];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+      best = Math.min(best, Math.hypot(a[0] + t * dx - p[0], a[1] + t * dy - p[1]));
+    }
+    return best;
+  };
+  const at = (step: number) => stepStart(LINES, route, step)!;
+
+  it("starts at the route start and ends at the destination", () => {
+    expect(at(0)).toEqual({ point: ground.points[0], floorId: ground.floorId });
+    expect(at(LINES.length - 1)).toEqual({ point: top.points[top.points.length - 1], floorId: top.floorId });
+  });
+
+  it("a ride step waits at the stairs on the floor it leaves, the step after it starts on the new floor", () => {
+    expect(at(1).floorId).toBe(ground.floorId);
+    expect(at(2)).toEqual({ point: basement.points[0], floorId: basement.floorId });
+    expect(at(7)).toEqual({ point: basement.points[basement.points.length - 1], floorId: basement.floorId });
+    expect(at(8)).toEqual({ point: top.points[0], floorId: top.floorId });
+  });
+
+  it("every step start lies on the route line, moving forward step by step, on the plan's metres", () => {
+    const plan = buildPlan(LINES, route);
+    let previous: [number, number] | null = null;
+    for (let step = 2; step <= 6; step++) {
+      const p = at(step);
+      expect(p.floorId).toBe(basement.floorId);
+      expect(distToLine(p.point, basement.points)).toBeLessThan(1e-6);
+      if (step > 2) {
+        const m = new RouteMatcher(legs);
+        m.resetTo({ distanceAlong: plan.steps[step].startM }); // same metres as Walk with me
+        expect(m.position().point[0]).toBeCloseTo(p.point[0], 6);
+        expect(m.position().point[1]).toBeCloseTo(p.point[1], 6);
+      }
+      if (previous) expect(Math.hypot(p.point[0] - previous[0], p.point[1] - previous[1])).toBeGreaterThan(1);
+      previous = p.point;
+    }
+  });
+
+  it("Walk with me reset to the step start shows the same point, also across a floor change", () => {
+    for (const step of [2, 4, 8, 10]) {
+      const p = at(step);
+      const m = new RouteMatcher(legs);
+      m.resetTo({ point: p.point, floorId: p.floorId });
+      expect(m.position().floorId).toBe(p.floorId);
+      expect(m.position().point[0]).toBeCloseTo(p.point[0], 6);
+      expect(m.position().point[1]).toBeCloseTo(p.point[1], 6);
+    }
+  });
+
+  it("clamps the step and needs a route line", () => {
+    expect(stepStart(LINES, route, 99)).toEqual(at(LINES.length - 1));
+    expect(stepStart(LINES, { segments: [], floor_changes: [] }, 1)).toBeNull();
   });
 });
