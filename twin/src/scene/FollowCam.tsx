@@ -136,22 +136,32 @@ export function FollowCam({ model, floorY }: Props) {
       }
       const back = saved.current;
       saved.current = null;
-      const now = controlsRef.current;
-      // The plan is north up again once the walk ends (the follow cam turned it heading up).
-      const store = useTwin.getState();
-      if (now && store.viewMode === "2d" && !store.viewHandover) void now.rotateTo(0, now.polarAngle, !store.reducedMotion);
-      // Only the same controls on the same building (2D/3D switch or a new building: nothing to go back to).
-      if (!back || !now || now !== back.controls || back.model !== useTwin.getState().model) return;
-      const animate = !useTwin.getState().reducedMotion;
-      const smooth = now.smoothTime;
-      if (animate) now.smoothTime = 0.45;
-      const done = [now.setLookAt(back.position.x, back.position.y, back.position.z, back.target.x, back.target.y, back.target.z, animate)];
-      if ((camera as THREE.OrthographicCamera).isOrthographicCamera) done.push(now.zoomTo(back.zoom, animate));
-      void Promise.all(done).then(() => {
-        now.smoothTime = smooth;
-      });
-      invalidate();
-      setTimeout(invalidate, 0);
+      // After the commit: CameraRig's effect clears controlsRef in its own cleanup and sets it again right after, so
+      // inside this cleanup it is often null (Done left the plan turned heading up and zoomed in).
+      setTimeout(() => {
+        const now = controlsRef.current;
+        // The plan is north up again once the walk ends (the follow cam turned it heading up).
+        const store = useTwin.getState();
+        const northUp = store.viewMode === "2d" && !store.viewHandover;
+        const animate = !store.reducedMotion;
+        // The nearest north (the follow cam's azimuth may be several turns away from 0): the short way round.
+        const north = now ? Math.round(now.azimuthAngle / (2 * Math.PI)) * 2 * Math.PI : 0;
+        if (now && northUp) void now.rotateAzimuthTo(north, animate);
+        invalidate();
+        // Only the same controls on the same building (2D/3D switch or a new building: nothing to go back to).
+        if (!back || !now || now !== back.controls || back.model !== store.model) return;
+        const smooth = now.smoothTime;
+        if (animate) now.smoothTime = 0.45;
+        const done = [now.setLookAt(back.position.x, back.position.y, back.position.z, back.target.x, back.target.y, back.target.z, animate)];
+        // setLookAt takes the azimuth of the saved view: north up has to come after it, or it is overwritten.
+        if (northUp) done.push(now.rotateAzimuthTo(north, animate));
+        if ((camera as THREE.OrthographicCamera).isOrthographicCamera) done.push(now.zoomTo(back.zoom, animate));
+        void Promise.all(done).then(() => {
+          now.smoothTime = smooth;
+        });
+        invalidate();
+        setTimeout(invalidate, 0);
+      }, 0);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walking]);
