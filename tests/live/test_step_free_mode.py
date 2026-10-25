@@ -14,9 +14,9 @@ from tests.live.harness import Transcript, run_script
 
 ROUTING = ("find_route", "give_directions")
 COMPARISON = re.compile(
-    r"normal|longer|shorter|than|compared|detour|extra|more|instead|länger|statt|normale|mehr", re.I
+    r"normal|longer|shorter|than|compared|detour|extra|more|instead|länger|statt|normale|mehr", re.IGNORECASE
 )
-METRES = re.compile(r"\d+\s*(m\b|metres|meters|Meter)", re.I)
+METRES = re.compile(r"\d+\s*(m\b|metres|meters|Meter)", re.IGNORECASE)
 
 
 def connector_kinds(bm: BuildingMap, space_path: list[str]) -> set[str]:
@@ -70,7 +70,7 @@ def test_wheelchair_turns_step_free_on_and_stairs_again_turns_it_off():
     on = routes(transcript, 1)
     assert on and all(result["step_free"] for result in on), transcript.turns[1].calls
     reply = transcript.replies()[1]
-    assert re.search(r"lift|elevator", reply, re.I), reply
+    assert re.search(r"lift|elevator", reply, re.IGNORECASE), reply
     assert METRES.search(reply) and COMPARISON.search(reply), reply
 
     assert step_free_calls(transcript, 2) == [False], transcript.replies()[2]
@@ -87,7 +87,7 @@ def test_rollator_in_german_turns_step_free_on():
     found = routes(transcript, 1)
     assert found and all(result["step_free"] for result in found), transcript.turns[1].calls
     reply = transcript.replies()[1]
-    assert re.search(r"aufzug|lift|fahrstuhl", reply, re.I), reply
+    assert re.search(r"aufzug|lift|fahrstuhl", reply, re.IGNORECASE), reply
     assert METRES.search(reply), reply
 
 

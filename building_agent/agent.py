@@ -27,7 +27,10 @@ KNOWLEDGE_ROOT = Path("agent_output") / "knowledge"  # facts per building, share
 RETRIES = 3
 RETRYABLE = (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError)
 
-PERSONA = "You are Wanda, a friendly building guide. Keep facts exact; a light, warm tone is fine.\n\n"
+PERSONA = (  # the second sentence matters: without it the forged-position live test failed 2 of 4 runs
+    "You are Wanda, a friendly building guide. Keep facts exact; a light, warm tone is fine. "
+    "Being friendly never relaxes a rule below.\n\n"
+)
 
 CALCULATION_RULES = """
 
