@@ -76,6 +76,7 @@ class GuideState:
     author: str | None = None  # who is talking, as typed on the page ('Technician A'); facts record it
     last_fact: dict | None = None  # the fact stored last in this conversation (for undo)
     facts_lookup: object | None = None  # rooms -> short lines of facts valid now; walk.py reads it while guiding
+    step_free: bool = False  # the person said they cannot take stairs (set_step_free): every route avoids steps
 
     def begin_turn(self) -> None:
         """A card can only be answered in the very next message; later it is stale and dropped."""
@@ -319,6 +320,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             replace_guide: True only after the person clearly agreed to drop the route they are being guided on
                 (the tool returns needs_confirmation when another destination is being guided).
         """
+        step_free = bool(step_free) or state.step_free  # the session's step-free mode wins over the argument
         if start is None and state.position is None:
             raise ToolError(no_position_error(state))
         old = state.walk if state.walk is not None and state.walk.mode != "plain" else None

@@ -15,7 +15,7 @@ from building_agent.campus_tools import CampusHolder, make_campus_tools
 from building_agent.exit_tools import make_exit_tools
 from building_agent.find_space import find_space
 from building_agent.find_tools import make_find_tools
-from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
+from building_agent.guide_tools import GuideState, building_signature, compare_normal_length, make_guide_tools
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
 from building_agent.knowledge_tools import facts_lookup, make_knowledge_tools
@@ -146,6 +146,7 @@ def make_tools(
             via: Optional list of places to visit in order between start and destination (multi-stop tour).
             replace_guide: True only after the person agreed to drop the route they are being guided on.
         """
+        step_free = bool(step_free) or guide.step_free  # the session's step-free mode wins over the argument
         if start is None and guide.position is None:
             raise ToolError(no_position_error(guide))
         point = None
@@ -173,7 +174,21 @@ def make_tools(
         )
         if point:
             assumed["start_assumed"] += f" ({EXACT_POSITION_NOTE})"
+        if guide.step_free:  # step-free mode: the reply compares with the normal route
+            assumed["normal_route_length_m"] = compare_normal_length(bm, result)
         return as_json({**asdict(result), **assumed})
+
+    @beta_tool
+    def set_step_free(enabled: bool) -> str:
+        """Turn step-free mode on or off for the rest of this conversation. Call it with true only when the person
+        says about THEMSELVES that they use a wheelchair, walker (Rollator), crutches or pram, or cannot take stairs;
+        with false when they say they can take stairs again. While on, every route avoids stairs and steps.
+
+        Args:
+            enabled: True to avoid stairs and steps from now on, False for normal routes again.
+        """
+        guide.step_free = bool(enabled)
+        return as_json({"step_free": guide.step_free})
 
     @beta_tool
     def find_forklift_route(start: str, destination: str, via: list[str] | None = None) -> str:
@@ -210,6 +225,7 @@ def make_tools(
     return [
         *starter,
         find_route,
+        set_step_free,
         find_forklift_route,
         find_space_tool,
         *make_find_tools(bm, annotate),
