@@ -28,7 +28,7 @@ export const TAP_STALK_M = 1.35; // top of the 3D pin's head above the floor
 
 /** How far above its marker a room label's bottom edge sits (px). */
 export const LABEL_LIFT = {
-  here: HERE_RIM_PX + BADGE_GAP_PX, // just above the dot's white rim
+  here: HERE_RIM_PX + BADGE_GAP_PX + 6, // above the dot's white rim, with room for the frame the HTML label lags behind a gliding camera
   end: PIN_HEIGHT_PX + 3, // just above the destination pin's head
   start: START_DOT_PX + 12, // just above the start dot
   tap: TAP_CROSS_PX + BADGE_GAP_PX, // 2D: above the tap pin's crosshair, so no line runs through the name
