@@ -269,6 +269,7 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (event.pointerType === "touch") {
         touches++;
         fingers.set(event.pointerId, [event.clientX, event.clientY]);
+        if (tiltSession.current && !tiltSession.current.pos.has(event.pointerId)) tiltSession.current = null; // a lost lift
         if (touches > 1) stopPan(); // two fingers: pinch on the 2D plan (below), the controls in 3D
         if (touches === 2 && controls.current && usable()) startPinch(controls.current);
         back = null;
