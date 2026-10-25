@@ -42,13 +42,8 @@
     0 0 calc(var(--wanda-level, 0) * 32px) color-mix(in srgb, var(--ob-active) 45%, transparent);
   transition: box-shadow 80ms linear;
 }
-/* Wanda speaking: the same ring in the signal colour, and a slow breathe */
-.ob-talk.speaking {
-  box-shadow: 0 0 0 calc(4px + var(--wanda-level, 0) * 18px) color-mix(in srgb, var(--signal) 28%, transparent),
-    0 0 calc(var(--wanda-level, 0) * 32px) color-mix(in srgb, var(--signal) 45%, transparent);
-  transform: scale(calc(1 + var(--wanda-level, 0) * 0.06));
-  transition: box-shadow 80ms linear, transform 80ms linear;
-}
+/* in the Wanda bar the mic listens in Synera blue; Wanda speaking shows on the orb, not on the mic */
+.wb-mic.listening { --ob-active: var(--signal); }
 
 /* status line: thinking / listening / notice */
 .ob-status {
@@ -81,9 +76,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ob-dots i, .ob-rec { animation: none; }
-  .ob-mic.listening, .ob-talk.listening, .ob-talk.speaking { transform: none; transition: none; }
+  .ob-mic.listening, .ob-talk.listening { transform: none; transition: none; }
   .ob-mic.listening, .ob-talk.listening { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ob-active) 28%, transparent); }
-  .ob-talk.speaking { box-shadow: 0 0 0 4px color-mix(in srgb, var(--signal) 28%, transparent); }
 }
 
 /* touch: every tap target at least 44 px */
@@ -93,19 +87,76 @@
 }
 
 
-/* closed by default: only Chat and Talk, round, bottom right of the dock (in its flow, so never over the card) */
+/* closed by default: only the Wanda bar, in the dock's flow (so never over the card) */
 .omnibox.collapsed .omnibox-input {
   position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden;
   opacity: 0; pointer-events: none; border: 0; box-shadow: none;
 }
-.ob-fabs { display: flex; justify-content: flex-end; gap: 10px; }
-.ob-fab {
-  width: 48px; height: 48px; min-height: 48px; padding: 0; border-radius: var(--radius-pill); display: inline-flex; align-items: center;
-  justify-content: center; color: var(--text); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
-  -webkit-touch-callout: none; user-select: none;
+/* ===== The Wanda bar: one glass pill at the bottom. Orb (who), caption (what), Ask, Talk, Stop (only when needed). */
+.wanda-bar {
+  display: flex; align-items: center; gap: 6px; height: 56px; padding: 0 6px 0 8px; border-radius: var(--radius-pill);
+  background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2);
+  box-shadow: var(--shadow-float); -webkit-touch-callout: none; user-select: none;
+  animation: wb-in var(--t-base) both;
 }
-.ob-fab:hover { background: var(--surface); }
-.ob-fab svg { width: 22px; height: 22px; }
+.worker .wanda-bar { height: 64px; padding: 0 8px 0 10px; }
+@keyframes wb-in { from { opacity: 0; transform: translateY(4px) scaleY(0.92); } to { opacity: 1; transform: none; } }
+
+/* the orb: Synera blue, a soft highlight top left; breathes when idle, follows the voice level, turns while thinking */
+.wanda-orb {
+  --wanda-level: 0;
+  flex: none; position: relative; width: 40px; height: 40px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--signal-ink) 55%, transparent) 0, transparent 38%),
+    radial-gradient(circle at 50% 55%, var(--signal) 0, var(--signal-dark) 100%);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--signal-dark) 35%, transparent);
+  animation: wb-breathe 3s ease-in-out infinite;
+}
+.worker .wanda-orb { width: 44px; height: 44px; }
+@keyframes wb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+.wanda-orb.listening, .wanda-orb.speaking {
+  animation: none;
+  transform: scale(calc(1 + var(--wanda-level, 0) * 0.25));
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--signal-dark) 35%, transparent),
+    0 0 calc(6px + var(--wanda-level, 0) * 26px) calc(var(--wanda-level, 0) * 6px) color-mix(in srgb, var(--signal) 45%, transparent);
+  transition: transform 80ms linear, box-shadow 80ms linear;
+}
+/* thinking: a lighter arc travels round the orb */
+.wanda-orb.thinking::after {
+  content: ""; position: absolute; inset: -3px; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 62%, color-mix(in srgb, var(--signal) 70%, var(--signal-ink)) 88%, transparent 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 calc(50% - 3px), #000 calc(50% - 2px));
+  mask: radial-gradient(circle, transparent 0 calc(50% - 3px), #000 calc(50% - 2px));
+  animation: wb-spin 1.4s linear infinite;
+}
+@keyframes wb-spin { to { transform: rotate(1turn); } }
+
+/* the caption: one line, the tap target that opens the input */
+.wb-caption {
+  flex: 1; min-width: 0; display: flex; align-items: center; align-self: stretch; padding: 0 4px;
+  font-size: 14px; line-height: 1.3; color: var(--ink-2); cursor: text; white-space: nowrap; overflow: hidden;
+}
+.worker .wb-caption { font-size: 15px; }
+.wb-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.wanda-bar.listening .wb-caption, .wanda-bar.speaking .wb-caption, .wanda-bar.reply .wb-caption { color: var(--text); }
+.wb-kicker { flex: none; color: var(--signal); font-weight: 600; }
+.wanda-bar.thinking .wb-text { color: var(--ink-2); }
+
+/* round buttons in the bar */
+.wb-btn {
+  flex: none; position: relative; display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  width: 44px; height: 44px; min-height: 44px; border-radius: var(--radius-pill); border: 0;
+  color: var(--text); background: transparent;
+}
+.wb-btn:hover { background: var(--paper-2); }
+.wb-btn svg { width: 22px; height: 22px; }
+.wb-ask { width: 36px; height: 36px; min-height: 36px; color: var(--ink-2); }
+.wb-ask svg { width: 20px; height: 20px; }
+@media (pointer: coarse) { .wb-ask { width: 44px; height: 44px; min-height: 44px; } }
+.wb-mic { background: var(--paper-2); }
+.wb-mic:hover { background: color-mix(in srgb, var(--text) 15%, transparent); }
+.wb-stop { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); animation: wb-in var(--t-base) both; }
+.wb-stop:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); }
 .ob-talk { position: relative; }
 /* spoken replies off: a muted-speaker badge on the Talk button */
 .ob-badge {
@@ -113,10 +164,17 @@
   display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--text);
   border: 2px solid var(--panel-solid); pointer-events: none;
 }
-.ob-fab .ob-badge svg { width: 14px; height: 14px; }
-/* icon plus word ("Ask", "Talk"): an icon alone makes people guess */
-.ob-fab.ob-labelled { width: auto; padding: 0 18px 0 14px; gap: 8px; font-size: 14px; font-weight: 600; }
-.ob-fab-label { line-height: 1; }
+.wb-btn .ob-badge svg { width: 14px; height: 14px; }
+
+/* the input opens out of the bar */
+.omnibox.expanded .omnibox-input { animation: wb-in var(--t-base) both; transform-origin: bottom center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wanda-bar, .wb-stop, .omnibox.expanded .omnibox-input { animation: none; }
+  .wanda-orb, .wanda-orb.listening, .wanda-orb.speaking { animation: none; transform: none; transition: none; }
+  .wanda-orb.listening, .wanda-orb.speaking { box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 30%, transparent); }
+  .wanda-orb.thinking::after { animation: none; }
+}
 .omnibox.collapsed .ob-status { align-self: flex-end; }
 /* suggestion chips above the empty input: send the question as if typed */
 .ob-chips { display: flex; flex-wrap: wrap; gap: 6px; }

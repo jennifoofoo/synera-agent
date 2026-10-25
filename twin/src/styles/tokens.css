@@ -6,6 +6,11 @@
   /* surfaces */
   --paper: #f6f5f2; /* app and 3D background, warm off-white (scene) */
   --paper-2: #edebe6; /* inset fields, hover, ground (scene) */
+  /* 3D studio backdrop behind the transparent canvas: cool white at the top, a light lavender grey below (the fog
+   * colour, scene), a soft vignette toward the corners, and 1.5 % film grain against banding */
+  --studio-top: #f6f7fa; /* scene */
+  --studio-bottom: #e8e9ef; /* scene: fog */
+  --studio-vignette: rgba(52, 58, 84, 0.10);
   --surface: #ffffff; /* solid cards, inputs */
   --ink: #1d2430; /* text, graphite */
   --ink-2: #5a626d; /* secondary text (5.9:1 on --surface) */
@@ -17,7 +22,7 @@
   --glass: rgba(255, 255, 255, 0.8);
   --glass-strong: rgba(255, 255, 255, 0.92); /* text-heavy sheets and lists */
   --blur: 16px;
-  --shadow-float: 0 1px 2px rgba(29, 36, 48, 0.06), 0 8px 24px rgba(29, 36, 48, 0.1);
+  --shadow-float: 0 1px 2px rgba(29, 36, 48, 0.05), 0 12px 32px rgba(40, 46, 80, 0.1); /* soft, diffuse: cards float */
   --shadow-soft: 0 1px 2px rgba(29, 36, 48, 0.05), 0 4px 12px rgba(29, 36, 48, 0.08);
 
   /* the one signal colour: route, primary button, selection (white on it is 8.3:1) */
@@ -47,7 +52,7 @@
   /* shape: soft corners, pills for chips and round buttons */
   --radius: 14px; /* cards, panels */
   --radius-sm: 10px; /* buttons, inputs */
-  --radius-lg: 18px; /* sheets */
+  --radius-lg: 20px; /* cards and sheets */
   --radius-pill: 999px;
 
   /* type: Inter (self-hosted, src/main.tsx), tabular numerals everywhere; scale 12 / 14 / 16 / 20 / 28 */

@@ -24,6 +24,7 @@
 import { useState } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
+import { frameSize } from "./markerLayout";
 
 export type MapTier = "area" | "far" | "mid" | "near";
 
@@ -53,7 +54,8 @@ export function tierOf(metresPerPixel: number, extentM = 0): MapTier {
 
 const centre = new THREE.Vector3();
 
-function metresPerPixelOf(camera: THREE.Camera, width: number, height: number, focus: THREE.Vector3): number {
+function metresPerPixelOf(camera: THREE.Camera, canvasWidth: number, canvasHeight: number, focus: THREE.Vector3): number {
+  const [width, height] = frameSize(camera, canvasWidth, canvasHeight);
   if ((camera as THREE.OrthographicCamera).isOrthographicCamera) {
     const ortho = camera as THREE.OrthographicCamera;
     return (ortho.right - ortho.left) / ortho.zoom / Math.max(1, width);

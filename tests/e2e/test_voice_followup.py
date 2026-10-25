@@ -178,7 +178,8 @@ def test_follow_up_after_spoken_reply_then_silence_closes(twin):
     wait_until(page, lambda: REPLY in page.evaluate("() => window.__spoken"))
     # After the reply has been spoken the mic opens by itself and says so.
     wait_until(page, lambda: follow_up_open(page))
-    assert "Listening" in page.inner_text(".ob-followup")
+    # the Wanda voice bar says it in its caption (.wb-text); the expanded bar keeps the status line (.ob-followup)
+    assert "Listening" in page.locator(".ob-followup, .wb-text").first.inner_text()
     assert page.evaluate("(t) => window.__say(t)", "and the coffee machine?")
     wait_until(page, lambda: len(chats) == 2)
     assert chats[1]["message"] == "and the coffee machine?"

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { CampusBack } from "../campus/CampusBack";
 import { useCampus } from "../campus/campusStore";
 import { useTwin } from "../store";
@@ -13,6 +14,12 @@ export function TopBar() {
   const campus = useCampus((s) => s.view);
   const campusMode = useCampus((s) => s.mode);
   const site = campusMode === "site" && campus?.loaded;
+  // "new building" typed or spoken in the Omnibox (store.ask): the store cannot import newBuildingStore (cycle)
+  useEffect(() => {
+    const onNew = () => useNewBuilding.getState().open();
+    window.addEventListener("twin:new-building", onNew);
+    return () => window.removeEventListener("twin:new-building", onNew);
+  }, []);
   const pick = (value: string) => {
     if (value === "__new") return void useNewBuilding.getState().open();
     if (value.startsWith(CAMPUS)) return void useCampus.getState().open(value.slice(CAMPUS.length));

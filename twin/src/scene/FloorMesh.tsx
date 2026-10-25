@@ -167,6 +167,7 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
         renderOrder={ghost ? 10 : 0}
         layers-mask={ghost ? 2 : 1}
         userData={{ floorId: floor.id, ghost }}
+        castShadow
         frustumCulled
       />
       <lineSegments geometry={built.edges} material={ghost ? materials.ghostEdges : materials.edges} renderOrder={ghost ? 11 : 1} layers-mask={ghost ? 2 : 1} />
