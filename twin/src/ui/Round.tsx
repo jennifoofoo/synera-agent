@@ -28,6 +28,7 @@ import {
   useRound,
   whatIfLine,
 } from "../round/round";
+import { useNotes } from "../notes/notesStore";
 import { PhoneSheet } from "./PhoneSheet";
 import "./Round.css";
 
@@ -71,6 +72,7 @@ export function RoundCard() {
   const model = useTwin((s) => s.model);
   const walking = useTwin((s) => s.walkStep !== null);
   const hereId = useTwin((s) => s.state?.position?.space_id ?? null);
+  const reportOpen = useNotes((s) => !!s.report);
   const round = useRound();
   const [pickStart, setPickStart] = useState(false);
   const [moreTypes, setMoreTypes] = useState(false);
@@ -113,7 +115,9 @@ export function RoundCard() {
     if (!round.open) setPickStart(false);
   }, [round.open]);
 
-  if (!model || walking) return null;
+  // The job report (round finished, or "finished") is the one sheet then: the panel would hide it (Phone.css keeps
+  // only the round panel's sheet in the dock). Closing the report brings the panel back.
+  if (!model || walking || reportOpen) return null;
   const name = (id: string) => model.spaceById.get(id)?.name ?? id;
 
   // Guiding without a step sheet: the stop is in the room you are already in (or there is no route to it).

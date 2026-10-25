@@ -2,7 +2,9 @@
 // header leaves its Done out (the video showed a grey Done in the header and a blue one below).
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { RoundBar } from "../ui/Round";
+import { useNotes } from "../notes/notesStore";
+import { useTwin } from "../store";
+import { RoundBar, RoundCard } from "../ui/Round";
 import { useRound, type RoundPlan } from "./round";
 
 const plan: RoundPlan = {
@@ -30,5 +32,29 @@ describe("RoundBar", () => {
     expect(lastStep).not.toContain(">Done<");
     expect(lastStep).toContain("Fire extinguisher 3.02");
     Object.assign(initial, kept);
+  });
+});
+
+/** Server render reads each store's initial state object: point it at the current state for one render. */
+function rendered(node: JSX.Element, stores: { getInitialState: () => object; getState: () => object }[]): string {
+  const kept = stores.map((store) => ({ ...store.getInitialState() }));
+  stores.forEach((store) => Object.assign(store.getInitialState(), store.getState()));
+  try {
+    return renderToStaticMarkup(node);
+  } finally {
+    stores.forEach((store, i) => Object.assign(store.getInitialState(), kept[i]));
+  }
+}
+
+describe("RoundCard", () => {
+  it("steps aside while the job report is open (the report sheet would be hidden under it)", () => {
+    const building = { key: "b", name: "B", floors: [], spaces: [], assets: [], openings: [], connectors: [] };
+    useTwin.setState({ buildingKey: "b", building: building as never, model: { building, spaceById: new Map(), assetById: new Map() } as never, walkStep: null });
+    useRound.setState({ open: true, plan, guiding: false, finished: true, busy: null, error: null });
+    useNotes.setState({ report: null });
+    expect(rendered(<RoundCard />, [useTwin, useRound, useNotes])).toContain("Inspection round");
+    useNotes.setState({ report: { round: null } as never });
+    expect(rendered(<RoundCard />, [useTwin, useRound, useNotes])).toBe("");
+    useNotes.setState({ report: null });
   });
 });
