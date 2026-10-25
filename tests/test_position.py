@@ -382,7 +382,7 @@ def test_swapping_the_building_clears_the_position(bm, tmp_path):
 
 
 def test_the_prompt_names_the_new_tools_and_stays_short():
-    for word in ("set_position", "find_nearest", "control_sentence", "[position: X]"):
+    for word in ("set_position", "clear_position", "find_nearest", "control_sentence", "[position: X]"):
         assert word in CONVERSATION_RULES
     assert len(CONVERSATION_RULES.split("- Position:")[1].split("- Guiding")[0]) < 1400
 

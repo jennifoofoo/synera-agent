@@ -26,7 +26,7 @@ Place knowledge (web/knowledge_api.py, docs/specs/place-knowledge.md; POSTs need
                  valid_to?, author?, related?, photo_base64?}   -> {fact, state}; closures only via the chat card
   GET  /api/facts/photo?key=&id=        image/jpeg (resized, no EXIF)
   POST /api/facts/undo {building, id?}  removes that fact (else the newest) if younger than 2 minutes -> {undone, state}
-  POST /api/round {building, type, area?, start?, return_to_start?, step_free?}  plan_round for the page -> {round, route, state}
+  POST /api/round {building, type, area?, start?, start_point?, return_to_start?, step_free?}  plan_round for the page -> {round, route, state}
   GET  /api/graph?key=[&format=aas][&at=]   JSON-LD with Brick/RealEstateCore types, or the AAS export
   state_view.facts (open now, all floors), state_view.closed_until {element_id: ISO}; timed closures are applied
   at the start of every request (no background job)
@@ -388,13 +388,21 @@ class App:
                     return 200, {"route": {"ok": False, "error": str(error)}, "state": api.state_view(session)}
             if path == "/api/round":
                 try:
+                    start = str(body["start"]) if body.get("start") else None
+                    start_point = None
+                    if start and body.get("start_point") is not None:  # the person's dot: same check as /api/route
+                        checked = check_route_point(
+                            body["start_point"], session.map, session.map.resolve_space(start), "start point"
+                        )
+                        start_point = list(checked.point) if checked.point else None
                     view = api.round_view(
                         session,
                         str(body.get("type", "")),
-                        str(body["start"]) if body.get("start") else None,
+                        start,
                         str(body.get("area") or ""),
                         bool(body.get("return_to_start", False)),
                         bool(body.get("step_free", False)),
+                        start_point,
                     )
                 except MapError as error:
                     view = {"ok": False, "error": str(error)}
