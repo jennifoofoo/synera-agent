@@ -61,8 +61,6 @@ def test_session_works_on_the_given_map_and_keeps_the_conversation():
 
 
 def test_failed_turn_leaves_the_conversation_valid(monkeypatch):
-    import starter_agent.agent as starter
-
     building_dir, _ = labelled_questions("errand")[0]
     agent = Agent(load_map(building_dir), Path("agent_output") / "test", client=object())
 
@@ -70,7 +68,7 @@ def test_failed_turn_leaves_the_conversation_valid(monkeypatch):
         self.messages.append({"role": "user", "content": text})
         raise RuntimeError("API died")
 
-    monkeypatch.setattr(starter.BuildingAgent, "ask", dying_ask)
+    monkeypatch.setattr(Agent, "run_tools", dying_ask)  # the tool loop (starter's, with our model and effort)
     try:
         agent.ask("hello")
     except RuntimeError:
@@ -120,3 +118,35 @@ def test_campus_holder_adds_campus_tools_and_rules_only_when_given(tmp_path):
     multi = Agent(first, P("agent_output") / "test", client=object(), campus=holder)
     assert {"campus_route", "list_buildings", "connect_buildings"} <= {tool.name for tool in multi.tools}
     assert CAMPUS_RULES in multi.system[0]["text"]
+
+
+def test_page_chat_uses_the_chat_model_and_the_benchmark_keeps_opus():
+    """Session (page chat and voice) answers with CHAT_MODEL/CHAT_EFFORT; Agent (benchmark answer) keeps the starter's
+    MODEL and EFFORT (Opus, medium). Every request also caches the conversation, not only tools and system."""
+    import starter_agent.agent as starter
+    from building_agent import agent as agent_module
+    from building_agent.agent import Session
+
+    seen = []
+
+    class Messages:
+        @staticmethod
+        def tool_runner(**params):
+            seen.append(params)
+            return iter(())
+
+    class Beta:
+        messages = Messages
+
+    class Client:
+        beta = Beta
+
+    building_dir, _ = labelled_questions("errand")[0]
+    bm = load_map(building_dir)
+    Session(bm, Path("agent_output") / "test", client=Client()).ask("hello")
+    Agent(bm, Path("agent_output") / "test", client=Client()).ask("hello")
+    chat, benchmark = seen
+    assert (chat["model"], chat["output_config"]["effort"]) == (agent_module.CHAT_MODEL, agent_module.CHAT_EFFORT)
+    assert (benchmark["model"], benchmark["output_config"]["effort"]) == (starter.MODEL, starter.EFFORT)
+    assert (starter.MODEL, starter.EFFORT) == ("claude-opus-5-5", "medium")
+    assert all(params["cache_control"] == {"type": "ephemeral"} for params in seen)
