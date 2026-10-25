@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyTwoFinger, distanceToOrthoZoom, type FingerPair, HANDOVER_POLAR, orthoZoomToDistance, tiltForSwipe } from "./twoFinger";
+import { classifyOptionDrag, classifyTwoFinger, distanceToOrthoZoom, type FingerPair, HANDOVER_POLAR, orthoZoomToDistance, tiltForSwipe } from "./twoFinger";
 
 const start: FingerPair = [
   [150, 400],
@@ -100,5 +100,23 @@ describe("tiltForSwipe", () => {
     expect(tiltForSwipe(-50, 1)).toBe(HANDOVER_POLAR);
     expect(tiltForSwipe(50, 1)).toBeCloseTo(HANDOVER_POLAR + 0.3, 9);
     expect(tiltForSwipe(10000, 1)).toBe(1);
+  });
+});
+
+describe("classifyOptionDrag (Option/Alt + mouse drag)", () => {
+  it("switches on a mostly vertical drag up of 40 px", () => {
+    expect(classifyOptionDrag(0, -39)).toBe("undecided");
+    expect(classifyOptionDrag(5, -40)).toBe("tilt-up");
+    expect(classifyOptionDrag(-15, -60)).toBe("tilt-up");
+  });
+
+  it("goes back on a mostly vertical drag down", () => {
+    expect(classifyOptionDrag(3, 45)).toBe("tilt-down");
+  });
+
+  it("rotates on a sideways or diagonal drag and never switches", () => {
+    expect(classifyOptionDrag(30, 0)).toBe("rotate");
+    expect(classifyOptionDrag(-30, -40)).toBe("rotate");
+    expect(classifyOptionDrag(4, 2)).toBe("undecided");
   });
 });

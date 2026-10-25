@@ -249,3 +249,40 @@ def test_option_swipe_switches_on_the_mac(open_twin):
     assert back["mode"] == "2d", back
     assert abs(back["scale"] - up["scale"]) < 0.1 * up["scale"], (up, back)
     assert not page.errors, page.errors
+
+
+def option_drag(page, start, delta, steps=20):
+    """Option/Alt held, left mouse button down at `start`, moved by `delta` in `steps` moves, then released."""
+    page.keyboard.down("Alt")
+    page.mouse.move(*start)
+    page.mouse.down()
+    for k in range(1, steps + 1):
+        page.mouse.move(start[0] + delta[0] * k / steps, start[1] + delta[1] * k / steps)
+        page.wait_for_timeout(16)
+    page.mouse.up()
+    page.keyboard.up("Alt")
+
+
+def test_option_mouse_drag_switches_and_goes_back(open_twin):
+    """The mouse twin of Option + swipe: Option/Alt + drag up on the plan switches to 3D and keeps tilting, Option/Alt
+    + drag down to nearly straight down goes back at the release, a sideways drag only rotates."""
+    page = open_twin("desktop")
+    before = zoom_on_floor_centre(page)
+    assert before["mode"] == "2d", before
+    option_drag(page, (640, 500), (120, 0))
+    sideways = settle(page)
+    assert sideways["mode"] == "2d", f"a sideways Option drag rotates, it never switches: {sideways}"
+    assert abs(math.remainder(sideways["azimuth"] - before["azimuth"], 2 * math.pi)) > 0.05, "a sideways drag rotates"
+    option_drag(page, (640, 560), (0, -220))
+    page.wait_for_timeout(600)
+    up = page.evaluate(CAMERA)
+    assert up["mode"] == "3d", up
+    assert up["polar"] > 0.4, f"the drag keeps tilting after the switch: {up}"
+    assert math.dist(sideways["target"][::2], up["target"][::2]) < 0.5, (sideways, up)
+    assert abs(up["scale"] - sideways["scale"]) < 0.1 * sideways["scale"], (sideways, up)
+    option_drag(page, (640, 200), (0, 400), steps=30)
+    page.wait_for_timeout(900)
+    back = settle(page)
+    assert back["mode"] == "2d", back
+    assert abs(back["scale"] - up["scale"]) < 0.15 * up["scale"], (up, back)
+    assert not page.errors, page.errors
