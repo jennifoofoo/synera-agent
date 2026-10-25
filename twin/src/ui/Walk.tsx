@@ -8,7 +8,6 @@ import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
 import { acceptWalkWithMeHint, declineWalkWithMeHint, honestLine, toggleWalkWithMe, useWalkMotion, walkWithMeAvailable } from "../walkWithMe";
-import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import { RoundBar } from "./Round";
 import { inRound, roundDone } from "../round/round";
@@ -113,7 +112,6 @@ export function Walk() {
               </span>
             )}
           </span>
-          <HandsFreeButton />
           {/* One clear way out: ends the guide and clears the route (Esc does the same). */}
           <button className="walk-end" onClick={end} title="End the route (Esc)">
             End route
@@ -123,7 +121,6 @@ export function Walk() {
           <TurnIcon line={steps[step]} up={rideUp(route.floor_changes, steps, step)} />
           <p aria-live="polite">{steps[step]}</p>
         </div>
-        <HandsFreeStatus />
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back
