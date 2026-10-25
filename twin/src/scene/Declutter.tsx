@@ -4,53 +4,68 @@
 // That is exact for the unrotated 2D plan, but not for the tilted perspective of 3D (rows of rooms squeeze together
 // towards the horizon, labels float at the marker's height), for a rotated plan, nor for the chips that Markers.tsx
 // floats above closed lifts and floor changes in 3D, which no layout sees. So after every frame that moved the
-// camera (at most every THROTTLE_MS) this pass measures every drei <Html> element on the map and hides the lower
-// ranked one of any pair that touches, and any label on a marker drawn in three.js (here dot, route ends, tap pin).
-// The tap pin itself yields to the here dot and the route ends.
-// Hiding is only `visibility` on drei's wrapper; nothing about the look changes. Ties keep what is already shown,
-// so labels do not flicker while the camera moves.
+// camera this pass measures every drei <Html> element on the map and hides the lower ranked one of any pair that
+// touches, and any label on a marker drawn in three.js (here dot, route ends, tap pin). The tap pin itself yields to
+// the here dot and the route ends.
+// When (docs/specs/label-rules.md, rule 5): only at decision points, never while the map only pans or rotates (the
+// labels still follow the camera, the visible set stays): a zoom step (more than 15 %, labelRules.ts), a change of
+// the labels on the map (floor, zoom bucket, route, selection, round: Labels.tsx re-lays them out), of the "you are
+// here" spot, the selection, the round, the view or the building, and a resize.
+// Who wins: the shared priority list (labelRules.ts, `data-label-class` on every label). Hysteresis: a shown label
+// stays until it really touches another, a hidden one only comes back with REVEAL_PX of free space around it.
+// Hiding is only `visibility` on drei's wrapper; nothing about the look changes.
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { useTwin } from "../store";
+import { useRound } from "../round/round";
+import { blocked, rankOfClass, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
+import { metresPerPixelOf } from "./mapZoom";
+import { controlsRef } from "./FloorMesh";
 import { frameSize, HERE_RIM_PX, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_RING_PX, TAP_STALK_M } from "./markerLayout";
 
-interface Box {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-
-const THROTTLE_MS = 90;
+const THROTTLE_MS = 90; // decisions at most this often (a fast zoom crosses several steps)
 const TOUCH_PX = 0.5; // boxes may touch by this much (rounding), any more and the lower ranked one goes
+const REVEAL_PX = 3; // a hidden label only comes back with this much free space around it
+const HYSTERESIS = { hold: TOUCH_PX, reveal: REVEAL_PX };
 const HIDDEN = "declutter-hidden";
 
-/** Priority of a map element (lower wins), in the order Labels.tsx lays them out: chips and badges, found names,
- * the marked rooms (destination, tapped, other markers), closed glyphs and their tag, symbols, landmarks, room and
- * area names, machine names, fire extinguishers, second lines, door widths. */
-export function rankOf(content: Element): number {
+/** Bumped at every decision. Per-frame label rules elsewhere (the far-label cull of 3D room names in Labels.tsx)
+ * re-decide only when it changes, so they keep still while the map pans or rotates, too. */
+export const labelDecision = { epoch: 0 };
+
+/** The class of a map element in the shared priority list: `data-label-class` (Labels.tsx), else by its look (the
+ * chips and badges of Markers.tsx and poiIcons.tsx are markers). */
+export function classOf(content: Element): LabelClass | string {
+  const own = (content as HTMLElement).dataset?.labelClass;
+  if (own) return own;
   const c = content.classList;
-  if (c.contains("chip") || c.contains("floor-badge") || c.contains("found-dot") || c.contains("walk-estimated")) return 0;
-  if (c.contains("found-name")) return 1;
-  if (c.contains("label-dest")) return 2;
-  if (c.contains("label-selected")) return 3;
-  if (c.contains("label-marked")) return 4;
+  if (c.contains("chip") || c.contains("floor-badge") || c.contains("found-dot") || c.contains("walk-estimated")) return "marker";
+  if (c.contains("found-name")) return "found";
+  if (c.contains("label-dest")) return "destination";
+  if (c.contains("label-selected")) return "selected";
+  if (c.contains("label-marked")) return "here";
   const kind = (content as HTMLElement).dataset?.zoomKind ?? "";
-  if (kind.startsWith("poi-")) return content.querySelector(".poi-closed") ? 5 : kind === "poi-extinguisher" ? 10 : 7;
-  if (kind === "closed-tag") return 6;
-  if (kind === "thing") return c.contains("label-landmark") ? 8 : 9;
-  if (kind === "room" || kind === "area") return 8.5;
-  if (kind === "sub") return 11;
-  if (kind === "door") return 12;
-  return 8.5;
+  if (kind.startsWith("poi-")) return content.querySelector(".poi-closed") ? "closure" : kind === "poi-extinguisher" ? "furniture" : "poi";
+  if (kind === "closed-tag") return "closure";
+  if (kind === "thing") return c.contains("label-landmark") ? "landmark" : "machine";
+  if (kind === "area") return "zone";
+  if (kind === "sub" || kind === "door") return "detail";
+  return "room";
+}
+
+/** Priority of a map element (lower wins). */
+export function rankOf(content: Element): number {
+  return rankOfClass(classOf(content));
 }
 
 function touches(a: Box, b: Box): boolean {
-  return Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > TOUCH_PX && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > TOUCH_PX;
+  return blocked(a, b, true, HYSTERESIS);
 }
 
 const v = new THREE.Vector3();
+const target = new THREE.Vector3();
 
 /** Screen boxes (client px) of the markers drawn in three.js at a constant size on screen (markerLayout.tsx). */
 function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): { fixed: Box[]; taps: { obj: THREE.Object3D; boxes: Box[] }[] } {
@@ -119,6 +134,11 @@ export function Declutter() {
   const last = useRef(0);
   const pending = useRef<number | null>(null);
   const state = useThree((s) => s.get);
+  // Decision points: `dirty` is set by a change of the labels, the store or the canvas; the zoom and the camera
+  // (2D / 3D) are checked every frame. `settle` counts the frames left before the pass (labels and transforms update).
+  const dirty = useRef(true);
+  const settle = useRef(0);
+  const decided = useRef<{ mpp: number | null; camera: string; size: string }>({ mpp: null, camera: "", size: "" });
 
   useEffect(
     () => () => {
@@ -126,6 +146,49 @@ export function Declutter() {
     },
     [],
   );
+
+  // Labels added, removed or restyled (a new zoom bucket, floor, route, selection): drei mounts and unmounts its
+  // wrappers here, Labels.tsx changes their classes. Our own hiding (classes on the wrappers) does not count.
+  useEffect(() => {
+    const target = (events.connected as HTMLElement | undefined) ?? (gl.domElement.parentNode as HTMLElement | null);
+    if (!target) return;
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type === "attributes" && record.target.parentNode === target) continue; // a wrapper: ours
+        dirty.current = true;
+        invalidate();
+        return;
+      }
+    });
+    observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "data-label-class"] });
+    return () => observer.disconnect();
+  }, [events.connected, gl, invalidate]);
+
+  // The "you are here" spot, the route, the selection, the floor, the view, the building and the round.
+  useEffect(() => {
+    const mark = () => {
+      dirty.current = true;
+      invalidate();
+    };
+    const twin = useTwin.subscribe((now, before) => {
+      if (
+        now.state?.position !== before.state?.position ||
+        now.state?.route !== before.state?.route ||
+        now.selection !== before.selection ||
+        now.focusedFloorId !== before.focusedFloorId ||
+        now.viewMode !== before.viewMode ||
+        now.buildingKey !== before.buildingKey
+      )
+        mark();
+    });
+    const round = useRound.subscribe((now, before) => {
+      if (now.index !== before.index || now.guiding !== before.guiding || now.plan !== before.plan || now.returning !== before.returning) mark();
+    });
+    return () => {
+      twin();
+      round();
+    };
+  }, [invalidate]);
 
   const pass = () => {
     pending.current = null;
@@ -151,6 +214,7 @@ export function Declutter() {
       items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom } });
     }
     items.sort((a, b) => a.rank - b.rank || Number(b.shown) - Number(a.shown) || a.order - b.order);
+    const shownBefore = new Map(items.map((item) => [item, item.shown]));
     const { fixed, taps } = markerBoxes(scene, camera, rect);
     const kept = fixed;
     // The tap pin yields to the "You are here" dot and the route ends (zoomed out they can fall on one spot); the
@@ -165,7 +229,7 @@ export function Declutter() {
       }
     }
     for (const item of items) {
-      const hide = kept.some((other) => touches(item.box, other));
+      const hide = kept.some((other) => blocked(item.box, other, shownBefore.get(item)!, HYSTERESIS));
       if (!hide) kept.push(item.box);
       if (hide !== item.wrapper.classList.contains(HIDDEN)) {
         item.wrapper.classList.toggle(HIDDEN, hide);
@@ -174,11 +238,29 @@ export function Declutter() {
     }
   };
 
-  useFrame(() => {
+  useFrame(({ camera, size }) => {
     if (pending.current !== null) return;
-    const wait = Math.max(0, THROTTLE_MS - (performance.now() - last.current));
-    // after this frame's <Html> transforms are written; a trailing pass catches the last frame of a movement
-    pending.current = window.setTimeout(pass, wait);
+    if (settle.current > 0) {
+      // a decision is under way: one more frame so labels re-rendered for it (and their transforms) are on screen
+      settle.current--;
+      invalidate();
+      if (settle.current === 0) {
+        const wait = Math.max(0, THROTTLE_MS - (performance.now() - last.current));
+        pending.current = window.setTimeout(pass, wait); // after this frame's <Html> transforms are written
+      }
+      return;
+    }
+    const c = controlsRef.current;
+    const focus = c ? c.getTarget(target) : target.set(0, 0, 0);
+    const mpp = metresPerPixelOf(camera, size.width, size.height, focus);
+    const sizeKey = `${size.width}x${size.height}`;
+    const before = decided.current;
+    if (!dirty.current && before.camera === camera.uuid && before.size === sizeKey && !zoomStepChanged(mpp, before.mpp)) return; // pan, rotate: keep
+    dirty.current = false;
+    decided.current = { mpp, camera: camera.uuid, size: sizeKey };
+    labelDecision.epoch++;
+    settle.current = 2;
+    invalidate(); // phones render on demand
   });
   return null;
 }
