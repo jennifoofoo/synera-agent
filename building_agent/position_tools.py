@@ -149,6 +149,15 @@ def make_position_tools(bm: BuildingMap, state) -> list:
         return {**store(spaces[0], point, "device"), "device": items[0]["name"] if len(items) == 1 else said}
 
     @beta_tool
+    def clear_position() -> str:
+        """Forget where the person is: "I'm not there anymore", "forget my position", "vergiss meinen Standort".
+        Same as clearing the dot on the page; the guided walk from that place ends too. Afterwards say in a few
+        words that you forgot it; ask where they are only when a next step needs it."""
+        had = state.position is not None
+        state.position = state.walk = state.session = None
+        return as_json({"cleared": True, "had_position": had})
+
+    @beta_tool
     def get_position() -> str:
         """Where the person is according to the conversation: room, floor, how you learned it (said, click,
         device, route) and how many messages ago. Use it to name your assumption before a route or when the
@@ -186,4 +195,4 @@ def make_position_tools(bm: BuildingMap, state) -> list:
         except MapError as error:
             raise ToolError(str(error)) from error
 
-    return [set_position, get_position, find_nearest]
+    return [set_position, clear_position, get_position, find_nearest]

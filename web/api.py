@@ -383,10 +383,12 @@ def round_view(
     area: str = "",
     return_to_start: bool = False,
     step_free: bool = False,
+    start_point=None,
 ) -> dict:
     """The inspection round the page asks for, planned by the same plan_round the agent uses (same order and metres in
     chat and panel), drawn as a page route that carries its stops (state.route.round). `area` is a floor ("Ground
-    floor", "Level 1", a floor name), the whole building ("", "all") or a room area plan_round understands."""
+    floor", "Level 1", a floor name), the whole building ("", "all") or a room area plan_round understands. One stop
+    per device; `start_point` [x, y] is an exact start in the start room (the person's dot)."""
     from building_agent.round_tools import plan_round  # imported here: keeps the web module light to import
 
     bm = session.map
@@ -402,13 +404,16 @@ def round_view(
             if folded in names:
                 floor_level, said = floor["level"], ""
                 break
-    result = plan_round(bm, what, start, floor_level, said or None, return_to_start, step_free)
+    result = plan_round(bm, what, start, floor_level, said or None, return_to_start, step_free, start_point)
     if result.get("needs_choice"):
         return {"ok": False, **result}
-    info = bm.planned_round["info"]
-    stops = [stop["space_id"] for stop in info["stops"]]
-    via, destination = (stops, info["start"]) if return_to_start else (stops[:-1], stops[-1])
-    route = route_view(session, info["start"], destination, step_free, via)
+    planned = bm.planned_round
+    info = planned["info"]
+    via = planned["via"]
+    destination = info["start"] if return_to_start else info["stops"][-1]["space_id"]
+    route = route_view(
+        session, info["start"], destination, step_free, via, info["start_point"], planned["destination_point"]
+    )
     session.route_request["round"] = info
     return {"ok": True, **result, "info": info, "route": route}
 
