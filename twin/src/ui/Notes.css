@@ -1,6 +1,6 @@
 /* ===== Place notes and job report (owner: notes session). Base tokens from styles/tokens.css. ===== */
 
-/* the Notes button: bottom left, level with the Ask/Talk row */
+/* the Notes button: bottom left, level with the Ask/Talk row (desktop) */
 .notes-fab {
   position: absolute; left: 14px; bottom: 18px; z-index: 4;
   display: inline-flex; align-items: center; gap: 6px; height: 44px; min-height: 44px; padding: 0 14px 0 12px;
@@ -12,10 +12,11 @@
   min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: var(--signal); color: var(--signal-ink);
   font-size: 12px; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
 }
-.app.worker .notes-fab { left: calc(var(--safe-l, 0px) + 8px); bottom: calc(var(--safe-b, 0px) + 8px); }
-/* never on top of other things at the bottom: typing, the planner side sheet, the walking sheet's own bottom row */
-.app:has(.omnibox.expanded) .notes-fab,
-.app.walking.worker .notes-fab { display: none; }
+/* phone: just above the dock on the left, mirroring the recenter button on the right (the dock grows with its sheets) */
+.app.worker .notes-fab { left: calc(var(--safe-l, 0px) + 8px); bottom: calc(var(--dock-h, 90px) + var(--safe-b, 0px) + 12px); }
+@media (orientation: landscape) and (max-height: 500px) { .app.worker .notes-fab { bottom: calc(var(--safe-b, 0px) + 8px); } }
+/* never on top of the keyboard input */
+.app:has(.omnibox.expanded) .notes-fab { display: none; }
 @media (max-width: 760px) { .app.planner:has(.dock .card) .notes-fab { display: none; } }
 
 /* the small blue note badge (sheet title, guide card) */
@@ -36,13 +37,14 @@
 .note-author button + button { border-left: 1px solid var(--line); }
 .note-empty { margin: 10px 0 0; color: var(--ink-2); font-size: 14px; }
 
-.note-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 38vh; overflow-y: auto; }
+.note-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 38vh; overflow-y: auto; overflow-x: hidden; }
 .note-row { display: flex; gap: 10px; align-items: flex-start; }
 .note-row-body { flex: 1; min-width: 0; }
 .note-meta { font-size: 13px; color: var(--ink-2); }
 .note-meta strong { color: var(--ink); font-weight: 600; }
 .note-text { margin: 2px 0 0; font-size: 15px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
-.note-remove { flex: none; }
+.note-remove { flex: none; min-height: 28px; padding: 2px 4px; border: 0; background: transparent; font-size: 12.5px; color: var(--ink-2); }
+.note-remove.armed { color: var(--danger); font-weight: 600; }
 .note-thumb {
   flex: none; padding: 0; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--paper-2);
 }
@@ -97,7 +99,7 @@
   border-radius: 22px; border: 0; background: rgba(255, 255, 255, 0.92); font-size: 24px; color: var(--ink);
 }
 
-/* map pins (scene/NotePins.tsx): small, offset up and right of the point so the room name stays readable */
+/* map pins (scene/NotePins.tsx): small; room notes in the room's corner, machine notes just above the machine */
 .note-pin {
   position: relative; transform: translate(6px, -30px); display: inline-flex; align-items: center; gap: 3px;
   height: 22px; min-height: 22px; padding: 0 5px; border-radius: 4px; border: 1.5px solid var(--surface);
@@ -109,6 +111,9 @@
   border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--signal);
 }
 .note-pin:hover { background: var(--signal-dark); }
+.note-pin.corner { transform: none; }
+.note-pin.corner::after { display: none; }
+.note-pin.corner .note-pin-pop { bottom: 28px; left: auto; right: -8px; }
 .note-pin-pop {
   position: absolute; left: 0; bottom: 30px; width: 200px; padding: 8px; border-radius: var(--radius); text-align: left;
   background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float); color: var(--ink); font-weight: 400; cursor: default;
@@ -116,3 +121,4 @@
 .note-pin-pop img { display: block; width: 100%; height: 110px; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: 6px; }
 .note-pin-pop .note-text { font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .note-pin-pop .note-meta { font-size: 12px; }
+.note-meta .nowrap { white-space: nowrap; }

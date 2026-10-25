@@ -1,8 +1,9 @@
-// Note pins on the map (owner: notes session): one small blue tag per room with notes, offset up and right of the
-// note's point so the room name under it stays readable. Tap: the newest note with its photo; tap that: the list.
+// Note pins on the map (owner: notes session): one small blue tag per room with notes, in the room's top-right
+// corner so the centred room name stays readable (a machine note: just above the machine). Tap: the newest note with its photo; tap that: the list.
 
 import { useState } from "react";
 import { Html } from "@react-three/drei";
+import type { Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { whenLabel, type Note } from "../notes/notes";
 import { closeNotes, openNotes, useNotes } from "../notes/notesStore";
@@ -29,6 +30,28 @@ function Pop({ note, count, onOpen }: { note: Note; count: number; onOpen: () =>
   );
 }
 
+/** Room notes sit in the room's top-right corner (inset), away from the centred room name and the route pins. */
+function innerCorner(polygon: Point[], anchor: Point): Point {
+  if (polygon.length < 3) return anchor;
+  const xs = polygon.map((p) => p[0]);
+  const ys = polygon.map((p) => p[1]);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const inset = Math.min(1.4, (maxX - minX) * 0.2, (maxY - minY) * 0.2);
+  const corner: Point = [maxX - inset, maxY - inset];
+  // An L-shaped room may not contain its bounding-box corner: fall back to halfway between corner and anchor.
+  return inside(corner, polygon) ? corner : [(corner[0] + anchor[0]) / 2, (corner[1] + anchor[1]) / 2];
+}
+
+function inside(point: Point, polygon: Point[]): boolean {
+  let hit = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
 export function NotePins({ model, floorY, visibleFloors }: Props) {
   const notes = useNotes((s) => s.notes);
   const [open, setOpen] = useState<string | null>(null);
@@ -42,7 +65,8 @@ export function NotePins({ model, floorY, visibleFloors }: Props) {
       {[...bySpace].map(([spaceId, list]) => {
         const newest = list.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
         const space = model.spaceById.get(spaceId)!;
-        const point = newest.point ?? space.anchor;
+        const asset = newest.assetId ? model.assetById.get(newest.assetId) : undefined;
+        const point = asset ? asset.position : innerCorner(space.polygon, space.anchor);
         const show = () => {
           setOpen(null);
           closeNotes();
@@ -52,7 +76,7 @@ export function NotePins({ model, floorY, visibleFloors }: Props) {
         return (
           <Html key={spaceId} position={[point[0], floorY(space.floor_id) + 0.1, -point[1]]} center zIndexRange={[4, 0]}>
             <button
-              className="note-pin"
+              className={`note-pin ${asset ? "" : "corner"}`}
               aria-label={`${list.length} note${list.length > 1 ? "s" : ""} in ${space.name}`}
               onClick={(event) => {
                 event.stopPropagation();
