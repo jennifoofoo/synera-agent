@@ -1,6 +1,7 @@
 # Spec: Ortswissen mit Zeit ("Wanda merkt sich, was im Gebäude gerade gilt")
 
 Status: Entwurf, wartet auf Okay von Jennifer und Leonie. Ziel: Wow-Effekt bis Code-Freeze 13:00.
+Es gibt kein "nach dem Freeze": alles hier wird bis 13:00 gebaut oder gestrichen.
 Hintergrund: Leonies Servicetechniker-Story (Schichtübergabe, Wissen des Erfahrenen), Recherche Knowledge Graph (Graphiti-Zeitmodell, Brick/RealEstateCore), Jennifers Idee "Sperrungen mit Zeitraum".
 
 ## Ziel in einem Satz
@@ -66,7 +67,9 @@ Mit dieser Spec ist es ein zeitlicher Wissensgraph über das Gebäude, ohne Grap
 - **Kanten:** Fakt `hängt an` Raum/Gerät/Element; Fakt `löst ab` älteren Fakt; Fakt `gemeldet von` Person; vorhanden: Tür `verbindet` Räume, Gerät `steht in` Raum, Raum `liegt auf` Etage. Jede Fakt-Kante gilt **von bis**.
 - **Abfragen über Beziehungen** (vor dem Freeze): `facts_here` bzw. `GET /api/facts` filtern nach Status (offen/erledigt/abgelaufen), Gerätetyp oder Kategorie, Bereich/Zone/Etage/Raum, Person und Zeitraum. Beispiel: "alle offenen Probleme an Pumpen in Halle A diese Woche".
 - **Export** `GET /api/graph?key=…` als **JSON-LD** mit Typen aus **Brick Schema** und **RealEstateCore** (Zuordnungstabelle unserer `room_type`/Gerätetypen, z. B. `kitchen` → `rec:Kitchen`, `fire_extinguisher` → `brick:Fire_Extinguisher`, Unbekanntes als `rec:Room` bzw. `brick:Equipment`), Fakten mit `validFrom`/`validTo`, `resolves`, `reportedBy`. Für Video und Technik-Text: "Gebäude plus Menschenwissen, mit Zeit, im Gebäude-Standard."
-- **Vorbereitet, nach dem Freeze:** ein Fakt an mehreren Knoten (Feld `related: [ids]` im Datenmodell schon anlegen, Wanda füllt es noch nicht), Asset Administration Shell für Maschinen, Graphiti bei vielen Gebäuden.
+- **Fakt an mehreren Knoten** (`related: [ids]`): Wanda schlägt weitere betroffene Orte/Geräte vor ("betrifft auch Halle A2?"), die Karte listet alle Anker, gespeichert wird erst nach "Ja"; Pin am Hauptanker, die anderen Orte zeigen einen Verweis; "erledigt" an einem Ort löst den ganzen Fakt ab.
+- **Asset Administration Shell (Export):** pro Maschine ein AAS-Teilmodell "Nameplate" (Name, Typ, Kategorie, Ort: Raum, Etage, Gebäude) plus "OpenIssues" (jetzt gültige Probleme) im Graph-Export (`GET /api/graph?key=…&format=aas` oder als Teil des JSON-LD). Nur Daten, die wir haben, nichts erfunden.
+- **Kein Graphiti / keine Graph-DB:** das eigene Zeitmodell deckt "gültig von bis", Ablösen und Verlauf ab; eine Graph-Datenbank brächte nur Infrastruktur, keine Funktion.
 
 ## Aufteilung
 | Teil | Wer | Dateien |
