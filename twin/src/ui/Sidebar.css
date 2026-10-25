@@ -103,6 +103,7 @@
 /* empty: Wanda's welcome, the same words and chips as the welcome card on the map, set in the column */
 .sb-log-empty { justify-content: center; }
 .sb-welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 0 0 8vh; animation: sb-in var(--t-base) both; }
+.sb-welcome-fairy { margin: 0 0 10px -4px; } /* FairyFigure.tsx, Wanda above her greeting */
 .sb-welcome .welcome-title { font-size: var(--fs-28); text-wrap: balance; }
 .sb-welcome .welcome-sub { margin: 6px 0 18px; font-size: var(--fs-16); }
 .sb-welcome .welcome-chips { justify-content: flex-start; gap: 8px; }
