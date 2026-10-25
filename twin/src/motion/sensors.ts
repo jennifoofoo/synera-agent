@@ -26,16 +26,22 @@ function orientationCtor(): (WithPermission & object) | undefined {
     : undefined;
 }
 
-/** True when the browser wants an explicit permission tap (iOS Safari 13+). */
+/** Android (Chrome and other Chromium browsers): devicemotion needs no permission call there, only https. A
+ * requestPermission that a browser or a test harness adds must not block it. */
+function isAndroid(): boolean {
+  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || "");
+}
+
+/** True when the browser wants an explicit permission tap (iOS Safari 13+). Never on Android. */
 export function needsPermissionPrompt(): boolean {
-  return typeof motionCtor()?.requestPermission === "function";
+  return !isAndroid() && typeof motionCtor()?.requestPermission === "function";
 }
 
 /** What the sensors can do before start(): unsupported | needs-https | needs-permission | denied | ready. */
 export function motionSupport(): MotionStatus {
   if (!hasWindow() || !motionCtor()) return "unsupported";
   if (window.isSecureContext === false) return "needs-https";
-  if (granted === false) return "denied";
+  if (granted === false && !isAndroid()) return "denied";
   if (needsPermissionPrompt() && granted !== true) return "needs-permission";
   return "ready";
 }
@@ -46,7 +52,7 @@ export async function requestMotionPermission(): Promise<MotionStatus> {
   const before = motionSupport();
   if (before === "unsupported" || before === "needs-https") return before;
   const motion = motionCtor()?.requestPermission;
-  if (typeof motion !== "function") {
+  if (typeof motion !== "function" || !needsPermissionPrompt()) {
     granted = true;
     return "ready";
   }
