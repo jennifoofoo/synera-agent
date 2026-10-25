@@ -201,7 +201,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
       stopSpeaking();
       inputRef.current?.blur(); // the keyboard goes away, the reply card shows
       const reply = await ask(message, voice);
-      if (reply && voice && useTwin.getState().voiceOut) void speak(reply.reply, useTwin.getState().speechAvailable);
+      if (reply && useTwin.getState().voiceOut) void speak(reply.reply, useTwin.getState().speechAvailable);
       if (voice) followUpAfterSpeech(); // the mic opens again for a few seconds once Wanda has finished speaking
     },
     [ask],

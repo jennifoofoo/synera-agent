@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { speakIfOn } from "../voice";
 import { useCampus } from "../campus/campusStore";
 import { spaceGroup } from "../model/palette";
 import { useNotes } from "../notes/notesStore";
@@ -115,7 +116,7 @@ export function Welcome() {
               onWheel={(event) => document.querySelector("canvas")?.dispatchEvent(new WheelEvent("wheel", event.nativeEvent))}
               onClick={() => {
                 setPhase("leaving");
-                void useTwin.getState().ask(text);
+                void useTwin.getState().ask(text).then((reply) => speakIfOn(reply, useTwin.getState().voiceOut, useTwin.getState().speechAvailable));
               }}
             >
               {text}

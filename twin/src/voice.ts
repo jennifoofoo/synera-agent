@@ -373,3 +373,8 @@ if (typeof document !== "undefined") {
   // user gesture), the next tap while guiding takes it.
   document.addEventListener("pointerup", () => awakeReasons.size > 0 && !sentinel && void syncWakeLock(), true);
 }
+
+/** Read a typed or chip reply aloud when the speaker toggle is on (spoken questions are read out in Omnibox). */
+export function speakIfOn(reply: { reply: string } | null | undefined, voiceOut: boolean, speechAvailable: boolean): void {
+  if (reply && voiceOut) void speak(reply.reply, speechAvailable);
+}
