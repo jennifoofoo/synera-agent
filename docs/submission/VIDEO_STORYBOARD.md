@@ -31,6 +31,22 @@ The walk is on **floor 3** (team decision: no access to the ground floor). Floor
 
 Placeholders in the table below: **[N] / [X]** = **[N stops · X m]** as the panel shows it on shoot day. Floor 3 from the Main Stairs: **5 stops · 127.9 m** per room (round-per-device not merged), or **6 stops · 114.2 m** per device (round-per-device merged). Note in the edit which one the footage shows.
 
+## 1a. Visual plan as filmed (Sunday, replaces the picture column of §1 where they differ; VO unchanged)
+
+| Time | Picture | Sound |
+|---|---|---|
+| 0:00–0:33 | **Gisela at her desk with the laptop**, everyday: sits down, gloves next to her, coffee, scrolls the 3D twin. Close-ups of hands and face. "42 %" overlay at 0:17. | VO S01–S06 |
+| 0:33–0:48 | **Laptop screen full frame** (screen recording or Playwright): 3D twin of the Urban Colab, Round → Floor 3 → Main Stairs, route appears. At ~0:46 cut to camera: **she closes the laptop**, takes her phone. | VO S07–S08 |
+| 0:48–0:53 | Split screen. Main Stairs, she taps the orb. | Gisela: "Wanda, fire extinguisher round, third floor. I start at the main stairs. Guide me." |
+| 0:53–1:01 | **Time-lapse** to stop 1; at the extinguisher she takes a **photo** (Notes → Add photo → Save; a photo without text is allowed). | music |
+| 1:01–1:05 | **Cutaway, "where does the photo go":** the photo thumbnail flies (CapCut keyframes) from the phone half into the **laptop knowledge graph** of that room: new node "Gisela · photo · 10:42". The laptop shot is recorded afterwards (Playwright) and cut in; nothing claims it updates live. | caption "Saved to the building's knowledge graph: who, where, when" + a soft "ping" |
+| 1:05–1:14 | Real time, stop 2 (3.02): Wanda reads the night-shift note, their photo of the bracket fades in. | Wanda (real app audio) |
+| 1:14–1:22 | Time-lapse through the other stops, a photo at each one (the counter on the phone runs). Last stop: she dictates her tip. | Gisela: "This hose cracks every winter. Check it first." |
+| 1:22–1:28 | "Finished." → job report on the phone. | Gisela + Wanda |
+| 1:28–2:00 | As §1 (knowledge graph full with time slider, architecture, plan photo → twin, close). | VO S09–S13 |
+
+**Rule: complex views stay on the laptop.** The phone only shows what a technician needs while walking (map, stop, note card, camera, report). Storage and the knowledge graph are shown on the laptop, cut in as a cutaway: no cognitive overload on the phone, and it is how the product is meant (technician walks, planner looks).
+
 ## 1. Storyboard, second by second
 
 **Filming style: follow-me-around, not staged.** Two people, little time: one of you films Gisela handheld while she does her normal round; the problem part (0:00–0:33) is cut from that same footage. No props, no set-ups, no retakes for "acting".
