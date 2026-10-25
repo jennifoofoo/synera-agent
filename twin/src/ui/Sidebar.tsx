@@ -92,8 +92,8 @@ export function Sidebar({ walking, dock }: { walking: boolean; dock: ReactNode }
         </button>
       </header>
       <div className="sb-tools" role="toolbar" aria-label="Tools">
-        <Round />
-        <NotesButton />
+        <Round docked />
+        <NotesButton docked />
       </div>
       <ChatLog />
       {/* Cards slot: route, place, walk, round and notes cards sit here, right above the composer. */}

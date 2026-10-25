@@ -270,11 +270,9 @@ def test_route_flow(open_page):
     rail = box(page, ".floorrail")
     floors = page.evaluate("() => window.__twinStore.getState().model.floors.length")
     # Since phones may switch to 3D (commit 9fa7c5d) the rail always holds the 2D/3D toggle: on a one-floor building
-    # it is that one 44 px button and no floor buttons, never an empty box. The compass (and the tilt buttons in 3D,
-    # ui/Compass.tsx) sit at the end of the rail on every building and are not counted.
-    buttons = page.evaluate(
-        "() => document.querySelectorAll('.floorrail button:not(.rail-compass):not(.rail-tilt)').length"
-    )
+    # it is that one 44 px button and no floor buttons, never an empty box. The "…" button (north up, tilt; FloorRail.tsx)
+    # sits at the end of the rail on every building and is not counted.
+    buttons = page.evaluate("() => document.querySelectorAll('.floorrail button:not(.rail-more)').length")
     assert rail and rail["top"] >= top["bottom"] and rail["height"] >= 44, (
         f"floor rail {rail} under or squeezed by the directions sheet"
     )

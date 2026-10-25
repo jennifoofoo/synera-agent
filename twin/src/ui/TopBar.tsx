@@ -3,6 +3,7 @@ import { CampusBack } from "../campus/CampusBack";
 import { useCampus } from "../campus/campusStore";
 import { useTwin } from "../store";
 import { useNewBuilding } from "./newBuildingStore";
+import { usePlannerList } from "./Planner";
 
 /** Top left: the building's name; tapping it changes the building. Nothing else up here. */
 export function TopBar() {
@@ -13,6 +14,8 @@ export function TopBar() {
   const campuses = useCampus((s) => s.available);
   const campus = useCampus((s) => s.view);
   const campusMode = useCampus((s) => s.mode);
+  // Laptop: the list of rooms and things lives in this menu (Planner.tsx); the phone has no list.
+  const listable = useTwin((s) => s.profile === "planner" && !!s.model && !s.draft);
   const site = campusMode === "site" && campus?.loaded;
   // "new building" typed or spoken in the Omnibox (store.ask): the store cannot import newBuildingStore (cycle)
   useEffect(() => {
@@ -21,6 +24,7 @@ export function TopBar() {
     return () => window.removeEventListener("twin:new-building", onNew);
   }, []);
   const pick = (value: string) => {
+    if (value === "__list") return void usePlannerList.getState().setOpen(true);
     if (value === "__new") return void useNewBuilding.getState().open();
     if (value.startsWith(CAMPUS)) return void useCampus.getState().open(value.slice(CAMPUS.length));
     useCampus.getState().exit();
@@ -46,6 +50,7 @@ export function TopBar() {
               Campus: {campusLabel(entry, campus)}
             </option>
           ))}
+          {listable && <option value="__list">All rooms and things</option>}
           <option value="__new">New building…</option>
         </select>
       </label>

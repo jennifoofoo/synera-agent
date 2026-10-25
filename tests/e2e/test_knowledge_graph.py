@@ -1,6 +1,6 @@
 """Knowledge panel (twin/src/ui/KnowledgeGraph.tsx, docs/specs/knowledge-graph-view.md) in the browser against the real
 web server (fake chat, no key): facts seeded via POST /api/facts show up in the ego graph of their room, the time
-slider hides a note after its valid_to, the AAS link points to format=aas, and the panel fits a 390 px phone.
+the AAS link points to format=aas, and the panel fits a 390 px phone.
 
 Skips without Playwright, chromium, data/train or twin/dist.
 Run: scripts/build_twin.sh && uv run --group e2e pytest -m e2e tests/e2e/test_knowledge_graph.py
@@ -105,22 +105,8 @@ def test_panel_slider_and_aas(seeded, playwright_instance):
         assert page.locator('[data-testid=knowledge-svg] g[data-id$=":person:marta"]').count() == 1
         assert page.get_by_test_id("knowledge-room-type").inner_text() == "rec:ProductionRoom"
 
-        # two days ahead: the forklift note (valid until tomorrow) is gone, the lathe note stays
-        set_slider(page, 2 * DAY_MS)
-        page.wait_for_function(
-            "() => !document.querySelector('[data-testid=knowledge-facts]').innerText.includes('Forklift')"
-        )
-        assert node_shown(page, lathe) and not node_shown(page, forklift)
-        assert page.get_by_test_id("knowledge-time").inner_text() != "Now"
-        # "Show ended" brings it back, faded
-        page.get_by_text("Show ended").click()
-        assert page.locator(f'g.ended[data-id$=":fact:{forklift}"]').count() == 1
-        # two days back: nothing was said yet
-        page.get_by_text("Show ended").click()
-        set_slider(page, -2 * DAY_MS)
-        page.wait_for_function(
-            "() => document.querySelectorAll('[data-testid=knowledge-svg] g[data-id*=\":fact:\"]').length === 0"
-        )
+        # no time slider any more (too much for the demo, 25.10.2026): the panel shows now, "Show ended" adds ended notes
+        assert page.get_by_test_id("knowledge-slider").count() == 0
 
         link = page.get_by_test_id("knowledge-aas")
         href = link.get_attribute("href")

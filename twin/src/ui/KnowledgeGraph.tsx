@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { useNotes } from "../notes/notesStore";
 import { useTwin } from "../store";
-import { ASSET_R, DAY_MS, FACT_R, HOUR_MS, LINE_H, PERSON_R, ROOM_R, TYPE_H, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
+import { ASSET_R, DAY_MS, FACT_R, HOUR_MS, LINE_H, PERSON_R, ROOM_R, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
 import "./KnowledgeGraph.css";
 
 interface KnowledgeState {
@@ -65,7 +65,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
   const [now] = useState(() => Date.now());
   const [graph, setGraph] = useState<LdNode[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [at, setAt] = useState(now);
+  const at = now; // the panel shows now; "Show ended" brings back what has ended (no time slider: too much for a demo)
   const [showEnded, setShowEnded] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -92,7 +92,6 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
   }, []);
 
   const ego = useMemo(() => (graph ? egoGraph(graph, roomId, { at, showEnded, width }) : null), [graph, roomId, at, showEnded, width]);
-  const range = timeRange(ego?.oldest ?? null, now);
   const room = ego?.nodes[0];
   const facts = ego?.nodes.filter((node) => node.ring === 2) ?? [];
   const focused = ego?.nodes.find((node) => node.id === focus) ?? null;
@@ -153,33 +152,8 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
           )
         )}
       </div>
-      <div className="kg-time">
-        <div className="kg-time-row">
-          <span className="tiny-label">Time</span>
-          <strong data-testid="knowledge-time">{momentLabel(at, now)}</strong>
-          {Math.abs(at - now) >= HOUR_MS && (
-            <button type="button" className="link kg-link" onClick={() => setAt(now)}>
-              Back to now
-            </button>
-          )}
-        </div>
-        <input
-          type="range"
-          aria-label="Time"
-          data-testid="knowledge-slider"
-          min={range.min}
-          max={range.max}
-          step={HOUR_MS}
-          value={Math.min(Math.max(at, range.min), range.max)}
-          onChange={(event) => setAt(Number(event.target.value))}
-        />
-        <div className="kg-time-ends kg-muted">
-          <span>{momentLabel(range.min, now)}</span>
-          <span>+{Math.round((range.max - now) / DAY_MS)} days</span>
-        </div>
-      </div>
       <ol className="kg-facts" data-testid="knowledge-facts">
-        {facts.length === 0 && <li className="kg-muted">No notes here at this time.</li>}
+        {facts.length === 0 && <li className="kg-muted">No notes here right now.</li>}
         {facts.map((fact) => (
           <li key={fact.id} className={fact.state === "ended" ? "ended" : ""} data-kind={fact.role}>
             <span className={`kg-num ${fact.role}`}>{fact.number}</span>
@@ -222,20 +196,12 @@ function GraphNode({ node, focused, onFocus }: { node: EgoNode; focused: boolean
   const select = () => onFocus(focused ? null : node.id);
   const classes = ["kg-node", node.role, node.state === "ended" ? "ended" : "", focused ? "focused" : "", node.hasFacts ? "has-facts" : ""].join(" ");
   // Ring 1 labels sit beside the node on the outside (left of the left half, right of the right half), up to two lines,
-  // never cut; the small type line only where it matters (things with notes) or on focus.
+  // never cut. Only the name: the class (brick:...) is in the tooltip and the AAS export, not on the drawing.
   const right = node.side !== "left";
   const dx = right ? r + 5 : -(r + 5);
   const anchor = right ? "start" : "end";
-  const rows: Array<{ text: string; cls: string }> = (node.lines ?? []).map((text) => ({ text, cls: "kg-label" }));
-  if (node.ring === 1 && node.role !== "more" && (node.hasFacts || focused)) rows.push({ text: mainType(node.types), cls: "kg-type" });
-  const heights = rows.map((row) => (row.cls === "kg-type" ? TYPE_H : LINE_H));
-  const total = heights.reduce((sum, h) => sum + h, 0);
-  let cursor = -total / 2;
-  const placed = rows.map((row, i) => {
-    const y = cursor + heights[i] / 2;
-    cursor += heights[i];
-    return { ...row, y };
-  });
+  const lines = node.lines ?? [];
+  const placed = lines.map((text, i) => ({ text, cls: "kg-label", y: (i - (lines.length - 1) / 2) * LINE_H }));
   return (
     <g
       className={classes}

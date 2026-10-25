@@ -243,6 +243,7 @@ export async function openRound(type?: string, area?: string): Promise<void> {
   const building = useTwin.getState().building;
   // No type asked for: the panel opens with "What" empty (or the one chosen before), the person picks.
   const known = type ? building?.assets.find((asset) => typeMatches(asset, type))?.type : undefined;
+  useTwin.getState().dismissReply(); // one card at a time: an open reply does not stay under the panel
   useRound.setState({
     open: true,
     type: known ?? useRound.getState().type,
