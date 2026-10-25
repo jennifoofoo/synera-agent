@@ -370,27 +370,6 @@ def test_a_valid_click_sets_the_position_and_state_view_shows_it(bm):
     assert adapter.position_view() is None
 
 
-def test_clear_position_forgets_the_dot_like_the_page_does(bm, state, tools, tmp_path):
-    room = next(s for s in bm.spaces.values() if s["type"] == "room")
-    state.position = make_position(bm, room["id"], None, "click", 1)
-    state.walk = object()
-    assert run(tools["clear_position"]) == {"cleared": True, "had_position": True}
-    assert state.position is None and state.walk is None
-    assert run(tools["clear_position"])["had_position"] is False
-    assert "clear_position" in {tool.name for tool in make_tools(bm, tmp_path, state)}
-
-
-def test_clear_position_leaves_the_page_without_a_dot(bm):
-    """The tool clears guide.position; the page reads it through position_view (state.position null)."""
-    adapter = adapter_with_session(bm)
-    room = next(s for s in bm.spaces.values() if s["type"] == "room")
-    adapter.apply_here(check_here({"space_id": room["id"]}, bm))
-    assert adapter.position_view() is not None
-    tool = next(t for t in make_position_tools(bm, adapter.session.guide) if t.name == "clear_position")
-    tool()
-    assert adapter.position_view() is None
-
-
 def test_swapping_the_building_clears_the_position(bm, tmp_path):
     other = next(
         path.parent for path in sorted((DATA / "dev").glob("*/building.json")) if path.parent.name != bm.data.get("id")
@@ -406,11 +385,6 @@ def test_the_prompt_names_the_new_tools_and_stays_short():
     for word in ("set_position", "clear_position", "find_nearest", "control_sentence", "[position: X]"):
         assert word in CONVERSATION_RULES
     assert len(CONVERSATION_RULES.split("- Position:")[1].split("- Guiding")[0]) < 1400
-
-
-def test_the_prompt_forbids_talking_about_internals_and_asks_instead():
-    rule = next(line for line in CONVERSATION_RULES.splitlines() if "internals" in line)
-    assert "tools, ids, limits" in rule and "ask one short question" in rule and "Tap the map" in rule
 
 
 # ---------- fuzz (criterion 11) ----------

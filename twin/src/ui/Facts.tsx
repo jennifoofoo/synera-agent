@@ -167,6 +167,7 @@ export function NotesButton() {
           <path d="M12 3 21 8l-9 5-9-5z" />
           <path d="m3 12.5 9 5 9-5M3 16.5l9 5 9-5" />
         </svg>
+        <span>On map</span>
       </button>
     </div>
   );
@@ -179,7 +180,8 @@ function AuthorSwitch() {
   const [name, setName] = useState(author === DEFAULT_AUTHOR ? "" : author);
   // Free name, remembered on this device; empty signs as "Technician".
   return (
-    <div className="note-author">
+    <label className="note-author">
+      <span>Signed</span>
       <input
         value={name}
         onChange={(event) => {
@@ -189,9 +191,9 @@ function AuthorSwitch() {
         placeholder={DEFAULT_AUTHOR}
         aria-label="Notes by (your name)"
         autoComplete="name"
-        size={12}
+        size={10}
       />
-    </div>
+    </label>
   );
 }
 

@@ -176,6 +176,7 @@ def make_campus_tools(holder: CampusHolder, output_directory: Path, state: Guide
             step_free: True to avoid stairs and steps (wheelchair, pram, trolley), also on links and entrances.
             via: Optional places to visit in order before the destination.
         """
+        step_free = bool(step_free) or state.step_free  # the session's step-free mode wins over the argument
         try:
             route = router.route(stop(start, start_building), stop(destination, destination_building), step_free, via)
         except AmbiguousReference as error:

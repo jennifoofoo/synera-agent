@@ -91,3 +91,26 @@ export function createTwist(deadZoneDeg = 8) {
     },
   };
 }
+
+/** Option/Alt + swipe up on the 2D plan switches to 3D (docs/specs/swipe-tilt.md): mostly vertical upward scrolling
+ * (positive deltaY, the direction that tilts the 3D view) adds up within one gesture; past `thresholdPx` it switches.
+ * Such an event does not turn the plan ("tilting"); every other event rotates as before ("rotate"). */
+export const ORBIT_SWITCH_PX = 40;
+export function createOrbitSwitch(thresholdPx = ORBIT_SWITCH_PX) {
+  let sum = 0;
+  let last = -Infinity;
+  return {
+    step(deltaX: number, deltaY: number, timeStamp: number): "switch" | "tilting" | "rotate" {
+      if (timeStamp - last > GESTURE_GAP_MS || timeStamp < last) sum = 0;
+      last = timeStamp;
+      if (!(deltaY > 0 && deltaY > 2 * Math.abs(deltaX))) {
+        sum = 0;
+        return "rotate";
+      }
+      sum += deltaY;
+      if (sum < thresholdPx) return "tilting";
+      sum = 0;
+      return "switch";
+    },
+  };
+}

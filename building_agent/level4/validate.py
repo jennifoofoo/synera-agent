@@ -12,14 +12,16 @@ from shapely.strtree import STRtree
 
 from building_agent.entrance_distance import entrance_nodes
 from building_agent.level4.schema import Finding, Findings
+from building_agent.plausibility import (
+    LARGE_ROOM_TYPES,
+    MIN_AREA_M2,
+    PLAUSIBLE_AREA_M2,
+    PLAUSIBLE_DOOR_WIDTH_M,
+    PLAUSIBLE_FOOTPRINT_M,
+)
 from starter_agent.building_map import ADJACENT_DISTANCE_M, OUTSIDE, BuildingMap
 
-MIN_AREA_M2 = 1.0
-PLAUSIBLE_AREA_M2 = (2.0, 300.0)
-PLAUSIBLE_DOOR_WIDTH_M = (0.7, 2.5)
-PLAUSIBLE_FOOTPRINT_M = (4.0, 400.0)
 OVERLAP_SHARE = 0.25
-LARGE_ROOM_TYPES = {"hall", "outdoor", "corridor"}
 OUTER_WALL_TOLERANCE_M = 0.6
 OUTER_CLOSE_GAP_M = 0.3
 

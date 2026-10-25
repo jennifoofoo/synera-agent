@@ -20,6 +20,7 @@
 .walk-list .walk-num { flex: none; width: 22px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .walk-list button.now .walk-num { color: var(--walk-blue); }
 .phone-sheet.tall { max-height: 75vh; max-height: calc(var(--vvh, 100dvh) * 0.75); }
+.card-walk .walk-kicker { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .card-walk .walk-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 13px; }
 .card-walk .walk-foot .walk-toggle { margin: 0; }
 .worker .card-walk .walk-foot .walk-toggle { min-height: 44px; }

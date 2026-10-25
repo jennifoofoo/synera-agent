@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { controlsRef } from "./FloorMesh";
+import { wallHeightFor } from "./geometry";
 import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
@@ -293,6 +294,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const roundStopId = useRound((s) => (s.plan && s.guiding && !s.returning && s.plan.building === buildingKey ? (s.plan.stops[s.index]?.spaceId ?? null) : null));
   // What the last decision showed (keys `${kind}-${id}`), for the overlap hysteresis (labelRules.ts).
   const lastShown = useRef<ReadonlySet<string>>(new Set());
+  const wallTop = wallHeightFor(floor);
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number; kind: "end" | "start" | "here" | "selected" }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, kind: "end" | "start" | "here" | "selected", height = 0) => {
@@ -313,10 +315,12 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       // The tap pin: 2D above its crosshair, 3D above the head of its stalk. A selection without a spot keeps the
       // name on the room's anchor. A marker already in the room with a larger lift wins (put keeps the larger lift).
       if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, "selected", flat ? 0 : TAP_STALK_M);
-      else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0, "selected");
+      // In 3D the name stands at wall-top height, where the selection band paints the walls (Markers.tsx): on the
+      // floor the oblique view projects it onto the near wall, at the room's edge instead of its middle.
+      else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0, "selected", flat ? 0 : wallTop);
     }
     return out;
-  }, [route, state?.position, model, floor.id, selectedId, tapPoint, flat]);
+  }, [route, state?.position, model, floor.id, selectedId, tapPoint, flat, wallTop]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -666,9 +670,25 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
         data-label-class={labelClass}
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
-        {item.space.name}
+        <NameWithNumber name={item.space.name} />
       </div>
     </Html>
+  );
+}
+
+/** "Office 0.22" → the name, then the room number smaller and grey (the card keeps the plain name). */
+export function splitRoomNumber(name: string): [string, string] {
+  const match = /^(.*\S)\s+(\d+(?:\.\d+)+[a-z]?)$/i.exec(name.trim());
+  return match ? [match[1], match[2]] : [name, ""];
+}
+
+function NameWithNumber({ name }: { name: string }) {
+  const [text, number] = splitRoomNumber(name);
+  if (!number) return <>{name}</>;
+  return (
+    <>
+      {text} <span className="label-num">{number}</span>
+    </>
   );
 }
 
@@ -688,7 +708,11 @@ function PoiPin({ item, tier, labelClass }: { item: Extract<Item, { kind: "poi" 
   return (
     <div className={`poi-pin poi-pin-${item.poi} ${size === POI_DOT_PX ? "poi-pin-dot" : ""} zoom-fade`} data-zoom-kind={`poi-${item.poi}`} data-label-class={labelClass} data-poi-space={item.id}>
       <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
-      {text && <span className="label label-halo poi-pin-name">{text}</span>}
+      {text && (
+        <span className="label label-halo poi-pin-name">
+          <NameWithNumber name={text} />
+        </span>
+      )}
     </div>
   );
 }

@@ -17,6 +17,10 @@ import { useWalkMotion } from "../walkWithMe";
 import "./HerePin.css";
 import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, Pulse, ScreenSized, TAP_CROSS_PX, TAP_DOT_PX, TAP_RING_PX, TAP_RING_W_PX, TAP_STALK_M } from "./markerLayout";
 
+/** The estimate ring around the dot (px): 34, growing to at most 50 with the uncertainty. */
+const ESTIMATE_RING_PX = 34;
+const ESTIMATE_RING_MAX_PX = 50;
+
 function inPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -296,13 +300,17 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMot
 
   if (!position || !shownFloor) return null;
   const point = target ?? [0, 0];
+  const ringPx = Math.min(ESTIMATE_RING_MAX_PX, ESTIMATE_RING_PX + 4 * Math.max(0, uncertaintyM - 1));
   return (
     <group ref={groupRef} position={[point[0], floorY(position.floor_id), -point[1]]} name={estimate ? "walk-estimate" : "here-dot"}>
       {estimate && !drag && (
         <>
-          {/* soft uncertainty ring in metres: it grows with the distance walked since the last confirmation */}
-          <Disc radius={uncertaintyM} colour={colour} opacity={0.08} through y={0.04} />
-          <Ring radius={uncertaintyM} colour={colour} width={flat ? 0.12 : 0.08} opacity={0.35} through />
+          {/* soft "estimated" ring, constant size on screen like the dot (a ring in metres filled the phone screen once
+              the follow-cam came close); it grows a little with the uncertainty, never past ESTIMATE_RING_MAX_PX */}
+          <ScreenSized>
+            <Disc radius={ringPx} colour={colour} opacity={0.08} through y={0.04} />
+            <Ring radius={ringPx} colour={colour} width={2} opacity={0.35} through />
+          </ScreenSized>
           <Html position={[0, 0, 0]} center zIndexRange={[5, 0]} style={{ pointerEvents: "none" }}>
             <span className="walk-estimated">estimated</span>
           </Html>

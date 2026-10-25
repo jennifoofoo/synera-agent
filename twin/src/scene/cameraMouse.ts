@@ -1,8 +1,10 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
-import { createTwist, createWheelClassifier, orbitDelta } from "./wheelInput";
+import { useTwin, type ViewHandover } from "../store";
+import { classifyTwoFinger, distanceToOrthoZoom, FLAT_ENOUGH_POLAR, type FingerPair, HANDOVER_POLAR, type TwoFingerGesture, tiltForSwipe } from "./twoFinger";
+import { createOrbitSwitch, createTwist, createWheelClassifier, orbitDelta } from "./wheelInput";
 
 // Input model (like a map):
 //  - left button or one finger: grab the map and pan (the point under the pointer stays under the pointer, no damping)
@@ -11,6 +13,9 @@ import { createTwist, createWheelClassifier, orbitDelta } from "./wheelInput";
 //  - middle button: pan. Mouse wheel and pinch: zoom to the pointer. Two-finger trackpad swipe: pan.
 //  - Option/Alt + wheel or swipe: horizontal rotates, vertical tilts (3D). Safari two-finger twist: rotate.
 //    Which wheel event is which: wheelInput.ts.
+//  - 2D <-> 3D like Google Maps (docs/specs/swipe-tilt.md): two fingers pushed up together on the plan (twoFinger.ts
+//    decides, a pinch never tilts) or Option/Alt + swipe up switch to 3D at the same spot and scale and keep tilting.
+//    In 3D, two fingers down (or Option/Alt + swipe down, then a 300 ms pause) to nearly straight down go back to 2D.
 // camera-controls does rotate, touch and the animated moves; panning, the wheel and gestures are done here.
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
@@ -39,7 +44,26 @@ interface Pinch {
   target0: THREE.Vector3;
   zoom0: number;
   spread0: number;
+  /** Finger positions at the start, and what the two fingers do (decided once per touch, see twoFinger.ts). */
+  fingers0: FingerPair;
+  gesture: TwoFingerGesture;
 }
+
+/** Fingers that switched the plan to 3D: they keep tilting the new 3D view until they lift. Lives in a ref, because
+ * the switch makes a new camera and this hook's listeners are set up again in the middle of the touch. */
+interface TiltSession {
+  ids: [number, number];
+  pos: Map<number, [number, number]>;
+  y0: number;
+}
+
+/** Two fingers in 3D: at the release, a swipe down that left the view nearly straight down goes back to the plan. */
+interface TiltBack {
+  ids: [number, number];
+  fingers0: FingerPair;
+}
+
+const OPTION_BACK_PAUSE_MS = 300;
 
 interface Options {
   controls: RefObject<CameraControlsImpl>;
@@ -64,6 +88,7 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
   const gl = useThree((s) => s.gl);
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
+  const tiltSession = useRef<TiltSession | null>(null);
 
   useEffect(() => {
     const el = gl.domElement;
@@ -81,8 +106,30 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
     const scratch = new THREE.OrthographicCamera();
     let restoreLeft: CameraControlsImpl["mouseButtons"]["left"] | null = null;
     let down: [number, number] = [0, 0];
+    let back: TiltBack | null = null;
+    let backTimer: ReturnType<typeof setTimeout> | undefined;
+    const orbitSwitch = createOrbitSwitch();
     const usable = () => !(active && !active());
     el.style.cursor = "grab";
+
+    /** The current view for the other camera (2D <-> 3D): target, px per metre in the image centre, heading. */
+    const handoverFrom = (c: CameraControlsImpl): Omit<ViewHandover, "mode"> => {
+      const t = c.getTarget(new THREE.Vector3());
+      const cam = c.camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
+      const flat = !!cam.isOrthographicCamera;
+      const frameHeight = cam.view?.enabled ? cam.view.fullHeight : el.getBoundingClientRect().height;
+      return {
+        target: [t.x, t.y, t.z],
+        scale: flat ? cam.zoom : distanceToOrthoZoom(c.distance, frameHeight, cam.fov),
+        azimuth: c.azimuthAngle,
+        polar: flat ? HANDOVER_POLAR : 0,
+      };
+    };
+    const pairOf = (ids: readonly [number, number], pos: Map<number, [number, number]>): FingerPair | null => {
+      const a = pos.get(ids[0]);
+      const b = pos.get(ids[1]);
+      return a && b ? [a, b] : null;
+    };
 
     const ground = (cam: THREE.Camera, clientX: number, clientY: number, plane: THREE.Plane, out: THREE.Vector3): boolean => {
       const rect = el.getBoundingClientRect();
@@ -130,9 +177,26 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (action === "pan") return scrollPan(c, event.deltaX, event.deltaY);
       if (action === "orbit") {
         const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
-        const [azimuth, polar] = orbitDelta(event.deltaX * scale, event.deltaY * scale, isFlat(c));
+        const dx = event.deltaX * scale;
+        const dy = event.deltaY * scale;
+        const flat = isFlat(c);
+        clearTimeout(backTimer);
+        if (flat) {
+          if (useTwin.getState().viewMode !== "2d") return; // switched already, the 3D camera is on its way
+          const step = orbitSwitch.step(dx, dy, event.timeStamp);
+          if (step === "switch") useTwin.getState().tiltTo3d(handoverFrom(c));
+          if (step !== "rotate") return;
+        }
+        const [azimuth, polar] = orbitDelta(dx, dy, flat);
         void c.rotate(azimuth, polar, false);
         invalidate();
+        // 3D swiped down to nearly straight down: back to the plan once the swipe pauses.
+        if (!flat && dy < 0 && c.polarAngle < FLAT_ENOUGH_POLAR) {
+          backTimer = setTimeout(() => {
+            const now = controls.current;
+            if (now && !isFlat(now) && now.polarAngle < FLAT_ENOUGH_POLAR && usable()) useTwin.getState().tiltTo2d(handoverFrom(now));
+          }, OPTION_BACK_PAUSE_MS);
+        }
         return;
       }
       zoomBy(wheelUnits(event), event.clientX, event.clientY);
@@ -182,7 +246,20 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       snap.updateMatrixWorld(true);
       const p0 = new THREE.Vector3();
       if (spread < 8 || !ground(snap, x, y, plane, p0)) return;
-      pinch = { snap, plane, p0, target0, zoom0: snap.zoom, spread0: spread };
+      const [a, b] = [...fingers.values()];
+      pinch = { snap, plane, p0, target0, zoom0: snap.zoom, spread0: spread, fingers0: [[...a], [...b]], gesture: "undecided" };
+    };
+
+    /** Two fingers pushed up together on the plan: undo the little pinch so far and switch to 3D at the start view;
+     * the fingers then keep tilting (tiltSession) until they lift. */
+    const tiltUp = (c: CameraControlsImpl, p: Pinch) => {
+      void c.zoomTo(p.zoom0, false);
+      void c.moveTo(p.target0.x, p.target0.y, p.target0.z, false);
+      const ids = [...fingers.keys()] as [number, number];
+      const pos = new Map<number, [number, number]>([...fingers.entries()].map(([id, xy]) => [id, [xy[0], xy[1]]]));
+      tiltSession.current = { ids, pos, y0: midpoint()[1] };
+      pinch = null;
+      useTwin.getState().tiltTo3d(handoverFrom(c));
     };
 
     const onPointerDown = (event: PointerEvent) => {
@@ -192,8 +269,14 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (event.pointerType === "touch") {
         touches++;
         fingers.set(event.pointerId, [event.clientX, event.clientY]);
+        if (tiltSession.current && !tiltSession.current.pos.has(event.pointerId)) tiltSession.current = null; // a lost lift
         if (touches > 1) stopPan(); // two fingers: pinch on the 2D plan (below), the controls in 3D
         if (touches === 2 && controls.current && usable()) startPinch(controls.current);
+        back = null;
+        if (touches === 2 && fingers.size === 2 && controls.current && !isFlat(controls.current) && usable()) {
+          const [a, b] = [...fingers.values()];
+          back = { ids: [...fingers.keys()] as [number, number], fingers0: [[...a], [...b]] };
+        }
       }
       const c = controls.current;
       if (!c || !usable() || !event.isPrimary) return;
@@ -222,10 +305,27 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
     const onPointerMove = (event: PointerEvent) => {
       lastX = event.clientX;
       lastY = event.clientY;
+      const session = tiltSession.current;
+      if (session?.pos.has(event.pointerId)) {
+        // The fingers that switched to 3D keep tilting it (the new controls never saw them go down).
+        session.pos.set(event.pointerId, [event.clientX, event.clientY]);
+        const pair = pairOf(session.ids, session.pos);
+        const c = controls.current;
+        if (pair && c && !isFlat(c)) {
+          void c.rotatePolarTo(tiltForSwipe(session.y0 - (pair[0][1] + pair[1][1]) / 2, c.maxPolarAngle), false);
+          invalidate();
+        }
+        return;
+      }
       if (fingers.has(event.pointerId)) fingers.set(event.pointerId, [event.clientX, event.clientY]);
       if (pinch && fingers.has(event.pointerId) && fingers.size === 2) {
         const c = controls.current;
         if (!c || !c.enabled) return void (pinch = null);
+        if (pinch.gesture === "undecided") {
+          const [a, b] = [...fingers.values()];
+          pinch.gesture = classifyTwoFinger(pinch.fingers0, [a, b]);
+          if (pinch.gesture === "tilt-up" && usable()) return tiltUp(c, pinch);
+        }
         // Exact: the ground point under the midpoint at the start stays under the midpoint at the new zoom.
         const [x, y, spread] = midpoint();
         const zoom = THREE.MathUtils.clamp((pinch.zoom0 * spread) / pinch.spread0, c.minZoom, c.maxZoom);
@@ -257,6 +357,14 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (event.pointerType === "touch") touches = Math.max(0, touches - 1);
       if (pan && event.pointerId === pan.pointerId) stopPan();
       const c = controls.current;
+      if (tiltSession.current?.pos.has(event.pointerId)) tiltSession.current = null; // a finger lifted: tilting ends
+      if (back?.ids.includes(event.pointerId)) {
+        // Released after two fingers in 3D: a swipe down (not a pinch) that left the view nearly straight down.
+        const last = pairOf(back.ids, fingers);
+        const swipe = last ? classifyTwoFinger(back.fingers0, last) : "undecided";
+        back = null;
+        if (swipe === "tilt-down" && c && !isFlat(c) && c.polarAngle < FLAT_ENOUGH_POLAR && usable()) useTwin.getState().tiltTo2d(handoverFrom(c));
+      }
       if (fingers.delete(event.pointerId) && pinch) {
         pinch = null;
         // One finger left after a pinch: it goes on moving the map from where it is.
@@ -295,6 +403,7 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
     host.addEventListener("mousedown", onMouseDown, true);
     host.addEventListener("dblclick", onDouble);
     return () => {
+      clearTimeout(backTimer);
       el.style.cursor = "";
       host.removeEventListener("wheel", onWheel, true);
       host.removeEventListener("gesturestart", onGestureStart);

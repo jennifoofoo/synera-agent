@@ -1,0 +1,88 @@
+/* ===== Knowledge panel (KnowledgeGraph.tsx). Tokens only; Synera blue only for the room in the centre. */
+.kg-panel {
+  position: absolute; left: 12px; top: 56px; z-index: 6; width: min(440px, calc(100% - 24px));
+  max-height: calc(100% - 56px - var(--bottom-inset, 0px) - 24px); overflow: auto;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px;
+  background: var(--glass-strong); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-float); font-size: var(--fs-14); color: var(--ink);
+  animation: kg-in var(--t-base);
+}
+.kg-panel > * { flex: none; } /* the panel scrolls; nothing inside shrinks under the graph */
+@keyframes kg-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.kg-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.kg-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kg-title strong { font-size: var(--fs-16); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kg-muted { color: var(--ink-2); font-size: var(--fs-12); }
+.kg-graph { width: 100%; min-height: 120px; }
+.kg-graph svg { display: block; overflow: visible; }
+
+/* graph */
+.kg-edges line { stroke: var(--hairline-strong); stroke-width: 1; }
+.kg-edges line.faded { stroke-dasharray: 3 3; opacity: 0.6; }
+.kg-node { cursor: pointer; outline: none; }
+.kg-node .kg-hit { fill: transparent; stroke: none; }
+.kg-node > circle:not(.kg-hit), .kg-node > rect { fill: var(--surface); stroke: var(--ink-2); stroke-width: 1.25; }
+.kg-node.room > circle:not(.kg-hit) { fill: var(--signal); stroke: var(--surface); stroke-width: 3; }
+.kg-node.door > circle:not(.kg-hit), .kg-node.connector > circle:not(.kg-hit) { fill: var(--paper-2); stroke: var(--hairline-strong); }
+.kg-node.asset.has-facts > circle:not(.kg-hit), .kg-node.door.has-facts > circle:not(.kg-hit) { stroke: var(--ink); stroke-width: 2; }
+.kg-node.more > circle:not(.kg-hit) { fill: var(--paper-2); stroke: none; }
+.kg-node.note > rect { fill: var(--surface); stroke: var(--ink); }
+.kg-node.issue > rect { fill: var(--ink); stroke: var(--ink); }
+.kg-node.closure > rect { fill: var(--surface); stroke: var(--danger); stroke-width: 2; }
+.kg-node .kg-bar { stroke: var(--danger); stroke-width: 2; }
+.kg-node.person > circle:not(.kg-hit) { fill: var(--paper-2); stroke: var(--ink-2); }
+.kg-node.ended { opacity: 0.35; }
+.kg-node.focused > circle:not(.kg-hit), .kg-node.focused > rect, .kg-node:focus-visible > circle:not(.kg-hit), .kg-node:focus-visible > rect {
+  stroke: var(--ink); stroke-width: 2.5;
+}
+.kg-node text { font-family: var(--font); text-anchor: middle; pointer-events: none; }
+.kg-label { font-size: 11px; font-weight: 500; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.kg-type { font-size: 9.5px; fill: var(--ink-2); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.kg-num-text { font-size: 10px; font-weight: 600; fill: var(--ink); }
+.kg-node.issue .kg-num-text { fill: var(--surface); }
+.kg-initial { font-size: 11px; font-weight: 600; fill: var(--ink); }
+.kg-more-text { font-size: 11px; font-weight: 600; fill: var(--ink-2); }
+
+/* type of the tapped node: the "real graph" signal */
+.kg-focus { display: flex; align-items: center; gap: 8px; min-height: 24px; min-width: 0; }
+.kg-focus-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-12); }
+.kg-tag {
+  flex: none; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--paper-2); color: var(--ink);
+  font-size: var(--fs-12); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0;
+}
+
+/* time slider */
+.kg-time { display: flex; flex-direction: column; gap: 4px; }
+.kg-time-row { display: flex; align-items: baseline; gap: 8px; }
+.kg-time-row strong { font-size: var(--fs-14); font-weight: 600; }
+.kg-time input[type="range"] { width: 100%; accent-color: var(--ink); margin: 2px 0; }
+.kg-time-ends { display: flex; justify-content: space-between; }
+.kg-panel button.link, .kg-link {
+  border: 0; background: transparent; padding: 0; min-height: 0; color: var(--ink); font-size: var(--fs-12); font-weight: 500;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.kg-time-row .kg-link { margin-left: auto; }
+
+/* fact list, numbers match the graph */
+.kg-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.kg-facts li { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.35; }
+.kg-facts li.ended { opacity: 0.45; }
+.kg-num {
+  flex: none; width: 20px; height: 20px; display: inline-grid; place-items: center; border-radius: 4px;
+  border: 1.25px solid var(--ink); font-size: 11px; font-weight: 600;
+}
+.kg-num.issue { background: var(--ink); color: var(--surface); border-radius: 50%; }
+.kg-num.closure { border-color: var(--danger); color: var(--danger); border-radius: 50%; }
+.kg-fact-text { min-width: 0; overflow-wrap: anywhere; }
+.kg-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px solid var(--hairline); }
+.kg-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-12); color: var(--ink-2); }
+
+/* phone: a bottom sheet over the input */
+.kg-panel.kg-sheet {
+  position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; z-index: 30;
+  max-height: calc(var(--vvh, 100dvh) * 0.78); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 12px max(14px, var(--safe-r, 0px)) calc(14px + var(--safe-b, 0px)) max(14px, var(--safe-l, 0px));
+  box-shadow: 0 -4px 24px rgba(29, 36, 48, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) { .kg-panel { animation: none; } }

@@ -52,6 +52,8 @@ export const api = {
       step_free: !!options.stepFree,
     }),
   clearRoute: (building: string) => postJson<{ state: BuildingState }>("/api/route/clear", { building }),
+  setStepFree: (building: string, enabled: boolean) =>
+    postJson<{ state: BuildingState }>("/api/step_free", { building, enabled }),
   close: (building: string, element: string, closed: boolean) =>
     postJson<{ element: string; closed: boolean; state: BuildingState }>("/api/close", { building, element, closed }),
   addDoor: (building: string, first: string, second: string, stepFree = true) =>

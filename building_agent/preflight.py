@@ -4,6 +4,7 @@ Used by scripts/preflight.py. Each check yields Findings (OK / WARN / FAIL, one 
 
 import itertools
 import json
+import math
 import time
 import traceback
 from dataclasses import asdict, dataclass, field
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from shapely.geometry import Point, Polygon
 
+from building_agent import plausibility as limits
 from building_agent.entrance_distance import distances_to_exit
 from building_agent.registry import load_kinds
 from building_agent.submission import QUESTION_FILES, load_questions
@@ -206,6 +208,88 @@ def _frame_finding(bm: BuildingMap, polygons: dict[str, Polygon]) -> Finding:
         WARN,
         f"source '{source}' is not in {sorted(STACKED_SOURCES)}: room_stacked will refuse ({note})",
     )
+
+
+# ---------- 2b. plausibility ----------
+
+
+def _number(value) -> float:
+    """value as float, nan when missing or not numeric (bool counts as not numeric)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return math.nan
+    return float(value)
+
+
+def _outside(value: float, bounds: tuple[float, float]) -> bool:
+    """True for nan, inf, zero, negative and anything outside bounds."""
+    return not (math.isfinite(value) and value > 0 and bounds[0] <= value <= bounds[1])
+
+
+def _polygon_area(space: dict) -> float:
+    explicit = space.get("area_m2")
+    if explicit is not None:
+        return _number(explicit)
+    try:
+        coords = [(float(x), float(y)) for x, y in space["polygon"]]
+        if not all(math.isfinite(v) for point in coords for v in point):
+            return math.nan
+        return Polygon(coords).buffer(0).area if len(coords) >= 3 else 0.0
+    except Exception:  # noqa: BLE001 - unusable outline is reported by check_geometry
+        return math.nan
+
+
+def check_plausibility(bm: BuildingMap) -> list[Finding]:
+    """WARN (never FAIL, never a change to the data) for dimensions that look wrong: door widths, room areas,
+    stair/lift rise and length, asset footprints. Limits live in building_agent/plausibility.py."""
+    out: list[Finding] = []
+
+    doors = []
+    for opening_id, opening in bm.openings.items():
+        bounds = (
+            limits.PREFLIGHT_DOOR_WIDTH_M if opening.get("kind") == "door" else limits.PREFLIGHT_WIDE_OPENING_WIDTH_M
+        )
+        if _outside(_number(opening.get("width_m")), bounds):
+            doors.append(opening_id)
+    rooms = []
+    for space_id, space in bm.spaces.items():
+        bounds = (
+            limits.PREFLIGHT_LARGE_AREA_M2 if space.get("type") in limits.LARGE_ROOM_TYPES else limits.PREFLIGHT_AREA_M2
+        )
+        if _outside(_polygon_area(space), bounds):
+            rooms.append(space_id)
+    vertical = []
+    elevations = {fid: _number(f.get("elevation_m")) for fid, f in bm.floors.items()}
+    for connector_id, connector in bm.connectors.items():
+        stops = sorted(
+            (
+                (_number(bm.floors[f].get("level")), elevations[f])
+                for f in connector.get("floor_ids", [])
+                if f in bm.floors
+            ),
+            key=lambda v: (math.isnan(v[0]), v[0]),
+        )
+        # rise per level, so a stop that skips floors (express stairs) is not mistaken for a tall storey
+        rises = [(hb - ha) / (lb - la) if lb != la else math.nan for (la, ha), (lb, hb) in itertools.pairwise(stops)]
+        if any(_outside(r, limits.PREFLIGHT_STOREY_RISE_M) for r in rises):
+            vertical.append(connector_id)
+    assets = []
+    for asset_id, asset in bm.assets.items():
+        footprint = asset.get("footprint") or {}
+        sides = (_number(footprint.get("width_m")), _number(footprint.get("depth_m")))
+        if any(_outside(side, limits.PREFLIGHT_ASSET_SIDE_M) for side in sides):
+            assets.append(asset_id)
+
+    for label, ids, text in (
+        ("door widths", doors, "openings with an implausible width_m (nan, 0, negative or out of range)"),
+        ("room areas", rooms, "spaces with an implausible area (nan, 0, negative or out of range)"),
+        ("stairs/lifts", vertical, "stairs/lifts with an implausible storey rise, so an implausible length"),
+        ("asset footprints", assets, "assets with an implausible footprint width/depth"),
+    ):
+        if ids:
+            out.append(_f("plausibility", WARN, f"{len(ids)} {text}", ids))
+        else:
+            out.append(_f("plausibility", OK, f"{label} plausible"))
+    return out
 
 
 # ---------- 3. graph ----------
@@ -450,6 +534,7 @@ def run(directory: Path, data_root: Path | None = None) -> list[Finding]:
         bm = BuildingMap.load(directory)
         steps = (
             lambda: check_geometry(bm),
+            lambda: check_plausibility(bm),
             lambda: check_graph(bm, directory, data_root),
             lambda: check_kinds(directory, bm),
         )

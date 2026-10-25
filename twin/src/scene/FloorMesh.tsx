@@ -5,7 +5,7 @@ import type { FloorModel, BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { tapMap } from "../tapAnswer";
-import { buildFloorGeometry, openingEditsOf, withCutaway } from "./geometry";
+import { buildFloorGeometry, openingEditsOf, roomBehindWall, withCutaway } from "./geometry";
 
 interface Props {
   floor: FloorModel;
@@ -140,21 +140,31 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
     if (ghost || !event.face) return;
     event.stopPropagation();
     const index = built.spaceIndexOf(event.face.a);
-    const space = floor.spaces[index];
+    let space = floor.spaces[index];
     if (!space) return;
     const native = event.nativeEvent;
     const screen: [number, number] = [native.clientX, native.clientY];
-    const point: [number, number] = [Math.round(event.point.x * 100) / 100, Math.round(-event.point.z * 100) / 100];
+    let point: [number, number] = [Math.round(event.point.x * 100) / 100, Math.round(-event.point.z * 100) / 100];
+    // The spot of the tap pin. A tap on a wall (3D) has none: its hit point is the room's edge and the wall may belong
+    // to the neighbour, so it selects the room behind the face without a pin (its name stands in the middle of the
+    // room at wall-top height, Labels.tsx; a pin on the floor would stand behind the near wall, at the room's edge).
+    let spot: [number, number] | undefined = point;
+    if (!flat && built.isWall(event.face.a)) {
+      const { normal } = event.face;
+      const ray = event.ray.direction;
+      ({ space, point } = roomBehindWall(floor.spaces, space, point, [normal.x, normal.y, normal.z], [ray.x, ray.y, ray.z]));
+      spot = undefined;
+    }
     if (native.shiftKey) {
       select({ kind: "point", id: `${space.id}@${point.join(",")}`, floor_id: floor.id, space_id: space.id, point }, screen);
       return;
     }
     const connector = model.connectorBySpace.get(space.id);
     if (connector) {
-      select({ kind: "connector", id: connector.id, floor_id: floor.id, space_id: space.id, point }, screen);
+      select({ kind: "connector", id: connector.id, floor_id: floor.id, space_id: space.id, point: spot }, screen);
       return;
     }
-    select({ kind: "space", id: space.id, floor_id: floor.id, point }, screen);
+    select({ kind: "space", id: space.id, floor_id: floor.id, point: spot }, screen);
   };
 
   return (

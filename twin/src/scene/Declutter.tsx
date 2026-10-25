@@ -22,7 +22,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useTwin } from "../store";
 import { useRound } from "../round/round";
-import { blocked, rankOfClass, ZOOM_MARGIN, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
+import { blocked, capped, rankOfClass, ZOOM_MARGIN, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
 import { metresPerPixelOf } from "./mapZoom";
 import { controlsRef } from "./FloorMesh";
 import { frameSize, HERE_RIM_PX, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_RING_PX, TAP_STALK_M } from "./markerLayout";
@@ -159,6 +159,39 @@ function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): {
   return { fixed, taps };
 }
 
+function union(rects: DOMRect[]): Box | null {
+  let box: Box | null = null;
+  for (const r of rects) {
+    if (r.width < 1 || r.height < 1) continue;
+    box = box ? { x0: Math.min(box.x0, r.left), y0: Math.min(box.y0, r.top), x1: Math.max(box.x1, r.right), y1: Math.max(box.y1, r.bottom) } : { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom };
+  }
+  return box;
+}
+
+/** Screen box of a map element. A symbol counts with the name beside it ("Lift 0.18"), which sits outside the
+ * badge's own box, so two named symbols side by side are seen as overlapping. */
+function contentBox(content: HTMLElement): Box | null {
+  const kind = content.dataset.zoomKind ?? "";
+  if (!kind.startsWith("poi-")) return union([content.getBoundingClientRect()]);
+  const badge = content.firstElementChild;
+  const name = content.querySelector(".poi-pin-name");
+  return union([badge, name].filter((el): el is Element => !!el).map((el) => el.getBoundingClientRect()));
+}
+
+/** Floating UI over the map; a label under it is hidden. */
+const CHROME = ".dock, .floorrail, .topbar, .round-toggle, .round-panel, .notes-fab-row, .recenter, .pill, .phone-search";
+
+function chromeBoxes(): Box[] {
+  const boxes: Box[] = [];
+  for (const el of Array.from(document.querySelectorAll(CHROME))) {
+    if (getComputedStyle(el).visibility === "hidden") continue;
+    // The dock is one box from its first to its last panel (card, the gap, the Wanda bar), not its padding.
+    const box = union(el.classList.contains("dock") ? Array.from(el.children).map((c) => c.getBoundingClientRect()) : [el.getBoundingClientRect()]);
+    if (box) boxes.push(box);
+  }
+  return boxes;
+}
+
 /** Mounted once inside the Canvas. */
 export function Declutter() {
   const gl = useThree((s) => s.gl);
@@ -231,7 +264,7 @@ export function Declutter() {
   const measure = () => {
     // drei <Html> appends its wrappers here (Html.js: events.connected || gl.domElement.parentNode)
     const target = (events.connected as HTMLElement | undefined) ?? (gl.domElement.parentNode as HTMLElement | null);
-    const items: { wrapper: HTMLElement; rank: number; shown: boolean; order: number; box: Box }[] = [];
+    const items: { wrapper: HTMLElement; rank: number; quiet: boolean; shown: boolean; order: number; box: Box }[] = [];
     if (!target) return items;
     let order = 0;
     for (const child of Array.from(target.children)) {
@@ -239,13 +272,13 @@ export function Declutter() {
       if (wrapper === gl.domElement || !wrapper.style.transform.includes("translate3d")) continue;
       const content = wrapper.firstElementChild?.firstElementChild as HTMLElement | null | undefined;
       if (!content) continue;
+      // The "estimated" tag belongs to the walk dot (it sits on the dot's rim): never hidden, never in the way.
+      if (content.classList.contains("walk-estimated")) continue;
       order++;
       if (wrapper.style.display === "none" || content.style.visibility === "hidden") continue; // behind the camera, culled
-      const kind = content.dataset.zoomKind ?? "";
-      const measured = (kind.startsWith("poi-") && content.firstElementChild) || content;
-      const r = measured.getBoundingClientRect();
-      if (r.width < 1 || r.height < 1) continue;
-      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom } });
+      const box = contentBox(content);
+      if (!box) continue;
+      items.push({ wrapper, rank: rankOf(content), quiet: capped(classOf(content) as LabelClass), shown: !wrapper.classList.contains(HIDDEN), order, box });
     }
     items.sort((a, b) => a.rank - b.rank || Number(b.shown) - Number(a.shown) || a.order - b.order);
     return items;
@@ -264,7 +297,9 @@ export function Declutter() {
     last.current = performance.now();
     const { scene, camera } = state();
     const rect = gl.domElement.getBoundingClientRect();
-    const items = measure().map((item) => ({ ...item, box: grown(item.box) }));
+    // Task labels (selected, destination, here, found ...) keep their true size: they sit right above their own
+    // marker by design, and the zoom margin would make them touch it and vanish.
+    const items = measure().map((item) => ({ ...item, box: item.quiet ? grown(item.box) : item.box }));
     const shownBefore = new Map(items.map((item) => [item, item.shown]));
     const markers = markerBoxes(scene, camera, rect);
     const fixed = markers.fixed.map(grown);
@@ -281,8 +316,14 @@ export function Declutter() {
         invalidate(); // phones render on demand
       }
     }
+    // Labels under the floating chrome (card, Wanda bar and the gap between them, rail, buttons) are hidden too:
+    // nothing peeks out between two panels.
+    // What the task names (selected, destination, here, found, round stop, the estimate chip ...) is never hidden by
+    // the chrome: if it really sits under a panel it is covered anyway.
+    const chrome = chromeBoxes();
     for (const item of items) {
-      const hide = kept.some((other) => blocked(item.box, other, shownBefore.get(item)!, HYSTERESIS));
+      const underChrome = item.quiet && chrome.some((other) => blocked(item.box, other, shownBefore.get(item)!, HYSTERESIS));
+      const hide = underChrome || kept.some((other) => blocked(item.box, other, shownBefore.get(item)!, HYSTERESIS));
       if (!hide) kept.push(item.box);
       fade(item.wrapper, false); // a decision starts from a clear map: no pair touches
       if (hide !== item.wrapper.classList.contains(HIDDEN)) {
@@ -344,6 +385,15 @@ export function Declutter() {
     settle.current = 2;
     invalidate(); // phones render on demand
   };
+
+  // A card opening or closing changes which labels it covers without moving the camera (phones render on demand).
+  useEffect(() => {
+    const dock = document.querySelector(".dock");
+    if (!dock || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => invalidate());
+    observer.observe(dock);
+    return () => observer.disconnect();
+  }, [invalidate]);
 
   useFrame(() => {
     if (pending.current !== null) return;

@@ -38,7 +38,12 @@ export function KeyHelp() {
   if (!open) return null;
   const rooms = roomColours();
   return (
-    <div className="keyhelp" role="dialog" aria-label="Keyboard and mouse help" onPointerDown={() => setOpen(false)}>
+    <>
+    <div className="keyhelp-backdrop" onPointerDown={() => setOpen(false)} aria-hidden />
+    <div className="keyhelp" role="dialog" aria-label="Keyboard and mouse help">
+      <button type="button" className="x keyhelp-close" aria-label="Close help" onClick={() => setOpen(false)}>
+        ×
+      </button>
       <h2>Controls</h2>
       <table>
         <tbody>
@@ -98,7 +103,8 @@ export function KeyHelp() {
           </ul>
         </>
       )}
-      <p>Press any key to close</p>
+      <p>Press any key or click outside to close</p>
     </div>
+    </>
   );
 }

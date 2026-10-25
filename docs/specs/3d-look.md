@@ -8,6 +8,7 @@ Die 3D-Ansicht soll wie ein ruhiges Architekturmodell wirken (Referenzen: Archil
 2. **Licht:** weiches Sonnenlicht mit Schatten (eine gerichtete Lichtquelle, Schattenkarte nur in 3D, Qualität nach `PerformanceMonitor`), Umgebungslicht über eine HDRI (drei `Environment`, leichtes Preset), Tonemapping sauber, keine dunklen Ecken.
 3. **Boden:** Bodenplatten mit Dicke (Kante sichtbar), Raumfarben wie in `palette.ts`; um das Gebäude eine ruhige Fläche: sehr blasses Raster, das mit der Entfernung ausblendet, **kein Punkteraster bis zum Horizont**.
 4. **Möbel nach Typ** (instanziert, ein Mesh pro Typ): Tisch (Platte + Beine), Stuhl, Regal, Schrank, Maschine (Block mit Fase und dunklerer Oberseite), Drucker, Sofa, Bett, Küchenzeile; alles andere als abgerundeter Block. Höhe nach Typ. Farbe neutral, leicht nach Kategorie.
+   Stand: Die Daten haben keine Höhen. Jedes Ding ist ein niedriger Körper mit Standardhöhe nach Typ (`twin/src/model/assetHeights.ts`: Palette 0,15 m, Tisch 0,75 m, Regale höchstens 1,2 m, sonst 0,3 m), Maschinen 1,9 m. Bodenmarkierungen bleiben flach und haben den Walkway-Farbton.
 5. **Aufräumen:** keine doppelten Schatten, Geisterbild-Test (`tests/e2e/test_twin_ghost.py`) bleibt grün (die Ursache war die Nachbearbeitung).
 
 ## Grenzen

@@ -8,6 +8,7 @@ import { useTwin } from "../store";
 import { useCameraKeys } from "./cameraKeys";
 import { useCameraMouse } from "./cameraMouse";
 import { controlsRef, cutawayUniforms } from "./FloorMesh";
+import { orthoZoomToDistance } from "./twoFinger";
 
 interface Props {
   model: BuildingModel;
@@ -107,7 +108,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const routeKey = route?.ok ? `${route.start}|${route.destination}|${route.length_m}` : null;
   useEffect(() => {
     const c = controls.current;
-    if (!c || !routeKey || !directionsOpen || !route?.segments) return;
+    if (!c || !routeKey || !directionsOpen || !route?.segments || useTwin.getState().viewHandover) return;
     const box = new THREE.Box3();
     for (const segment of route.segments) {
       if (flat && segment.floor_id !== focusedFloorId) continue;
@@ -166,7 +167,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   // label layout in Labels.tsx assumes it too). Q/E and a right drag may still turn it, Home turns it back.
   useEffect(() => {
     const c = controls.current;
-    if (!c || !flat || !focusedFloorId) return;
+    // A gesture switch keeps the view instead (viewHandover, applied below).
+    if (!c || !flat || !focusedFloorId || useTwin.getState().viewHandover) return;
     const floor = model.floorById.get(focusedFloorId);
     if (!floor) return;
     const y = floorY(floor.id);
@@ -201,7 +203,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   // every request ends with invalidate() (the transition then keeps requesting frames through the controls).
   useEffect(() => {
     const c = controls.current;
-    if (!c || !request.nonce) return;
+    // The new camera after a gesture switch keeps the view: the last request is not framed again.
+    if (!c || !request.nonce || useTwin.getState().viewHandover) return;
     const animate = !reducedMotion;
     const box = new THREE.Box3();
     const kick = () => setTimeout(invalidate, 0);
@@ -280,6 +283,40 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // The viewport size is a dependency on purpose: a request made while the canvas was hidden or being resized
     // (campus overlay, phone rotation) is framed again once the real size is known.
   }, [request.nonce, floorMode, camera, viewport.width, viewport.height]);
+
+  // A gesture switched 2D <-> 3D (store.tiltTo3d / tiltTo2d): the new controls take over the old view without
+  // animation, same target, same scale in the image centre, same heading. Runs after the effects above, which skip
+  // their framing while a handover is pending. The button and key T set no handover and behave as before.
+  useEffect(() => {
+    const c = controls.current;
+    const handover = useTwin.getState().viewHandover;
+    if (!c || !handover) return;
+    if (handover.mode !== viewMode) {
+      useTwin.setState({ viewHandover: null });
+      return;
+    }
+    const cam = c.camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
+    if (cam !== camera || !!cam.isOrthographicCamera !== flat) {
+      // The new default camera is not there yet. Never leave a handover behind: it would block the framing above.
+      const stale = setTimeout(() => {
+        if (useTwin.getState().viewHandover === handover) useTwin.setState({ viewHandover: null });
+      }, 1000);
+      return () => clearTimeout(stale);
+    }
+    useTwin.setState({ viewHandover: null });
+    const [x, y, z] = handover.target;
+    void c.moveTo(x, y, z, false);
+    if (flat) {
+      void c.rotateTo(handover.azimuth, PLAN_TILT, false);
+      void c.zoomTo(handover.scale, false);
+    } else {
+      const frameHeight = cam.view?.enabled ? cam.view.fullHeight : viewport.height;
+      void c.rotateTo(handover.azimuth, Math.max(handover.polar, c.minPolarAngle), false);
+      void c.dollyTo(orthoZoomToDistance(handover.scale, frameHeight, cam.fov), false);
+    }
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flat, camera]);
 
   // Test hooks (read only use): the store, the controls and a frame counter, for the Playwright measurements.
   useEffect(() => {
