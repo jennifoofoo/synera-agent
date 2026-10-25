@@ -21,9 +21,9 @@ export default function Effects({ quality }: { quality: number }) {
   });
   return (
     <EffectComposer ref={composer} multisampling={0} enableNormalPass={false}>
-      <N8AO aoRadius={2.2} intensity={1.8} distanceFalloff={1.2} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color(COLOURS.edge)} />
+      <N8AO aoRadius={1.4} intensity={1.1} distanceFalloff={1.0} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color(COLOURS.aoTint)} />
       <SMAA />
-      <Vignette eskil={false} offset={0.3} darkness={0.22} />
+      <Vignette eskil={false} offset={0.35} darkness={0.1} />
     </EffectComposer>
   );
 }

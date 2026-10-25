@@ -16,12 +16,12 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .worker { --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-l: env(safe-area-inset-left, 0px); --safe-r: env(safe-area-inset-right, 0px); --head-y: calc(var(--safe-t) + 8px); }
 .phone-search {
   position: absolute; top: var(--head-y); z-index: 4; width: 44px; height: 44px; min-height: 44px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-sm);
-  background: var(--surface); border: 1px solid var(--line);
+  display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-pill);
+  background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
 }
 .phone-search { right: calc(var(--safe-r) + 8px); }
 .worker .topbar { top: var(--head-y); left: calc(var(--safe-l) + 60px); right: calc(var(--safe-r) + 60px); display: flex; justify-content: center; }
-.worker .building-name { height: 44px; max-width: 100%; padding: 0 12px; font-size: 16px; }
+.worker .building-name { height: 44px; max-width: 100%; padding: 0 16px; font-size: var(--fs-16); border-radius: var(--radius-pill); }
 .worker .building-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .worker .building-name select { font-size: 16px; }
 .worker .pill { top: calc(var(--head-y) + 52px); right: calc(var(--safe-r) + 8px); }
@@ -60,7 +60,7 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .worker .dock:has(> .phone-sheet) { padding-bottom: 0; }
 .worker .dock > .phone-sheet {
   order: 2; margin: 0 calc(-8px - var(--safe-r)) 0 calc(-8px - var(--safe-l));
-  border-radius: 12px 12px 0 0; border-width: 1px 0 0; padding-bottom: var(--safe-b);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-bottom: var(--safe-b);
 }
 .keyboard-open .worker .dock { padding-bottom: 8px; }
 .keyboard-open .worker .dock > .phone-sheet { display: none; }
@@ -77,16 +77,18 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 
 /* the sheet */
 .phone-sheet {
-  position: relative; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08); overflow: hidden;
+  position: relative; border-radius: var(--radius-lg); background: var(--glass-strong); border: 0;
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2);
+  box-shadow: 0 -4px 24px rgba(29, 36, 48, 0.12); overflow: hidden;
   max-height: 45vh; max-height: calc(var(--vvh, 100dvh) * 0.45);
-  display: flex; flex-direction: column; animation: phone-sheet-in 150ms ease-out;
+  display: flex; flex-direction: column; animation: phone-sheet-in var(--t-base);
 }
-.phone-sheet.dragging { transition: none; }
-.phone-sheet:not(.dragging) { transition: transform 150ms ease-out; }
+/* while the sheet is dragged the blur is off (it is re-blurred every frame otherwise) */
+.phone-sheet.dragging { transition: none; -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--surface); }
+.phone-sheet:not(.dragging) { transition: transform var(--t-base); }
 .phone-sheet .sheet-grip { flex: none; height: 26px; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: grab; }
 .phone-sheet .sheet-handle { width: 64px; min-height: 26px; height: 26px; padding: 0; border: 0; background: transparent; position: relative; }
-.phone-sheet .sheet-handle::after { content: ""; position: absolute; left: 14px; right: 14px; top: 10px; height: 3px; border-radius: 1px; background: var(--hairline-strong); }
+.phone-sheet .sheet-handle::after { content: ""; position: absolute; left: 14px; right: 14px; top: 10px; height: 4px; border-radius: 2px; background: var(--hairline-strong); }
 .phone-sheet .sheet-body { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
 /* the card inside the sheet: the sheet is the surface */
 .phone-sheet .card { background: transparent; border: 0; box-shadow: none; padding: 0 14px 12px; border-radius: 0; }
@@ -97,7 +99,7 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 
 /* touch screens: no sticky hover, tooltips are not the only label */
 @media (hover: none) {
-  .worker button:hover { background: var(--surface); }
+  .worker button:hover { background: var(--paper-2); }
   .worker button.active:hover { background: var(--signal-soft); }
   .worker .rail-floor.active:hover { background: var(--ink); }
 }
@@ -105,7 +107,7 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 /* phone on its side: input bottom right, narrower, the sheet may use more of the short screen */
 @media (orientation: landscape) and (max-height: 520px) {
   .worker .dock { left: auto; width: min(460px, 58vw); }
-  .worker .dock > .phone-sheet { margin-left: 0; border-radius: 12px 0 0 0; border-left-width: 1px; }
+  .worker .dock > .phone-sheet { margin-left: 0; border-radius: var(--radius-lg) 0 0 0; }
   .worker .floorrail { max-height: calc(var(--vvh, 100dvh) - var(--head-y) - 56px - var(--safe-b) - 8px); }
   /* the dock fills the right column, so the floors go to the free left edge, below the route pill */
   :root .app.worker .floorrail, :root .app.worker.directions-open .floorrail {
@@ -123,11 +125,11 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 }
 
 /* the tapped room's name on the plan (Labels.tsx keeps it and drops labels that would sit on the room) */
-.worker .label.label-selected { font-weight: 650; }
+.worker .label.label-selected { font-weight: 600; }
 
 /* safe areas (viewport-fit=cover): in landscape the notch / Dynamic Island sits on the left or right edge.
    Everything on the phone reads the --safe-* variables, so tests can simulate a notch by setting them. */
-:root .app.worker.flat .pill { left: calc(var(--safe-l) + 8px); }
+:root .app.worker .pill { left: calc(var(--safe-l) + 8px); }
 :root .app.worker .recenter { right: calc(var(--safe-r) + 14px); }
 :root .app.worker .directions {
   padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) 10px calc(var(--safe-l) + 14px);

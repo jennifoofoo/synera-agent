@@ -15,9 +15,9 @@ const temp = new THREE.Object3D();
 const colour = new THREE.Color();
 
 /** 2D plan shapes: one quiet grey just darker than the floor; fainter while a route is shown, landmarks stronger. */
-const PLAN_THING = "#c3c0b9";
-const PLAN_THING_FAINT = "#cac8c2";
-const PLAN_LANDMARK = "#8f8a80";
+const PLAN_THING = COLOURS.planThing;
+const PLAN_THING_FAINT = COLOURS.planThingFaint;
+const PLAN_LANDMARK = COLOURS.planLandmark;
 /** 2D: things are thin slabs, so they never cover the route, pins or labels drawn above the floor. */
 const PLAN_HEIGHT = 0.06;
 
@@ -115,10 +115,10 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
     <group position-y={y}>
       {/* key: the material type changes between 2D (unlit, exact plan colour) and 3D (lit) */}
       <instancedMesh key={flat ? "plan" : "solid"} ref={mesh} args={[unitBox, undefined, capacity]} onClick={onClick} frustumCulled={false}>
-        {flat ? <meshBasicMaterial /> : <meshStandardMaterial roughness={0.8} metalness={0.05} />}
+        {flat ? <meshBasicMaterial /> : <meshStandardMaterial roughness={0.9} metalness={0.0} />}
       </instancedMesh>
       <instancedMesh ref={outline} args={[unitBox, undefined, capacity]} frustumCulled={false} raycast={() => null}>
-        <meshBasicMaterial color={COLOURS.thingEdge} side={THREE.BackSide} transparent opacity={0.6} />
+        <meshBasicMaterial color={COLOURS.thingEdge} side={THREE.BackSide} transparent opacity={0.45} />
       </instancedMesh>
     </group>
   );

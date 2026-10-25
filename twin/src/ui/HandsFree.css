@@ -2,9 +2,9 @@
 .hf-btn {
   --hf-blue: var(--signal);
   display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0;
-  color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  color: var(--text); background: var(--paper-2); border: 0;
 }
-.hf-btn.on { background: var(--hf-blue); border-color: var(--hf-blue); color: #fff; }
+.hf-btn.on { background: var(--hf-blue); color: #fff; }
 .hf-btn.on.heard { animation: hf-pulse 1.5s ease-out infinite; }
 @keyframes hf-pulse {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--hf-blue) 45%, transparent); }
@@ -35,6 +35,6 @@
 
 /* next to the omnibox buttons: the status as a small pill above them, right-aligned like the buttons */
 .ob-hf-status {
-  align-self: flex-end; padding: 4px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
+  align-self: flex-end; padding: 4px 12px; border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-soft);
 }
 .omnibox.expanded .ob-hf-status { align-self: center; }

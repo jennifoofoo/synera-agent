@@ -15,7 +15,7 @@ import { Disc, Ring } from "./Markers";
 import { markHereHintSeen } from "../ui/HereChip";
 import { useWalkMotion } from "../walkWithMe";
 import "./HerePin.css";
-import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, ScreenSized } from "./markerLayout";
+import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, Pulse, ScreenSized } from "./markerLayout";
 
 function inPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
@@ -96,6 +96,8 @@ interface DotProps {
   visibleFloors: Set<string>;
   flat: boolean;
   reducedMotion: boolean;
+  /** Phones render on demand: no breathing halo there (it would keep the frame loop alive). */
+  worker?: boolean;
   colour: string;
 }
 
@@ -106,7 +108,7 @@ interface Drag {
 
 /** The "You are here" dot. Pointer down on it, move over the floor, release: the new spot is set like "I'm here".
  * The one-time "drag to correct" hint lives in the HereChip bar, off the map. */
-export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMotion }: DotProps) {
+export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMotion, worker = false }: DotProps) {
   const known = useTwin((s) => s.state?.position ?? null);
   // Walk with me: the dot shows the step estimate instead (local only, never written to state.position).
   const estimate = useWalkMotion((s) => s.estimate);
@@ -304,7 +306,9 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMot
       )}
       {/* the map-app blue dot: constant size on screen, white rim, a calm accuracy halo, no text */}
       <ScreenSized>
-        <Disc radius={HERE_HALO_PX} colour={colour} opacity={0.16} through />
+        <Pulse reducedMotion={reducedMotion || worker} amount={0.3} speed={1}>
+          <Disc radius={HERE_HALO_PX} colour={colour} opacity={0.16} through />
+        </Pulse>
         <Disc radius={HERE_RIM_PX} colour="#ffffff" opacity={1} through y={0.08} order={30} />
         <Disc radius={HERE_CORE_PX} colour={colour} opacity={1} through y={0.1} order={31} />
       </ScreenSized>
