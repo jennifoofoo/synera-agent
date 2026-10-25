@@ -253,3 +253,13 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 - Damit ist auch `check.sh` auf main wieder grün (deine 3 Urban-Colab-Tool-Skripte sind formatiert, nur Format/Imports).
 - Offene Punkte aus der Review (nicht blockierend): im Chat-Guiding kann „how far“ die gezeichnete Route statt der Leg-Länge lesen; `state.route.via` fasst aufeinanderfolgende Stopps im selben Raum zusammen.
 - Als Nächstes: `feat/mucl-all-floors` (3. + 4. OG, 2. OG kommt) — wir drehen im 3. OG.
+
+## Jennifer an Leonie (Sonntag ~10:44): Tipps fürs Demo-Video
+Aus einem UI-Check mit Screenshots (Vorschau 8815, Laptop und iPhone, Urban Colab). Diese Stellen beim Dreh umgehen:
+- **Nicht von "Main Stairs" starten.** Die Treppe gibt es auf beiden Etagen, Wanda fragt zurück und zeichnet keine Route. Eindeutigen Start nehmen, z. B. "from the Project Room West to the Café".
+- **Nicht die Kaffee-Frage aus den Vorschlägen.** Die Antwort beginnt mit "There's no coffee machine" und klingt unsicher. Nächste Toilette oder nächster Ausgang wirken stärker.
+- **Handy: Begrüßungskarte vor der Aufnahme schließen.** Der dritte Vorschlag ist dort abgeschnitten.
+- **Laptop: Runde erst nach einer Frage öffnen.** Solange der Chat die Begrüßung zeigt, liegt das Runden-Panel halb über dem Text.
+- **Notizenliste nur kurz zeigen.** Viele Einträge sind von "Someone", das wirkt wie Testdaten.
+- **Bei hervorgehobenen Zielen nicht ganz reinzoomen.** Die Füllfarbe wirkt aus der Nähe matt.
+- Handy-Sheet: bei Rückfragen erscheint manchmal ein Meta-Satz wie "I'll ask which one." Wenn er im Bild ist, die Szene neu aufnehmen.
