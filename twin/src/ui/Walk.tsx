@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
-import { honestLine, toggleWalkWithMe, useWalkMotion } from "../walkWithMe";
+import { acceptWalkWithMeHint, declineWalkWithMeHint, honestLine, toggleWalkWithMe, useWalkMotion, walkWithMeAvailable } from "../walkWithMe";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import { RoundBar } from "./Round";
@@ -64,6 +64,7 @@ export function Walk() {
   const motionOn = useWalkMotion((s) => s.on);
   const estimate = useWalkMotion((s) => s.estimate);
   const motionNotice = useWalkMotion((s) => s.notice);
+  const motionAnswered = useWalkMotion((s) => s.answered);
   const line = step !== null ? honestLine(readable(walkSteps()[step] ?? "")) : "";
   const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
@@ -121,6 +122,20 @@ export function Walk() {
           <p aria-live="polite">{steps[step]}</p>
         </div>
         <HandsFreeStatus />
+        {/* Asked once, at the start of the guide, on phones that have the sensors; the answer is remembered. */}
+        {step === 0 && !motionOn && !motionAnswered && walkWithMeAvailable() && (
+          <div className="walk-hint" role="group" aria-label="Walk with me hint">
+            <p>Walk with me? I'll move along as you walk.</p>
+            <div className="walk-hint-actions">
+              <button className="link" onClick={declineWalkWithMeHint}>
+                Not now
+              </button>
+              <button className="primary" onClick={() => void acceptWalkWithMeHint()}>
+                Turn on
+              </button>
+            </div>
+          </div>
+        )}
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back
