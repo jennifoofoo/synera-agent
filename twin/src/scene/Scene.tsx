@@ -9,6 +9,7 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
+import { FloorRise } from "./FloorRise";
 import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
@@ -58,12 +59,12 @@ function Building({ model }: { model: BuildingModel }) {
         const visible = visibleFloors.has(floor.id);
         const showThings = visible && thingsMode !== "off" && (thingsMode === "all" || isFocused);
         return (
-          <group key={floor.id}>
+          <FloorRise key={floor.id} active={visible} y={floorY(floor.id)}>
             <FloorMesh floor={floor} model={model} y={floorY(floor.id)} ghost={false} visible={visible} />
             {roles.get(floor.id) === "outline" && <FloorOutline floor={floor} y={floorY(floor.id)} />}
             {showThings && <Things floor={floor} y={floorY(floor.id)} state={state} limit={thingsMode === "all" ? ALL_THINGS_LIMIT : NEAR_THINGS_LIMIT} flat={flat} />}
             {isFocused && visible && <Labels floor={floor} model={model} y={floorY(floor.id)} limit={flat ? (worker ? 30 : 80) : worker ? 14 : 36} flat={flat} />}
-          </group>
+          </FloorRise>
         );
       })}
       {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
