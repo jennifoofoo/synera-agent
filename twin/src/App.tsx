@@ -5,6 +5,7 @@ import { Scene } from "./scene/Scene";
 import { installHandsFree } from "./handsFree";
 import { useTwin } from "./store";
 import { Card } from "./ui/Card";
+import { TiltHint } from "./ui/Compass";
 import { ChangesPill } from "./ui/ChangesPill";
 import { FloorRail } from "./ui/FloorRail";
 import { KeyHelp } from "./ui/KeyHelp";
@@ -54,6 +55,7 @@ export function App() {
       </div>
       <NewBuilding />
       <KeyHelp />
+      <TiltHint />
       {loading && <div className="overlay">Loading {building?.name ?? "building"}…</div>}
       {error && <div className="overlay error">{error}</div>}
     </div>

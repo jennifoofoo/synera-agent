@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import { controlsRef } from "./FloorMesh";
 import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
@@ -474,7 +476,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       ))}
       {shown.map((item) =>
         item.kind === "room" ? (
-          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} y={y + 0.5} />
         ) : item.kind === "area" ? (
           <Html key={item.id} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[2, 0]} style={{ pointerEvents: "none" }}>
             <div className={`label label-halo label-area ${flat ? "label-plan" : ""} zoom-fade`} data-zoom-kind="area" data-area-rooms={item.area.space_ids.length}>
@@ -527,7 +529,27 @@ export function ClosedGlyph() {
   );
 }
 
-function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean }) {
+/** 3D: a room name further from the camera than this many times the orbit distance is hidden (the far side of a
+ * tilted view, near the horizon, where names pile up). Marked and selected rooms always keep theirs. */
+const FAR_LABEL = 1.3;
+
+function RoomLabel({ item, mark, flat, selected, y }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean; y: number }) {
+  const div = useRef<HTMLDivElement>(null);
+  const cull = !flat && !mark && !selected;
+  useFrame(({ camera }) => {
+    const el = div.current;
+    const c = controlsRef.current;
+    if (!el) return;
+    let hide = false;
+    if (cull && c) {
+      const dx = camera.position.x - item.point[0];
+      const dy = camera.position.y - y;
+      const dz = camera.position.z + item.point[1];
+      hide = Math.hypot(dx, dy, dz) > c.distance * FAR_LABEL;
+    }
+    const want = hide ? "hidden" : "";
+    if (el.style.visibility !== want) el.style.visibility = want;
+  });
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
@@ -536,6 +558,7 @@ function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind:
       style={{ pointerEvents: "none" }}
     >
       <div
+        ref={div}
         className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"
