@@ -296,7 +296,13 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       return;
     }
     const cam = c.camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
-    if (cam !== camera || !!cam.isOrthographicCamera !== flat) return; // the new default camera is not there yet
+    if (cam !== camera || !!cam.isOrthographicCamera !== flat) {
+      // The new default camera is not there yet. Never leave a handover behind: it would block the framing above.
+      const stale = setTimeout(() => {
+        if (useTwin.getState().viewHandover === handover) useTwin.setState({ viewHandover: null });
+      }, 1000);
+      return () => clearTimeout(stale);
+    }
     useTwin.setState({ viewHandover: null });
     const [x, y, z] = handover.target;
     void c.moveTo(x, y, z, false);
