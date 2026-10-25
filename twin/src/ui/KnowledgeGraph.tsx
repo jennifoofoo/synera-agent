@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
+import { useNotes } from "../notes/notesStore";
 import { useTwin } from "../store";
 import { ASSET_R, DAY_MS, FACT_R, HOUR_MS, LINE_H, PERSON_R, ROOM_R, TYPE_H, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
 import "./KnowledgeGraph.css";
@@ -26,8 +27,12 @@ export function closeKnowledge(): void {
   useKnowledge.setState({ roomId: null });
 }
 
-/** The entry in the room card. */
+/** The entry in the room card: for the planner on a laptop (never the technician's phone), and only for a room that
+ * has at least one note or issue (now or in its history), else there is nothing to show. */
 export function KnowledgeButton({ roomId }: { roomId: string }) {
+  const planner = useTwin((s) => s.profile === "planner");
+  const hasNotes = useNotes((s) => s.notes.some((note) => note.kind !== "closure" && note.anchor.space_id === roomId));
+  if (!planner || !hasNotes) return null;
   return (
     <button type="button" data-testid="knowledge-open" onClick={() => openKnowledge(roomId)}>
       Knowledge
