@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Billboard, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
@@ -14,6 +14,8 @@ import { PIN_HEAD_PX, PIN_HEAD_Y_PX, Pulse, START_DOT_PX, ScreenSized } from "./
  * route end's label at the same height. */
 export const LIFT = 0.15;
 const DRAW_IN_S = 1.4;
+/** The chaos moment: when the route changes, the old line dissolves for this long before the new one draws in. */
+const DISSOLVE_S = 0.3;
 /** Route line width on screen (px), 2D and 3D, and its white casing on each side. */
 const LINE_PX = 6;
 const LINE_PX_3D = 5.5;
@@ -116,15 +118,41 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
   const line = useRef<Line2>(null);
   const flow = useRef<Line2>(null);
   const started = useRef(0);
+  // The previous line, kept as a ghost while it dissolves (only when the route itself changed, not on a floor switch).
+  const [ghost, setGhost] = useState<THREE.Vector3[] | null>(null);
+  const ghostStarted = useRef(0);
+  const ghostRefs = [useRef<Line2>(null), useRef<Line2>(null), useRef<Line2>(null)];
+  const previous = useRef<{ points: THREE.Vector3[]; onlyFloor: string | null } | null>(null);
   useEffect(() => {
-    started.current = performance.now();
-  }, [points]);
+    const before = previous.current;
+    previous.current = points.length >= 2 ? { points, onlyFloor } : null;
+    const dissolve = !reducedMotion && !!before && before.points !== points && before.onlyFloor === onlyFloor && points.length >= 2;
+    if (dissolve && before) {
+      ghostStarted.current = performance.now();
+      setGhost(before.points);
+    } else {
+      setGhost(null);
+    }
+    started.current = performance.now() + (dissolve ? DISSOLVE_S * 1000 : 0);
+  }, [points, onlyFloor, reducedMotion]);
 
   const guided = !!legPoints;
   // The flow keeps asking for frames; on a phone (frameloop "demand") only while guiding, never under reduced motion.
   const flowOn = !reducedMotion && (!worker || guided);
+  const guidedRef = useRef(false);
+  guidedRef.current = guided;
   useFrame(({ invalidate }, delta) => {
-    const drawn = reducedMotion ? 1 : Math.min(1, (performance.now() - started.current) / 1000 / DRAW_IN_S);
+    if (ghost) {
+      const t = Math.min(1, (performance.now() - ghostStarted.current) / 1000 / DISSOLVE_S);
+      const bases = [guidedRef.current ? HALO_OPACITY * 0.5 : HALO_OPACITY, guidedRef.current ? 0.6 : 1, guidedRef.current ? 0.35 : 1];
+      ghostRefs.forEach((ref, i) => {
+        const material = ref.current?.material as THREE.ShaderMaterial | undefined;
+        if (material) material.opacity = bases[i] * (1 - t);
+      });
+      if (t >= 1) setGhost(null);
+      else invalidate();
+    }
+    const drawn = reducedMotion ? 1 : Math.min(1, Math.max(0, performance.now() - started.current) / 1000 / DRAW_IN_S);
     if (drawn < 1) invalidate(); // keeps the draw-in moving under frameloop="demand", then stops
     for (const ref of [halo, casing, line]) {
       const material = ref.current?.material as (THREE.ShaderMaterial & { dashOffset: number }) | undefined;
@@ -161,6 +189,13 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
   const depth = depthOf(flat);
   return (
     <group>
+      {ghost && (
+        <>
+          <Line ref={ghostRefs[0]} points={ghost} color={lineColour} lineWidth={lineWidth + 2 * HALO_PX} transparent opacity={guided ? HALO_OPACITY * 0.5 : HALO_OPACITY} {...depth} renderOrder={18} />
+          <Line ref={ghostRefs[1]} points={ghost} color={COLOURS.routeGlow} lineWidth={casingWidth} transparent opacity={guided ? 0.6 : 1} {...depth} renderOrder={18} />
+          <Line ref={ghostRefs[2]} points={ghost} color={lineColour} lineWidth={lineWidth} transparent opacity={guided ? 0.35 : 1} {...depth} renderOrder={18} />
+        </>
+      )}
       {/* halo: the same line, wide and faint, drawn in with the route (normal blending: additive would vanish on white) */}
       <Line
         ref={halo}
@@ -228,7 +263,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       {/* the destination in map-app red (its own colour token), only on the floor where the route ends */}
       {endsHere && (
         <group position={points[points.length - 1]} name="route-end">
-          <DestinationPin key={`${route.start}|${route.destination}`} colour={COLOURS.destination} reducedMotion={reducedMotion} />
+          <DestinationPin key={`${route.start}|${route.destination}|${route.length_m}`} colour={COLOURS.destination} reducedMotion={reducedMotion} />
         </group>
       )}
     </group>
