@@ -48,7 +48,7 @@ Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `sc
 ## Während Leonie schläft (Jennifer, ca. 03:00): Agenten übernehmen zwei Teile
 - Seite fürs Ortswissen: Plan `docs/specs/place-knowledge-page.md`, Branch `feat/twin-knowledge-page`. Ersetzt Leonies lokale Browser-Notizen (`feat/twin-notes`): Notizen liegen auf dem Server, mit Zeit. Foto-Knopf, Protokoll und Prüfrunde kann Leonie darauf aufsetzen.
 - 3D-Look: Plan `docs/specs/3d-look.md`. Wird von Jennifers zweiter Sitzung gebaut (Ordner `ui-polish`, Licht, Boden, Wände, Möbel), nicht von einem weiteren Agenten.
-- Leonies Frage zur Prüfrunde (zweiter Startknopf): Jennifer entscheidet beim Aufwachen; Vorschlag A (Routenkarte während der Runde ausblenden) ist auch Jennifers Sitzung lieber.
+- **Prüfrunde: Spec `docs/specs/inspection-round.md`.** Leonie, bitte `feat/twin-round` und `feat/agent-plan-round` gleich nach dem Aufwachen pushen (spätestens 9:00, Weg A). Sonst baut Jennifers Sitzung den Server-Teil selbst (Weg B). Zwei Startknöpfe: Vorschlag A (Routenkarte während der Runde ausblenden).
 - Leonies lokale Branches (`feat/twin-round`, `feat/agent-plan-round`, `feat/twin-notes`) sind nicht gepusht; bitte pushen, bevor du weiterbaust.
 
 ## Für Leonies 3D-Look (Jennifers Test 02:50)
