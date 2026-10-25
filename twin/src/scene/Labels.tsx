@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { controlsRef } from "./FloorMesh";
@@ -17,6 +17,7 @@ import { useLandmarks } from "./landmarks";
 import { blocked, capped, densityBudget, rankOfClass, type LabelClass } from "./labelRules";
 import { useRound } from "../round/round";
 import { labelDecision } from "./Declutter";
+import { crispCentre, roundedPosition } from "./crispHtml";
 import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
 
 interface Props {
@@ -636,6 +637,14 @@ const FAR_LABEL = 1.3;
 function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number; kind: string }; flat: boolean; selected: boolean; y: number; labelClass: LabelClass }) {
   const div = useRef<HTMLDivElement>(null);
   const cull = !flat && !mark && !selected;
+  // The destination and the selected room are read closely: placed on whole pixels so their text stays sharp.
+  const crisp = !!mark || selected;
+  const lift = mark?.lift ?? 0;
+  useLayoutEffect(() => {
+    const el = div.current;
+    if (!crisp || !el) return;
+    return crispCentre(el, !!mark, lift);
+  }, [crisp, mark, lift]);
   const decided = useRef(-1);
   useEffect(() => {
     decided.current = -1; // decide again for the new role
@@ -658,7 +667,8 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
-      center
+      center={!crisp}
+      calculatePosition={crisp ? roundedPosition : undefined}
       zIndexRange={[2, 0]}
       style={{ pointerEvents: "none" }}
     >
@@ -668,7 +678,6 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
         data-label-space={item.space.id}
         data-zoom-kind="room"
         data-label-class={labelClass}
-        style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
         <NameWithNumber name={item.space.name} />
       </div>
