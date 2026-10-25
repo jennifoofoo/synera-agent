@@ -18,8 +18,9 @@ export function closedConnectorStops(model: BuildingModel, closed: readonly stri
   return out;
 }
 
-/** Names of the closed elements on the route's floors (the server already routes around every closure). */
-export function closedOnRoute(model: BuildingModel, route: Route, closed: readonly string[]): string[] {
+/** Names of the closed elements on the route's floors (the server already routes around every closure). With
+ * `until` (element id -> end text), a timed closure's name carries it: "Office lift until tomorrow 18:00". */
+export function closedOnRoute(model: BuildingModel, route: Route, closed: readonly string[], until: Readonly<Record<string, string>> = {}): string[] {
   if (!route.ok || !closed.length) return [];
   const floors = new Set(route.floors?.length ? route.floors : (route.segments ?? []).map((segment) => segment.floor_id));
   const names: string[] = [];
@@ -30,9 +31,9 @@ export function closedOnRoute(model: BuildingModel, route: Route, closed: readon
     const opening = model.openingById.get(id);
     if (connector) {
       const onFloors = connector.space_ids.some((spaceId) => floors.has(model.spaceById.get(spaceId)?.floor_id ?? ""));
-      if (onFloors) names.push(connector.name || (connector.kind === "lift" ? "Lift" : "Stairs"));
+      if (onFloors) names.push(timed(connector.name || (connector.kind === "lift" ? "Lift" : "Stairs"), until[id] ?? until[connector.id]));
     } else if (space) {
-      if (floors.has(space.floor_id)) names.push(space.name || "a room");
+      if (floors.has(space.floor_id)) names.push(timed(space.name || "a room", until[id]));
     } else if (opening) {
       if (floors.has(opening.floor_id)) doors++;
     }
@@ -40,6 +41,10 @@ export function closedOnRoute(model: BuildingModel, route: Route, closed: readon
   const unique = [...new Set(names)];
   if (doors) unique.push(doors === 1 ? "a door" : `${doors} doors`);
   return unique;
+}
+
+function timed(name: string, until: string | undefined): string {
+  return until ? `${name} ${until}` : name;
 }
 
 /** "Avoids closed Lift 1", "Avoids closed Lift 1 and Stairs B", "Avoids 4 closed places"; "" when nothing is closed. */

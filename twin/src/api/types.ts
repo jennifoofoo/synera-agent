@@ -137,6 +137,38 @@ export interface BuildingState {
   removed_assets?: string[];
   removed_openings?: string[];
   widened_openings?: Record<string, number>;
+  /** Place knowledge open now (all floors), see api/facts.ts. */
+  facts?: Fact[];
+  /** Timed closures: element id -> ISO end ("Closed until ..."). */
+  closed_until?: Record<string, string>;
+}
+
+/** One piece of place knowledge (docs/specs/place-knowledge.md, "Vertrag für die Seite"). */
+export interface FactAnchor {
+  space_id: string;
+  asset_id: string | null;
+  element_id: string | null;
+  point: Point | null;
+  floor_id: string;
+}
+
+export interface Fact {
+  id: string;
+  kind: "note" | "issue" | "closure";
+  anchor: FactAnchor;
+  related?: string[];
+  text: string;
+  valid_from: string;
+  valid_to: string | null;
+  status: "open" | "resolved" | "expired";
+  resolved_by?: string | null;
+  /** Set on the fact that resolved another one ("fixed"): history only, never a pin. */
+  resolves?: string | null;
+  author: string | null;
+  person_id?: string | null;
+  source?: string;
+  photo: string | null;
+  created_at: string;
 }
 
 export interface Building {
@@ -177,6 +209,8 @@ export interface ChatReply {
   here_note?: string;
   opened?: string;
   stale?: boolean;
+  /** Place knowledge the reply is about (Wanda's fact tools): highlighted on the map like `located`. */
+  facts?: (Fact | string)[];
 }
 
 export interface Status {

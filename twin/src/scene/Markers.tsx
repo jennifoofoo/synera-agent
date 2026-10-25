@@ -14,6 +14,7 @@ import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
 import { ClosedGlyph } from "./Labels";
+import { untilByPlace, untilText } from "../model/facts";
 import { Pulse } from "./markerLayout";
 import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
@@ -35,6 +36,8 @@ export interface Disruption {
   floor_id: string;
   point: Point;
   names: string[];
+  /** The closed element ids (same order as names): "Closed until ..." looks up state.closed_until. */
+  ids: string[];
 }
 
 /** Closed rooms and doors (red disc and chip). Closed lifts and stairs are not in here: their own glyph, a hatched
@@ -45,8 +48,8 @@ export function clusterDisruptions(model: BuildingModel, closed: string[]): Disr
     if (model.connectorById.has(id) || model.connectorBySpace.has(id)) continue;
     const space = model.spaceById.get(id);
     const opening = model.openingById.get(id);
-    if (space) items.push({ floor_id: space.floor_id, point: space.anchor, names: [space.name || space.id] });
-    else if (opening) items.push({ floor_id: opening.floor_id, point: opening.position, names: [`Door ${opening.id.split("-").pop()}`] });
+    if (space) items.push({ floor_id: space.floor_id, point: space.anchor, names: [space.name || space.id], ids: [id] });
+    else if (opening) items.push({ floor_id: opening.floor_id, point: opening.position, names: [`Door ${opening.id.split("-").pop()}`], ids: [id] });
   }
   const clusters: Disruption[] = [];
   for (const item of items) {
@@ -55,8 +58,9 @@ export function clusterDisruptions(model: BuildingModel, closed: string[]): Disr
     );
     if (near) {
       near.names.push(...item.names);
+      near.ids.push(...item.ids);
       near.point = [(near.point[0] * (near.names.length - 1) + item.point[0]) / near.names.length, (near.point[1] * (near.names.length - 1) + item.point[1]) / near.names.length];
-    } else clusters.push({ ...item, names: [...item.names] });
+    } else clusters.push({ ...item, names: [...item.names], ids: [...item.ids] });
   }
   return clusters;
 }
@@ -166,6 +170,8 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
   const closedRooms = useMemo(() => closedSpaces(model, state?.closed ?? []), [model, state?.closed]);
   const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
+  const untilBy = useMemo(() => untilByPlace(model, state?.closed_until), [model, state?.closed_until]);
+  const until = (id: string | undefined) => (id && untilBy.get(id) ? ` ${untilText(untilBy.get(id)!)}` : "");
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
   const chip = (text: string, kind: string) => (
@@ -214,7 +220,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
       {disruptions
         .filter((d) => shown(d.floor_id))
         .map((d, index) => {
-          const label = d.names.length === 1 ? `Closed · ${d.names[0]}` : `${d.names.length} closed`;
+          const label = d.names.length === 1 ? `Closed${until(d.ids[0])} · ${d.names[0]}` : `${d.names.length} closed`;
           return (
             <group key={index} name="closed-marker" userData={{ count: d.names.length }} position={at(d.floor_id, d.point)}>
               <Disc radius={0.9} colour={COLOURS.danger} opacity={0.14} through />
@@ -245,7 +251,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
                 <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
                   <div className="chip chip-danger chip-closed">
                     <ClosedGlyph />
-                    {`Closed · ${name}`}
+                    {`Closed${until(spaceId)} · ${name}`}
                   </div>
                 </Html>
               </group>
