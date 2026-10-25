@@ -111,6 +111,39 @@ function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): {
   return { fixed, taps };
 }
 
+function union(rects: DOMRect[]): Box | null {
+  let box: Box | null = null;
+  for (const r of rects) {
+    if (r.width < 1 || r.height < 1) continue;
+    box = box ? { x0: Math.min(box.x0, r.left), y0: Math.min(box.y0, r.top), x1: Math.max(box.x1, r.right), y1: Math.max(box.y1, r.bottom) } : { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom };
+  }
+  return box;
+}
+
+/** Screen box of a map element. A symbol counts with the name beside it ("Lift 0.18"), which sits outside the
+ * badge's own box, so two named symbols side by side are seen as overlapping. */
+function contentBox(content: HTMLElement): Box | null {
+  const kind = content.dataset.zoomKind ?? "";
+  if (!kind.startsWith("poi-")) return union([content.getBoundingClientRect()]);
+  const badge = content.firstElementChild;
+  const name = content.querySelector(".poi-pin-name");
+  return union([badge, name].filter((el): el is Element => !!el).map((el) => el.getBoundingClientRect()));
+}
+
+/** Floating UI over the map; a label under it is hidden. */
+const CHROME = ".dock, .floorrail, .topbar, .round-toggle, .round-panel, .notes-fab-row, .recenter, .pill, .phone-search";
+
+function chromeBoxes(): Box[] {
+  const boxes: Box[] = [];
+  for (const el of Array.from(document.querySelectorAll(CHROME))) {
+    if (getComputedStyle(el).visibility === "hidden") continue;
+    // The dock is one box from its first to its last panel (card, the gap, the Wanda bar), not its padding.
+    const box = union(el.classList.contains("dock") ? Array.from(el.children).map((c) => c.getBoundingClientRect()) : [el.getBoundingClientRect()]);
+    if (box) boxes.push(box);
+  }
+  return boxes;
+}
+
 /** Mounted once inside the Canvas. */
 export function Declutter() {
   const gl = useThree((s) => s.gl);
@@ -144,11 +177,9 @@ export function Declutter() {
       if (!content) continue;
       order++;
       if (wrapper.style.display === "none" || content.style.visibility === "hidden") continue; // behind the camera, culled
-      const kind = content.dataset.zoomKind ?? "";
-      const measured = (kind.startsWith("poi-") && content.firstElementChild) || content;
-      const r = measured.getBoundingClientRect();
-      if (r.width < 1 || r.height < 1) continue;
-      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom } });
+      const box = contentBox(content);
+      if (!box) continue;
+      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box });
     }
     items.sort((a, b) => a.rank - b.rank || Number(b.shown) - Number(a.shown) || a.order - b.order);
     const { fixed, taps } = markerBoxes(scene, camera, rect);
@@ -164,6 +195,9 @@ export function Declutter() {
         invalidate(); // phones render on demand
       }
     }
+    // Labels under the floating chrome (card, Wanda bar and the gap between them, rail, buttons) are hidden too:
+    // nothing peeks out between two panels.
+    kept.push(...chromeBoxes());
     for (const item of items) {
       const hide = kept.some((other) => touches(item.box, other));
       if (!hide) kept.push(item.box);
@@ -173,6 +207,15 @@ export function Declutter() {
       }
     }
   };
+
+  // A card opening or closing changes which labels it covers without moving the camera (phones render on demand).
+  useEffect(() => {
+    const dock = document.querySelector(".dock");
+    if (!dock || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => invalidate());
+    observer.observe(dock);
+    return () => observer.disconnect();
+  }, [invalidate]);
 
   useFrame(() => {
     if (pending.current !== null) return;
