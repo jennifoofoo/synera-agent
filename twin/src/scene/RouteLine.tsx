@@ -8,6 +8,7 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { PIN_HEAD_PX, PIN_HEAD_Y_PX, Pulse, START_DOT_PX, ScreenSized } from "./markerLayout";
+import { NextTurnBadge, WalkedLine } from "./FollowRoute";
 
 /** Height of the route line above the floor (m): high enough above the slab that it never flickers with the floor,
  * so in 3D it can be depth-tested (walls hide it); the flat 2D plan draws it without depth test. Labels.tsx anchors a
@@ -245,6 +246,9 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
           <Line points={legPoints} color={lineColour} lineWidth={lineWidth} transparent {...depth} renderOrder={23} />
         </>
       )}
+      {/* Guide me follow-cam (FollowRoute.tsx): the walked part fades, the next turn gets a chip. */}
+      <WalkedLine points={points} lengths={lengths} floorY={floorY} lift={LIFT} lineWidth={lineWidth} casingWidth={casingWidth} depthTest={!flat} />
+      <NextTurnBadge route={route} floorY={floorY} onlyFloor={onlyFloor} lift={LIFT} />
       {/* ends: constant size on screen. The start is a paper dot with a blue ring (or nothing when "You are here"
           stands there), the destination a slim red pin on its tip. The room labels move above them (Labels.tsx). */}
       {startsHere && (
