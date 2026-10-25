@@ -29,7 +29,9 @@ ON_SCREEN = """(t) => {
   const p = t;
   const x = v[0] * p[0] + v[4] * p[1] + v[8] * p[2] + v[12], y = v[1] * p[0] + v[5] * p[1] + v[9] * p[2] + v[13], z = v[2] * p[0] + v[6] * p[1] + v[10] * p[2] + v[14];
   const cx = P[0] * x + P[4] * y + P[8] * z + P[12], cy = P[1] * x + P[5] * y + P[9] * z + P[13], cw = P[3] * x + P[7] * y + P[11] * z + P[15];
-  return [(cx / cw * 0.5 + 0.5) * innerWidth, (1 - (cy / cw * 0.5 + 0.5)) * innerHeight];
+  // the canvas, not the window: on a laptop the chat column takes the left of the screen (docs/specs/chat-sidebar.md)
+  const r = document.querySelector('canvas').getBoundingClientRect();
+  return [r.left + (cx / cw * 0.5 + 0.5) * r.width, r.top + (1 - (cy / cw * 0.5 + 0.5)) * r.height];
 }"""
 
 
@@ -68,11 +70,15 @@ def test_left_drag_moves_the_map_with_the_pointer(engine, mode, base_url, playwr
 
         world = page.evaluate(TARGET)
         before = page.evaluate(ON_SCREEN, world)
-        # Press on the middle of the map (a room), drag 200 px right and 60 px down, release.
-        page.mouse.move(640, 400)
+        # Press on the middle of the map (a room), drag 200 px right and 60 px down, release. The middle of the
+        # canvas, not of the window: on a laptop the chat column takes the left (docs/specs/chat-sidebar.md).
+        mx, my = page.evaluate(
+            "() => { const r = document.querySelector('canvas').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)]; }"
+        )
+        page.mouse.move(mx, my)
         page.mouse.down()
         for step in range(1, 21):
-            page.mouse.move(640 + step * 10, 400 + step * 3)
+            page.mouse.move(mx + step * 10, my + step * 3)
             page.wait_for_timeout(16)
         page.mouse.up()
         page.wait_for_timeout(300)
@@ -84,7 +90,7 @@ def test_left_drag_moves_the_map_with_the_pointer(engine, mode, base_url, playwr
         assert not errors, errors
 
         # A plain click (no movement) still selects a room.
-        page.mouse.click(840, 460)
+        page.mouse.click(mx + 200, my + 60)
         page.wait_for_timeout(300)
         assert page.evaluate("window.__twinStore.getState().selection") is not None, "a click should select the room"
     finally:

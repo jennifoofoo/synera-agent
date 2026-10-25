@@ -1,78 +1,158 @@
 /* ===== Laptop chat column (docs/specs/chat-sidebar.md). Planner profile from 1024 px only; tokens only. =====
    .app becomes a two-column grid. Every other child of .app is placed in the map column, so its absolute boxes
    (the canvas, the rail, the sheets, overlays) use the map area as their containing block: the canvas is only as
-   wide as the map and the camera needs no left inset. */
+   wide as the map and the camera needs no left inset.
+   The look: one calm paper surface, no floating glass inside it. Hierarchy from type and spacing (20/600 heading,
+   13 px grey meta), white only for the things you read or type in (answers, cards, the composer). */
 .app.with-sidebar {
   --sidebar-w: 380px;
+  --sb-pad: 16px;
   display: grid; grid-template-columns: var(--sidebar-w) minmax(0, 1fr); grid-template-rows: 100%;
 }
-@media (min-width: 1440px) { .app.with-sidebar { --sidebar-w: 420px; } }
+@media (min-width: 1440px) { .app.with-sidebar { --sidebar-w: 420px; --sb-pad: 20px; } }
 .app.with-sidebar > * { grid-column: 2; grid-row: 1; }
 .app.with-sidebar > .sidebar { grid-column: 1; }
 
 .sidebar {
   position: relative; z-index: 5; min-width: 0; min-height: 0; height: 100%;
-  display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 14px;
+  display: flex; flex-direction: column;
   background: var(--paper); border-right: 1px solid var(--hairline-strong);
 }
 
-/* head: building (the TopBar, moved here), the floor below, the collapse button on the right */
-.sb-head { display: flex; align-items: center; gap: 8px; }
-.sidebar .topbar { position: static; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
-.sidebar .building-name { min-width: 0; max-width: 100%; box-shadow: var(--shadow-soft); background: var(--surface); }
+/* ---- head: the building as a heading, the floor under it, the collapse button on the right ---- */
+.sb-head { display: flex; align-items: flex-start; gap: 8px; padding: calc(var(--sb-pad) - 2px) calc(var(--sb-pad) - 6px) 0 var(--sb-pad); }
+.sb-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sidebar .topbar { position: static; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sidebar .building-name {
+  min-width: 0; max-width: 100%; padding: 2px 18px 2px 0; border-radius: 0; gap: 0;
+  background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  font-size: var(--fs-20); font-weight: 600; letter-spacing: -0.01em; line-height: 1.25;
+}
+.sidebar .building-name:hover { background: transparent; color: var(--ink); }
+.sidebar .building-name .brand-mark { display: none; }
+/* a small chevron says the name is a picker (the native select lies invisible on top) */
+.sidebar .building-name::after {
+  content: ""; position: absolute; right: 4px; top: 50%; width: 6px; height: 6px; margin-top: -5px;
+  border-right: 1.5px solid var(--ink-2); border-bottom: 1.5px solid var(--ink-2); transform: rotate(45deg);
+  transition: border-color var(--t-fast);
+}
+.sidebar .building-name:hover::after { border-color: var(--ink); }
 .sidebar .building-title { max-width: 100%; }
-.sb-floor { margin: -4px 0 0 4px; font-size: 13px; color: var(--muted); }
+.sb-floor { font-size: 13px; color: var(--ink-2); }
 .sb-toggle {
   flex: none; width: 36px; height: 36px; min-height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; color: var(--muted); border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink-2); border-radius: var(--radius-sm);
 }
-.sb-toggle:hover { color: var(--text); background: var(--paper-2); }
+.sb-toggle:hover { color: var(--ink); background: var(--paper-2); }
 /* collapsed: a glass button top left, the building name moves right of it; the rest is the floating layout */
 .sb-expand {
-  position: absolute; left: 12px; top: 12px; z-index: 4; width: 44px; height: 44px; min-height: 44px; color: var(--text);
+  position: absolute; left: 12px; top: 12px; z-index: 4; width: 44px; height: 44px; min-height: 44px; color: var(--ink);
   background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2);
   box-shadow: var(--shadow-float); border-radius: var(--radius);
 }
 .sb-expand:hover { background: var(--surface); }
 .app.sb-collapsed .topbar { left: 64px; }
 
-/* the Omnibox in the column: the Wanda bar (orb, caption, Stop) on top, the input always open below it. The orb is
-   the one voice button, so the input's own mic, the close button and Ask are not needed here; the conversation
-   below replaces the "earlier replies" popover. */
-.omnibox.docked .wanda-bar { order: -1; height: 52px; box-shadow: var(--shadow-soft); }
-.omnibox.docked.collapsed .omnibox-input {
-  position: relative; right: auto; bottom: auto; width: auto; height: auto; min-height: 0; padding: 4px 4px 4px 14px;
-  overflow: visible; opacity: 1; pointer-events: auto; box-shadow: var(--shadow-soft);
+/* ---- tools: Round · Notes · On map as quiet icon + label buttons (moved here from the map on the laptop) ---- */
+.sb-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 10px 0 0; padding: 0 calc(var(--sb-pad) - 8px) 10px;
+  border-bottom: 1px solid var(--hairline-strong);
 }
-.omnibox.docked .omnibox-input { box-shadow: var(--shadow-soft); }
+.app.with-sidebar > .sidebar .sb-tools .notes-fab-row { position: static; display: contents; }
+.sidebar .sb-tools .round-toggle,
+.sidebar .sb-tools .notes-fab,
+.sidebar .sb-tools .notes-layer {
+  position: static; height: 32px; min-height: 32px; padding: 0 10px 0 8px; gap: 6px; display: inline-flex; align-items: center;
+  background: transparent; border: 0; box-shadow: none; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; color: var(--ink-2);
+}
+.sidebar .sb-tools .round-toggle svg, .sidebar .sb-tools .notes-fab svg, .sidebar .sb-tools .notes-layer svg { width: 16px; height: 16px; color: currentColor; }
+.sidebar .sb-tools .round-toggle:hover, .sidebar .sb-tools .notes-fab:hover, .sidebar .sb-tools .notes-layer:hover { background: var(--paper-2); color: var(--ink); }
+.sidebar .sb-tools .notes-layer.on { background: var(--signal-soft); color: var(--signal-dark); }
+.sidebar .sb-tools .notes-count { min-width: 18px; height: 18px; line-height: 18px; font-size: 11px; }
+/* an open round panel takes the column's width under the tools (its own card is styled by the round session) */
+.sidebar .sb-tools .round-panel { position: relative; left: auto; top: auto; width: 100%; flex-basis: 100%; max-height: 50vh; margin: 6px 0 0; }
+
+/* ---- the conversation: oldest first, full answers, scrolls; ChatLog keeps it at the newest ---- */
+.sb-log {
+  flex: 1 1 auto; min-height: 80px; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 0;
+  padding: 16px var(--sb-pad) 12px; display: flex; flex-direction: column; gap: 12px;
+  scrollbar-width: thin; scrollbar-color: var(--hairline-strong) transparent;
+}
+.sb-msg { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; font-size: var(--fs-14); animation: sb-in var(--t-base) both; }
+.sb-user {
+  align-self: flex-end; max-width: 85%; padding: 8px 12px; border-radius: var(--radius) var(--radius) 4px var(--radius);
+  background: var(--signal-soft); color: var(--signal-dark);
+}
+.sb-agent {
+  align-self: flex-start; max-width: 100%; padding: 10px 14px; border-radius: 4px var(--radius) var(--radius) var(--radius);
+  background: var(--surface); box-shadow: var(--shadow-soft); color: var(--ink);
+}
+/* replies: paragraphs and lists from chatMarkdown.ts (the bubble itself keeps pre-wrap off for them) */
+.sb-text { white-space: normal; }
+.sb-text p, .sb-text ul, .sb-text ol { margin: 0; }
+.sb-text > * + * { margin-top: 8px; }
+.sb-text ul, .sb-text ol { padding-left: 20px; }
+.sb-text li + li { margin-top: 3px; }
+.sb-text li::marker { color: var(--ink-2); }
+.sb-text strong { font-weight: 600; }
+.sb-note { margin-top: 6px; color: var(--warn); font-size: 12.5px; }
+.sb-thinking { padding: 12px 14px; }
+@keyframes sb-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* empty: Wanda's welcome, the same words and chips as the welcome card on the map, set in the column */
+.sb-log-empty { justify-content: center; }
+.sb-welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 0 0 8vh; animation: sb-in var(--t-base) both; }
+.sb-welcome .welcome-title { font-size: var(--fs-28); text-wrap: balance; }
+.sb-welcome .welcome-sub { margin: 6px 0 18px; font-size: var(--fs-16); }
+.sb-welcome .welcome-chips { justify-content: flex-start; gap: 8px; }
+.sb-welcome .welcome-chip { background: var(--surface); box-shadow: var(--shadow-soft); text-align: left; }
+.sb-welcome .welcome-chip:hover { box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--hairline-strong); }
+
+/* ---- the card slot, right above the composer: route, place, walk, round and notes cards ---- */
+.sb-dock { flex: none; max-height: 58%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px var(--sb-pad) 10px; }
+.sb-dock:empty { display: none; }
+.sidebar .card { box-shadow: var(--shadow-soft); }
+/* The reply card would repeat the newest answer, which stands in full in the conversation: only its route line
+   (length, Guide me, End route) stays. */
+.sidebar .card-reply:not(:has(.route-line)), .sidebar .card-reply .card-reply-body, .sidebar .card-reply .card-note { display: none; }
+.sidebar .card-reply .route-line { margin-top: 0; padding-top: 0; border-top: 0; }
+.sidebar .directions { position: relative; left: auto; top: auto; width: auto; box-shadow: var(--shadow-soft); }
+
+/* ---- the composer: one row at the bottom, like a chat app. The Wanda orb (voice) left, the text field beside it
+   with the speaker toggle small inside. No second field and no separate Wanda bar. ---- */
+.sb-composer { flex: none; padding: 10px var(--sb-pad) var(--sb-pad); border-top: 1px solid var(--hairline-strong); }
+.omnibox.docked { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+.omnibox.docked > * { flex: 1 1 100%; min-width: 0; } /* status lines, notices: full width above the row */
+.omnibox.docked > .wanda-bar { order: 1; }
+.omnibox.docked > .omnibox-input { order: 2; }
+/* with the text field: the bar shrinks to the orb (and Stop while listening or speaking) */
+.omnibox.docked:has(> .omnibox-input) > .wanda-bar {
+  flex: none; height: auto; padding: 0; gap: 6px; background: transparent; box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none; animation: none;
+}
+.omnibox.docked:has(> .omnibox-input) .wb-caption { display: none; }
+.omnibox.docked > .omnibox-input,
+.omnibox.docked.collapsed > .omnibox-input {
+  position: relative; right: auto; bottom: auto; flex: 1 1 0; width: auto; height: 48px; min-height: 48px;
+  padding: 0 4px 0 14px; overflow: visible; opacity: 1; pointer-events: auto; border: 0;
+  border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--hairline);
+  -webkit-backdrop-filter: none; backdrop-filter: none; animation: none;
+}
+.omnibox.docked > .omnibox-input:focus-within { box-shadow: var(--shadow-soft), 0 0 0 2px color-mix(in srgb, var(--signal) 35%, transparent); }
+.omnibox.docked .omnibox-input input { font-size: 15px; }
+.omnibox.docked .ob-icon { width: 32px; height: 32px; min-height: 32px; }
+.omnibox.docked .ob-icon svg { width: 18px; height: 18px; }
+/* walking (no text field): the bar stays whole, caption and all, as the walk's voice line */
+.omnibox.docked:not(:has(> .omnibox-input)) > .wanda-bar { box-shadow: var(--shadow-soft); background: var(--surface); }
+/* the conversation replaces the earlier-replies popover; the orb is the one voice button; the welcome chips in the
+   conversation replace the input's own suggestions */
 .omnibox.docked .ob-history,
 .omnibox.docked .ob-icon[title="Earlier replies"],
 .omnibox.docked .ob-close,
 .omnibox.docked .ob-mic,
+.omnibox.docked .ob-chips,
 .omnibox.docked .wb-ask { display: none; }
-.omnibox.docked .ob-status { align-self: stretch; }
+.omnibox.docked .ob-status { align-self: stretch; justify-content: center; }
 
-/* the conversation: oldest first, full answers, scrolls; ChatLog keeps it at the newest */
-.sb-log {
-  flex: 1 1 auto; min-height: 80px; overflow-y: auto; overscroll-behavior: contain; list-style: none; margin: 0; padding: 4px 2px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.sb-msg { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
-.sb-user {
-  align-self: flex-end; max-width: 85%; padding: 8px 12px; border-radius: var(--radius); font-size: 14px;
-  background: var(--signal-soft); color: var(--signal-dark);
-}
-.sb-agent { align-self: stretch; padding: 10px 12px; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-soft); font-size: 14px; }
-.sb-note { margin-top: 6px; color: var(--warn); font-size: 12.5px; }
-.sb-thinking { align-self: flex-start; padding: 12px 14px; }
-.sb-empty { padding: 8px 4px; color: var(--muted); font-size: 13px; }
-
-/* docked at the bottom: the card or the walk sheet, the notes, the campus card. The reply card would repeat the
-   newest answer, which already stands in full in the conversation above: only its route line (length, Guide me,
-   End route) stays. */
-.sb-dock { flex: none; max-height: 58%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px; margin: -2px; }
-.sb-dock:empty { display: none; }
-.sidebar .card { box-shadow: var(--shadow-soft); }
-.sidebar .card-reply:not(:has(.route-line)), .sidebar .card-reply .card-reply-body, .sidebar .card-reply .card-note { display: none; }
-.sidebar .card-reply .route-line { margin-top: 0; padding-top: 0; border-top: 0; }
-.sidebar .directions { position: relative; left: auto; top: auto; width: auto; box-shadow: var(--shadow-soft); }
+@media (prefers-reduced-motion: reduce) { .sb-msg, .sb-welcome { animation: none; } }

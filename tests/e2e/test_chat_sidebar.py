@@ -103,7 +103,22 @@ def test_column_width_and_order(laptop):
     assert page.locator(".sidebar .wanda-orb").is_visible(), "the Wanda orb sits in the column"
     field = page.evaluate(BOX, ".sidebar input[aria-label='Ask or search']")
     log = page.evaluate(BOX, ".sidebar .sb-log")
-    assert field["bottom"] <= log["top"], "the input is above the conversation"
+    orb = page.evaluate(BOX, ".sidebar .wanda-orb")
+    assert field["top"] >= log["bottom"], "the composer is at the bottom, under the conversation"
+    assert (
+        orb["right"] <= field["left"]
+        and abs((orb["top"] + orb["bottom"]) / 2 - (field["top"] + field["bottom"]) / 2) < 6
+    ), "one composer row: the orb left of the text field"
+    assert page.locator(".sidebar input[aria-label='Ask or search']").count() == 1, "one text field"
+    assert page.locator(".sidebar .wb-caption:visible").count() == 0, "no separate Wanda bar above the field"
+    # the tools moved from the map into the column
+    for name in ("Inspection round", "Notes", "Notes and photos on the map"):
+        assert page.locator(".sidebar .sb-tools").get_by_role("button", name=name, exact=True).is_visible(), name
+    assert page.locator(".notes-fab-row:not(.sidebar .notes-fab-row)").count() == 0
+    # empty: Wanda's welcome and the chips sit in the conversation, the floating welcome card is gone
+    assert page.locator(".sidebar .sb-welcome .welcome-title").is_visible()
+    assert page.locator(".sidebar .sb-welcome .welcome-chip").count() >= 1
+    assert page.locator(".welcome").count() == 0, "no welcome card over the map"
     canvas = page.evaluate(BOX, "canvas")
     assert abs(canvas["left"] - side["right"]) <= 1, "the canvas starts at the column's edge (never under it)"
     assert abs(canvas["right"] - page.viewport_size["width"]) <= 1
@@ -203,3 +218,45 @@ def test_no_column_on_phone_profile_or_narrow(case, chromium, base_url):
         assert page.errors == [], page.errors
     finally:
         context.close()
+
+
+MARKDOWN = "Two places:\n\n1. **Café (Gastraum)**, 20 m\n2. *Kitchen*, 35 m\n\n- <b>not html</b>\nAnswer: Café"
+
+
+def test_reply_markdown_rendered(laptop):
+    page, _ = laptop
+    page.unroute("**/api/chat")
+    page.route(
+        "**/api/chat",
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body=json.dumps({"reply": MARKDOWN, "backend": "fake"})
+        ),
+    )
+    _ask(page, "Where can I eat?")
+    bubble = page.locator(".sidebar .sb-agent .sb-text").last
+    assert bubble.locator("ol > li").count() == 2
+    assert bubble.locator("ol strong").inner_text() == "Café (Gastraum)"
+    assert bubble.locator("ol em").inner_text() == "Kitchen"
+    assert bubble.locator("ul > li").inner_text() == "<b>not html</b>", "markup stays text"
+    assert bubble.locator("b").count() == 0
+    assert "**" not in bubble.inner_text() and "Answer:" not in bubble.inner_text()
+
+
+def test_place_card_note_opens_form_for_that_room(laptop):
+    page, _ = laptop
+    plan = _plan(page)
+    name = page.evaluate("(id) => window.__twinStore.getState().model.spaceById.get(id).name", plan["c"])
+    page.evaluate(
+        "([id, p, f]) => window.__twinStore.getState().select({ kind: 'space', id, floor_id: f, point: p })",
+        [plan["c"], plan["point"], plan["floor"]],
+    )
+    card = page.locator(".sidebar .card-selection")
+    card.wait_for(timeout=20000)
+    actions = card.locator(".card-actions button")
+    assert [t.strip() for t in actions.all_inner_texts()][:3] == ["Route", "I'm here", "Note"]
+    card.get_by_role("button", name="Add a note here").click()
+    form = page.get_by_role("region", name="New note").or_(page.locator("section[aria-label='New note']"))
+    form.first.wait_for(timeout=20000)
+    assert name in form.first.inner_text(), "the form is about exactly that room"
+    assert "Wanda, note:" in form.first.inner_text(), "the voice tip"
+    assert page.evaluate("() => window.__twinStore.getState().selection") is None
