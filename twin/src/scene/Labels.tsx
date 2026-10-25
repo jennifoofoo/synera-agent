@@ -317,7 +317,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     if (selectedId) {
       // The tap pin: 2D above its crosshair, 3D above the head of its stalk. A selection without a spot keeps the
       // name on the room's anchor. A marker already in the room with a larger lift wins (put keeps the larger lift).
-      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, "selected", flat ? 0 : TAP_STALK_M);
+      // RoomLabel stands the name 0.5 m below `height` (for the screen-sized pins); the stalk is in metres, so the
+      // name is anchored exactly at the head's top (TAP_STALK_M), else a close view puts the head over the name.
+      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, "selected", flat ? 0 : TAP_STALK_M + 0.5);
       // In 3D the name stands at wall-top height, where the selection band paints the walls (Markers.tsx): on the
       // floor the oblique view projects it onto the near wall, at the room's edge instead of its middle.
       else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0, "selected", flat ? 0 : wallTop);
