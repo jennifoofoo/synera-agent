@@ -1,6 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { useThree } from "@react-three/fiber";
 import { AccumulativeShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import { boundsOf, type BuildingModel } from "../model/model";
@@ -43,8 +42,9 @@ function hullOf(points: Pt[]): Pt[] {
 /** The plinth's rectangle in plan coordinates: the smallest rectangle around the indoor spaces of all floors (turned
  * with the building when it is not axis-aligned), plus the margin. Outdoor areas (yards, site) are left out. */
 function plinthRect(model: BuildingModel) {
-  const indoor = model.building.spaces.filter((space) => space.type !== "outdoor");
-  const points: Pt[] = (indoor.length ? indoor : model.building.spaces).flatMap((space) => space.polygon as Pt[]);
+  const spaces = model.building.spaces;
+  const indoor = spaces.filter((space) => space.type !== "outdoor");
+  const points: Pt[] = (indoor.length ? indoor : spaces).flatMap((space) => space.polygon as Pt[]);
   const hull = hullOf(points);
   const fit = (angle: number) => {
     const c = Math.cos(angle);
@@ -73,48 +73,92 @@ function plinthRect(model: BuildingModel) {
 /** Spread of the plinth's shadow on the backdrop (m): how far the blur reaches past its edge. */
 const PLINTH_SHADOW_M = 1.6;
 
-/** A soft, blurred rectangle (alpha texture, white on black) for the plinth's shadow on the backdrop: `w` x `d` metres
- * plus PLINTH_SHADOW_M on every side. Drawn once on a 2D canvas (shadowBlur works in every browser), no render pass,
- * so the phone gets it too. */
-function softRectTexture(w: number, d: number): THREE.CanvasTexture {
-  const pw = w + 2 * PLINTH_SHADOW_M;
-  const pd = d + 2 * PLINTH_SHADOW_M;
-  const ppm = Math.min(16, 512 / Math.max(pw, pd)); // canvas pixels per metre
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.ceil(pw * ppm);
-  canvas.height = Math.ceil(pd * ppm);
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.shadowColor = "#fff";
-  ctx.shadowBlur = PLINTH_SHADOW_M * 0.9 * ppm;
-  const far = canvas.width + 100;
-  ctx.shadowOffsetX = far; // draw the shape off canvas, keep only its blurred shadow
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(PLINTH_SHADOW_M * ppm * 0.7 - far, PLINTH_SHADOW_M * ppm * 0.7, (w + PLINTH_SHADOW_M * 0.6) * ppm, (d + PLINTH_SHADOW_M * 0.6) * ppm);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.NoColorSpace;
-  return texture;
+/** The plinth follows the ground floor's footprint (indoor spaces, every shape, not a bounding rectangle), this
+ * much wider on each side (m). */
+const FOOTPRINT_MARGIN_M = 0.9;
+
+interface Footprint {
+  /** Alpha mask of the footprint plus margin (white inside), and its blurred copy for the shadow. */
+  mask: THREE.CanvasTexture;
+  shadow: THREE.CanvasTexture;
+  /** Size and centre of the textures' plane in plan metres. */
+  w: number;
+  d: number;
+  cx: number;
+  cy: number;
 }
 
-/** The thin bevelled base the model stands on, like an architectural model on a table (3D only), with its own soft
- * shadow on the backdrop. */
+/** The ground floor's footprint drawn on a 2D canvas: every indoor polygon filled and stroked with a round line
+ * twice the margin wide, which is exactly the union of the rooms grown by the margin. Drawn once, no render pass. */
+function footprintTextures(model: BuildingModel): Footprint | null {
+  const ground = model.floors.find((floor) => floor.spaces.some((space) => space.type !== "outdoor"));
+  const polygons = (ground?.spaces ?? []).filter((space) => space.type !== "outdoor").map((space) => space.polygon as Pt[]);
+  if (!polygons.length) return null;
+  const b = boundsOf(polygons.flat() as [number, number][]);
+  const pad = FOOTPRINT_MARGIN_M + PLINTH_SHADOW_M * 1.5;
+  const w = b.maxX - b.minX + 2 * pad;
+  const d = b.maxY - b.minY + 2 * pad;
+  const ppm = Math.min(24, 2048 / Math.max(w, d)); // canvas pixels per metre
+  const draw = (blur: number) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(w * ppm);
+    canvas.height = Math.ceil(d * ppm);
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const far = blur ? canvas.width + 100 : 0;
+    if (blur) {
+      ctx.shadowColor = "#fff";
+      ctx.shadowBlur = blur * ppm;
+      ctx.shadowOffsetX = far; // draw the shape off canvas, keep only its blurred shadow
+    }
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#fff";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.lineWidth = 2 * FOOTPRINT_MARGIN_M * ppm;
+    ctx.beginPath();
+    for (const polygon of polygons) {
+      polygon.forEach(([x, y], i) => {
+        const px = (x - b.minX + pad) * ppm - far;
+        const py = (b.maxY + pad - y) * ppm; // canvas rows run south; the texture's top is plan north
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+    }
+    ctx.fill("nonzero");
+    ctx.stroke();
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.NoColorSpace;
+    return texture;
+  };
+  return { mask: draw(0), shadow: draw(PLINTH_SHADOW_M * 0.9), w, d, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2 };
+}
+
+/** The base the model stands on, like an architectural model on a table (3D only): the ground floor's own outline
+ * with a small margin (not a rectangle around every floor, which left a large empty slab beside an L-shaped or
+ * offset building), with its own soft shadow on the backdrop. */
 export function Plinth({ model }: { model: BuildingModel }) {
-  const { w, d, cx, cy, angle } = useMemo(() => plinthRect(model), [model]);
-  const geometry = useMemo(() => new RoundedBoxGeometry(w, PLINTH_THICKNESS_M, d, 3, 0.12), [w, d]);
-  const shadow = useMemo(() => softRectTexture(w, d), [w, d]);
-  useEffect(() => () => {
-    geometry.dispose();
-    shadow.dispose();
-  }, [geometry, shadow]);
+  const footprint = useMemo(() => footprintTextures(model), [model]);
+  useEffect(
+    () => () => {
+      footprint?.mask.dispose();
+      footprint?.shadow.dispose();
+    },
+    [footprint],
+  );
+  if (!footprint) return null;
+  const { w, d, cx, cy, mask, shadow } = footprint;
   const top = plinthTop(model);
   return (
-    <group position={[cx, top, -cy]} rotation-y={angle}>
-      <mesh geometry={geometry} position-y={-PLINTH_THICKNESS_M / 2 - 0.004} castShadow raycast={() => null}>
-        <meshStandardMaterial color={COLOURS.plinth} roughness={0.9} metalness={0} />
+    <group position={[cx, top, -cy]}>
+      <mesh position-y={-0.004} rotation-x={-Math.PI / 2} raycast={() => null} receiveShadow>
+        <planeGeometry args={[w, d]} />
+        <meshStandardMaterial color={COLOURS.plinth} roughness={0.9} metalness={0} alphaMap={mask} alphaTest={0.5} />
       </mesh>
       <mesh position-y={-PLINTH_THICKNESS_M - 0.02} rotation-x={-Math.PI / 2} raycast={() => null} renderOrder={-1}>
-        <planeGeometry args={[w + 2 * PLINTH_SHADOW_M, d + 2 * PLINTH_SHADOW_M]} />
+        <planeGeometry args={[w, d]} />
         <meshBasicMaterial color={COLOURS.shadowTint} alphaMap={shadow} transparent opacity={0.28} depthWrite={false} fog={false} />
       </mesh>
     </group>

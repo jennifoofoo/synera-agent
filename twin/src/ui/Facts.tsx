@@ -145,8 +145,10 @@ export function NotesButton() {
   const draft = useTwin((s) => s.draft);
   const selection = useTwin((s) => s.selection);
   const position = useTwin((s) => s.state?.position ?? null);
+  // While walking the map stays free: notes surface on their own at the destination or a round stop.
+  const walking = useTwin((s) => s.walkStep !== null);
   useEffect(installNotes, []);
-  if (!model || draft || sheet !== "closed") return null;
+  if (!model || draft || walking || sheet !== "closed") return null;
   void notes; // re-render on changes
   const spaceId = selection?.kind === "asset" ? model.assetById.get(selection.id)?.space_id : selection?.kind === "space" ? selection.id : (selection?.space_id ?? position?.space_id);
   const here = spaceId ? notesIn([spaceId]).length : 0;

@@ -169,6 +169,9 @@ export function isSpeaking(): boolean {
 
 const ANSWER_LINE = /^\s*\**\s*Answer:/i;
 const ID_TOKEN = /\s*[([]?`?\b[A-Za-z][\w.]*(?:-[\w.]+){2,}`?[)\]]?/g;
+/** A square-bracketed reference with a digit in it ("[plan-89323a15-F0-S002]", "[space S002]", "[F0-S002, F0-S003]"),
+ * never a markdown link text ("[Room 1](…)"). Nobody says square brackets out loud. */
+const BRACKET_REF = /\s*\[[^\]\n]*\d[^\]\n]*\](?!\()/g;
 
 /** The reply without its final "Answer: …" line (also "**Answer:**"). For anything shown or spoken. */
 export function withoutAnswerLine(reply: string): string {
@@ -183,6 +186,7 @@ export function withoutAnswerLine(reply: string): string {
 export function spokenText(reply: string): string {
   return withoutAnswerLine(reply)
     .replace(/```[\s\S]*?```/g, " ")
+    .replace(BRACKET_REF, "")
     .replace(ID_TOKEN, (token) => (/\d/.test(token) ? "" : token))
     .replace(/[*_`#>|]+/g, "")
     .replace(/^\s*[-•]\s+/gm, "")

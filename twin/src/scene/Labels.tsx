@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { controlsRef } from "./FloorMesh";
@@ -17,6 +17,7 @@ import { useLandmarks } from "./landmarks";
 import { blocked, capped, densityBudget, rankOfClass, type LabelClass } from "./labelRules";
 import { useRound } from "../round/round";
 import { labelDecision } from "./Declutter";
+import { crispCentre, roundedPosition } from "./crispHtml";
 import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
 
 interface Props {
@@ -291,6 +292,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const tapPoint = useTwin((s) => (s.selection?.point && s.selection.kind !== "asset" && s.selection.kind !== "opening" ? s.selection.point : null));
   // The stop of the round being walked to (notesStore.ts currentStop): its name ranks just below the marked rooms.
   const buildingKey = useTwin((s) => s.buildingKey);
+  // While walking the map shows names only, no second lines ("Lobby · 309 m²").
+  const walking = useTwin((s) => s.walkStep !== null);
   const roundStopId = useRound((s) => (s.plan && s.guiding && !s.returning && s.plan.building === buildingKey ? (s.plan.stops[s.index]?.spaceId ?? null) : null));
   // What the last decision showed (keys `${kind}-${id}`), for the overlap hysteresis (labelRules.ts).
   const lastShown = useRef<ReadonlySet<string>>(new Set());
@@ -314,7 +317,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     if (selectedId) {
       // The tap pin: 2D above its crosshair, 3D above the head of its stalk. A selection without a spot keeps the
       // name on the room's anchor. A marker already in the room with a larger lift wins (put keeps the larger lift).
-      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, "selected", flat ? 0 : TAP_STALK_M);
+      // RoomLabel stands the name 0.5 m below `height` (for the screen-sized pins); the stalk is in metres, so the
+      // name is anchored exactly at the head's top (TAP_STALK_M), else a close view puts the head over the name.
+      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, "selected", flat ? 0 : TAP_STALK_M + 0.5);
       // In 3D the name stands at wall-top height, where the selection band paints the walls (Markers.tsx): on the
       // floor the oblique view projects it onto the near wall, at the room's edge instead of its middle.
       else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0, "selected", flat ? 0 : wallTop);
@@ -517,7 +522,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     if (!tagsDone) placeTags();
     // Near, 2D: a second line under the room names shown ("Kitchen · 24 m²"), if it fits in the room and is free.
-    if (flat && tier === "near") {
+    if (flat && tier === "near" && !walking) {
       for (const item of [...result]) {
         if (item.kind !== "room") continue;
         const space = item.space;
@@ -547,7 +552,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     lastShown.current = new Set(classes.keys());
     return { shown: result, pins, classes };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId, walking]);
 
   return (
     <group position-y={y + 0.5}>
@@ -634,8 +639,22 @@ export function ClosedGlyph() {
 const FAR_LABEL = 1.3;
 
 function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number; kind: string }; flat: boolean; selected: boolean; y: number; labelClass: LabelClass }) {
-  const div = useRef<HTMLDivElement>(null);
+  const div = useRef<HTMLDivElement | null>(null);
+  // drei <Html> renders its children into their own root after this component's effects: track the node itself.
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const attach = useCallback((el: HTMLDivElement | null) => {
+    div.current = el;
+    setNode(el);
+  }, []);
   const cull = !flat && !mark && !selected;
+  // The destination and the selected room are read closely: placed on whole pixels so their text stays sharp.
+  const crisp = !!mark || selected;
+  const above = !!mark;
+  const lift = mark?.lift ?? 0;
+  useLayoutEffect(() => {
+    if (!crisp || !node) return;
+    return crispCentre(node, above, lift);
+  }, [crisp, node, above, lift]);
   const decided = useRef(-1);
   useEffect(() => {
     decided.current = -1; // decide again for the new role
@@ -658,17 +677,19 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
-      center
+      center={!crisp}
+      calculatePosition={crisp ? roundedPosition : undefined}
       zIndexRange={[2, 0]}
       style={{ pointerEvents: "none" }}
     >
       <div
-        ref={div}
+        ref={attach}
         className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} ${mark?.kind === "end" ? "label-dest" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"
         data-label-class={labelClass}
-        style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
+        // right from the first paint (Declutter may measure before the effect snaps it to whole pixels)
+        style={crisp ? { transform: above ? `translate(-50%, calc(-100% - ${lift}px))` : "translate(-50%, -50%)" } : undefined}
       >
         <NameWithNumber name={item.space.name} />
       </div>

@@ -15,7 +15,7 @@ import { openingEditsOf, outlineGeometry, polygonGeometry, wallTopOutline, withC
 import { cutawayUniforms } from "./FloorMesh";
 import { HereDot, TapPin } from "./HerePin";
 import { ClosedGlyph } from "./Labels";
-import { Pulse } from "./markerLayout";
+import { Pulse, PulseFew } from "./markerLayout";
 import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
 
@@ -188,6 +188,9 @@ export function closedSpaces(model: BuildingModel, closed: string[]): { id: stri
   return spaces;
 }
 
+/** Found things (3D) with a ring and a name: the nearest this many, the rest are a small dot. */
+const FOUND_NAMED = 5;
+
 export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
   const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
@@ -195,6 +198,20 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
   const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
+  // Finds with many hits stay calm: only the nearest few get a ring and a name, the rest a small dot.
+  const position = state?.position ?? null;
+  const namedFinds = useMemo(() => {
+    const named = new Set<string>();
+    for (const highlight of Object.values(highlights)) {
+      const assets = highlight.ids.map((id) => model.assetById.get(id)).filter((asset): asset is NonNullable<typeof asset> => !!asset);
+      const from = position?.point ? { floor: position.floor_id, point: position.point } : assets[0] ? { floor: assets[0].floor_id, point: assets[0].position } : null;
+      const away = (asset: (typeof assets)[number]) =>
+        from ? Math.hypot(asset.position[0] - from.point[0], asset.position[1] - from.point[1]) + (asset.floor_id === from.floor ? 0 : 1e4) : 0;
+      for (const asset of [...assets].sort((a, b) => away(a) - away(b)).slice(0, FOUND_NAMED)) named.add(asset.id);
+    }
+    return named;
+  }, [highlights, model, position?.floor_id, position?.point]);
+  const destination = state?.route?.ok ? state.route.destination : null;
   const chip = (text: string, kind: string) => (
     <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
       <div className={`chip chip-${kind}`}>{text}</div>
@@ -330,7 +347,8 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
       {Object.entries(highlights).flatMap(([name, highlight]) =>
         highlight.ids.map((id) => {
           const space = model.spaceById.get(id);
-          if (space && shown(space.floor_id)) {
+          // the route's destination is blue already: no second tint on top
+          if (space && shown(space.floor_id) && space.id !== destination) {
             return (
               <group key={`${name}-${id}`} position-y={floorY(space.floor_id)}>
                 <SpaceOverlay polygon={space.polygon} height={0.2} colour={highlight.colour} opacity={0.4} outline />
@@ -340,11 +358,18 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           const asset = model.assetById.get(id);
           if (asset && shown(asset.floor_id) && !flat) {
             const size = assetSize(asset);
+            if (!namedFinds.has(id)) {
+              return (
+                <group key={`${name}-${id}`} position={at(asset.floor_id, asset.position)}>
+                  <Disc radius={0.28} colour={highlight.colour} opacity={0.85} y={size[1] + 0.05} />
+                </group>
+              );
+            }
             return (
               <group key={`${name}-${id}`} position={at(asset.floor_id, asset.position)}>
-                <Pulse reducedMotion={reducedMotion} speed={1.2} amount={0.2}>
-                  <Ring radius={Math.max(size[0], size[2]) * 0.8 + 0.5} colour={highlight.colour} width={0.16} />
-                </Pulse>
+                <PulseFew reducedMotion={reducedMotion} times={3} speed={1.2} amount={0.2}>
+                  <Ring radius={Math.max(size[0], size[2]) * 0.6 + 0.35} colour={highlight.colour} width={0.12} />
+                </PulseFew>
                 <group position-y={size[1] + 0.9}>{chip(asset.name, "accent")}</group>
               </group>
             );
