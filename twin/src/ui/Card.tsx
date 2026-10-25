@@ -21,6 +21,8 @@ import { RouteChips } from "./RouteChips";
 import { TurnIcon, rideUp } from "./Walk";
 import { useRound } from "../round/round";
 import { KnowledgeButton } from "./KnowledgeGraph";
+import { NoteGlyph } from "./Facts";
+import { notesIn, openNotes, useNotes } from "../notes/notesStore";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -178,6 +180,10 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   // Details on demand (semantic zoom, level 4): the equipment in a tapped room, not for a thing or a stair/lift.
   const equipmentRoom = !asset && !connector ? space?.id : undefined;
   const equipment = useMemo(() => (equipmentRoom ? equipmentOf(model.assetById.values(), equipmentRoom) : null), [model, equipmentRoom]);
+  // Notes already left here (one quiet line that opens them), and "Note" adds one for exactly this room or thing
+  // (openNotes freezes the tapped place: room, device or door, see notesStore.currentPlace).
+  const allNotes = useNotes((s) => s.notes);
+  const notesHere = useMemo(() => (roomId ? notesIn([roomId]) : []), [roomId, allNotes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const imHere = () => {
     // No agent call: the position is set on screen now and travels as context.here with the next chat message.
@@ -215,6 +221,14 @@ function SelectionCard({ model }: { model: BuildingModel }) {
           From: {spaceName(model, position.space_id)}
         </div>
       )}
+      {notesHere.length > 0 && (
+        <button className="link card-notes" data-testid="card-notes" onClick={() => openNotes("here")}>
+          <NoteGlyph size={14} />
+          <span>
+            {notesHere.length} {notesHere.length === 1 ? "note" : "notes"} · {notesHere[0].text || "Photo"}
+          </span>
+        </button>
+      )}
       {roomId && (
         <div className="card-actions">
           <button className="primary" onClick={() => openDirections(roomId)}>
@@ -225,6 +239,10 @@ function SelectionCard({ model }: { model: BuildingModel }) {
               {hereAlready ? "You're here" : "I'm here"}
             </button>
           )}
+          <button className="card-note-add" onClick={() => openNotes("add")} aria-label="Add a note here" title="Add a note or photo for this place">
+            <NoteGlyph size={16} />
+            Note
+          </button>
           <KnowledgeButton roomId={roomId} />
         </div>
       )}

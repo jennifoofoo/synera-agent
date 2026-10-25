@@ -18,7 +18,7 @@ import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
 import { Round } from "./ui/Round";
-import { SIDEBAR_MIN_WIDTH, Sidebar, SidebarExpand, useMinWidth, useSidebar } from "./ui/Sidebar";
+import { SIDEBAR_MIN_WIDTH, Sidebar, SidebarExpand, useMinWidth, useReframeOnColumn, useSidebar } from "./ui/Sidebar";
 import { Walk } from "./ui/Walk";
 import { Welcome } from "./ui/Welcome";
 
@@ -40,6 +40,7 @@ export function App() {
   const collapsed = useSidebar((s) => s.collapsed);
   const sidebar = profile === "planner" && wide;
   const docked = sidebar && !collapsed;
+  useReframeOnColumn(docked);
   useEffect(() => {
     void loadBuildings();
   }, [loadBuildings]);
@@ -62,14 +63,14 @@ export function App() {
         />
       )}
       <Scene />
-      <Welcome />
+      {!docked && <Welcome />}
       <CampusSite />
       {!docked && <TopBar />}
       <FloorRail />
       <Recenter />
       <ChangesPill />
       <Planner />
-      <Round />
+      {!docked && <Round />}
       <Phone />
       {!docked && (
         <div className="dock">
@@ -81,7 +82,7 @@ export function App() {
         </div>
       )}
       {sidebar && collapsed && <SidebarExpand />}
-      <NotesButton />
+      {!docked && <NotesButton />}
       <KnowledgeGraph />
       <NewBuilding />
       <KeyHelp />

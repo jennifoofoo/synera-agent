@@ -1,6 +1,8 @@
 // Laptop chat column (docs/specs/chat-sidebar.md): on the planner profile from 1024 px the chat is a fixed column on
-// the left. Top to bottom: building and floor, the Omnibox (Wanda orb + input), the whole conversation (scrolls, full
-// answers, newest at the bottom), and docked below it the card or the walk sheet, the notes and the campus card.
+// the left, laid out like a chat app. Top to bottom: the building as a calm heading with its floor, a quiet tool row
+// (Round, Notes, On map), the conversation (scrolls, full answers, newest at the bottom; empty it greets with Wanda's
+// welcome and the suggestion chips), the card slot (route card, place card, walk sheet, notes, campus card) and the
+// composer at the bottom (the Wanda orb for voice, the text field, the speaker toggle).
 // The map gets the rest: App makes .app a grid and every other child sits in the map column (Sidebar.css).
 // Phone (worker) and windows under 1024 px never render this.
 
@@ -9,8 +11,11 @@ import { create } from "zustand";
 import { floorLabel } from "../model/model";
 import { useTwin } from "../store";
 import { withoutAnswerLine } from "../voice";
+import { NotesButton } from "./Facts";
 import { Omnibox } from "./Omnibox";
+import { Round } from "./Round";
 import { TopBar } from "./TopBar";
+import { useWelcomeChips } from "./Welcome";
 import "./Sidebar.css";
 
 const COLLAPSED_KEY = "twin.sidebarCollapsed";
@@ -51,28 +56,48 @@ export function useMinWidth(px: number): boolean {
   return match;
 }
 
-/** The left column. `dock` is what used to float at the bottom (card or walk sheet, notes, campus card). */
+/** The column opening or closing changes the canvas width: frame the building again in the new map area, unless the
+ * camera was sent somewhere else (a room, a route) since the last Home. */
+export function useReframeOnColumn(docked: boolean): void {
+  const first = useRef(true);
+  useEffect(() => {
+    // The first render frames on load (store.openBuilding); the column is already there by then.
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const { camera, model, requestCamera } = useTwin.getState();
+      if (model && camera.kind === "home") requestCamera({ kind: "home" });
+    }, 120); // after the canvas has measured its new size (react-three-fiber observes it)
+    return () => window.clearTimeout(timer);
+  }, [docked]);
+}
+
+/** The left column. `dock` is what used to float at the bottom of the map (card or walk sheet, notes, campus card). */
 export function Sidebar({ walking, dock }: { walking: boolean; dock: ReactNode }) {
   const setCollapsed = useSidebar((s) => s.setCollapsed);
   return (
     <aside className="sidebar" aria-label="Chat with the building">
-      <div className="sb-head">
-        <TopBar />
-        <button
-          type="button"
-          className="sb-toggle"
-          aria-label="Hide chat"
-          aria-expanded
-          title="Hide chat"
-          onClick={() => setCollapsed(true)}
-        >
-          <ChevronIcon left />
+      <header className="sb-head">
+        <div className="sb-title">
+          <TopBar />
+          <FloorLine />
+        </div>
+        <button type="button" className="sb-toggle" aria-label="Hide chat" aria-expanded title="Hide chat" onClick={() => setCollapsed(true)}>
+          <PanelIcon />
         </button>
+      </header>
+      <div className="sb-tools" role="toolbar" aria-label="Tools">
+        <Round />
+        <NotesButton />
       </div>
-      <FloorLine />
-      <Omnibox walking={walking} docked />
       <ChatLog />
+      {/* Cards slot: route, place, walk, round and notes cards sit here, right above the composer. */}
       <div className="sb-dock">{dock}</div>
+      <div className="sb-composer">
+        <Omnibox walking={walking} docked />
+      </div>
     </aside>
   );
 }
@@ -82,7 +107,7 @@ export function SidebarExpand() {
   const setCollapsed = useSidebar((s) => s.setCollapsed);
   return (
     <button type="button" className="sb-toggle sb-expand" aria-label="Show chat" aria-expanded={false} title="Show chat" onClick={() => setCollapsed(false)}>
-      <ChevronIcon />
+      <PanelIcon />
     </button>
   );
 }
@@ -104,9 +129,10 @@ function ChatLog() {
     const list = ref.current;
     if (list) list.scrollTop = list.scrollHeight;
   }, [chat, busy]);
+  const empty = chat.length === 0 && !busy;
   return (
-    <ol className="sb-log" ref={ref} aria-label="Conversation" aria-live="polite">
-      {chat.length === 0 && !busy && <li className="sb-empty">Ask Wanda anything about this building, or tap the orb and talk.</li>}
+    <ol className={`sb-log ${empty ? "sb-log-empty" : ""}`} ref={ref} aria-label="Conversation" aria-live="polite">
+      {empty && <ColumnWelcome />}
       {chat.map((message) =>
         message.role === "user" ? (
           <li key={message.id} className="sb-msg sb-user">
@@ -134,12 +160,34 @@ function ChatLog() {
   );
 }
 
-function ChevronIcon({ left = false }: { left?: boolean }) {
+/** The empty conversation: Wanda's welcome (as on the phone's welcome card) and the questions this building answers. */
+function ColumnWelcome() {
+  const name = useTwin((s) => s.building?.name);
+  const chips = useWelcomeChips();
+  return (
+    <li className="sb-welcome" aria-label="Welcome">
+      {/* Slot for Wanda's picture (the fairy, docs/specs/wanda-fairy.md); empty until that lands. */}
+      <div className="sb-welcome-art" aria-hidden />
+      <h2 className="welcome-title">Hi, I'm Wanda.</h2>
+      <p className="welcome-sub">What can I help you find in {name ?? "this building"}?</p>
+      {chips.length > 0 && (
+        <div className="welcome-chips">
+          {chips.map((text) => (
+            <button key={text} type="button" className="welcome-chip" onClick={() => void useTwin.getState().ask(text)}>
+              {text}
+            </button>
+          ))}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function PanelIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="3" y="4" width="18" height="16" rx="2.5" />
       <path d="M9 4v16" />
-      <path d={left ? "M15.5 10l-2 2 2 2" : "M13.5 10l2 2-2 2"} />
     </svg>
   );
 }
