@@ -138,6 +138,13 @@ export const useNotes = create<NotesState>(() => ({
   dismissed: [],
 }));
 
+/** Who a new note is signed by, without asking: a name saved earlier on this device, else the profile
+ * ("Planner" on the laptop, "Technician" on the phone). */
+export function noteAuthor(): string {
+  if (authorRemembered()) return useNotes.getState().author;
+  return useTwin.getState().profile === "planner" ? "Planner" : DEFAULT_AUTHOR;
+}
+
 /** True once a name was saved on this device (the add form asks for it only before that). */
 export function authorRemembered(): boolean {
   try {
@@ -287,7 +294,8 @@ function mergeStateFacts(notes: Note[]): Note[] {
 }
 
 export async function addNote(input: { text: string; photo?: Blob | null; place?: NotePlace | null; kind?: FactKind; source?: "text" | "voice" | "tap" }): Promise<Note | null> {
-  const { buildingKey, author, storage } = useNotes.getState();
+  const { buildingKey, storage } = useNotes.getState();
+  const author = noteAuthor();
   const place = input.place ?? currentPlace();
   const text = input.text.trim();
   if (!buildingKey || !storage || !place || (!text && !input.photo)) return null;
