@@ -138,10 +138,11 @@ ROUND = "() => { const r = window.__round.useRound.getState(); return { guiding:
 def test_round_on_the_demo_building(page):
     start = space_id(page, "Main aisle H-B3")
     page.evaluate(
-        "async (start) => { await window.__round.openRound('fire extinguisher', 'Ground floor'); await window.__round.useRound.setState({ startId: start }); await window.__round.planRound(); }",
+        # the start first, so openRound plans once (15 route calls, 1 to 2 s each when the machine is busy)
+        "async (start) => { window.__round.useRound.setState({ startId: start }); await window.__round.openRound('fire extinguisher', 'Ground floor'); }",
         start,
     )
-    plan = wait_until(page, f"() => {{ const r = ({ROUND})(); return r.stops && !r.busy && r }}")
+    plan = wait_until(page, f"() => {{ const r = ({ROUND})(); return r.stops && !r.busy && r }}", timeout_s=90)
     assert len(plan["stops"]) == 5, plan
     stops = plan["stops"]
     same_order = page.evaluate(
