@@ -7409,7 +7409,7 @@
   {
    "id": "plan-89323a15-V02",
    "kind": "stairs",
-   "name": "Treppe",
+   "name": "Main Stairs",
    "floor_ids": [
     "plan-89323a15-B1",
     "plan-89323a15-F0",
