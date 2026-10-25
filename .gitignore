@@ -13,3 +13,4 @@ data/
 # Local role marker for Claude sessions
 .claude/role
 .claude/worktrees/
+docs/submission/video/vo/

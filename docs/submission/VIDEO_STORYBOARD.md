@@ -29,7 +29,12 @@ Placeholders in the table below: **[N] / [X]** = **[N stops · X m]** as the pan
 
 ## 1. Storyboard, second by second
 
-Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recording). VO = voiceover (Leonie or Jennifer, one voice, calm). Lines in quotes are exact.
+Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recording). Lines in quotes are exact.
+
+**Three audio layers** (never mixed up):
+- **(a) Narrator VO** = ElevenLabs, a calm female voice that is **not** Wanda's. Rendered **before the edit** from `docs/submission/video/vo_lines.json` with `make_vo.py` (§6): VO-first, the picture is cut to the real VO lengths, which makes exactly 2:00 easy. Every "VO:" line below is in that file word for word (`tests/test_make_vo.py` checks it).
+- **(b) Wanda** = the real app audio from the phone screen recording (the app speaks through ElevenLabs via `/api/speak`, voice `jqcCZkN6Knx8BJ5TBdYR`). If room noise ruins a take, replace it with the **identical sentence** rendered through our own `/api/speak` (same pipeline, same voice, so it is still the real product's voice). Never script Wanda's round sentence by hand: it is phrased by the LLM.
+- **(c) Gisela** = her short lines, spoken live on camera after tapping the orb (clip-on mic).
 
 | Time | Shot | On screen | Spoken (exact) | Caption (burned in) | Purpose |
 |---|---|---|---|---|---|
@@ -138,7 +143,7 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
 
 ## 6. Production (one person, a Mac, about 2 hours after the shoot)
 
-**Rule:** all narration is **voiceover**, recorded after the shoot to the final picture. On camera only two kinds of sound: Gisela's short lines to Wanda, each after tapping the orb ("Wanda, fire extinguisher round …", "Done", "Note: …", "Finished"; there is no wake word) and Wanda's real app voice. Nothing else is spoken on location. Clean means: no ums, no room noise under the VO, no UI clutter, no secrets.
+**Rule:** all narration is **ElevenLabs voiceover, rendered first** (VO-first: the picture is cut to it). On camera only two kinds of sound: Gisela's short lines to Wanda, each after tapping the orb ("Wanda, fire extinguisher round …", "Done", "Note: …", "Finished"; there is no wake word) and Wanda's real app voice. Nothing else is spoken on location. Clean means: no ums, no room noise under the VO, no UI clutter, no secrets.
 
 ### Toolchain (pick the left column unless you already know the right one)
 
@@ -148,34 +153,54 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
 | Phone screen recording | iPhone Control Centre → Screen Recording, **long-press → Microphone on** (so Gisela's line and Wanda's voice are in the file for sync) | – |
 | Camera | second iPhone, 4K 30 fps, landscape, locked exposure (long-press on the subject) | any camera |
 | Edit, split screen, captions | **CapCut desktop** (free): drag both clips onto two tracks, "Picture in picture" / crop to 50/50, auto-captions → edit → burn in on export | **iMovie** (split screen exists, captions are weak), **DaVinci Resolve** only if someone knows it, **Descript** if you want to edit by deleting words in the transcript |
-| Voiceover | Record: iPhone Voice Memos or QuickTime, a headset/lavalier mic, small quiet room with soft surfaces (no corridor echo) | Generate: **ElevenLabs** (we already use it in the app). Use one narrator voice that is clearly **not** Wanda's app voice (`ELEVENLABS_VOICE_ID`), so the jury can tell narrator and product apart |
+| Voiceover | **ElevenLabs via `docs/submission/video/make_vo.py`** (model `eleven_multilingual_v2`): pick one female narrator voice that is clearly **not** Wanda's (`jqcCZkN6Knx8BJ5TBdYR`; the script refuses it), render all 12 lines, check lengths, import the MP3s into CapCut | – |
 | Captions | CapCut auto-captions, fix names by hand ("Wanda", "Urban Colab", "Main Stairs", "Third Floor Corridor"), white text, dark box, bottom third, at least 5 % of frame height | Descript captions |
 | Music | royalty-free, calm, no vocals (CapCut library, YouTube Audio Library, Pixabay Music), at **−25 to −30 dB** under the VO, ducked further under Wanda's voice | none (fine) |
 | Architecture diagram | **Keynote** with Magic Move (see below), export as 1080p movie | an HTML motion slide (below), screen-recorded |
 
 **Code-based options, honestly:**
 - **Remotion** (render video from React) has official agent skills (`remotion-dev/skills` on GitHub), and community skills exist (e.g. `video-shotcraft`). It could render the split screen, animated captions and the diagram from our own twin components. But it needs a Node project, a render setup and someone who checks frame timing: realistic first result 2–4 hours. **Not before a 13:00 deadline.** Good later for a polished version.
-- **HTML motion slide** for the 10-s diagram beat: one self-contained HTML file with CSS animations (boxes appear, arrows draw, a JSON snippet flashes), opened full screen and screen-recorded. A Claude session can write it in about 15 minutes, no install. Use it only if Keynote is not at hand.
+- **HTML motion slides (built):** `docs/submission/video/architecture.html` plays the diagram beat and the 145 card (Space plays, 15 s, 1920×1080), `mockup.html` frames the clips in an iPhone/MacBook and plays the split screen in sync. Screen-record them full screen; Keynote is only the fallback.
 - Agentic "do the whole edit" repos (OpenMontage etc.) are not worth the setup today.
 
-### Step-by-step plan (times for one person)
+### Step-by-step plan (times for one person, VO-first)
+
+Commands (from the repo root; the key stays in `.env`, never printed):
+
+```bash
+uv run --env-file .env python docs/submission/video/make_vo.py --list-voices
+```
+
+```bash
+uv run --env-file .env python docs/submission/video/make_vo.py --samples VOICE_ID_1 VOICE_ID_2 VOICE_ID_3
+```
+
+```bash
+uv run --env-file .env python docs/submission/video/make_vo.py --voice VOICE_ID
+```
+
+```bash
+uv run --env-file .env python docs/submission/video/make_vo.py --voice VOICE_ID --only S06 S08
+```
 
 | Step | What | Time |
 |---|---|---|
-| 1 | Prep checklist (§4), seed, reset, rehearse twice | 20 min |
-| 2 | Shoot S1–S4, S9 (problem shots, plan photo) | 20 min |
-| 3 | Shoot S6+S7 (round, split screen), 2–3 full takes, sync clap each take | 25 min |
-| 4 | Record S5 (laptop planning), 3 takes | 10 min |
-| 5 | Build the diagram (Keynote or HTML) and the 145 card | 20 min |
-| 6 | AirDrop everything to the Mac, rename (below), pick best takes | 10 min |
-| 7 | Rough cut in CapCut to the storyboard timings, split screen synced on the clap | 25 min |
-| 8 | Record/generate the VO to the rough cut, place it, trim to fit | 15 min |
-| 9 | Captions (auto, then correct), music, levels | 15 min |
-| 10 | Export 1080p, QA (below), upload | 15 min |
+| 1 | **Pick the narrator:** `--list-voices`, choose 3 female voices (not Wanda), `--samples` renders the hook line with each into `docs/submission/video/vo/samples/`; listen, pick one (optionally put it in `.env` as `NARRATOR_VOICE_ID`) | 10 min |
+| 2 | **Render the VO:** default run writes `vo/S01.mp3 … S12.mp3` and prints each line's real length against its slot, flagging `OVER` | 3 min |
+| 3 | **Fix overruns:** shorten the text in `vo_lines.json` **and** the same "VO:" line in §1 (the test keeps them equal), re-render only those lines with `--only`; or `--speed 1.05`. Stop when nothing says OVER | 10 min |
+| 4 | Prep checklist (§4), seed, reset, rehearse twice | 20 min |
+| 5 | Shoot S1–S4, S9 (problem shots, plan photo) | 20 min |
+| 6 | Shoot S6+S7 (round, split screen), 2–3 full takes, sync clap each take | 25 min |
+| 7 | Record S5 (laptop planning), 3 takes | 10 min |
+| 8 | Diagram + 145 card: `docs/submission/video/architecture.html` (Space plays, screen-record), split frames with `mockup.html` | 10 min |
+| 9 | AirDrop everything to the Mac, rename (below), pick best takes | 10 min |
+| 10 | **Cut picture to the VO in CapCut:** put S01–S12 on the audio track at their slot times first, then lay the picture under them; the round (0:52–1:32) carries Wanda's app audio and Gisela's lines | 25 min |
+| 11 | Captions (auto, then correct), music, levels | 15 min |
+| 12 | Export 1080p, QA (below), upload | 15 min |
 
-Total about 3 h 15 min including the shoot; the edit alone (steps 5–10) is about 1 h 40 min. If short on time: skip music, skip the knowledge-view pan, use one round take.
+Total about 3 h including the shoot. Steps 1–3 can run before the shoot (no footage needed). If short on time: skip music, skip the knowledge-view pan, use one round take.
 
-**File naming** (one folder `video/`, not in git): `S06_round_cam_take2.mov`, `S07_round_phone_take2.mp4`, `S05_laptop_take1.mov`, `VO_problem_v2.m4a`, `DIAG_architecture.mov`, exports `wanda_2min_v1.mp4`, `wanda_2min_FINAL.mp4`.
+**File naming** (one folder `video/`, not in git): `S06_round_cam_take2.mov`, `S07_round_phone_take2.mp4`, `S05_laptop_take1.mov`, `vo/S03.mp3` (from make_vo.py), `DIAG_architecture.mov`, exports `wanda_2min_v1.mp4`, `wanda_2min_FINAL.mp4`.
 
 **Export and upload:** 1920×1080, 30 fps, H.264, about 10–16 Mbit/s, AAC 48 kHz. Upload as **YouTube unlisted** (most reliable playback for the jury) or Loom; open the link in a private window to check it plays without login. One person uploads, agreed in chat.
 
@@ -197,7 +222,7 @@ Slide C (1:47–1:55), Magic Move: the evacuation-plan photo (`demo/plans/urban-
 
 - [ ] Length **≤ 2:00** (check the file's duration in Finder/QuickTime, not the editor).
 - [ ] Product name spelled **"Wanda – the building that talks back"** on the title card and the end card; team names correct.
-- [ ] Audio: VO peaks around −6 dB, no clipping; Wanda's voice understandable; music never louder than speech; no echo or wind.
+- [ ] Audio: narrator VO peaks around −6 dB, no clipping; narrator and Wanda clearly two different voices; Wanda understandable; music never louder than speech; no echo or wind.
 - [ ] Captions legible on a phone held at arm's length; no typos in room names (English names only); source line under the 12.9 million number.
 - [ ] Split screen in sync (her lips and the "Done" on the map within a few frames).
 - [ ] Every number on screen matches the panel on shoot day and says which round it is (floor 3: 5 per room / 6 per device).
