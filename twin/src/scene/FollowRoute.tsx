@@ -92,6 +92,14 @@ function shortLine(line: string): string {
   return text.length > 34 ? `${text.slice(0, 32).trimEnd()}…` : text;
 }
 
+/** The badge names the turn, not a distance: the sheet's "Walk about 6 m ..." is the current step and a second
+ * number on the map read as a contradiction. "Walk about 16 m through the door" -> "Then: through the door". */
+export function thenLine(line: string): string {
+  const rest = line.replace(/^Walk about \d+(?:[.,]\d+)? m\s*/i, "").trim();
+  const text = shortLine(rest.length >= 3 ? rest.charAt(0).toLowerCase() + rest.slice(1) : line);
+  return `Then: ${text}`;
+}
+
 interface BadgeProps {
   route: Route | null;
   floorY: (floorId: string) => number;
@@ -119,7 +127,7 @@ export function NextTurnBadge({ route, floorY, onlyFloor, lift }: BadgeProps) {
     <Html position={[badge.at.x, floorY(badge.at.floorId) + lift, -badge.at.y]} center zIndexRange={[6, 0]} style={{ pointerEvents: "none" }}>
       <span className="chip chip-route" data-next-turn style={{ transform: "translateY(-18px)", whiteSpace: "nowrap" }}>
         <TurnIcon line={badge.next} up={badge.up} />
-        {shortLine(badge.next)}
+        {thenLine(badge.next)}
       </span>
     </Html>
   );
