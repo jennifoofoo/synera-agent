@@ -151,12 +151,12 @@ export function Scene() {
       ) : (
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
-      <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
+      <color attach="background" args={[flat ? COLOURS.plan : COLOURS.groundOuter]} />
       {!flat && <fog attach="fog" args={[COLOURS.groundOuter, size * 2.5, size * 9]} />}
       {/* soft daylight: a bright sky dome, one steep key light for the wall tops, a cool fill from the other side */}
-      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, 1.6]} />
-      <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={1.3} color={COLOURS.sky} />
-      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.5} color={COLOURS.fill} />
+      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, 2.1]} />
+      <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={0.9} color={COLOURS.sky} />
+      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.6} color={COLOURS.fill} />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}

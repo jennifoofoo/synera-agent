@@ -70,9 +70,11 @@ export function TapPin({ floorY, visibleFloors, flat }: PinProps) {
   return (
     <group position={[selection.point[0], floorY(selection.floor_id) + 0.07, -selection.point[1]]} name="tap-pin">
       <Ring radius={radius} colour={COLOURS.selection} width={flat ? 0.16 : 0.12} through order={30} />
-      <lineSegments geometry={cross} renderOrder={19}>
-        <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={false} />
-      </lineSegments>
+      {flat && (
+        <lineSegments geometry={cross} renderOrder={19}>
+          <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={false} />
+        </lineSegments>
+      )}
       <Disc radius={flat ? 0.28 : 0.2} colour={COLOURS.selection} opacity={1} through y={0.02} order={31} />
       {!flat && (
         <>
