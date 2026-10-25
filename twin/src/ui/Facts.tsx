@@ -146,7 +146,7 @@ function NoteRow({ note, past = false }: { note: Note; past?: boolean }) {
 
 /** Bottom left: "Notes" (opens "What's here?" for the tapped room, the guidance step's room or "You are here") and
  * the map layer "Notes & photos" (spec: off by default). Installs the notes store. */
-export function NotesButton() {
+export function NotesButton({ docked = false }: { docked?: boolean }) {
   const sheet = useNotes((s) => s.sheet);
   const notes = useNotes((s) => s.notes);
   const layer = useNotes((s) => s.layer);
@@ -157,13 +157,20 @@ export function NotesButton() {
   // While walking the map stays free: notes surface on their own at the destination or a round stop.
   const walking = useTwin((s) => s.walkStep !== null);
   useEffect(installNotes, []);
-  if (!model || draft || walking || sheet !== "closed") return null;
+  // Laptop tool row (docked): the button stays while the notes are open, pressed, so the row never shifts.
+  const open = sheet !== "closed";
+  if (!model || draft || walking || (open && !docked)) return null;
   void notes; // re-render on changes
   const spaceId = selection?.kind === "asset" ? model.assetById.get(selection.id)?.space_id : selection?.kind === "space" ? selection.id : (selection?.space_id ?? position?.space_id);
   const here = spaceId ? notesIn([spaceId]).length : 0;
   return (
     <div className="notes-fab-row">
-      <button className="notes-fab" onClick={() => openNotes("here")} aria-label={here ? `Notes, ${here} here` : "Notes"}>
+      <button
+        className="notes-fab"
+        onClick={() => (open ? closeNotes() : openNotes("here"))}
+        aria-label={here ? `Notes, ${here} here` : "Notes"}
+        aria-pressed={docked ? open : undefined}
+      >
         <NoteGlyph />
         <span>Notes</span>
         {here > 0 && <span className="notes-count">{here}</span>}
