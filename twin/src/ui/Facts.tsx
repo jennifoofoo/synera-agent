@@ -20,6 +20,7 @@ export function NotesToggle() {
   const layer = useFacts((s) => s.layer);
   const setLayer = useFacts((s) => s.setLayer);
   const count = useTwin((s) => pinFacts(s.state?.facts).length);
+  if (!layer && count === 0) return null; // nothing to show: no extra button in the rail
   const title = layer ? "Hide notes & photos" : `Show notes & photos${count ? ` (${count})` : ""}`;
   return (
     <button className={`rail-toggle rail-notes ${layer ? "active" : ""}`} onClick={() => setLayer(!layer)} title={title} aria-label="Notes & photos" aria-pressed={layer} data-testid="notes-toggle">
