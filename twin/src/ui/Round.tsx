@@ -105,6 +105,13 @@ export function Round() {
             ))}
           </select>
         </label>
+        <label>
+          <span className="tiny-label">End</span>
+          <select value={round.returnToStart ? "start" : "last"} onChange={(event) => void setRoundChoice({ returnToStart: event.target.value === "start" })}>
+            <option value="last">At the last stop</option>
+            <option value="start">Back at the start</option>
+          </select>
+        </label>
       </div>
 
       {!plan && !busy && !error && (
@@ -188,12 +195,18 @@ export function RoundBar() {
   return (
     <div className="round-bar">
       <span className="round-bar-text">
-        <strong>
-          Stop {status.stop} of {status.total}
-        </strong>{" "}
-        · {status.label}
+        {status.returning ? (
+          <strong>{status.label}</strong>
+        ) : (
+          <>
+            <strong>
+              Stop {status.stop} of {status.total}
+            </strong>{" "}
+            · {status.label}
+          </>
+        )}
       </span>
-      <button className="round-bar-done" onClick={() => void roundDone()} disabled={!!round.busy} title="Checked: go to the next stop">
+      <button className="round-bar-done" onClick={() => void roundDone()} disabled={!!round.busy} title={status.returning ? "Back at the start: finish the round" : "Checked: go to the next stop"}>
         Done
       </button>
       <button className="link round-bar-exit" onClick={endRound} title="Leave the round (checks are kept)">
