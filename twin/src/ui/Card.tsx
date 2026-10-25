@@ -20,6 +20,7 @@ import { AvoidsClosed } from "./AvoidsClosed";
 import { RouteChips } from "./RouteChips";
 import { TurnIcon, rideUp } from "./Walk";
 import { useRound } from "../round/round";
+import { KnowledgeButton } from "./KnowledgeGraph";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -223,6 +224,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
               {hereAlready ? "You're here" : "I'm here"}
             </button>
           )}
+          <KnowledgeButton roomId={roomId} />
         </div>
       )}
     </Sheet>

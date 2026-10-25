@@ -9,6 +9,7 @@ import { TiltHint } from "./ui/Compass";
 import { ChangesPill } from "./ui/ChangesPill";
 import { FloorRail } from "./ui/FloorRail";
 import { KeyHelp } from "./ui/KeyHelp";
+import { KnowledgeGraph } from "./ui/KnowledgeGraph";
 import { NewBuilding } from "./ui/NewBuilding";
 import { NotesButton, NotesDock } from "./ui/Facts";
 import { Omnibox } from "./ui/Omnibox";
@@ -60,6 +61,7 @@ export function App() {
         <Omnibox walking={walking} />
       </div>
       <NotesButton />
+      <KnowledgeGraph />
       <NewBuilding />
       <KeyHelp />
       <TiltHint />
