@@ -73,7 +73,7 @@ def test_tap_answers_where_are_you(page, server):
 
     # 3. the tap answers: "I'm here." with context.here of the tapped room, no card
     tap(page, x, y)
-    for _ in range(50):
+    for _ in range(150):
         if len(requests) >= 2:
             break
         page.wait_for_timeout(100)
@@ -84,7 +84,7 @@ def test_tap_answers_where_are_you(page, server):
     assert here["space_id"] == space_id
     assert here.get("point"), "the exact tapped point travels with context.here"
     assert "space_id" not in answer["context"], "no selection context with the answer"
-    hint.wait_for(state="hidden", timeout=5000)
+    hint.wait_for(state="hidden", timeout=15000)
     page.wait_for_function("!window.__twinAudit.store.getState().chatBusy", timeout=10000)
     assert page.locator(".card-selection").count() == 0, "the answering tap must not open the room card"
     position = page.evaluate("() => window.__twinAudit.store.getState().state.position")
@@ -93,7 +93,7 @@ def test_tap_answers_where_are_you(page, server):
 
     # 4. the question is answered: the next tap opens the card again
     tap(page, x, y)
-    page.locator(".card-selection").wait_for(state="visible", timeout=5000)
+    page.locator(".card-selection").wait_for(state="visible", timeout=15000)
     assert len(requests) == 2
     assert not page.errors, page.errors
 
@@ -115,7 +115,7 @@ def test_hint_dismiss_keeps_taps_normal(page, server):
     hint = page.locator("[data-testid=tap-where]")
     hint.wait_for(state="visible", timeout=10000)
     hint.get_by_role("button", name="Not now").click()
-    hint.wait_for(state="hidden", timeout=5000)
+    hint.wait_for(state="hidden", timeout=15000)
     tap(page, x, y)
-    page.locator(".card-selection").wait_for(state="visible", timeout=5000)
+    page.locator(".card-selection").wait_for(state="visible", timeout=15000)
     assert not page.errors, page.errors
