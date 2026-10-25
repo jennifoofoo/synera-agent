@@ -48,13 +48,25 @@ Jeder Techniker kann per Sprache oder Tippen Wissen an einen Ort oder ein Gerät
 | "Was ist gerade gesperrt?" | aktive Sperrungen mit "bis wann" |
 Regeln: Fakten nur nach Karte und klarem "Ja" (wie jede Änderung). Zeitwörter ("bis morgen", "bis 14 Uhr", "für zwei Stunden", "bis Freitag") deterministisch auflösen, Unklares nachfragen. Wanda erfindet nichts; sie nennt Alter und Autor ("seit heute 8:10, von Techniker A").
 
+## Entscheidungen (Jennifer, 25.10. nachts)
+- **So wenig Klicken wie möglich, Sprache zuerst:** "Zeig mir das Foto", "Was gibt's hier?", "Zeig alle Notizen in Halle A" öffnen das Foto bzw. heben die Stellen auf der Karte hervor (Agent liefert `facts`-Treffer wie heute `located`).
+- **Ebene "Notes & photos"** (Laptop und Handy), Standard **aus**: eingeschaltet Pins für alle jetzt gültigen Notizen, Probleme, Fotos. Schalter neben der Etagenleiste bzw. in der Legende. Antippen eines Pins: Text, Alter, Autor, kleines Foto, sonst nichts.
+- **Immer sichtbar, auch bei ausgeschalteter Ebene:** Sperrungen (ändern Wege, Sicherheit) mit "Closed until …"; beim Begleiten die Fakten der Räume auf der eigenen Route (und Wanda liest sie beim Betreten vor).
+- **"bis morgen"** = morgen 18:00 (Schichtende), "bis Freitag" = Freitag 18:00, Zeitzone Europe/Berlin; Unklares fragt Wanda nach.
+- **Autor:** Name einmal auf der Seite eingeben ("Techniker A"), im Browser gemerkt, sonst "Technician". Kein Login.
+- **Erledigt melden:** jeder, der Verlauf zeigt wer.
+- **Löschen:** nur "undo" direkt nach dem Anlegen; sonst nur ablösen.
+- **Fotos:** optional, Handy-Kamera, verkleinert, EXIF und Ortsdaten entfernt.
+- **Speicher:** pro Gebäude in einer Datei, bleibt nach Neustart erhalten.
+- **Bestätigung:** Notizen und Probleme per Sprache/Chat: kurze Karte, dann "Ja". Sperrungen: Karte mit Wirkung auf die Wege wie heute. Knopf "Notiz hier" in der Seite: Absenden gilt als Bestätigung.
+
 ## Aufteilung
 | Teil | Wer | Dateien |
 |---|---|---|
 | Faktenspeicher, Zeitlogik ("jetzt gültig", Ablösen, Ablauf), Zeitwörter-Parser, Sperrung mit `valid_to` im Routing (Tick beim Abfragen, kein Hintergrundjob) | Jennifer (Agent K1) | neu `building_agent/knowledge.py`, `building_agent/time_words.py` (gibt es? sonst neu), kleine Anbindung in `guide_tools.py` (Aktion `close` bekommt `until`) |
 | API: `GET /api/facts?key=&space_id=&asset_id=&at=` (jetzt gültig / Verlauf), `POST /api/facts` (nur über bestätigte Karte bzw. lokal nach Bestätigung), Foto-Upload (verkleinert, EXIF weg), `state_view.facts` (aktive Fakten pro Etage) | Jennifer (Agent K1, nutzt den halben Notizen-Branch) | neu `web/knowledge_api.py`, `web/server.py` (Routen), `web/api.py` (state_view) |
 | Agent-Werkzeuge: `remember_here(text, kind, until?)` (schlägt Karte vor), `resolve_here(…)`, `facts_here(scope, when=now|history)`, Hinweis beim Begleiten in `walk.py` (Raum mit aktiven Fakten) | Jennifer (Agent K2, Prompt-Änderung → Live-Suite) | `building_agent/knowledge_tools.py`, eine Prompt-Zeile in `agent.py`, Registrierung in `tools.py` |
-| Seite: Pins für aktive Fakten (Notiz-Symbol, Problem-Symbol, Sperrung "until …"), Antippen zeigt Liste mit Alter/Autor/Foto, "Notiz hier"-Knopf in der Raumkarte (Text, Foto), Verlauf aufklappbar, "Closed until …" am Sperr-Symbol, freihändig "merk dir …" an den Chat geben | **Leonie** | neu `ui/Facts.tsx`, `scene/FactPins.tsx`, kleine Einhängepunkte in `Card.tsx`, `poiIcons`, `handsFree.ts` |
+| Seite: Ebene "Notes & photos" (Standard aus) mit Pins für aktive Fakten (Notiz-Symbol, Problem-Symbol), Sperrung "until …" immer sichtbar, Antippen zeigt Text/Alter/Autor/Foto, Foto per Sprache öffnen, "Notiz hier"-Knopf in der Raumkarte (Text, Foto), Verlauf aufklappbar, "Closed until …" am Sperr-Symbol, freihändig "merk dir …" an den Chat geben | **Leonie** | neu `ui/Facts.tsx`, `scene/FactPins.tsx`, kleine Einhängepunkte in `Card.tsx`, `poiIcons`, `handsFree.ts` |
 
 ## Vertrag für die Seite (Leonie)
 - `state.facts`: `[{id, kind, anchor: {space_id, asset_id, element_id, point, floor_id}, text, valid_from, valid_to, status, author, photo}]` nur jetzt gültige, in jeder Antwort mit `state`.
