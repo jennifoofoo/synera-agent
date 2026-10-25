@@ -8,26 +8,29 @@ Update (Leonie's session): the inspection round, `plan_round` and the browser no
 
 **Rule: always say the start point** ("I start at the entrance in Main aisle H-B3"), otherwise Wanda asks for it (no entrance is marked as the main one).
 
-Real numbers: all fire extinguishers on the ground floor, start at the entrance in Main aisle H-B3: **5 stops, about 100 m** (page 100 m, agent 99.1 m). With a new door between Production zone H-A2 and Server room 0.16: **62 m, 38 m shorter**.
+Real numbers: all fire extinguishers on the ground floor, start at the entrance in Main aisle H-B3: **5 stops, about 100 m** (page 100 m, agent 99.1 m). (For Q&A only: a new door between Production zone H-A2 and Server room 0.16 makes it 62 m.)
 Demo link (opens the round and the "Try a door" button): `#round=fire%20extinguisher&area=Ground%20floor&building=train/proc-factory-train-015&door=proc-factory-train-015-F0-S002,proc-factory-train-015-F0-S016`
 
 ## Cast and props
-- **Klaus**, 63, retiring next month. **Tom**, 24, three weeks in the job. Both use the same iPhone app.
-- Printed signs on real spots: "Fire extinguisher" ×5 (numbered to match the stops), "Production zone H-A2", "Server room 0.16", "Main aisle H-B3 – Entrance".
+- **One person: Gisela**, service technician (team decision: one person only, women only; no facility manager in the 2-minute video).
+- The knowledge from others appears only as notes already on the map ("from the night shift"), never as a second person on screen. Seed one note before the shoot at fire extinguisher 2 (Production zone H-A2) with a photo: "Bracket is loose, always check it first" (author: night shift).
+- Printed signs on real spots: "Fire extinguisher" ×5 (numbered to match the stops), "Main aisle H-B3 – Entrance".
 - iPhone (screen recording on), gloves, a tripod or second phone for the outside shot.
 
 ## Script (2:00: 60 s product, 60 s technology)
 
 | Time | Picture | Said | Notes |
 |---|---|---|---|
-| 0:00–0:08 | Klaus at a machine. Caption: "Klaus, 63. 38 years in this plant. Retires next month." | Voiceover: "When Klaus retires, 38 years of knowledge leave with him." | |
-| 0:08–0:15 | Klaus at fire extinguisher 2, iPhone, takes a photo | Klaus (Talk): "Note: the bracket here is loose, always check it first." Pin with photo appears. | notes |
-| 0:15–0:35 | Tom walks with the iPhone; screen recording of the map | Tom (Talk): "Inspection round: all fire extinguishers on the ground floor. I start at the entrance in Main aisle H-B3." Wanda: "Five stops, about 100 metres." Two stops shown with "Done", the rest as a 2-second time-lapse. At stop 2: "**Klaus left a note here:** the bracket is loose." Photo fades in. | round + notes |
-| 0:35–0:47 | Same iPhone, 2D map | "What if a door here?" (Try a door) → new door, new route, "Round 38 m shorter (100 → 62 m)". | round what-if |
-| 0:47–1:00 | Tom at the end | Tom (Talk): "Finished." Job report: 5 of 5 stops, 1 note with photo. (Cut this scene first if the video is too long.) | report |
-| 1:00–1:25 | Diagram: voice → Wanda (agent) → tools → building graph | Voiceover: "Every fact comes from code, not from the language model: areas from polygons, shared walls, floors in 3D, door widths, door-to-door routes on Synera's route model. The model picks the tool and phrases the answer. That's why all 145 benchmark answers are reproducible." | |
+| 0:00–0:10 | Gisela at the hall entrance with gloves and the iPhone. Caption: "Gisela, service technician." | Voiceover: "Every day, technicians search: for machines, for parts, for what the last shift knew. And when experienced colleagues retire, their knowledge leaves with them." | |
+| 0:10–0:30 | Gisela walks; screen recording of the map | Gisela (Talk): "Inspection round: all fire extinguishers on the ground floor. I start at the entrance in Main aisle H-B3." Wanda: "Five stops, about 100 metres." Route appears, "Stop 1 of 5". Two stops with "Done", the rest as a 2-second time-lapse. | round |
+| 0:30–0:45 | At stop 2 | Wanda: "**Note from the night shift:** the bracket is loose, always check it first." Photo fades in. Gisela checks it. | notes |
+| 0:45–0:55 | Gisela at stop 4 takes a photo | Gisela (Talk): "Note: hose is cracked, replace next week." Pin with photo appears: the next person will hear it. | notes |
+| 0:55–1:00 | End of the round | Gisela (Talk): "Finished." Job report: 5 of 5 stops, 2 notes with photos. | report |
+| 1:00–1:25 | Diagram: voice → Wanda (agent) → tools → building graph | Voiceover: "Every fact comes from code, not from the language model: areas from polygons, shared walls, floors in 3D, door widths, door-to-door routes on Synera's route model. The model picks the tool and phrases the answer; the shortest round is computed, not guessed. That's why all 145 benchmark answers are reproducible." | |
 | 1:25–1:45 | A floor plan image turning into the twin | Voiceover: "It works on any building, even from a floor plan: every furniture symbol becomes an asset, so we tell kitchens from offices." | Level 4 |
-| 1:45–2:00 | Map full of note pins; roadmap card | Voiceover: "As easy as the maps you already use, and you just talk to it. Klaus retires. His knowledge doesn't. With 6G, the building will know where you are." Logo, team names. | |
+| 1:45–2:00 | Map full of note pins; roadmap card | Voiceover: "As easy as the maps you already use, and you just talk to it. The knowledge stays in the building. Today you tell Wanda where you are; with 6G, the building will know." Logo, team names. | |
+
+Cut first if too long: the report (0:55–1:00). The what-if door (facility manager level) is not in the video; mention it in the live pitch or Q&A only.
 
 ## Shoot checklist
 - iPhone: open the page over the tunnel (https, needed for the mic), allow the mic, speaker on, screen recording on; quiet spot for the voice takes.
