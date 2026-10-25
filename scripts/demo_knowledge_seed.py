@@ -31,7 +31,7 @@ STORY = [
         14,
         "Lift",
         "issue",
-        "Lift out of order until tomorrow, technician booked. Use the Main Stairs.",
+        "Lift door closes slowly, technician booked.",
         "Jonas",
         1,
         None,
