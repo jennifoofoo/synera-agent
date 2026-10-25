@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Billboard, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
@@ -7,33 +7,22 @@ import type { Route, RouteSegment } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
-import { PIN_HEAD_PX, PIN_HEAD_Y_PX, Pulse, START_DOT_PX, ScreenSized } from "./markerLayout";
+import { PIN_HEAD_PX, PIN_HEAD_Y_PX, START_DOT_PX, ScreenSized } from "./markerLayout";
 import { NextTurnBadge, WalkedLine } from "./FollowRoute";
+import { ROUTE_CASING_PX, ROUTE_LINE_PX, routeLayers, simplifyPolyline } from "./routeLook";
 
 /** Height of the route line above the floor (m): high enough above the slab that it never flickers with the floor,
  * so in 3D it can be depth-tested (walls hide it); the flat 2D plan draws it without depth test. Labels.tsx anchors a
  * route end's label at the same height. */
 export const LIFT = 0.15;
-const DRAW_IN_S = 1.4;
-/** The chaos moment: when the route changes, the old line dissolves for this long before the new one draws in. */
-const DISSOLVE_S = 0.3;
-/** Route line width on screen (px), 2D and 3D, and its white casing on each side. */
-const LINE_PX = 6;
-const LINE_PX_3D = 5.5;
+const DRAW_IN_S = 1.0;
+/** The pin's white casing (px). */
 const CASING_PX = 1.5;
-/** A soft halo of the signal colour under the casing (px each side) and its opacity. */
-const HALO_PX = 8;
-const HALO_OPACITY = 0.16;
-/** The travelling flow on the line: thin white dashes (px wide, metres long) that move at walking pace. */
-const FLOW_PX = 2.2;
-const FLOW_DASH_M = 1.0;
-const FLOW_GAP_M = 2.2;
-const FLOW_SPEED_MPS = 2.4;
-const FLOW_OPACITY = 0.6;
 /** The destination pin pops when it appears (seconds). */
 const POP_S = 0.26;
-/** Depth handling of the route lines in one place: hidden by walls in 3D, always on top on the 2D plan. */
-const depthOf = (flat: boolean) => ({ depthTest: !flat, depthWrite: false });
+/** The route lies on the floor like a map app's line, in 2D and 3D alike: never cut into pieces by walls or
+ * furniture, above the room fills, below the labels (HTML). */
+const DEPTH = { depthTest: false, depthWrite: false } as const;
 
 interface Props {
   route: Route | null;
@@ -52,7 +41,7 @@ function toPoints(segments: RouteSegment[], floorY: (id: string) => number, only
   for (const segment of segments) {
     if (onlyFloor && segment.floor_id !== onlyFloor) continue;
     const y = floorY(segment.floor_id) + LIFT;
-    for (const [x, z] of segment.points) points.push(new THREE.Vector3(x, y, -z));
+    for (const [x, z] of simplifyPolyline(segment.points)) points.push(new THREE.Vector3(x, y, -z));
   }
   return points;
 }
@@ -109,11 +98,13 @@ function slice(points: THREE.Vector3[], lengths: number[], s0: number, s1: numbe
   return result;
 }
 
-/** The route as ONE line with a casing, like a map app (vertical runs at stairs and lifts in 3D), drawn in once.
- * The server's guide leg (door to door) is not drawn as a path of its own: during guidance the part of the route
- * that the current leg covers is emphasised on the same line and the rest is paler. */
+/** The route as ONE line, like a map app: one solid blue line on a thin darker casing (routeLook.ts), drawn in once
+ * (vertical runs at stairs and lifts in 3D). Only the current route is ever drawn: a new route replaces the old line
+ * at once, nothing of the old one stays or fades. The server's guide leg (door to door) is not a path of its own:
+ * during guidance the part of the route that the current leg covers keeps the full blue and the rest turns pale. */
 export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, reducedMotion, flat = false, worker = false }: Props) {
   void model;
+  void flat;
   const here = useTwin((s) => s.state?.position ?? null);
   const points = useMemo(() => (route?.ok && route.segments ? toPoints(route.segments, floorY, onlyFloor) : []), [route, floorY, onlyFloor]);
   const lengths = useMemo(() => {
@@ -134,75 +125,39 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     return s1 - s0 > 0.5 ? slice(points, lengths, s0, s1) : null;
   }, [guideSegments, points, lengths, floorY, onlyFloor]);
 
-  const halo = useRef<Line2>(null);
-  const casing = useRef<Line2>(null);
-  const line = useRef<Line2>(null);
-  const flow = useRef<Line2>(null);
+  const layerRefs = [useRef<Line2>(null), useRef<Line2>(null)];
   const runGaps = useRef<Line2>(null);
   const started = useRef(0);
-  // The previous line, kept as a ghost while it dissolves (only when the route itself changed, not on a floor switch).
-  const [ghost, setGhost] = useState<THREE.Vector3[] | null>(null);
-  const ghostStarted = useRef(0);
-  const ghostRefs = [useRef<Line2>(null), useRef<Line2>(null), useRef<Line2>(null)];
-  const previous = useRef<{ points: THREE.Vector3[]; onlyFloor: string | null } | null>(null);
-  useEffect(() => {
-    const before = previous.current;
-    previous.current = points.length >= 2 ? { points, onlyFloor } : null;
-    const dissolve = !reducedMotion && !!before && before.points !== points && before.onlyFloor === onlyFloor && points.length >= 2;
-    if (dissolve && before) {
-      ghostStarted.current = performance.now();
-      setGhost(before.points);
-    } else {
-      setGhost(null);
-    }
-    started.current = performance.now() + (dissolve ? DISSOLVE_S * 1000 : 0);
-  }, [points, onlyFloor, reducedMotion]);
+  // A new line draws in from its start (a floor switch too); set before the first frame, so the new line never shows
+  // whole for a frame. The draw-in uses the dash pattern, and Line2 draws round caps (round joints) only without
+  // dashes: once drawn, the line drops the dashes again.
+  const [drawingIn, setDrawingIn] = useState(false);
+  useLayoutEffect(() => {
+    started.current = performance.now();
+    setDrawingIn(!reducedMotion);
+  }, [points, reducedMotion]);
 
-  const guided = !!legPoints;
-  // The flow keeps asking for frames; on a phone (frameloop "demand") only while guiding, never under reduced motion.
-  const flowOn = !reducedMotion && (!worker || guided);
-  const guidedRef = useRef(false);
-  guidedRef.current = guided;
-  useFrame(({ invalidate }, delta) => {
-    if (ghost) {
-      const t = Math.min(1, (performance.now() - ghostStarted.current) / 1000 / DISSOLVE_S);
-      const bases = [guidedRef.current ? HALO_OPACITY * 0.5 : HALO_OPACITY, guidedRef.current ? 0.6 : 1, guidedRef.current ? 0.35 : 1];
-      ghostRefs.forEach((ref, i) => {
-        const material = ref.current?.material as THREE.ShaderMaterial | undefined;
-        if (material) material.opacity = bases[i] * (1 - t);
-      });
-      if (t >= 1) setGhost(null);
-      else invalidate();
-    }
+  useFrame(({ invalidate }) => {
     const drawn = reducedMotion ? 1 : Math.min(1, Math.max(0, performance.now() - started.current) / 1000 / DRAW_IN_S);
     if (drawn < 1) invalidate(); // keeps the draw-in moving under frameloop="demand", then stops
-    for (const ref of [halo, casing, line]) {
+    else if (drawingIn) setDrawingIn(false);
+    for (const ref of layerRefs) {
       const material = ref.current?.material as (THREE.ShaderMaterial & { dashOffset: number }) | undefined;
       if (material) material.dashOffset = total * (1 - drawn);
     }
     const runMaterial = runGaps.current?.material as THREE.ShaderMaterial | undefined;
     if (runMaterial) runMaterial.opacity = THREE.MathUtils.clamp((drawn - 0.6) / 0.4, 0, 1); // once the line got there
-    const flowMaterial = flow.current?.material as (THREE.ShaderMaterial & { dashOffset: number; opacity: number }) | undefined;
-    if (flowMaterial) {
-      // fades in as the draw-in ends, so the two dash patterns never fight
-      flowMaterial.opacity = flowOn ? FLOW_OPACITY * THREE.MathUtils.clamp((drawn - 0.85) / 0.15, 0, 1) : 0;
-      if (flowOn) {
-        flowMaterial.dashOffset -= FLOW_SPEED_MPS * Math.min(delta, 0.1);
-        invalidate();
-      }
-    }
   });
 
   if (points.length < 2 || !route?.segments) return null;
   // On a single floor the line may only run to the stairs: the start dot and the destination belong to their own floor.
   const startsHere = !onlyFloor || route.segments[0].floor_id === onlyFloor;
   const endsHere = !onlyFloor || route.segments[route.segments.length - 1].floor_id === onlyFloor;
-  // One signal blue in both views, on a white casing (2 px each side) and a soft halo of its own colour under it,
-  // so it is the one thing with depth and glow in the picture. Widths are screen px (Line2), so the line keeps its
-  // width at any zoom.
+  const guided = !!legPoints;
+  const layers = routeLayers(guided);
   const lineColour = COLOURS.signal;
-  const lineWidth = flat ? LINE_PX : LINE_PX_3D;
-  const casingWidth = lineWidth + 2 * CASING_PX;
+  const lineWidth = ROUTE_LINE_PX;
+  const casingWidth = ROUTE_LINE_PX + 2 * ROUTE_CASING_PX;
   // "You are here" stands at the start: that dot is the start, no second marker on it.
   const first = route?.segments?.[0];
   const hereAtStart =
@@ -210,83 +165,46 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
     !!first &&
     here.floor_id === first.floor_id &&
     (here.space_id === route?.start || (!!here.point && Math.hypot(here.point[0] - first.points[0][0], here.point[1] - first.points[0][1]) < 3));
-  const depth = depthOf(flat);
   return (
     <group>
-      {ghost && (
-        <>
-          <Line ref={ghostRefs[0]} points={ghost} color={lineColour} lineWidth={lineWidth + 2 * HALO_PX} transparent opacity={guided ? HALO_OPACITY * 0.5 : HALO_OPACITY} {...depth} renderOrder={18} />
-          <Line ref={ghostRefs[1]} points={ghost} color={COLOURS.routeGlow} lineWidth={casingWidth} transparent opacity={guided ? 0.6 : 1} {...depth} renderOrder={18} />
-          <Line ref={ghostRefs[2]} points={ghost} color={lineColour} lineWidth={lineWidth} transparent opacity={guided ? 0.35 : 1} {...depth} renderOrder={18} />
-        </>
-      )}
-      {/* halo: the same line, wide and faint, drawn in with the route (normal blending: additive would vanish on white) */}
-      <Line
-        ref={halo}
-        points={points}
-        color={lineColour}
-        lineWidth={lineWidth + 2 * HALO_PX}
-        transparent
-        opacity={guided ? HALO_OPACITY * 0.5 : HALO_OPACITY}
-        dashed
-        dashSize={total}
-        gapSize={total}
-        {...depth}
-        renderOrder={19}
-      />
-      <Line
-        ref={casing}
-        points={points}
-        color={COLOURS.routeGlow}
-        lineWidth={casingWidth}
-        transparent
-        opacity={guided ? 0.6 : 1}
-        dashed
-        dashSize={total}
-        gapSize={total}
-        {...depth}
-        renderOrder={20}
-      />
-      <Line
-        ref={line}
-        name="route-line"
-        points={points}
-        color={lineColour}
-        lineWidth={lineWidth}
-        transparent
-        opacity={guided ? 0.35 : 1}
-        dashed
-        dashSize={total}
-        gapSize={total}
-        {...depth}
-        renderOrder={21}
-      />
-      {/* flow: thin white dashes travelling along the line at walking pace (opacity set per frame above) */}
-      <Line ref={flow} points={points} color={COLOURS.routeGlow} lineWidth={FLOW_PX} transparent opacity={0} dashed dashSize={FLOW_DASH_M} gapSize={FLOW_GAP_M} {...depth} renderOrder={21.5} />
+      {/* casing then line, both opaque (no halo, glow or flow: translucent layers double-blend at every joint) */}
+      {layers.map((layer, i) => (
+        <Line
+          key={layer.name}
+          ref={layerRefs[i]}
+          name={layer.name}
+          points={points}
+          color={layer.colour}
+          lineWidth={layer.widthPx}
+          dashed={drawingIn}
+          dashSize={total}
+          gapSize={total}
+          {...DEPTH}
+          renderOrder={layer.renderOrder}
+        />
+      ))}
       {/* the run between two floors: white gaps over the blue make it a dashed line (the "↑ 1" badge sits at its foot) */}
       {runs.length >= 2 && (
-        <Line ref={runGaps} name="route-floor-run" points={runs} segments color={COLOURS.routeGlow} lineWidth={lineWidth + 0.5} transparent opacity={0} dashed dashSize={RUN_GAP_M} gapSize={RUN_DASH_M} {...depth} renderOrder={21.6} />
+        <Line ref={runGaps} name="route-floor-run" points={runs} segments color={COLOURS.routeGlow} lineWidth={lineWidth + 0.5} transparent opacity={0} dashed dashSize={RUN_GAP_M} gapSize={RUN_DASH_M} {...DEPTH} renderOrder={21.6} />
       )}
       {legPoints && (
         <>
-          <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} transparent {...depth} renderOrder={22} />
-          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} transparent {...depth} renderOrder={23} />
+          <Line points={legPoints} color={COLOURS.mapBlueDark} lineWidth={casingWidth} {...DEPTH} renderOrder={22} />
+          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} {...DEPTH} renderOrder={23} />
         </>
       )}
-      {/* Guide me follow-cam (FollowRoute.tsx): the walked part fades, the next turn gets a chip. */}
-      <WalkedLine points={points} lengths={lengths} floorY={floorY} lift={LIFT} lineWidth={lineWidth} casingWidth={casingWidth} depthTest={!flat} />
+      {/* Guide me follow-cam (FollowRoute.tsx): the walked part turns grey, the next turn gets a chip. */}
+      <WalkedLine points={points} lengths={lengths} floorY={floorY} lift={LIFT} lineWidth={lineWidth} casingWidth={casingWidth} depthTest={false} />
       <NextTurnBadge route={route} floorY={floorY} onlyFloor={onlyFloor} lift={LIFT} />
-      {/* ends: constant size on screen. The start is a paper dot with a blue ring (or nothing when "You are here"
+      {/* ends: constant size on screen. The start is a white dot in a blue ring (or nothing when "You are here"
           stands there), the destination a slim red pin on its tip. The room labels move above them (Labels.tsx). */}
       {startsHere && (
         <group position={points[0]} name="route-start">
           {!hereAtStart && (
             <ScreenSized>
-              <Pulse reducedMotion={reducedMotion || worker} amount={0.35} speed={1}>
-                <EndDisc radius={START_DOT_PX + 8} colour={lineColour} order={23} opacity={0.18} />
-              </Pulse>
-              <EndDisc radius={START_DOT_PX} colour={lineColour} order={24} />
-              <EndDisc radius={START_DOT_PX - 2} colour={COLOURS.routeGlow} order={25} />
+              <EndDisc radius={START_DOT_PX + 1} colour={COLOURS.mapBlueDark} order={24} />
+              <EndDisc radius={START_DOT_PX} colour={lineColour} order={24.5} />
+              <EndDisc radius={START_DOT_PX - 2.5} colour={COLOURS.routeGlow} order={25} />
             </ScreenSized>
           )}
         </group>
@@ -294,7 +212,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       {/* the destination in map-app red (its own colour token), only on the floor where the route ends */}
       {endsHere && (
         <group position={points[points.length - 1]} name="route-end">
-          <DestinationPin key={`${route.start}|${route.destination}|${route.length_m}`} colour={COLOURS.destination} reducedMotion={reducedMotion} />
+          <DestinationPin key={`${route.start}|${route.destination}|${route.length_m}`} colour={COLOURS.destination} reducedMotion={reducedMotion || worker} />
         </group>
       )}
     </group>
