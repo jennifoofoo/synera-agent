@@ -1,0 +1,81 @@
+# Spec: Ortswissen mit Zeit ("Wanda merkt sich, was im Gebäude gerade gilt")
+
+Status: Entwurf, wartet auf Okay von Jennifer und Leonie. Ziel: Wow-Effekt bis Code-Freeze 13:00.
+Hintergrund: Leonies Servicetechniker-Story (Schichtübergabe, Wissen des Erfahrenen), Recherche Knowledge Graph (Graphiti-Zeitmodell, Brick/RealEstateCore), Jennifers Idee "Sperrungen mit Zeitraum".
+
+## Ziel in einem Satz
+Jeder Techniker kann per Sprache oder Tippen Wissen an einen Ort oder ein Gerät hängen ("Ventil an Presse 2 tropft", "Aufzug 1 bis morgen kaputt"), mit **gültig ab / gültig bis**; Wanda nutzt es beim Routen und liest es dem Nächsten genau dort vor. Nichts wird gelöscht, Fakten werden abgelöst, der Verlauf bleibt.
+
+## Was es heute gibt und was fehlt
+| Baustein | Heute | Fehlt |
+|---|---|---|
+| Gebäudegraph (Räume, Türen, Treppen, Aufzüge, Geräte mit IDs) | ja, `BuildingMap` | nichts |
+| Sperren (Tür, Aufzug, Treppe) mit Karte und "Ja", Routing weicht aus, Sperrung sichtbar | ja | **Zeitraum** (bis wann), **Grund**, **wer**, automatisches Wiederöffnen |
+| Standort ("I'm here", Tippen, Punkt) | ja | nichts |
+| Freihändige Befehle lokal ("next", "repeat") | ja (`handsFree.ts`) | "merk dir …", "erledigt/repariert" |
+| Notizen am Ort | nein (halbe Server-API auf gestopptem Branch, wiederverwendbar) | Speicher, API, Werkzeug, Anzeige |
+| Verlauf ("was war letzte Woche kaputt?") | nein | Faktenspeicher mit Gültigkeit |
+
+## Datenmodell: ein Fakt (Graphiti-Zeitmodell, eigener kleiner Speicher, keine Graph-DB)
+```json
+{
+  "id": "f-…", "building": "<key>",
+  "kind": "note | issue | closure",
+  "anchor": {"space_id": "…", "asset_id": "… | null", "element_id": "Tür/Aufzug/Treppe-ID | null", "point": [x, y] | null, "floor_id": "…"},
+  "text": "Ventil tropft",
+  "valid_from": "ISO-Zeit", "valid_to": "ISO-Zeit | null",
+  "status": "open | resolved | expired",
+  "resolved_by": "<fact id> | null",
+  "author": "Techniker A | null", "source": "voice | text | tap", "utterance": "Originalsatz", "photo": "url | null",
+  "created_at": "ISO-Zeit"
+}
+```
+- `note`: Hinweis/Wissen ("hier immer erst den Hebel links"), kein Einfluss aufs Routing.
+- `issue`: Problem an Gerät/Ort ("tropft"), bleibt offen bis "repariert"/"erledigt" → neuer Fakt `resolved`, alter bekommt `valid_to` und `resolved_by`.
+- `closure`: gesperrtes Element mit Zeitraum ("Aufzug 1 bis morgen kaputt"): wirkt aufs Routing, solange `valid_from <= jetzt < valid_to`; danach automatisch wieder offen.
+- "Jetzt gültig" = `valid_from <= jetzt` und (`valid_to` leer oder `> jetzt`) und Status nicht `resolved`. Nichts wird gelöscht (außer Tippfehler direkt nach dem Anlegen, "undo").
+- Speicher: `agent_output/knowledge/<building>/facts.json` plus Fotos, atomar geschrieben, pro Gebäude. Schema-Mapping auf Brick/RealEstateCore (Raum- und Gerätetypen) als Export später, nicht für den Freeze.
+
+## Was Wanda können soll (Sätze für Demo und Tests)
+| Sagen | Was passiert |
+|---|---|
+| "Hey Wanda, merk dir hier: Ventil an Presse 2 tropft." | Karte "Notiz an Presse 2 (Halle A2): Ventil tropft, ab jetzt, offen" → "Ja" → Fakt `issue`, Pin auf der Karte |
+| "Aufzug 1 ist bis morgen kaputt." | Karte mit Wirkung auf Wege ("3 Routen länger") und Zeitraum "bis morgen 18:00" (Zeitwort wird aufgelöst, unklar → nachfragen) → "Ja" → Sperrung mit Ablauf, Routing weicht aus, Karte zeigt "Closed until tomorrow 18:00" |
+| "Ventil repariert." / "Erledigt." am Ort | löst den offenen Fakt dort ab (Karte, "Ja") |
+| "Was gibt's hier?" / "Gibt es Hinweise zu Presse 2?" | liest die jetzt gültigen Fakten vor, kurz |
+| "Was war diese Woche an Presse 2?" | Verlauf inkl. erledigter Fakten mit Datum |
+| beim Begleiten in einen Raum mit Notiz | Wanda liest den Hinweis beim Betreten vor (einmal pro Gang) |
+| "Was ist gerade gesperrt?" | aktive Sperrungen mit "bis wann" |
+Regeln: Fakten nur nach Karte und klarem "Ja" (wie jede Änderung). Zeitwörter ("bis morgen", "bis 14 Uhr", "für zwei Stunden", "bis Freitag") deterministisch auflösen, Unklares nachfragen. Wanda erfindet nichts; sie nennt Alter und Autor ("seit heute 8:10, von Techniker A").
+
+## Aufteilung
+| Teil | Wer | Dateien |
+|---|---|---|
+| Faktenspeicher, Zeitlogik ("jetzt gültig", Ablösen, Ablauf), Zeitwörter-Parser, Sperrung mit `valid_to` im Routing (Tick beim Abfragen, kein Hintergrundjob) | Jennifer (Agent K1) | neu `building_agent/knowledge.py`, `building_agent/time_words.py` (gibt es? sonst neu), kleine Anbindung in `guide_tools.py` (Aktion `close` bekommt `until`) |
+| API: `GET /api/facts?key=&space_id=&asset_id=&at=` (jetzt gültig / Verlauf), `POST /api/facts` (nur über bestätigte Karte bzw. lokal nach Bestätigung), Foto-Upload (verkleinert, EXIF weg), `state_view.facts` (aktive Fakten pro Etage) | Jennifer (Agent K1, nutzt den halben Notizen-Branch) | neu `web/knowledge_api.py`, `web/server.py` (Routen), `web/api.py` (state_view) |
+| Agent-Werkzeuge: `remember_here(text, kind, until?)` (schlägt Karte vor), `resolve_here(…)`, `facts_here(scope, when=now|history)`, Hinweis beim Begleiten in `walk.py` (Raum mit aktiven Fakten) | Jennifer (Agent K2, Prompt-Änderung → Live-Suite) | `building_agent/knowledge_tools.py`, eine Prompt-Zeile in `agent.py`, Registrierung in `tools.py` |
+| Seite: Pins für aktive Fakten (Notiz-Symbol, Problem-Symbol, Sperrung "until …"), Antippen zeigt Liste mit Alter/Autor/Foto, "Notiz hier"-Knopf in der Raumkarte (Text, Foto), Verlauf aufklappbar, "Closed until …" am Sperr-Symbol, freihändig "merk dir …" an den Chat geben | **Leonie** | neu `ui/Facts.tsx`, `scene/FactPins.tsx`, kleine Einhängepunkte in `Card.tsx`, `poiIcons`, `handsFree.ts` |
+
+## Vertrag für die Seite (Leonie)
+- `state.facts`: `[{id, kind, anchor: {space_id, asset_id, element_id, point, floor_id}, text, valid_from, valid_to, status, author, photo}]` nur jetzt gültige, in jeder Antwort mit `state`.
+- `GET /api/facts?key=…&space_id=…` → `{facts: [...]}` jetzt gültig; `&history=1` inkl. erledigt/abgelaufen, neueste zuerst.
+- `POST /api/facts` `{key, kind, anchor, text, valid_to?, author?, photo_base64?}` → legt an (für den Knopf "Notiz hier" nach Bestätigung in der Seite); Sperrungen nur über den Chat (Karte und "Ja"), weil sie Routen ändern.
+- Sperrung mit Zeit: `state.closed` bleibt wie heute; neu `state.closed_until: {element_id: ISO-Zeit}`.
+
+## Tests
+- Zeitlogik: gültig/abgelaufen/abgelöst, Grenzfälle (genau `valid_to`), Ablauf öffnet Sperrung, Verlauf vollständig.
+- Zeitwörter: "bis morgen", "bis 14 Uhr", "für 2 Stunden", "bis Freitag", Unklares → Rückfrage.
+- Routing: Sperrung mit Ablauf wirkt nur im Zeitraum (Zeit wird im Test gesetzt).
+- API: Validierung (IDs existieren, Text 1..500, Foto Typ/Größe, EXIF weg, kein Pfad-Trick), nur Gebäude des Schlüssels.
+- Live: "merk dir hier …" → Karte → "Ja" → Fakt; "Aufzug 1 bis morgen kaputt" → Karte mit Zeit; "was gibt's hier?"; Sicherheitsregel bleibt (nichts ohne "Ja").
+- e2e (Leonie): Pin erscheint, Antippen zeigt Notiz, "Closed until" sichtbar.
+- Antworten der Testfragen bleiben byte-gleich (`SUBMISSION/answers.json` neu erzeugen und vergleichen).
+
+## Zeitplan (Freeze 13:00)
+1. Okay zur Spec (Jennifer, Leonie).
+2. Server (K1) und Agent (K2) parallel, je etwa 2 Stunden; Leonie die Seite parallel gegen den Vertrag.
+3. Bis etwa 10:30 mergen, Live-Suite und Browser-Tests, Antworten vergleichen.
+4. Danach nur Bugfixes, Video mit der Szene "morgens Notiz, mittags repariert, nächste Schicht hört den Verlauf".
+
+## Demo-Szene (für das Video)
+Morgens: "Hey Wanda, merk dir: Ventil an Presse 2 tropft." → Pin. "Aufzug 1 ist bis morgen kaputt." → Aufzug rot, "Closed until tomorrow", Route biegt ab. Mittags: "Ventil repariert." Nächste Schicht beim Vorbeilaufen: kein Hinweis mehr zum Ventil, auf Nachfrage "Hat diese Woche einmal getropft, repariert heute 12:40."

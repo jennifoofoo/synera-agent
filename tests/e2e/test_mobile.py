@@ -139,8 +139,8 @@ def open_route(page) -> tuple[str, str]:
 
 
 def start_walk(page) -> None:
-    """Start on the route card: step-by-step directions on the client (Walk.tsx), no agent call."""
-    page.get_by_role("button", name="Start", exact=True).tap()
+    """Guide me on the route card: step-by-step directions on the client (Walk.tsx), no agent call."""
+    page.get_by_role("button", name="Guide me", exact=True).tap()
     page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
     page.wait_for_timeout(800)
 
@@ -166,12 +166,15 @@ def test_viewport_meta(open_page):
     assert "width=device-width" in content and "initial-scale=1" in content and "viewport-fit=cover" in content, content
 
 
-@audit("ok", "worker profile, 2D only, no 3D toggle")
+@audit("ok", "worker profile starts in 2D, 3D toggle available")
 def test_worker_profile_2d(open_page):
     page = open_page()
     s = page.evaluate("() => { const s = window.__twinStore.getState(); return [s.profile, s.viewMode]; }")
     assert s == ["worker", "2d"], s
-    assert page.locator(".rail-view").count() == 0
+    page.locator(".rail-view").tap()
+    page.wait_for_timeout(500)
+    assert page.evaluate("() => window.__twinStore.getState().viewMode") == "3d"
+    assert not page.errors, page.errors
 
 
 @audit("ok", "no horizontal overflow, no errors (portrait and landscape)")
@@ -187,7 +190,7 @@ def test_no_overflow_no_errors(open_page, landscape):
 @audit("1", "chat input at least 16 px (no iOS zoom)")
 def test_chat_input_font_size(open_page):
     page = open_page()
-    page.get_by_role("button", name="Chat").tap()
+    page.get_by_role("button", name="Ask", exact=True).tap()
     page.wait_for_timeout(300)
     size = page.evaluate("() => parseFloat(getComputedStyle(document.querySelector('.omnibox-input input')).fontSize)")
     assert size >= 16, f"chat input is {size}px"
@@ -258,7 +261,7 @@ def test_route_flow(open_page):
     top = box(page, ".directions")
     sheet = box(page, ".phone-sheet")
     assert top and sheet, "directions panel or summary card missing"
-    assert page.get_by_role("button", name="Start", exact=True).is_visible()
+    assert page.get_by_role("button", name="Guide me", exact=True).is_visible()
     route = page.evaluate(PROJECT, page.evaluate(ROUTE_POINTS))
     middle = (route["top"] + route["bottom"]) / 2
     assert top["bottom"] - 2 <= middle <= sheet["top"] + 2, (
@@ -293,7 +296,7 @@ def test_walk_sheet(open_page, landscape):
     for i in range(buttons.count()):
         b = buttons.nth(i).bounding_box()
         assert b and b["height"] >= 44 and b["y"] + b["height"] <= height, f"step button {i}: {b}"
-    end = page.get_by_role("button", name="End directions").bounding_box()
+    end = page.get_by_role("button", name="End route").bounding_box()
     assert end and end["y"] >= 0 and end["y"] + end["height"] <= height, end
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
     sheet = box(page, ".phone-sheet")
@@ -318,7 +321,7 @@ def test_wake_lock_while_guiding(open_page):
     start_walk(page)
     page.wait_for_timeout(300)
     assert page.evaluate("() => window.__wake") > before, "no wake lock request while walking"
-    page.get_by_role("button", name="End directions").tap()
+    page.get_by_role("button", name="End route").tap()
     page.wait_for_timeout(400)
     assert walk_step(page) is None
     assert page.evaluate("() => window.__released") >= 1, "wake lock not released after walking"
@@ -350,7 +353,7 @@ def test_audio_unlock(open_page):
 def test_chat_keyboard(open_page, landscape):
     page = open_page(FAKE_KEYBOARD, landscape=landscape)
     tap_room(page)
-    page.get_by_role("button", name="Chat").tap()
+    page.get_by_role("button", name="Ask", exact=True).tap()
     page.wait_for_timeout(300)
     keyboard = 200 if landscape else 336
     page.evaluate(f"() => window.__kb({keyboard})")
@@ -428,3 +431,25 @@ def test_touch_targets(open_page):
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
     tap_room(page)
     assert not page.evaluate(SMALL_TARGETS), page.evaluate(SMALL_TARGETS)
+
+
+# Every bottom sheet: at most one drag handle, and a body that never scrolls sideways (a sideways scrollbar thumb
+# looked like a second handle on macOS Chrome, Jennifer's screenshot 24.10.).
+SHEET_HANDLES = """() => [...document.querySelectorAll('.phone-sheet')].map(sheet => {
+  const body = sheet.querySelector('.sheet-body');
+  return { handles: sheet.querySelectorAll('.sheet-handle').length, wide: body ? body.scrollWidth - body.clientWidth : 0 };
+})"""
+
+
+@audit("handle", "one drag handle per sheet, no sideways scrollbar (room card, route, walk)")
+def test_one_handle_per_sheet(open_page):
+    page = open_page()
+    tap_room(page)
+    for sheet in page.evaluate(SHEET_HANDLES):
+        assert sheet["handles"] <= 1 and sheet["wide"] <= 0, sheet
+    open_route(page)
+    for sheet in page.evaluate(SHEET_HANDLES):
+        assert sheet["handles"] <= 1 and sheet["wide"] <= 0, sheet
+    start_walk(page)
+    for sheet in page.evaluate(SHEET_HANDLES):
+        assert sheet["handles"] <= 1 and sheet["wide"] <= 0, sheet

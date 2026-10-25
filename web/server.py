@@ -337,6 +337,21 @@ class App:
         return 404, {"error": f"Unknown endpoint {path}"}
 
 
+TUNNEL_SUFFIXES = tuple(
+    suffix.strip().lower() for suffix in os.environ.get("TWIN_TUNNEL_SUFFIXES", "").split(",") if suffix.strip()
+)  # set only by scripts/tunnel.sh, e.g. ".trycloudflare.com"
+
+
+def tunnel_origin(origin: str | None, host: str | None) -> bool:
+    """True for the page itself served through a tunnel the person started: an https Origin on an allowed tunnel
+    suffix whose host also matches the request's Host (same origin). Off unless TWIN_TUNNEL_SUFFIXES is set."""
+    if not TUNNEL_SUFFIXES or not origin or not host:
+        return False
+    parsed = urlparse(origin)
+    name = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and name.endswith(TUNNEL_SUFFIXES) and host.split(":")[0].lower() == name
+
+
 def make_handler(app: App) -> type:
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs) -> None:
@@ -436,6 +451,8 @@ def make_handler(app: App) -> type:
             allowed = {f"127.0.0.1:{port}", f"localhost:{port}"}
             origin = self.headers.get("Origin")
             host = self.headers.get("Host")
+            if tunnel_origin(origin, host):  # the page itself, served through scripts/tunnel.sh (opt-in, https)
+                origin, host = None, None
             if (origin is not None and origin not in {f"http://{name}" for name in allowed}) or (
                 host is not None and host not in allowed
             ):

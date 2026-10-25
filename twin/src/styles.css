@@ -44,7 +44,7 @@ button.x:hover { color: var(--text); background: transparent; }
 .building-name select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; }
 .brand-mark { width: 8px; height: 8px; border-radius: 1px; background: var(--signal); }
 
-/* left edge: floors, one compact segmented control with shared hairlines */
+/* floors: one compact segmented control with shared hairlines (laptop: top right, see below) */
 .floorrail {
   position: absolute; left: 12px; top: 64px; z-index: 3; display: flex; flex-direction: column; gap: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
@@ -72,7 +72,10 @@ button.x:hover { color: var(--text); background: transparent; }
   padding: 3px 4px 3px 10px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line);
   font-size: 13px; color: var(--muted);
 }
-.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: var(--radius-sm); }
+.pill button { min-height: 24px; padding: 2px 8px; font-size: 12.5px; border-radius: var(--radius-sm); border-color: transparent; background: transparent; color: var(--muted); }
+.pill button:hover { color: var(--text); background: var(--paper-2); }
+/* rarely used (List, the changes pill, step-free): quiet until hovered, so each state keeps at most two main actions */
+.planner-toggle:hover { color: var(--text); border-color: var(--line); }
 
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(244, 242, 238, 0.7); z-index: 5; pointer-events: none; }
 .overlay.error { color: var(--danger); pointer-events: auto; }
@@ -88,6 +91,15 @@ button.x:hover { color: var(--text); background: transparent; }
   background: transparent; border: 0; padding: 0; color: var(--ink); font-size: 12px; font-weight: 500;
   text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 2px var(--paper), 0 0 2px var(--paper);
 }
+/* 2D: machine names (near) are smaller and grey; landmarks of the directions are ink and a touch bolder */
+.label.label-plan.label-thing { font-size: 11px; font-weight: 400; color: var(--ink-2); }
+.label.label-plan.label-landmark { font-size: 11.5px; font-weight: 600; color: var(--ink); }
+/* 2D semantic zoom (docs/specs/semantic-zoom.md): one calm, larger name per area in the overview; at near zoom a
+   small second line under room names ("Kitchen · 24 m²") and the clear width of wide doors ("1.4 m"). Ink only:
+   --ink-2 drops below 4.5:1 on the darker room greys. */
+.label.label-area { font-size: 14px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink); }
+.label.label-plan.label-sub { font-size: 10.5px; font-weight: 400; line-height: 13px; color: var(--ink); opacity: 0.85; }
+.label.label-plan.label-door { font-size: 10px; font-weight: 500; line-height: 13px; color: var(--ink); }
 .poi {
   width: 20px; height: 20px; border-radius: 3px; background: var(--surface); border: 1px solid var(--hairline-strong); color: var(--ink-2);
   font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
@@ -97,8 +109,12 @@ button.x:hover { color: var(--text); background: transparent; }
   position: absolute; right: 14px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 3;
   width: 44px; height: 44px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--line); font-size: 20px; color: var(--ink);
 }
-/* 2D: the floor picker moves to the right edge, same control */
-.app.flat .floorrail { left: auto; right: 12px; }
+/* Phone layout (also narrow windows and tablets, 2D and 3D alike): the floor picker on the right edge; Phone.css
+   places it further (landscape phones: left).  */
+.app.worker .floorrail { left: auto; right: 12px; }
+/* Laptop: ONE home for the floor rail in 2D and 3D, top right under the List button. When the List sheet opens it
+   slides left with the sheet's edge (150 ms), never jumps sides. */
+.app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); top: 56px; transition: right var(--t-fast, 150ms ease-out); }
 .app.worker.flat .pill { left: 10px; right: auto; }
 
 /* Nothing overlaps: the insets (set by the sheets through the store) push the chrome out of the way. */
@@ -107,7 +123,10 @@ button.x:hover { color: var(--text); background: transparent; }
 .app.worker.directions-open .floorrail { max-height: calc(var(--vvh, 100dvh) - var(--top-inset, 0px) - var(--dock-h, 90px) - 24px); }
 .app.worker .recenter { bottom: calc(var(--dock-h, 90px) + var(--safe-b, 0px) + 12px); }
 .app.planner .recenter { bottom: calc(var(--bottom-inset, 80px) + 24px); right: calc(var(--right-inset, 0px) + 14px); }
-.app.planner.flat .floorrail { right: calc(var(--right-inset, 0px) + 12px); }
+/* Laptop: the rail has one home, top right under the List button, in 2D and 3D alike. A right side sheet (List)
+   slides it left with the sheet's edge (150 ms), it never switches sides. Phones keep their own place (Phone.css). */
+.app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); transition: right var(--t-fast, 150ms ease-out); }
+@media (prefers-reduced-motion: reduce) { .app.planner .floorrail { transition: none; } }
 /* the List button (top right, about 44 px tall) must never cover the floor rail when a sheet pushes the rail up */
 .app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 56px); }
 .chip {

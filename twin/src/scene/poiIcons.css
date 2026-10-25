@@ -1,12 +1,12 @@
-/* Round point-of-interest badges on the 2D map (22 px, see POI_PX). */
+/* Point-of-interest badges on the 2D map (22 px, see POI_PX): a small paper square with a hairline edge and a thin
+   dark icon, the same family as the square buttons (no dark discs, no shadow). */
 .poi-badge {
-  width: 22px; height: 22px; border-radius: 50%; background: var(--ink-2, #5f6368); border: 1.5px solid var(--surface, #fff);
-  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  width: 22px; height: 22px; border-radius: 4px; background: var(--surface, #fbfaf8); border: 1px solid var(--hairline-strong, rgba(29, 36, 48, 0.35));
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; color: var(--ink, #1d2430);
 }
-.poi-badge svg { width: 14px; height: 14px; fill: #fff; }
-.poi-badge svg .stroke { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.poi-badge svg .stroke.thin { stroke-width: 1.2; }
+.poi-badge svg { width: 15px; height: 15px; fill: currentColor; }
+.poi-badge svg .stroke { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.poi-badge svg .stroke.thin { stroke-width: 1.1; }
 
 /* Floor change on the route: a blue pill with the stairs/lift glyph and "↑ 1" (22 px tall, see FLOOR_BADGE_H_PX). */
 .floor-badge {
@@ -26,3 +26,22 @@
 .found-dot.many { width: 18px; height: 18px; }
 /* its name, beside the dot, in the route blue with the paper halo of the room labels */
 .label.found-name { color: var(--signal-dark, #002478); font-weight: 600; }
+
+/* Safety symbols in their norm colours (ISO 7010 / ISO 3864): fire extinguisher red, first aid / defibrillator /
+   eyewash green. Icons only, never room fills (DESIGN.md tokens --safety-red / --safety-green). */
+.poi-badge.poi-extinguisher { background: var(--safety-red, #a52019); }
+.poi-badge.poi-firstaid { background: var(--safety-green, #237f52); }
+
+/* Closed lift or stairs: the same glyph, danger-red edge and a diagonal bar across it (prohibition style), and a
+   "Closed" tag beside it from the mid tier on. COLOURS.danger, never the safety red. */
+.poi-badge.poi-closed { position: relative; border: 1.5px solid var(--danger, #b3382c); color: var(--ink-2, #5a626d); }
+.poi-badge.poi-closed::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 26px; height: 2px; background: var(--danger, #b3382c);
+  transform: translate(-50%, -50%) rotate(45deg); border-radius: 1px;
+}
+.label.closed-tag { color: var(--danger, #b3382c); font-weight: 600; }
+
+/* Semantic zoom: what enters a zoom tier fades in (150-200 ms), never pops; no animation with reduced motion. */
+@keyframes zoom-fade-in { from { opacity: 0; } }
+.zoom-fade { animation: zoom-fade-in 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .zoom-fade { animation: none; } }

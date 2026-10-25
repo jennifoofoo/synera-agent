@@ -1,5 +1,5 @@
 // Directions, like a maps app: a compact From/To panel at the top (phone: top sheet; laptop: small panel top left)
-// and the route summary with "Start" in the bottom card. "Route" on the room card opens it. From is "Your location"
+// and the route summary with "Guide me" in the bottom card. "Route" on the room card opens it. From is "Your location"
 // when the position is known, else empty and focused ("Choose start"). Both set = the route is computed at once.
 // Owner: the Card/Position session. The fields are the Omnibox's PlaceInput (one grey ghost match, no list).
 
@@ -7,9 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
-import { HERE, useTwin, type Place } from "../store";
+import { HERE, useTwin, walkLines, type Place } from "../store";
 import { PlaceInput } from "./Autocomplete";
 import { walkMinutes } from "./Walk";
+import { AvoidsClosed } from "./AvoidsClosed";
 import "./Directions.css";
 
 export function placeName(model: BuildingModel, place: Place | null): string {
@@ -131,7 +132,7 @@ function facts(model: BuildingModel, route: Route) {
   return { length, floors: route.floors?.length ?? 1, stepFree };
 }
 
-/** The bottom card while directions are open: summary and "Start" (= step-by-step on the client, see Walk). */
+/** The bottom card while directions are open: summary and "Guide me" (= step-by-step on the client, see Walk). */
 export function DirectionsSummary({ model }: { model: BuildingModel }) {
   const directions = useTwin((s) => s.directions)!;
   const route = useTwin((s) => s.state?.route ?? null);
@@ -139,25 +140,33 @@ export function DirectionsSummary({ model }: { model: BuildingModel }) {
   const startWalk = useTwin((s) => s.startWalk);
   if (!directions.from || !directions.to || !route) return null;
   if (!route.ok) {
-    return <div className="card-note dir-error">{route.error ?? "No route between these two."}</div>;
+    return <div className="card-note dir-error">{route.message ?? route.error ?? "No route between these two."}</div>;
   }
   const f = facts(model, route);
   const start = () => {
     close(true);
     startWalk();
   };
+  // The same one line as the route card ("30 m · 1 min · 4 steps · step-free") and the same primary action.
+  const steps = walkLines(route.steps).length;
   return (
     <>
-      <div className="card-line route-facts">
-        {f.length && <b>{f.length}</b>}
-        <span>
-          {f.floors} {f.floors === 1 ? "floor" : "floors"}
+      <div className="route-summary" data-testid="route-summary">
+        <span className="route-dot" aria-hidden />
+        <span className="route-sentence">
+          {f.length && <b>{f.length}</b>}
+          <span className="card-muted">
+            {steps > 0 && ` · ${steps} ${steps === 1 ? "step" : "steps"}`}
+            {f.floors > 1 && ` · ${f.floors} floors`}
+            {" · "}
+          </span>
+          <span className={f.stepFree ? "ok" : "warn"}>{f.stepFree ? "step-free" : "has stairs"}</span>
         </span>
-        <span className={f.stepFree ? "ok" : "warn"}>{f.stepFree ? "step-free" : "has stairs"}</span>
       </div>
+      <AvoidsClosed model={model} route={route} />
       <div className="card-actions">
         <button className="primary" onClick={start} title="Step-by-step directions">
-          Start
+          Guide me
         </button>
       </div>
     </>

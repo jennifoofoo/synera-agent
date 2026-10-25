@@ -1,14 +1,15 @@
 // The one input: "Ask or search…". Typing completes the best place inline as grey ghost text (see Autocomplete);
 // accepting it flies there and selects it. Enter on a sentence asks the building (the reply shows in the Card).
 // Voice in via the mic (push-to-talk), replies to spoken questions are spoken back (mute toggle).
-// By default only two round buttons show: Chat (opens the input) and Talk (push-to-talk). The input stays mounted
+// By default only two buttons show, icon plus word: Ask (opens the input) and Talk (push-to-talk). The input stays mounted
 // but invisible, so the header search, Cmd/Ctrl+K and Chat just focus it; focus opens it, an empty blur closes it.
 // Owner: chat/search session, see ARCHITECTURE.md.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTwin } from "../store";
 import { keepAwake, listen, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
-import { pauseHandsFree } from "../handsFree";
+import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
+import { parseWake } from "../wake";
 import { Autocomplete, type PlaceHit } from "./Autocomplete";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { voiceHint } from "./phoneHints";
@@ -17,16 +18,26 @@ import "./Omnibox.css";
 const QUESTION_START =
   /^(where|what|which|how|who|why|when|is|are|can|could|would|do|does|did|show|find|take|bring|route|guide|walk|lead|navigate|get|close|open|reopen|block|add|list|count|tell|give|help|i'?m|i am|we|my|please)\b/i;
 const VOICE_PREF = "twin.voiceOut";
+/** Shown when the input opens on an empty chat: the usual first questions, sent as if typed. */
+const SUGGESTIONS = [
+  { label: "Nearest toilet", message: "Where is the nearest toilet?" },
+  { label: "Way out", message: "What is the nearest way out?" },
+  { label: "Coffee", message: "Where can I get a coffee?" },
+];
 
 function looksLikeQuestion(text: string): boolean {
   const trimmed = text.trim();
   return trimmed.includes("?") || trimmed.split(/\s+/).length > 3 || QUESTION_START.test(trimmed);
 }
 
-export function Omnibox() {
+export function Omnibox({ walking = false }: { walking?: boolean }) {
   const model = useTwin((s) => s.model);
   const ask = useTwin((s) => s.ask);
   const busy = useTwin((s) => s.chatBusy);
+  const handsFreeOn = useTwin((s) => s.handsFree);
+  const followUp = useTwin((s) => s.followUp);
+  const followUpOpen = useTwin((s) => s.followUpOpen);
+  const followUpHeard = useTwin((s) => s.followUpHeard);
   const chat = useTwin((s) => s.chat);
   const chatAvailable = useTwin((s) => s.chatAvailable);
   const speechAvailable = useTwin((s) => s.speechAvailable);
@@ -108,16 +119,18 @@ export function Omnibox() {
   const submit = useCallback(
     async (message: string, voice = false) => {
       if (!message.trim() || useTwin.getState().chatBusy) return;
-      if (!useTwin.getState().chatAvailable) {
+      if (!useTwin.getState().chatAvailable && useTwin.getState().walkStep === null) {
         setNotice("Asking is off: the server has no agent key. Search still works.");
         return;
       }
       setText("");
       setHistory(false);
+      cancelFollowUp();
       stopSpeaking();
       inputRef.current?.blur(); // the keyboard goes away, the reply card shows
       const reply = await ask(message, voice);
       if (reply && voice && useTwin.getState().voiceOut) void speak(reply.reply, useTwin.getState().speechAvailable);
+      if (voice) followUpAfterSpeech(); // the mic opens again for a few seconds once Wanda has finished speaking
     },
     [ask],
   );
@@ -154,7 +167,12 @@ export function Omnibox() {
       onInterim: (said) => {
         if (listenerRef.current === listener) setHeard(said);
       },
-      onFinal: (said) => void submit(said, true),
+      onFinal: (said) => {
+        // "Hey Wanda, where is the toilet" sends the question only; "Hey Wanda" alone gets "I'm here." and a listen.
+        const wake = parseWake(said);
+        if (wake && !wake.rest) imHere();
+        else void submit(wake ? wake.rest : said, true);
+      },
       onEnd: (error) => {
         if (listenerRef.current === listener) listenerRef.current = null;
         keepAwake("listening", false);
@@ -292,8 +310,36 @@ export function Omnibox() {
         </div>
       )}
 
-      {!busy && !listening && !notice && <HandsFreeStatus className="ob-hf-status" />}
+      {expanded && !walking && chatAvailable && chat.length === 0 && !text.trim() && !listening && !busy && (
+        <div className="ob-chips" role="group" aria-label="Suggestions">
+          {SUGGESTIONS.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              className="ob-chip"
+              onPointerDown={(event) => event.preventDefault()} // keep the input open
+              onClick={() => void submit(chip.message)}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
 
+      {followUpOpen && !handsFreeOn && !busy && !listening && !notice && (
+        <div className="ob-status ob-followup" role="status" aria-live="polite">
+          <span className="ob-rec" aria-hidden />
+          {followUpHeard ? <span className="ob-heard">{followUpHeard}</span> : "Listening… ask your next question"}
+          <button type="button" className="x" aria-label="Stop listening" onClick={cancelFollowUp}>
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* While walking, the step sheet has the hands-free button and line: shown once, never twice. */}
+      {!walking && !busy && !listening && !notice && <HandsFreeStatus className="ob-hf-status" />}
+
+      {!walking && (
       <form
         className={`omnibox-input ${listening ? "is-listening" : ""}`}
         onSubmit={(event) => event.preventDefault()}
@@ -345,6 +391,20 @@ export function Omnibox() {
         </button>
         <button
           type="button"
+          className={`ob-icon ob-followup-toggle ${followUp ? "" : "off"}`}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => {
+            setFollowUpPref(!followUp);
+            setNotice(followUp ? "Follow-up listening off." : "Follow-up listening on: after a spoken reply, just keep talking.");
+          }}
+          aria-label={followUp ? "Follow-up listening on. Tap to turn off." : "Follow-up listening off. Tap to turn on."}
+          aria-pressed={followUp}
+          title={followUp ? "Follow-up listening on" : "Follow-up listening off"}
+        >
+          <FollowUpIcon />
+        </button>
+        <button
+          type="button"
           className={`ob-mic mic ${listening ? "listening" : ""}`}
           onPointerDown={(event) => event.preventDefault()}
           onClick={toggleMic}
@@ -356,23 +416,29 @@ export function Omnibox() {
           <MicIcon />
         </button>
       </form>
+      )}
 
-      {!expanded && (
+      {(!expanded || walking) && (
         <div className="ob-fabs">
-          <HandsFreeButton className="ob-fab" />
+          {/* While walking only Talk stays: "next", "back", "repeat", "stop" by voice (see store.ask). */}
+          {!walking && (
+            <button
+              type="button"
+              className="ob-fab ob-labelled"
+              aria-label="Ask"
+              title="Type to ask or search (Ctrl+K)"
+              // Focus inside the tap so iOS opens the keyboard; the focus opens the input.
+              onClick={() => inputRef.current?.focus()}
+            >
+              <ChatIcon />
+              <span className="ob-fab-label">Ask</span>
+            </button>
+          )}
+          {/* "Hey Wanda" is switched on in the step sheet; here only while it is on, to see and mute it */}
+          {handsFreeOn && !walking && <HandsFreeButton className="ob-fab" />}
           <button
             type="button"
-            className="ob-fab"
-            aria-label="Chat"
-            title="Type to ask or search"
-            // Focus inside the tap so iOS opens the keyboard; the focus opens the input.
-            onClick={() => inputRef.current?.focus()}
-          >
-            <ChatIcon />
-          </button>
-          <button
-            type="button"
-            className={`ob-fab ob-talk mic ${listening ? "listening" : ""}`}
+            className={`ob-fab ob-talk ob-labelled mic ${listening ? "listening" : ""}`}
             aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
             aria-pressed={listening}
             title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
@@ -385,6 +451,9 @@ export function Omnibox() {
             onClick={talkClick}
           >
             <MicIcon />
+            <span className="ob-fab-label" aria-hidden>
+              {listening ? "Send" : "Talk"}
+            </span>
             {!voiceOut && !listening && (
               <span className="ob-badge" aria-hidden>
                 <MutedIcon />
@@ -421,6 +490,22 @@ function SpeakerIcon() {
   return (
     <svg {...glyphProps}>
       <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+    </svg>
+  );
+}
+
+/** A speech bubble with a return arrow: keep talking after the reply. */
+function FollowUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 5.5h16v10H10l-4 3.5v-3.5H4zM15.5 9.5a3 3 0 1 1-1-2.2M15.6 6.2v1.6h-1.6"
+      />
     </svg>
   );
 }

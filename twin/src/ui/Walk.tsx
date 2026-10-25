@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
+import { honestLine, toggleWalkWithMe, useWalkMotion } from "../walkWithMe";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import "./Walk.css";
@@ -58,18 +59,34 @@ export function Walk() {
   useEffect(() => {
     if (!walking) setList(false);
   }, [walking]);
-  const line = step !== null ? readable(walkSteps()[step] ?? "") : "";
+  const motionOn = useWalkMotion((s) => s.on);
+  const estimate = useWalkMotion((s) => s.estimate);
+  const motionNotice = useWalkMotion((s) => s.notice);
+  const line = step !== null ? honestLine(readable(walkSteps()[step] ?? "")) : "";
+  const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
     const { voiceOut, handsFree, speechAvailable } = useTwin.getState();
     if (line && (voiceOut || handsFree)) void speak(line, speechAvailable);
-  }, [line, step]);
+  }, [line, step, repeat]);
   useEffect(() => () => stopSpeaking(), []);
+  // Esc ends the route (guide and line in one go), unless the key belongs to a text field.
+  useEffect(() => {
+    if (!walking) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      useTwin.getState().stopWalk();
+      void useTwin.getState().clearRoute();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walking]);
 
   if (step === null || !model || !route?.ok) return null;
-  const steps = walkSteps().map(readable);
+  const steps = walkSteps().map(readable).map(honestLine);
   const last = step >= steps.length - 1;
   // What is left from the current step on: the metres named in the remaining step lines, scaled to the route length.
-  const length = metresLeft(steps, step, route.length_m);
+  // Walk with me on: the module's estimate (walking metres only), shown as "about".
+  const length = estimate ? Math.round(estimate.distanceLeftM) : metresLeft(steps, step, route.length_m);
   const minutes = length !== null ? walkMinutes(length) : null;
   const end = () => {
     stopWalk();
@@ -82,11 +99,18 @@ export function Walk() {
         <div className="card-head">
           <span className="card-kicker">
             Step {step + 1} of {steps.length}
-            {length !== null && <span className="card-muted"> · {length} m left · {minutes} min</span>}
+            {length !== null && (
+              <span className="card-muted">
+                {" "}
+                · {estimate ? "about " : ""}
+                <span className="walk-left">{length}</span> m left · {minutes} min
+              </span>
+            )}
           </span>
           <HandsFreeButton />
-          <button className="x" onClick={end} aria-label="End directions">
-            ×
+          {/* One clear way out: ends the guide and clears the route (Esc does the same). */}
+          <button className="walk-end" onClick={end} title="End the route (Esc)">
+            End route
           </button>
         </div>
         <div className="walk-now">
@@ -102,10 +126,23 @@ export function Walk() {
             {last ? "Done" : "Next"}
           </button>
         </div>
-        {steps.length > 1 && (
-          <button className="link walk-toggle" onClick={() => setList(!list)} aria-expanded={list}>
-            {list ? "Hide steps" : `All ${steps.length} steps`}
-          </button>
+        {/* One quiet row under the buttons: the Walk with me switch (counts steps, moves an estimated dot along the
+            route; off by default) and the list toggle. */}
+        <div className="walk-foot">
+          <label className="walk-motion-switch">
+            <input type="checkbox" role="switch" checked={motionOn} onChange={() => void toggleWalkWithMe()} aria-label="Walk with me" />
+            Walk with me
+          </label>
+          {steps.length > 1 && (
+            <button className="link walk-toggle" onClick={() => setList(!list)} aria-expanded={list}>
+              {list ? "Hide steps" : `All ${steps.length} steps`}
+            </button>
+          )}
+        </div>
+        {(motionNotice || estimate?.atConnector || estimate?.offRoute) && (
+          <p className="walk-motion-note" role="status" aria-live="polite">
+            {estimate?.atConnector ? "Waiting here. Tap Next once you are through." : estimate?.offRoute ? "Looks like you turned around?" : motionNotice}
+          </p>
         )}
         {list && (
           <ol className="walk-list">

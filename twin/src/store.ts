@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "./api/client";
-import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point } from "./api/types";
+import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point, Route } from "./api/types";
 import { buildModel, type BuildingModel } from "./model/model";
 
 export type FloorMode = "stacked" | "exploded" | "single";
@@ -64,6 +64,8 @@ export interface ChatMessage {
   text: string;
   located?: Located[];
   note?: string;
+  /** This reply drew a new route (the card then shows the one-line route summary, the text behind "Steps"). */
+  route?: boolean;
 }
 
 interface TwinState {
@@ -136,6 +138,8 @@ interface TwinState {
   // --- walking (owner: phone session): "Start" steps through state.route.steps on the client, no agent call.
   /** Index into state.route.steps while walking; null = not walking. */
   walkStep: number | null;
+  /** Bumped by "repeat" while walking: the Walk sheet speaks the current step again. */
+  walkRepeat: number;
   startWalk: () => void;
   setWalkStep: (step: number) => void;
   stopWalk: () => void;
@@ -148,7 +152,15 @@ interface TwinState {
   handsFreeHeard: string;
   /** Why hands-free switched itself off (no mic permission, unsupported browser); null otherwise. */
   handsFreeNotice: string | null;
+  /** Something was said to Wanda since hands-free went on: the "Say Hey Wanda" hint is not shown again. */
+  handsFreeSpoken: boolean;
   setHandsFree: (on: boolean) => void;
+  /** Setting "Follow-up listening" (default on, localStorage twin.followUp): after a spoken reply the mic stays open
+   * a few seconds for the next question, no wake word or button. Change it with setFollowUpPref (handsFree.ts). */
+  followUp: boolean;
+  /** The follow-up window is open right now ("listening…"), and what was heard in it so far. */
+  followUpOpen: boolean;
+  followUpHeard: string;
 
   loadBuildings: () => Promise<void>;
   openBuilding: (key: string) => Promise<void>;
@@ -180,11 +192,34 @@ interface TwinState {
   ask: (message: string, voice?: boolean, opts?: { here?: ChatContext["here"] }) => Promise<ChatReply | null>;
 }
 
+/** The person muted "Hey Wanda" during guidance: remembered per browser, so the next guidance stays quiet too. */
+export function handsFreeMuted(): boolean {
+  try {
+    return localStorage.getItem("twin.handsFreeMuted") === "1";
+  } catch {
+    return false;
+  }
+}
+export function setHandsFreeMuted(muted: boolean): void {
+  try {
+    localStorage.setItem("twin.handsFreeMuted", muted ? "1" : "0");
+  } catch {
+    /* private mode: not remembered */
+  }
+}
+
 let messageId = 0;
 let cameraNonce = 0;
 
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/** A real phone: coarse pointer AND a small screen. Phones start in 2D (lighter, easier to read while walking) but
+ * keep the 2D/3D toggle like tablets and narrow laptop windows; ambient occlusion stays off in the phone profile. */
+export function isPhone(): boolean {
+  if (typeof window === "undefined") return false;
+  return !!window.matchMedia?.("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 600;
+}
 
 function autoProfile(): Profile {
   if (typeof window === "undefined") return "planner";
@@ -206,13 +241,13 @@ export const useTwin = create<TwinState>((set, get) => ({
 
   profile: autoProfile(),
   profileForced: false,
-  viewMode: autoProfile() === "worker" ? "2d" : "3d",
+  viewMode: isPhone() ? "2d" : "3d",
   bottomInset: 0,
   rightInset: 0,
   topInset: 0,
   draft: false,
   offCentre: false,
-  floorMode: "stacked",
+  floorMode: "single", // only the chosen floor: a ghosted floor above read as a shadow copy
   focusedFloorId: null,
   thingsMode: "near",
   cutaway: true,
@@ -235,10 +270,21 @@ export const useTwin = create<TwinState>((set, get) => ({
   campusRoute: false,
   directions: null,
   walkStep: null,
+  walkRepeat: 0,
   handsFree: false,
   handsFreeStatus: "listening",
   handsFreeHeard: "",
   handsFreeNotice: null,
+  handsFreeSpoken: false,
+  followUp: (() => {
+    try {
+      return localStorage.getItem("twin.followUp") !== "off";
+    } catch {
+      return true;
+    }
+  })(),
+  followUpOpen: false,
+  followUpHeard: "",
 
   async loadBuildings() {
     try {
@@ -273,15 +319,14 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   applyState(state) {
-    set({ state });
+    set({ state: withPendingHere(state) });
   },
 
   setProfile(profile) {
     const next = profile ?? autoProfile();
-    set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" ? { viewMode: "2d" as const } : {}) });
+    set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" && isPhone() ? { viewMode: "2d" as const } : {}) });
   },
   setViewMode(viewMode) {
-    if (viewMode === "3d" && get().profile === "worker") return; // phones are 2D only
     set({ viewMode });
   },
   setBottomInset(bottomInset) {
@@ -399,6 +444,8 @@ export const useTwin = create<TwinState>((set, get) => ({
     if (!get().state?.route?.ok) return;
     set({ walkStep: 0, selection: null, popover: null, replyShown: false });
     walkFloor(0);
+    // Guidance listens for "Hey Wanda" by itself, unless the person muted it last time.
+    if (!handsFreeMuted() && !get().handsFree) get().setHandsFree(true);
   },
   setWalkStep(step) {
     const steps = walkSteps();
@@ -409,9 +456,10 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   stopWalk() {
     set({ walkStep: null });
+    if (get().handsFree) get().setHandsFree(false);
   },
   setHandsFree(handsFree) {
-    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null });
+    set({ handsFree, handsFreeStatus: "listening", handsFreeHeard: "", handsFreeNotice: null, handsFreeSpoken: false });
   },
 
   async route(start, destination, stepFree = false) {
@@ -447,6 +495,19 @@ export const useTwin = create<TwinState>((set, get) => ({
   async ask(message, voice = false, opts = {}) {
     const { buildingKey, selection, hereArmed, model } = get();
     if (!buildingKey || !message.trim()) return null;
+    // Walking the steps (client side, see Walk): the usual words move the step, no agent call.
+    const walkStep = get().walkStep;
+    if (walkStep !== null) {
+      const word = message.trim().toLowerCase().replace(/[.!?]+$/, "");
+      if (/^(next|ok|okay|done|weiter|go on|continue|and now|und jetzt)$/.test(word)) return get().setWalkStep(walkStep + 1), null;
+      if (/^(back|previous|zurück)$/.test(word)) return get().setWalkStep(walkStep - 1), null;
+      if (/^(repeat|again|say again|nochmal)$/.test(word)) return set({ walkRepeat: get().walkRepeat + 1 }), null;
+      if (/^(stop|end|end route|cancel|abbrechen)$/.test(word)) {
+        get().stopWalk();
+        await get().clearRoute();
+        return null;
+      }
+    }
     if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
       get().startWalk(); // the drawn route already has its steps; no agent call
       return null;
@@ -474,14 +535,16 @@ export const useTwin = create<TwinState>((set, get) => ({
       pendingHere: null,
     }));
     try {
+      const routeBefore = routeKey(get().state?.route);
       const reply = await api.chat(buildingKey, message, hasContext ? context : undefined, voice);
+      const newRoute = !!reply.state?.route?.ok && routeKey(reply.state.route) !== routeBefore;
       const note = reply.selection_ignored
         ? `I couldn't use the selection: ${reply.selection_ignored}`
         : reply.here_ignored
           ? `I couldn't use "I'm here": ${reply.here_ignored}`
           : reply.here_note;
       set((s) => ({
-        chat: [...s.chat, { id: ++messageId, role: "agent", text: reply.reply, located: reply.located, note }],
+        chat: [...s.chat, { id: ++messageId, role: "agent", text: reply.reply, located: reply.located, note, route: newRoute }],
         chatBusy: false,
         replyShown: true,
         selection: reply.selection_ignored ? s.selection : null,
@@ -530,6 +593,11 @@ function withPendingHere(next: BuildingState): BuildingState {
   return pendingHere && !next.position && state?.position ? { ...next, position: state.position } : next;
 }
 
+/** Identity of a drawn route (same ends and length = same route). */
+function routeKey(route: Route | null | undefined): string {
+  return route?.ok ? `${route.start}|${route.destination}|${route.length_m}` : "";
+}
+
 // --- directions (owner: card session): compute the route for the open From/To, newest request wins.
 let directionsRun = 0;
 async function routeDirections(): Promise<void> {
@@ -551,18 +619,31 @@ async function routeDirections(): Promise<void> {
     if (state?.route) useTwin.setState({ state: withPendingHere((await api.clearRoute(buildingKey)).state) });
     return;
   }
-  const result = await api.route(buildingKey, start, destination, directions.stepFree);
+  // "Here" with a dot: the route starts (or ends) at the dot, not at the room's anchor.
+  const here = state?.position?.point ? { x: state.position.point[0], y: state.position.point[1], floor_id: state.position.floor_id } : null;
+  const points = {
+    ...(here && directions.from === HERE ? { start_point: here } : {}),
+    ...(here && directions.to === HERE ? { destination_point: here } : {}),
+  };
+  const result = await api.route(buildingKey, start, destination, directions.stepFree, [], points);
   if (run !== directionsRun || !useTwin.getState().directions) return; // a newer pick or a close won
   useTwin.setState({ state: withPendingHere(result.state), replyShown: false });
   if (result.route.ok && result.route.floors?.length) useTwin.setState({ focusedFloorId: result.route.floors[0] });
 }
 
 /** The steps to walk: the route's own (deterministic, from /api/route), else one line to the destination. */
+/** The route's step lines without the opening "Start in X on Ground floor." (it says nothing to do; the walk begins
+ * with the first real move). */
+export function walkLines(steps: string[] | undefined): string[] {
+  return (steps ?? []).filter((line, index, all) => !(index === 0 && all.length > 1 && /^Start (in|at) /.test(line)));
+}
+
 export function walkSteps(): string[] {
   const { state, model } = useTwin.getState();
   const route = state?.route;
   if (!route?.ok) return [];
-  if (route.steps?.length) return route.steps;
+  const steps = walkLines(route.steps);
+  if (steps.length) return steps;
   const name = route.destination ? model?.spaceById.get(route.destination)?.name || route.destination : "the destination";
   return [`Go to ${name}.`];
 }
@@ -581,7 +662,7 @@ if (typeof window !== "undefined") {
     const { profileForced } = useTwin.getState();
     if (!profileForced) {
       const next = autoProfile();
-      useTwin.setState({ profile: next, ao: next === "planner", ...(next === "worker" ? { viewMode: "2d" } : {}) });
+      useTwin.setState({ profile: next, ao: next === "planner", ...(isPhone() ? { viewMode: "2d" } : {}) });
     }
   };
   window.addEventListener("resize", refreshProfile);

@@ -5,6 +5,7 @@ give_directions use), so map and chat show the same rooms. Every other number co
 
 import csv
 import itertools
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -445,7 +446,28 @@ def current_route(session: Session) -> dict | None:
             request.get("destination_point"),
         )
     except MapError as error:
-        return {"ok": False, "error": str(error), **request}
+        return {"ok": False, "error": str(error), "message": readable_error(session.map, str(error)), **request}
+
+
+def closed_label(bm: BuildingMap, element_id: str) -> str:
+    """A closed element as people say it: 'Lift 1', 'the door between Kitchen 2.21 and Corridor 2.01'."""
+    if element_id in bm.connectors:
+        return bm.connectors[element_id].get("name") or "a lift or stair"
+    if element_id in bm.openings:
+        rooms = [bm.spaces[s]["name"] for s in bm.openings[element_id]["space_ids"] if s in bm.spaces]
+        kind = "entrance" if bm.openings[element_id].get("kind") == "entrance" else "door"
+        return f"the {kind} of {rooms[0]}" if len(rooms) == 1 else f"the {kind} between {' and '.join(rooms)}"
+    return "a closed passage"
+
+
+def readable_error(bm: BuildingMap, text: str) -> str:
+    """The routing message for the page: no ids in brackets, closures named instead of listed as ids."""
+    closures = re.search(r" with the current closures \[(.*?)\]", text)
+    if closures:
+        ids = re.findall(r"'([^']+)'", closures.group(1))
+        named = ", ".join(dict.fromkeys(closed_label(bm, i) for i in ids)) or "the current closures"
+        text = text.replace(closures.group(0), f" because of closures: {named}")
+    return re.sub(r" \[[^\]]*\]", "", text).strip()
 
 
 def compact_steps(steps: list[str]) -> list[str]:
@@ -462,7 +484,45 @@ def compact_steps(steps: list[str]) -> list[str]:
             compact[-1] = step
         else:
             compact.append(step)
-    return compact
+    return merge_short_walks(compact)
+
+
+SHORT_WALK_M = 3
+WALK_STEP = re.compile(r"^Walk about (\d+) m (?:through the door|through the opening) into (.+)\.$")
+WALK_ON = re.compile(r"^Walk about (\d+) m(?: (through the door|through the opening))?(.*)$")
+
+
+def merge_short_walks(steps: list[str]) -> list[str]:
+    """A walk of under SHORT_WALK_M metres into a room is folded into the next walk: 'Walk about 1 m … into A.' and
+    'Walk about 2 m … into B.' read as 'Walk about 3 m via A into B.' (several 1 m steps in a row look broken).
+    Lift and stair steps and the first and last lines stay as they are."""
+    merged: list[str] = []
+    carry: tuple[int, list[str]] | None = None  # metres and rooms passed that still wait for the next walk
+    for step in steps:
+        short = WALK_STEP.match(step)
+        if short and int(short.group(1)) < SHORT_WALK_M:
+            metres, rooms = carry or (0, [])
+            carry = (metres + int(short.group(1)), [*rooms, short.group(2)])
+            continue
+        walk = WALK_ON.match(step) if carry else None
+        if carry and walk:
+            metres, rooms = carry
+            rest = walk.group(3)
+            step = f"Walk about {metres + int(walk.group(1))} m via {', '.join(rooms)}{rest}"
+            carry = None
+        elif carry:  # a lift or stair line follows: keep the short walks as one line before it
+            metres, rooms = carry
+            merged.append(
+                f"Walk about {max(metres, 1)} m into {rooms[-1]}."
+                if len(rooms) == 1
+                else f"Walk about {max(metres, 1)} m via {', '.join(rooms[:-1])} into {rooms[-1]}."
+            )
+            carry = None
+        merged.append(step)
+    if carry:
+        metres, rooms = carry
+        merged.append(f"Walk about {max(metres, 1)} m into {rooms[-1]}.")
+    return merged
 
 
 def route_legs(
@@ -515,6 +575,7 @@ def route_geometry(
         path[-1] = ("x", destination_point, stops[-1])
     path = trim_big_room_ends(bm, path)
     drawing = route_draw.draw_index(bm)  # once per line: its signature check walks every asset
+    path = with_door_approaches(bm, path, drawing)
     segments: list[dict] = []
     floor_changes: list[dict] = []
     current: dict | None = None
@@ -526,6 +587,8 @@ def route_geometry(
             return opening["floor_id"], rounded(opening["position"])
         if kind == "x":
             return bm.spaces[space_id]["floor_id"], rounded(element)
+        if kind == "p":  # a door's approach point: element is (opening id, point)
+            return bm.spaces[space_id]["floor_id"], rounded(element[1])
         if space_id == OUTSIDE or space_id not in bm.spaces:
             return None
         return bm.spaces[space_id]["floor_id"], rounded(route_draw.drawn_anchor(bm, space_id, drawing))
@@ -581,11 +644,45 @@ def route_geometry(
             add_point(node, "outside")  # from one entrance to another, outside the building
         else:
             same_room = previous[2] == node[2] and node[2] in bm.spaces
-            add_point(node, room=node[2] if same_room else None)
+            door, approach = (previous, node) if node[0] == "p" else (node, previous)
+            # a door and its own approach point: straight along the wall normal, no detour
+            to_door = door[0] == "o" and approach[0] == "p" and approach[1][0] == door[1]
+            add_point(node, room=node[2] if same_room and not to_door else None)
     for change in floor_changes:
         going_up = bm.floors[change["to_floor"]]["level"] > bm.floors[change["from_floor"]]["level"]
         change["direction"] = "up" if going_up else "down"
     return {"segments": segments, "floor_changes": floor_changes}
+
+
+def with_door_approaches(bm: BuildingMap, path: list[tuple], drawing) -> list[tuple]:
+    """Drawing only: round every door the line crosses, an approach point ("p", point, room) on each side
+    (route_draw.door_approach), so the line runs through the doorway along the wall normal instead of turning
+    on the door centre and cutting the jambs. None before a line that starts at the door or after one that ends
+    there, none for wide openings."""
+
+    def crosses(first: tuple | None, second: tuple | None) -> bool:
+        return (
+            first is not None
+            and second is not None
+            and first[0] == second[0] == "o"
+            and first[1] == second[1]
+            and first[2] != second[2]
+        )
+
+    out: list[tuple] = []
+    for position, node in enumerate(path):
+        preceding = path[position - 1] if position > 0 else None
+        following = path[position + 1] if position + 1 < len(path) else None
+        if position > 0 and crosses(node, following):
+            approach = route_draw.door_approach(bm, node[1], node[2], drawing)
+            if approach is not None:
+                out.append(("p", (node[1], approach), node[2]))
+        out.append(node)
+        if position < len(path) - 1 and crosses(preceding, node):
+            approach = route_draw.door_approach(bm, node[1], node[2], drawing)
+            if approach is not None:
+                out.append(("p", (node[1], approach), node[2]))
+    return out
 
 
 def trim_big_room_ends(bm: BuildingMap, path: list[tuple]) -> list[tuple]:

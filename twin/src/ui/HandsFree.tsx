@@ -1,7 +1,7 @@
 // Hands-free toggle and status (owner: hands-free session). The same button sits next to the omnibox buttons and in
 // the step sheet; one tap switches "Hey Wanda" listening on or off. The engine is handsFree.ts.
 
-import { useTwin } from "../store";
+import { setHandsFreeMuted, useTwin } from "../store";
 import { primeEarcon } from "../voice";
 import "./HandsFree.css";
 
@@ -11,6 +11,7 @@ export function HandsFreeButton({ className = "" }: { className?: string }) {
   const setHandsFree = useTwin((s) => s.setHandsFree);
   const toggle = () => {
     if (!on) primeEarcon(); // inside the tap, so the chime may play later
+    if (useTwin.getState().walkStep !== null) setHandsFreeMuted(on); // muting during guidance is remembered
     setHandsFree(!on);
   };
   return (
@@ -34,7 +35,11 @@ export function HandsFreeStatus({ className = "" }: { className?: string }) {
   const status = useTwin((s) => s.handsFreeStatus);
   const heard = useTwin((s) => s.handsFreeHeard);
   const notice = useTwin((s) => s.handsFreeNotice);
+  const followUpOpen = useTwin((s) => s.followUpOpen);
+  const spoken = useTwin((s) => s.handsFreeSpoken);
   if (!on && !notice) return null;
+  // The "Say Hey Wanda" hint only until something was said; afterwards the lit button says enough.
+  if (on && status === "listening" && spoken) return null;
   return (
     <div className={`hf-status ${on ? status : "notice"} ${className}`} role="status" aria-live="polite">
       {!on ? (
@@ -51,7 +56,7 @@ export function HandsFreeStatus({ className = "" }: { className?: string }) {
       ) : status === "heard" ? (
         <>
           <span className="hf-dot live" aria-hidden />
-          <span className="hf-text strong">{heard || "Yes?"}</span>
+          <span className="hf-text strong">{heard || (followUpOpen ? "Listening…" : "Yes?")}</span>
         </>
       ) : (
         <>

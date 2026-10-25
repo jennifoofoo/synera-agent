@@ -172,6 +172,26 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flat, focusedFloorId, camera]);
 
+  // 3D floor change: the camera glides up or down by the height difference (short, under 300 ms; reduced motion
+  // jumps), so the switch reads as moving through the building. "All floors" and routes frame on their own.
+  const lastFloor = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = lastFloor.current;
+    lastFloor.current = focusedFloorId;
+    const c = controls.current;
+    if (!c || flat || !previous || !focusedFloorId || previous === focusedFloorId || floorMode === "exploded") return;
+    const dy = floorY(focusedFloorId) - floorY(previous);
+    if (Math.abs(dy) < 0.01) return;
+    const target = c.getTarget(new THREE.Vector3());
+    const smooth = c.smoothTime;
+    c.smoothTime = 0.06;
+    void c.moveTo(target.x, target.y + dy, target.z, !reducedMotion).then(() => {
+      c.smoothTime = smooth;
+    });
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedFloorId]);
+
   // Requests from the store. Under frameloop="demand" a camera transition needs a first frame to start, so
   // every request ends with invalidate() (the transition then keeps requesting frames through the controls).
   useEffect(() => {
