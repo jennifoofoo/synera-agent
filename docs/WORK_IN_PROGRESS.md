@@ -184,3 +184,18 @@ Ursache, warum sie fehlen (für später): Level 4 liest Geräte nur aus den farb
 - **`feat/demo-urban-colab-prep`** (2b6bfb4): dein `feat/demo-urban-colab` + unser `feat/inspection-round-and-notes`, Runden-Panel ohne Geräte mit klarer Meldung, zwei Notiz-Fixes, `scripts/demo_seed.py` (Nachtschicht-Notiz am 2. Stopp, idempotent), `tests/test_demo_urban_colab.py` (überspringt, bis Feuerlöscher da sind), Video-/Formulartext auf Urban Colab mit Platzhaltern. Mit 5 Test-Feuerlöschern durchgespielt: 5 Stopps · 106 m, Notiz vorgelesen, Bericht korrekt.
 Nach dem Eintragen der Feuerlöscher: `agent_output/buildings/plan-89323a15` löschen, `scripts/install_demo_buildings.sh`, dann `uv run python scripts/demo_seed.py`.
 Für dich gefunden (deine Dateien): Sprachleisten-Untertitel zeigt rohe IDs ("Project Room [plan-89323a15-F0-S002]", `Omnibox.tsx`); die Willkommenskarte "Hi, I'm Wanda" verdeckt beim Laden ein offenes Runden-Panel; Urban Colab: Route Flur West → Treppe läuft durch ELT-Verteiler, EDV und Umkleide, Project Room → Foyer 55 m, bitte Türen gegen die Plan-Fotos prüfen.
+
+## Leonie an Jennifer (Sonntag ~07:30): diese Punkte haben wir übernommen, bitte nicht doppelt bauen
+Du warst offline, darum haben Leonies Sitzungen die Punkte aus unseren Notizen selbst gebaut, je auf eigenem Branch (nicht `main`):
+- **Gemeinsame Basis `feat/ui-fixes-base`** (a3976bc) = main + `feat/inspection-round-and-notes` + `feat/twin-label-rules` + `feat/demo-urban-colab-prep`.
+- **`feat/twin-ui-fixes`** (von der Basis, gepusht), nur `twin/`:
+  1. Hey-Wanda-Knopf: eingeschaltet beim Hover `--signal-dark` statt weiß (`styles.css`). **Achtung, falls du am Knopf selbst etwas geändert hast (Sprachleiste): bitte beim Merge abgleichen.**
+  2. Scharfe Labels: neue `scene/SharpHtml.tsx` ersetzt drei `Html` in Szene und Campus, rundet auf ganze Pixel.
+  3. Gefundene Geräte: blau eingefärbt statt Dauer-Ring, Ring pulsiert 3× und ist weg, Namensschilder nur für die 5 nächsten, kein extra getönter Zielraum (`Markers.tsx`).
+  4. Etagen bei Routen über mehrere Etagen: Klick zeigt nur diese Etage, "alle Etagen" stapelt wieder (`floorVisibility.tsx`).
+  5. Sprachleiste ohne rohe IDs (`Omnibox.tsx`).
+  6. Willkommenskarte nicht, solange das Runden-Panel offen ist.
+  Tests: tsc, Build, vitest 181; e2e 38/40 (Pixel 7), `test_here_ui::test_tap_pin_then_here_then_drag[desktop]` scheitert schon auf der Basis gleich.
+- **`feat/round-per-device`** (läuft noch, Tests und Live-Suite): Prüfrunde mit einer Station **pro Gerät** (zwei Feuerlöscher in einer Halle = zwei Stationen), Etappen von Gerät zu Gerät mit `start_point`/`destination_point`, `leg_m` je Etappe ("how far" für Station und Runde); Prompt-Regel "nie über eigene Werkzeuge/IDs/Grenzen reden, sondern kurz nachfragen"; neues Werkzeug **Standort löschen**. Berührt `round_tools.py`, `agent.py`, `tools.py`, `web/api.py`, `round.ts`, `handsFree.ts`.
+Noch bei dir: Feuerlöscher im Urban Colab eintragen, Urban-Colab-Türen prüfen, `feat/twin-desktop-flow`. Neu gesehen: die 3D-Ansicht zeichnet dauerhaft ~60 fps auch ohne Bewegung (nicht von unseren Branches; vermutlich Studio-Look/Kamera), kostet am Handy Akku.
+Vorschlag für den Merge nach `main`: alles auf einmal (Basis + UI-Fixes + Runde pro Gerät), dann einmal volle Suite, Live-Suite, Benchmark-Vergleich.
