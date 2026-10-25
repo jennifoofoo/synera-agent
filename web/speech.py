@@ -557,3 +557,57 @@ def synthesize(
     if not payload:
         raise SpeechError("ElevenLabs returned no audio.")
     return payload
+
+
+# ---------- ElevenLabs speech-to-text (wake word on iPhone, see twin/src/wakeListen.ts) ----------
+
+STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+STT_MODEL = "scribe_v1"
+STT_TIMEOUT_SECONDS = 8
+STT_MAX_BYTES = 1_000_000
+STT_AUDIO_TYPES = ("audio/mp4", "audio/webm", "audio/ogg", "audio/wav", "audio/mpeg", "audio/aac", "audio/x-m4a")
+_STT_EXTENSIONS = {"audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac", "audio/mpeg": "mp3"}
+
+
+def _multipart(fields: dict[str, str], file_bytes: bytes, content_type: str) -> tuple[bytes, str]:
+    boundary = f"----wanda{os.urandom(12).hex()}"
+    parts: list[bytes] = []
+    for name, value in fields.items():
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode())
+    extension = _STT_EXTENSIONS.get(content_type, content_type.split("/")[-1])
+    parts.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="utterance.{extension}"\r\n'
+        f"Content-Type: {content_type}\r\n\r\n".encode()
+        + file_bytes
+        + b"\r\n"
+    )
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+def transcribe(audio: bytes, content_type: str, http: HttpFunction | None = None) -> str:
+    """Text of a short recorded utterance (ElevenLabs Scribe). Raises SpeechError; messages never contain the key."""
+    api_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    if not api_key:
+        raise SpeechError("ELEVENLABS_API_KEY is not set.")
+    if not audio:
+        raise SpeechError("No audio.")
+    body, multipart_type = _multipart({"model_id": STT_MODEL, "tag_audio_events": "false"}, audio, content_type)
+    headers = {"xi-api-key": api_key, "Content-Type": multipart_type, "Accept": "application/json"}
+    try:
+        status, payload = (http or _urllib_http)(STT_URL, headers, body, STT_TIMEOUT_SECONDS)
+    except TimeoutError:
+        raise SpeechError("ElevenLabs did not answer in time.") from None
+    except urllib.error.URLError as error:
+        if isinstance(error.reason, (TimeoutError, socket.timeout)):
+            raise SpeechError("ElevenLabs did not answer in time.") from None
+        raise SpeechError("Could not reach ElevenLabs.") from None
+    except Exception:  # noqa: BLE001 - their text may hold the key
+        raise SpeechError("Could not reach ElevenLabs.") from None
+    if status != 200:
+        raise SpeechError(_error_for_status(status))
+    try:
+        text = json.loads(payload).get("text", "")
+    except (ValueError, AttributeError):
+        raise SpeechError("ElevenLabs returned no transcript.") from None
+    return str(text or "").strip()

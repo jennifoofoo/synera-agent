@@ -26,6 +26,7 @@ import {
   type RecognitionResult,
 } from "./voice";
 import { normalizeSpeech, parseWake } from "./wake";
+import { startWakeListen, stopWakeListen, wakeListenSupported } from "./wakeListen";
 import { placeAt, walkMinutes, walkNow } from "./walkInfo";
 import { ABOUT_THERE, walkWithMeDriving } from "./walkWithMe";
 import { inRound, roundDone, roundHowFar, roundStatus } from "./round/round";
@@ -397,6 +398,11 @@ function onResult(results: ArrayLike<RecognitionResult>, from: number): void {
 function start(): void {
   window.clearTimeout(restartTimer);
   if (!enabled() || paused || recognition || document.visibilityState === "hidden") return;
+  if (!continuousRecognitionLikely() && wakeListenSupported()) {
+    // iPhone/Safari: no dependable continuous recognition, so record utterances and transcribe them (wakeListen.ts).
+    startWakeListen(handleUtterance);
+    return;
+  }
   const Ctor = recognitionCtor();
   if (!Ctor || !window.isSecureContext) {
     fail(voiceHint());
@@ -437,6 +443,7 @@ function schedule(): void {
 function halt(): void {
   window.clearTimeout(restartTimer);
   disarm();
+  stopWakeListen();
   const current = recognition;
   recognition = null;
   if (!current) return;

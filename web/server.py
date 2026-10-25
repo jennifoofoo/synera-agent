@@ -19,6 +19,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
                      pace: "off" | "ask" | "say" (top level, default off), context.guide_tick: true with an empty message,
                      context.guide_step?: int, see docs/specs/auto-pace.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
+  POST /api/transcribe  raw audio body (audio/mp4, audio/webm, ...; max 1 MB)   {text} (ElevenLabs Scribe; iPhone wake word)
 
 Place knowledge (web/knowledge_api.py, docs/specs/place-knowledge.md; POSTs need a same-origin page):
   GET  /api/facts?key=&space_id=&asset_id=&element_id=&floor_id=&area=&asset_type=&category=&person=&since=&until=&at=
@@ -89,6 +90,8 @@ MAX_BODY_BYTES = 1_000_000
 VOICE_ID = re.compile(r"[A-Za-z0-9]{10,40}")
 SPEAK_MIN_GAP_SECONDS = 1.0
 SPEAK_MAX_PER_MINUTE = 30
+TRANSCRIBE_MIN_GAP_SECONDS = 0.3
+TRANSCRIBE_MAX_PER_MINUTE = 40
 
 
 def speech_available() -> bool:
@@ -117,19 +120,35 @@ class App:
         self.synthesize = speech.synthesize  # replaced in tests
         self.clock = time.monotonic  # replaced in tests
         self.speak_times: deque[float] = deque()
+        self.transcribe = speech.transcribe  # replaced in tests
+        self.transcribe_times: deque[float] = deque()
+
+    def _allow(self, times: deque[float], min_gap: float, per_minute: int) -> bool:
+        now = self.clock()
+        with self.lock:
+            while times and now - times[0] > 60:
+                times.popleft()
+            if times and now - times[-1] < min_gap:
+                return False
+            if len(times) >= per_minute:
+                return False
+            times.append(now)
+            return True
 
     def allow_speak(self) -> bool:
         """At most 1 request per second and 30 per minute (each call to /api/speak can cost money)."""
-        now = self.clock()
-        with self.lock:
-            while self.speak_times and now - self.speak_times[0] > 60:
-                self.speak_times.popleft()
-            if self.speak_times and now - self.speak_times[-1] < SPEAK_MIN_GAP_SECONDS:
-                return False
-            if len(self.speak_times) >= SPEAK_MAX_PER_MINUTE:
-                return False
-            self.speak_times.append(now)
-            return True
+        return self._allow(self.speak_times, SPEAK_MIN_GAP_SECONDS, SPEAK_MAX_PER_MINUTE)
+
+    def transcribe_audio(self, audio: bytes, content_type: str) -> tuple[int, dict]:
+        """Text of one recorded utterance (the iPhone wake word), or (status, error payload)."""
+        if not os.environ.get("ELEVENLABS_API_KEY"):
+            return 503, {"error": "Transcription is not configured (ELEVENLABS_API_KEY)."}
+        if not self._allow(self.transcribe_times, TRANSCRIBE_MIN_GAP_SECONDS, TRANSCRIBE_MAX_PER_MINUTE):
+            return 429, {"error": "Too many transcription requests, wait a moment."}
+        try:
+            return 200, {"text": self.transcribe(audio, content_type)}
+        except speech.SpeechError as error:
+            return 502, {"error": str(error)}
 
     def speak(self, body: dict) -> tuple[int, bytes | dict]:
         """Shorten the text for speaking and return MP3 bytes, or (status, error payload)."""
@@ -609,6 +628,29 @@ def make_handler(app: App) -> type:
             data = self.rfile.read(length)
             self.run(lambda: app.upload(data))
 
+        def run_transcribe(self) -> None:
+            """Raw audio body of one utterance (the iPhone wake word): {text}. Size is checked before reading."""
+            if not self.speak_request_allowed(speech.STT_AUDIO_TYPES):
+                return
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                length = -1
+            if length <= 0:
+                self.send_json(411, {"error": "The upload needs a Content-Length."})
+                return
+            if length > speech.STT_MAX_BYTES:
+                self.close_connection = True  # the body is not read
+                self.send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "The recording is too large."})
+                return
+            audio = self.rfile.read(length)
+            content_type = self.headers.get("Content-Type", "").split(";")[0].strip().lower()
+            try:
+                status, payload = app.transcribe_audio(audio, content_type)
+            except Exception:  # noqa: BLE001 - report it, don't kill the server
+                status, payload = 500, {"error": "Transcription failed."}  # never the exception text
+            self.send_json(status, payload)
+
         def run_attach(self, query: dict) -> None:
             """Raw svg or building.json body for an uploaded plan (named by its id, never by a path)."""
             kind = (query.get("kind") or [""])[0]
@@ -639,6 +681,9 @@ def make_handler(app: App) -> type:
                 return
             if url.path == "/api/level4/attach":
                 self.run_attach(parse_qs(url.query))
+                return
+            if url.path == "/api/transcribe":
+                self.run_transcribe()
                 return
             if url.path.startswith(("/api/speak", "/api/level4/", "/api/facts")) and not self.speak_request_allowed():
                 return
