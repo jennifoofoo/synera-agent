@@ -54,6 +54,8 @@ class Walk:
     mode: str = "plain"
     index: int = 0
     left_cache: dict = field(default_factory=dict)
+    facts_lookup: object = None  # rooms -> short lines of notes valid now (place knowledge); None without a store
+    announced: set = field(default_factory=set)  # rooms whose note was read out on this walk (once per walk)
 
 
 def spoken(text: str) -> str:
@@ -101,7 +103,36 @@ def build_walk(bm: BuildingMap, route, via: list[str] | None = None, mode: str =
 
 def remember_route(bm: BuildingMap, state, route, via: list[str] | None = None, mode: str = "plain") -> Walk:
     state.walk = build_walk(bm, route, via, mode)
+    state.walk.facts_lookup = getattr(state, "facts_lookup", None)
     return state.walk
+
+
+def carry_notes(old: Walk, new: Walk) -> Walk:
+    """A walk rebuilt on the way (rerouted, moved along) keeps its note lookup and what was already read out."""
+    new.facts_lookup, new.announced = old.facts_lookup, old.announced
+    return new
+
+
+SAY_FACT = "After the step add this one line once, short, in the person's language: "
+
+
+def step_fact(walk: Walk, index: int) -> str | None:
+    """The note of a room this step enters, if one is valid now and was not read out on this walk yet."""
+    if walk.facts_lookup is None or index >= len(walk.rooms):
+        return None
+    rooms = [room for room in walk.rooms[index] if room not in walk.announced]
+    if not rooms:
+        return None
+    try:
+        found = walk.facts_lookup(rooms)
+    except Exception:  # noqa: BLE001 - a broken note store must never break guiding
+        return None
+    for room in rooms:
+        if found.get(room):
+            walk.announced.add(room)
+            lines = found[room]
+            return lines[0] + (f" (and {len(lines) - 1} more)" if len(lines) > 1 else "")
+    return None
 
 
 def room_at(walk: Walk, index: int) -> str:
@@ -145,7 +176,7 @@ def step_payload(bm: BuildingMap, walk: Walk) -> dict:
     here, after = metres_left(bm, walk, index), None if arrived else metres_left(bm, walk, index + 1)
     leg = here - after if here is not None and after is not None else None
     seconds = round(leg / WALK_M_PER_S / PACE_ROUND_S) * PACE_ROUND_S if leg is not None and leg > 0 else 0
-    return {
+    result = {
         "mode": "guided",
         "step": walk.steps[index],
         "step_number": index + 1,
@@ -155,6 +186,11 @@ def step_payload(bm: BuildingMap, walk: Walk) -> dict:
         "about_seconds": seconds or None,
         "say": SAY_LAST if arrived else SAY_STEP,
     }
+    fact = None if arrived else step_fact(walk, index)
+    if fact:  # a note in a room this step enters: read once per walk
+        result["fact"] = fact
+        result["say"] = f"{SAY_STEP} {SAY_FACT}{fact}"
+    return result
 
 
 def landmark_indexes(walk: Walk) -> list[int]:
@@ -371,7 +407,7 @@ def follow(bm: BuildingMap, state, space_id: str) -> dict | None:
         return {"on_route": on_route, "note": str(error)}
     finally:
         bm.last_route = kept
-    state.walk = build_walk(bm, fresh, via_ahead, walk.mode if walk.mode != "stopped" else "plain")
+    state.walk = carry_notes(walk, build_walk(bm, fresh, via_ahead, walk.mode if walk.mode != "stopped" else "plain"))
     if on_route:
         state.position = make_position(bm, space_id, None, "route", state.turn)
     return {
@@ -455,7 +491,7 @@ def after_change(bm: BuildingMap, state, before_left: float | None) -> dict | No
         walk.left_cache.clear()
         return {"route_unaffected": True}
     longer = None if before_left is None else round(fresh.length_m - before_left, 1)
-    state.walk = build_walk(bm, fresh, via_ahead, walk.mode)
+    state.walk = carry_notes(walk, build_walk(bm, fresh, via_ahead, walk.mode))
     return {"rerouted": True, "longer_by_m": longer, "remaining_length_m": fresh.length_m, **payload(bm, state.walk)}
 
 

@@ -169,7 +169,9 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, self.campus.synced_holder)
+                self.chats[key] = ChatAdapter(
+                    session.directory, session.map, self.level4, self.campus.synced_holder, self.knowledge
+                )
             return self.chats[key]
 
     def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:

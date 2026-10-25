@@ -100,13 +100,16 @@ def iso(moment: datetime) -> str:
 
 
 def parse_time(value) -> datetime | None:
-    """ISO text or datetime -> aware datetime (naive counts as Europe/Berlin); None stays None."""
+    """ISO text or datetime -> aware datetime in UTC (naive counts as Europe/Berlin); None stays None.
+
+    UTC on purpose: two aware datetimes with the SAME ZoneInfo compare by wall time, so in the repeated hour when
+    summer time ends (02:00-03:00 twice) a fact made at 02:59+02:00 looked like the future at 02:05+01:00."""
     if value is None or value == "":
         return None
     if isinstance(value, datetime):
-        return berlin_now(value)
+        return berlin_now(value).astimezone(UTC)
     try:
-        return berlin_now(datetime.fromisoformat(str(value)))
+        return berlin_now(datetime.fromisoformat(str(value))).astimezone(UTC)
     except ValueError as error:
         raise KnowledgeError(f"Not a time: {value!r}.") from error
 
