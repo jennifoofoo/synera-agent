@@ -15,7 +15,7 @@ import { Disc, Ring } from "./Markers";
 import { markHereHintSeen } from "../ui/HereChip";
 import { useWalkMotion } from "../walkWithMe";
 import "./HerePin.css";
-import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, Pulse, ScreenSized } from "./markerLayout";
+import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, Pulse, ScreenSized, TAP_CROSS_PX, TAP_DOT_PX, TAP_RING_PX, TAP_RING_W_PX, TAP_STALK_M } from "./markerLayout";
 
 function inPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
@@ -53,34 +53,38 @@ export function TapPin({ floorY, visibleFloors, flat }: PinProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, select]);
 
-  const reach = flat ? 4.5 : 3;
+  // A small screen-sized crosshair (px, about 1.5x the ring radius): long lines in metres ran across walls and labels.
   const cross = useMemo(() => {
-    const gap = flat ? 1.1 : 0.8;
+    const gap = TAP_DOT_PX + 2;
+    const reach = TAP_CROSS_PX;
     const verts = [-reach, 0, 0, -gap, 0, 0, gap, 0, 0, reach, 0, 0, 0, 0, -reach, 0, 0, -gap, 0, 0, gap, 0, 0, reach];
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     return geometry;
-  }, [reach, flat]);
+  }, []);
   useEffect(() => () => cross.dispose(), [cross]);
 
   if (!selection || !active || !selection.point || !visibleFloors.has(selection.floor_id)) return null;
   // The dot already stands here (just pressed "I'm here"): never two markers on one spot.
   if (position && position.floor_id === selection.floor_id && samePoint(position.point, selection.point)) return null;
-  const radius = flat ? 1.1 : 0.8;
   return (
     <group position={[selection.point[0], floorY(selection.floor_id) + 0.07, -selection.point[1]]} name="tap-pin">
-      <Ring radius={radius} colour={COLOURS.selection} width={flat ? 0.16 : 0.12} through order={30} />
-      <lineSegments geometry={cross} renderOrder={19}>
-        <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={false} />
-      </lineSegments>
-      <Disc radius={flat ? 0.28 : 0.2} colour={COLOURS.selection} opacity={1} through y={0.02} order={31} />
+      {/* Ring, dot and crosshair keep their size on screen like the other markers (markerLayout.tsx), so the room's
+          name can sit just above them (Labels.tsx, LABEL_LIFT.tap). In 3D the crosshair is depth-tested: walls hide it. */}
+      <ScreenSized>
+        <Ring radius={TAP_RING_PX} colour={COLOURS.selection} width={TAP_RING_W_PX} through order={30} />
+        <lineSegments geometry={cross} renderOrder={flat ? 19 : 15}>
+          <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={!flat} depthWrite={false} />
+        </lineSegments>
+        <Disc radius={TAP_DOT_PX} colour={COLOURS.selection} opacity={1} through y={0.02} order={31} />
+      </ScreenSized>
       {!flat && (
         <>
           <mesh position-y={0.55}>
             <cylinderGeometry args={[0.025, 0.025, 1.1, 8]} />
             <meshBasicMaterial color={COLOURS.selection} />
           </mesh>
-          <mesh position-y={1.15}>
+          <mesh position-y={TAP_STALK_M - 0.2}>
             <sphereGeometry args={[0.2, 16, 16]} />
             <meshBasicMaterial color={COLOURS.selection} />
           </mesh>

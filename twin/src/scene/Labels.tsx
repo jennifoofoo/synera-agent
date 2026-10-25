@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import { controlsRef } from "./FloorMesh";
 import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
@@ -8,7 +10,7 @@ import { areasOf, type Area } from "./areas";
 import { prettyType } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
 import { closedConnectorStops } from "../model/closures";
-import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
+import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
 import { FACT_PIN_PX, FactPin, pinSpots, useFactPins } from "./FactPins";
@@ -241,6 +243,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const route = state?.route ?? null;
   // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
   const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
+  // Where the tap pin stands (HerePin.tsx TapPin): the tapped room's name moves above it like above the other markers.
+  const tapPoint = useTwin((s) => (s.selection?.point && s.selection.kind !== "asset" && s.selection.kind !== "opening" ? s.selection.point : null));
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
@@ -257,9 +261,14 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
-    if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
+    if (selectedId) {
+      // The tap pin: 2D above its crosshair, 3D above the head of its stalk. A selection without a spot keeps the
+      // name on the room's anchor. A marker already in the room with a larger lift wins (put keeps the larger lift).
+      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, flat ? 0 : TAP_STALK_M);
+      else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
+    }
     return out;
-  }, [route, state?.position, model, floor.id, selectedId]);
+  }, [route, state?.position, model, floor.id, selectedId, tapPoint, flat]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -298,6 +307,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const here = state?.position;
     const herePoint = here?.floor_id === floor.id ? (here.point ?? model.spaceById.get(here.space_id)?.anchor) : undefined;
     if (herePoint) kept.push(boxOf(herePoint, HERE_RIM_PX, HERE_RIM_PX));
+    // The tap pin with its small crosshair (2D; in 3D the stalk stands up and the layout is approximate anyway).
+    if (flat && tapPoint && selectedId && model.spaceById.get(selectedId)?.floor_id === floor.id) kept.push(boxOf(tapPoint, TAP_CROSS_PX, TAP_CROSS_PX));
     for (const points of routeOnFloor) {
       if (points.length < 2) continue;
       kept.push(boxOf(points[0], START_DOT_PX + 2, START_DOT_PX + 2));
@@ -475,7 +486,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return { shown: result, pins };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, factPins, untilBy]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, factPins, untilBy]);
 
   return (
     <group position-y={y + 0.5}>
@@ -499,7 +510,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       ))}
       {shown.map((item) =>
         item.kind === "room" ? (
-          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} y={y + 0.5} />
         ) : item.kind === "area" ? (
           <Html key={item.id} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[2, 0]} style={{ pointerEvents: "none" }}>
             <div className={`label label-halo label-area ${flat ? "label-plan" : ""} zoom-fade`} data-zoom-kind="area" data-area-rooms={item.area.space_ids.length}>
@@ -556,7 +567,27 @@ export function ClosedGlyph() {
   );
 }
 
-function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean }) {
+/** 3D: a room name further from the camera than this many times the orbit distance is hidden (the far side of a
+ * tilted view, near the horizon, where names pile up). Marked and selected rooms always keep theirs. */
+const FAR_LABEL = 1.3;
+
+function RoomLabel({ item, mark, flat, selected, y }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean; y: number }) {
+  const div = useRef<HTMLDivElement>(null);
+  const cull = !flat && !mark && !selected;
+  useFrame(({ camera }) => {
+    const el = div.current;
+    const c = controlsRef.current;
+    if (!el) return;
+    let hide = false;
+    if (cull && c) {
+      const dx = camera.position.x - item.point[0];
+      const dy = camera.position.y - y;
+      const dz = camera.position.z + item.point[1];
+      hide = Math.hypot(dx, dy, dz) > c.distance * FAR_LABEL;
+    }
+    const want = hide ? "hidden" : "";
+    if (el.style.visibility !== want) el.style.visibility = want;
+  });
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
@@ -565,6 +596,7 @@ function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind:
       style={{ pointerEvents: "none" }}
     >
       <div
+        ref={div}
         className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"

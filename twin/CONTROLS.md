@@ -23,21 +23,36 @@ smooth, stepped per frame with the frame time, works with key repeat disabled, a
 
 ## Mouse, trackpad and touch
 
+Works the same in 2D and 3D, Chrome and Safari. 2D has no tilt, so there "tilt" rotates or does nothing.
+
 | Input | Does |
 | --- | --- |
-| Left drag, middle drag | Grab the map and move it (2D and 3D). The point under the pointer stays under it, no damping |
-| Right drag, Ctrl or Alt + left drag | Rotate (3D also tilts, 2D rotates only; Home turns the plan north up) |
-| Wheel, trackpad pinch | Zoom towards the pointer. One 100 px wheel notch is a 15 percent step |
-| Two-finger trackpad scroll | Move the map. Alt + scroll zooms instead (for a mouse that is taken for a trackpad) |
+| Drag (mouse, or trackpad with the click held) | Grab the map and move it. The point under the pointer stays under it |
+| Option / Alt + drag | Up / down tilts (3D), sideways rotates |
+| Right drag, Ctrl + drag | Rotate and tilt, like Option + drag |
+| Two-finger trackpad swipe | Move the map. Never zooms |
+| Pinch, mouse wheel | Zoom towards the pointer. One 100 px wheel notch is a 15 percent step |
+| Option / Alt + two-finger swipe or wheel | Sideways rotates, up / down tilts (3D). In 2D both directions rotate |
+| Two-finger twist (Safari) | Rotate. Chrome has no twist: use Option + swipe, Option + drag or the compass |
+| Compass (end of the floor rail) | Click: north up and straight down. Drag: rotate (3D: up / down tilts). The two arrow buttons below it tilt flatter / steeper (3D) |
 | Click | Select a room, only if the pointer moved less than 6 px |
 | Double click, double tap | Fly to that room (3D), zoom in 2x at that point (2D) |
 | One finger | Move the map |
 | Two fingers | 2D: pinch to zoom around the midpoint, the map moves with the fingers, no rotation. 3D: pinch to zoom, twist to rotate, up or down to tilt |
 
-How a wheel event is told apart: line-mode events and pixel steps of 50 px or more that are whole multiples of 120
-(legacy `wheelDeltaY`) are mouse notches and zoom. Small, fractional or sideways steps, and any stream of them, are a
-trackpad scroll and pan. Safari pinch (`gesturechange`) and Chrome pinch (ctrl + wheel) zoom. The page never scrolls
-or zooms while the pointer is over the canvas.
+The 3D view never tilts flatter than about 57 degrees from straight down (`MAX_TILT` in `CameraRig.tsx`), for every
+input. Room names far from the camera (more than 1.3 times the orbit distance) are hidden in 3D so the horizon does
+not fill up with names; marked and selected rooms keep theirs. The first time the 3D view shows on the laptop, a hint
+says "Option + drag to tilt" (once, remembered in localStorage).
+
+How a wheel event is told apart (`scene/wheelInput.ts`, unit tested in `wheelInput.test.ts`): ctrl + wheel is a
+trackpad pinch (Chrome, Firefox) and zooms; Option / Alt + wheel orbits. Otherwise the device decides, first match
+wins: line or page mode is a mouse; an event less than 150 ms after the last one keeps that gesture's device (a swipe
+never turns into a zoom halfway, momentum included); a sideways delta is a trackpad; a legacy `wheelDeltaY` of exactly
+-3 x `deltaY` is a trackpad, whole multiples of 120 a mouse; a fractional delta is a trackpad; a whole step of 50 px
+or more on Y only is a mouse notch, a smaller one a trackpad. Trackpad pans, mouse zooms. Safari pinch and twist come
+as `gesturechange` (scale zooms, rotation turns after an 8 degree dead zone). The page never scrolls or zooms while
+the pointer is over the canvas.
 
 ## Map symbols
 
@@ -49,7 +64,11 @@ racks, furniture; darker and named when the directions use them as a landmark). 
 ## Where it lives
 
 - `scene/cameraMouse.ts`: pan (grab), wheel and gestures, drag never clicks, double click hook.
+- `scene/wheelInput.ts`: which wheel event is a pinch, a swipe, a mouse notch or an orbit; the Safari twist.
+- `ui/Compass.tsx`: compass and tilt buttons at the end of the floor rail, the one-time tilt hint.
 - `scene/cameraKeys.ts`: held keys, typing guard (`isTypingTarget`).
 - `scene/CameraRig.tsx`: limits, damping, store requests, floor and view keys, the double click fly-to.
 - `ui/KeyHelp.tsx`: the help card.
 - `tests/e2e/test_twin_controls.py`: left drag moves the map by the dragged distance, a drag selects nothing.
+- `tests/e2e/test_twin_trackpad.py`: trackpad swipe pans, ctrl + wheel zooms, Alt + wheel and Alt + drag rotate and
+  tilt, the tilt buttons and the tilt limit, the compass resets north up.

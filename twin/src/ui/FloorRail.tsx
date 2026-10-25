@@ -1,5 +1,6 @@
 import { useKeyHelp } from "../scene/controlsTable";
 import { useTwin } from "../store";
+import { Compass } from "./Compass";
 import { NotesToggle } from "./Facts";
 
 /** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
@@ -79,6 +80,7 @@ export function FloorRail() {
           ?
         </button>
       )}
+      <Compass />
     </div>
   );
 }
