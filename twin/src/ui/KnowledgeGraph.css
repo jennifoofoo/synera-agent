@@ -39,7 +39,6 @@
 }
 .kg-node text { font-family: var(--font); text-anchor: middle; pointer-events: none; }
 .kg-label { font-size: 11px; font-weight: 500; fill: var(--ink); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
-.kg-type { font-size: 9.5px; fill: var(--ink-2); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
 .kg-num-text { font-size: 10px; font-weight: 600; fill: var(--ink); }
 .kg-node.issue .kg-num-text { fill: var(--surface); }
 .kg-initial { font-size: 11px; font-weight: 600; fill: var(--ink); }

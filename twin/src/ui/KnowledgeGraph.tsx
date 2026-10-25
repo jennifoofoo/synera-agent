@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { useNotes } from "../notes/notesStore";
 import { useTwin } from "../store";
-import { ASSET_R, DAY_MS, FACT_R, HOUR_MS, LINE_H, PERSON_R, ROOM_R, TYPE_H, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
+import { ASSET_R, DAY_MS, FACT_R, HOUR_MS, LINE_H, PERSON_R, ROOM_R, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
 import "./KnowledgeGraph.css";
 
 interface KnowledgeState {
@@ -196,20 +196,12 @@ function GraphNode({ node, focused, onFocus }: { node: EgoNode; focused: boolean
   const select = () => onFocus(focused ? null : node.id);
   const classes = ["kg-node", node.role, node.state === "ended" ? "ended" : "", focused ? "focused" : "", node.hasFacts ? "has-facts" : ""].join(" ");
   // Ring 1 labels sit beside the node on the outside (left of the left half, right of the right half), up to two lines,
-  // never cut; the small type line only where it matters (things with notes) or on focus.
+  // never cut. Only the name: the class (brick:...) is in the tooltip and the AAS export, not on the drawing.
   const right = node.side !== "left";
   const dx = right ? r + 5 : -(r + 5);
   const anchor = right ? "start" : "end";
-  const rows: Array<{ text: string; cls: string }> = (node.lines ?? []).map((text) => ({ text, cls: "kg-label" }));
-  if (node.ring === 1 && node.role !== "more" && (node.hasFacts || focused)) rows.push({ text: mainType(node.types), cls: "kg-type" });
-  const heights = rows.map((row) => (row.cls === "kg-type" ? TYPE_H : LINE_H));
-  const total = heights.reduce((sum, h) => sum + h, 0);
-  let cursor = -total / 2;
-  const placed = rows.map((row, i) => {
-    const y = cursor + heights[i] / 2;
-    cursor += heights[i];
-    return { ...row, y };
-  });
+  const lines = node.lines ?? [];
+  const placed = lines.map((text, i) => ({ text, cls: "kg-label", y: (i - (lines.length - 1) / 2) * LINE_H }));
   return (
     <g
       className={classes}
