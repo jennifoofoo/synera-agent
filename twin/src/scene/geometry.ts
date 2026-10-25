@@ -24,6 +24,8 @@ export interface FloorGeometry {
   zones: THREE.BufferGeometry;
   /** space index (into floor.spaces) per vertex of `solid`, for picking */
   spaceIndexOf: (vertexIndex: number) => number;
+  /** true when the vertex belongs to a wall piece (not a slab) */
+  isWall: (vertexIndex: number) => boolean;
   wallHeight: number;
   spaceCount: number;
 }
@@ -370,15 +372,16 @@ export function effectiveOpenings(floor: FloorModel, edits?: OpeningEdits): Open
   return [...kept, ...added];
 }
 
-export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): FloorGeometry {
-  const builder = new Builder();
-  const wallHeight = wallHeightFor(floor);
-  const colourCache = new Map<string, THREE.Color>();
-  const colourFor = (hex: string) => {
-    let colour = colourCache.get(hex);
-    if (!colour) colourCache.set(hex, (colour = new THREE.Color(hex)));
-    return colour;
-  };
+/** Where a floor's walls stand: the CCW polygons, how many rooms own each edge (1 = outer wall) and the gaps the
+ * openings cut per space. Shared by the floor mesh and the selection's wall-top outline, so both agree exactly. */
+interface WallLayout {
+  polygons: Point[][];
+  edgeOwners: Map<string, number>;
+  gapsBySpace: Map<string, Gap[]>;
+  allCuts: Cut[];
+}
+
+function wallLayout(floor: FloorModel, edits?: OpeningEdits): WallLayout {
   // Which edges are shared by two rooms (interior) and which face outside.
   const edgeOwners = new Map<string, number>();
   const polygons: Point[][] = floor.spaces.map((space) => ccw(space.polygon));
@@ -388,7 +391,6 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
       edgeOwners.set(key, (edgeOwners.get(key) ?? 0) + 1);
     }
   });
-  const drawnEdges = new Set<string>();
   // Gaps per space: every opening cuts the walls and the outline of the spaces it joins.
   const indexById = new Map(floor.spaces.map((space, index) => [space.id, index]));
   const gapsBySpace = new Map<string, Gap[]>();
@@ -406,6 +408,30 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
       gapsBySpace.set(spaceId, list);
     }
   }
+  return { polygons, edgeOwners, gapsBySpace, allCuts };
+}
+
+/** Outward wall normal in scene xz for an outer edge a-b of a CCW polygon (the cutaway lowers walls facing the
+ * camera along it); interior edges get none. */
+function outwardOf(a: Point, b: Point, outer: boolean): [number, number] {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = Math.hypot(dx, dy) || 1;
+  // Model (dy, -dx)/len -> scene (dy, dx)/len (z = -y flips the sign of y).
+  return outer ? [dy / length, dx / length] : [0, 0];
+}
+
+export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): FloorGeometry {
+  const builder = new Builder();
+  const wallHeight = wallHeightFor(floor);
+  const colourCache = new Map<string, THREE.Color>();
+  const colourFor = (hex: string) => {
+    let colour = colourCache.get(hex);
+    if (!colour) colourCache.set(hex, (colour = new THREE.Color(hex)));
+    return colour;
+  };
+  const { polygons, edgeOwners, gapsBySpace, allCuts } = wallLayout(floor, edits);
+  const drawnEdges = new Set<string>();
   const industrial = isIndustrial(floor.spaces);
   floor.spaces.forEach((space: Space, sid) => {
     const polygon = polygons[sid];
@@ -424,12 +450,7 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
       // Edges shared by two spaces are built once, with the gaps of both.
       if (drawnEdges.has(key)) continue;
       drawnEdges.add(key);
-      const outer = (edgeOwners.get(key) ?? 1) === 1;
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const length = Math.hypot(dx, dy) || 1;
-      // Outward normal in scene xz: model (dy, -dx)/len -> scene (dy, dx)/len (z = -y flips the sign of y).
-      const outward: [number, number] = outer ? [dy / length, dx / length] : [0, 0];
+      const outward = outwardOf(a, b, (edgeOwners.get(key) ?? 1) === 1);
       for (const [t0, t1] of keptPieces(a, b, gaps)) {
         builder.wallPiece(lerp(a, b, t0), lerp(a, b, t1), 0, height, colourFor(palette.wall), outward, sid, WALL_THICKNESS);
       }
@@ -441,11 +462,13 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
   }
   const { solid, edges, zones } = builder.build(null);
   const spaceIndex = solid.getAttribute("spaceIndex") as THREE.BufferAttribute;
+  const wall = solid.getAttribute("wall") as THREE.BufferAttribute;
   return {
     solid,
     edges,
     zones,
     spaceIndexOf: (vertexIndex) => spaceIndex.getX(vertexIndex),
+    isWall: (vertexIndex) => wall.getX(vertexIndex) > 0.5,
     wallHeight,
     spaceCount: floor.spaces.length,
   };
@@ -472,6 +495,106 @@ export function outlineGeometry(polygon: Point[], y: number): THREE.BufferGeomet
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
+  return geometry;
+}
+
+/** Even-odd point-in-polygon test in model metres. */
+export function insidePolygon([x, y]: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * The room a tap on a wall means, and the spot for its pin. A wall piece belongs to whichever of its two rooms was
+ * built first, and its hit point lies on the room's edge; so the room is the one on the side of the face the camera
+ * sees (a wall top: the room beyond it, the one the camera looks into), and the spot is that room's anchor.
+ * `normal` is the hit face's normal, `ray` the view direction (both scene xz; scene z = -model y).
+ */
+export function roomBehindWall(spaces: Space[], fallback: Space, hit: Point, normal: [number, number, number], ray: [number, number, number]): { space: Space; point: Point } {
+  let [nx, ny, nz] = normal;
+  if (nx * ray[0] + ny * ray[1] + nz * ray[2] > 0) [nx, ny, nz] = [-nx, -ny, -nz]; // the side facing the camera
+  let [dx, dz] = Math.abs(ny) > 0.7 ? [ray[0], ray[2]] : [nx, nz];
+  const length = Math.hypot(dx, dz) || 1;
+  [dx, dz] = [dx / length, dz / length];
+  const probe: Point = [hit[0] + dx * (WALL_THICKNESS + 0.2), hit[1] - dz * (WALL_THICKNESS + 0.2)];
+  const space = spaces.find((candidate) => candidate.polygon.length >= 3 && insidePolygon(probe, candidate.polygon)) ?? fallback;
+  return { space, point: space.anchor };
+}
+
+/** Width of the selection band on the wall tops: a touch wider than the wall, so it reads as painting the wall top. */
+export const WALL_TOP_BAND = WALL_THICKNESS + 0.04;
+
+/**
+ * The selected room's outline on top of its walls (3D): one flat band per wall piece, centred on the polygon edge at
+ * the floor's wall height, with the floor mesh's `wallNormal` and `wall` attributes. With the withCutaway material it
+ * follows the walls exactly: lowered where the dollhouse cutaway lowers an outer wall; across door gaps and hall zone
+ * lines (no wall) it lies on the floor. Drawn
+ * on the floor instead, a see-through outline showed the room's floor edge through the near wall, so it seemed to
+ * stick out into the corridor (the camera looks over the wall tops, which is where people see a room's boundary).
+ */
+export function wallTopOutline(floor: FloorModel, spaceId: string, edits?: OpeningEdits): THREE.BufferGeometry {
+  const index = floor.spaces.findIndex((space) => space.id === spaceId);
+  const geometry = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const wallNormals: number[] = [];
+  const walls: number[] = [];
+  if (index >= 0 && floor.spaces[index].polygon.length >= 3) {
+    const { polygons, edgeOwners, gapsBySpace } = wallLayout(floor, edits);
+    const polygon = polygons[index];
+    const gaps = gapsBySpace.get(spaceId) ?? [];
+    const y = (floor.spaces[index].type === "outdoor" ? Math.min(wallHeightFor(floor), 0.5) : wallHeightFor(floor)) + 0.015;
+    const floorY = 0.03;
+    const half = WALL_TOP_BAND / 2;
+    for (let i = 0; i < polygon.length; i++) {
+      const a = polygon[i];
+      const b = polygon[(i + 1) % polygon.length];
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (length < 0.02) continue;
+      const ux = (b[0] - a[0]) / length;
+      const uy = (b[1] - a[1]) / length;
+      const outward = outwardOf(a, b, (edgeOwners.get(edgeKey(a, b)) ?? 1) === 1);
+      // Wall pieces get the band on their top; door gaps and hall zone lines (no wall) get it on the floor, so the
+      // room's outline stays closed.
+      const kept = keptPieces(a, b, gaps);
+      const pieces: [number, number, number][] = [];
+      let cursor = 0;
+      for (const [t0, t1] of kept) {
+        if (t0 > cursor + 1e-6) pieces.push([cursor, t0, floorY]);
+        pieces.push([t0, t1, y]);
+        cursor = t1;
+      }
+      if (cursor < 1 - 1e-6) pieces.push([cursor, 1, floorY]);
+      for (const [t0, t1, height] of pieces) {
+        // At the polygon's corners the band runs on by half its width, so neighbouring bands close the corner.
+        const p = lerp(a, b, t0);
+        const q = lerp(a, b, t1);
+        const s0 = t0 <= 1e-6 ? half : 0;
+        const s1 = t1 >= 1 - 1e-6 ? half : 0;
+        const p0: Point = [p[0] - ux * s0, p[1] - uy * s0];
+        const q0: Point = [q[0] + ux * s1, q[1] + uy * s1];
+        const corners: Point[] = [
+          [p0[0] + uy * half, p0[1] - ux * half],
+          [q0[0] + uy * half, q0[1] - ux * half],
+          [q0[0] - uy * half, q0[1] + ux * half],
+          [p0[0] - uy * half, p0[1] + ux * half],
+        ];
+        for (const k of [0, 1, 2, 0, 2, 3]) {
+          positions.push(corners[k][0], height, -corners[k][1]);
+          wallNormals.push(outward[0], outward[1]);
+          walls.push(1);
+        }
+      }
+    }
+  }
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("wallNormal", new THREE.Float32BufferAttribute(wallNormals, 2));
+  geometry.setAttribute("wall", new THREE.Float32BufferAttribute(walls, 1));
+  geometry.computeBoundingSphere();
   return geometry;
 }
 
