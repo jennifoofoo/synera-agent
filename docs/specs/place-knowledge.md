@@ -80,10 +80,12 @@ Mit dieser Spec ist es ein zeitlicher Wissensgraph über das Gebäude, ohne Grap
 | Seite: Ebene "Notes & photos" (Standard aus) mit Pins für aktive Fakten (Notiz-Symbol, Problem-Symbol), Sperrung "until …" immer sichtbar, Antippen zeigt Text/Alter/Autor/Foto, Foto per Sprache öffnen, "Notiz hier"-Knopf in der Raumkarte (Text, Foto), Verlauf aufklappbar, "Closed until …" am Sperr-Symbol, freihändig "merk dir …" an den Chat geben | **Leonie** | neu `ui/Facts.tsx`, `scene/FactPins.tsx`, kleine Einhängepunkte in `Card.tsx`, `poiIcons`, `handsFree.ts` |
 
 ## Vertrag für die Seite (Leonie)
-- `state.facts`: `[{id, kind, anchor: {space_id, asset_id, element_id, point, floor_id}, text, valid_from, valid_to, status, author, photo}]` nur jetzt gültige, in jeder Antwort mit `state`.
-- `GET /api/facts?key=…&space_id=…` → `{facts: [...]}` jetzt gültig; `&history=1` inkl. erledigt/abgelaufen, neueste zuerst.
-- `POST /api/facts` `{key, kind, anchor, text, valid_to?, author?, photo_base64?}` → legt an (für den Knopf "Notiz hier" nach Bestätigung in der Seite); Sperrungen nur über den Chat (Karte und "Ja"), weil sie Routen ändern.
-- Sperrung mit Zeit: `state.closed` bleibt wie heute; neu `state.closed_until: {element_id: ISO-Zeit}`.
+- `state.facts`: `[{id, kind, anchor: {space_id, asset_id, element_id, point, floor_id}, related, text, valid_from, valid_to, status, author, person_id, source, photo, created_at, …}]` nur jetzt gültige (alle Etagen), in jeder Antwort mit `state`. `photo` ist eine URL (`/api/facts/photo?key=…&id=…`) oder `null`.
+- `GET /api/facts?key=…&space_id=…` → `{facts: [...], persons: [{person_id, name, count}]}` jetzt gültig; `&history=1` inkl. erledigt/abgelaufen, neueste zuerst. Weitere Filter: `asset_id, element_id, floor_id, area` ("Halle A"), `asset_type, category, person, since, until, at, status=open|resolved|expired|all`.
+- `POST /api/facts` `{building, kind: note|issue, anchor, text, valid_to?, author?, related?, photo_base64?}` (statt `building` geht auch `key`) → `{fact, state}`; Sperrungen nur über den Chat (Karte und "Ja"), weil sie Routen ändern. Wie alle schreibenden Endpunkte nur von der eigenen Seite (Origin-Prüfung), JSON bis 12 MB.
+- `GET /api/facts/photo?key=…&id=…` → JPEG (verkleinert, ohne EXIF). `POST /api/facts/undo {building}` → `{undone, state}` (nur jüngster Fakt, jünger als 2 Minuten). `GET /api/graph?key=…[&format=aas]` → JSON-LD bzw. AAS.
+- Sperrung mit Zeit: `state.closed` bleibt wie heute (enthält auch Sperrungen aus Fakten, solange sie gelten); neu `state.closed_until: {element_id: ISO-Zeit}` nur für Sperrungen mit Ende. Öffnen auf der Seite (`POST /api/close` mit `closed: false`) beendet die Sperr-Fakten dieses Elements.
+- Speicher: `agent_output/knowledge/<building id>/facts.json` plus `photos/`.
 
 ## Tests
 - Zeitlogik: gültig/abgelaufen/abgelöst, Grenzfälle (genau `valid_to`), Ablauf öffnet Sperrung, Verlauf vollständig.

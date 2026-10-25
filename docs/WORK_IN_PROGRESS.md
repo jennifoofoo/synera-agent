@@ -45,6 +45,17 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
 **Bis zum Freeze nur Fixes, mit einer Ausnahme als Wow-Effekt: Ortswissen mit Zeit** (Notizen, Probleme, Sperrungen "bis morgen" an Ort oder Gerät), Spec `docs/specs/place-knowledge.md`, wartet auf euer Okay. Leonie baut die Seite gegen den Vertrag dort.
 
+## Während Leonie schläft (Jennifer, ca. 03:00): Agenten übernehmen zwei Teile
+- Seite fürs Ortswissen: Plan `docs/specs/place-knowledge-page.md`, Branch `feat/twin-knowledge-page`. Ersetzt Leonies lokale Browser-Notizen (`feat/twin-notes`): Notizen liegen auf dem Server, mit Zeit. Foto-Knopf, Protokoll und Prüfrunde kann Leonie darauf aufsetzen.
+- 3D-Look: Plan `docs/specs/3d-look.md`. Wird von Jennifers zweiter Sitzung gebaut (Ordner `ui-polish`, Licht, Boden, Wände, Möbel), nicht von einem weiteren Agenten.
+- **Prüfrunde: Spec `docs/specs/inspection-round.md`.** Leonie, bitte `feat/twin-round` und `feat/agent-plan-round` gleich nach dem Aufwachen pushen (spätestens 9:00, Weg A). Sonst baut Jennifers Sitzung den Server-Teil selbst (Weg B). Zwei Startknöpfe: Vorschlag A (Routenkarte während der Runde ausblenden).
+- Leonies lokale Branches (`feat/twin-round`, `feat/agent-plan-round`, `feat/twin-notes`) sind nicht gepusht; bitte pushen, bevor du weiterbaust.
+
+## Für Leonies 3D-Look (Jennifers Test 02:50)
+- Boden in 3D: das Punkteraster füllt bei flachem Blick die halbe Fläche bis zum Horizont und wirkt unruhig. Besser: sehr blasses Raster, das mit der Entfernung ausblendet, oder einfarbiger Boden.
+- Kippen begrenzt auf etwa 55 bis 60 Grad und weit entfernte Etiketten ausblenden: macht `fix/twin-trackpad` (Kamera, kleine Änderung in Labels.tsx).
+- Fadenkreuz des Tipp-Pins kürzer: macht `fix/twin-pin-label`.
+
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
 - Folge-Modus: nach jeder gesprochenen Antwort etwa 8 s zuhören, ohne Wake Word und ohne Knopf.
