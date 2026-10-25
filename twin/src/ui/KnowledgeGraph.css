@@ -1,6 +1,6 @@
 /* ===== Knowledge panel (KnowledgeGraph.tsx). Tokens only; Synera blue only for the room in the centre. */
 .kg-panel {
-  position: absolute; left: 12px; top: 56px; z-index: 6; width: 440px;
+  position: absolute; left: 12px; top: 56px; z-index: 6; width: min(440px, calc(100% - 24px));
   max-height: calc(100% - 56px - var(--bottom-inset, 0px) - 24px); overflow: auto;
   display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px;
   background: var(--glass-strong); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2);

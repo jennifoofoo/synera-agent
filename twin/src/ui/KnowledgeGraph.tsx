@@ -29,7 +29,7 @@ export function closeKnowledge(): void {
 /** The entry in the room card. */
 export function KnowledgeButton({ roomId }: { roomId: string }) {
   return (
-    <button data-testid="knowledge-open" onClick={() => openKnowledge(roomId)}>
+    <button type="button" data-testid="knowledge-open" onClick={() => openKnowledge(roomId)}>
       Knowledge
     </button>
   );
@@ -102,7 +102,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
           <span className="tiny-label">Knowledge graph</span>
           <strong>{room?.label ?? "…"}</strong>
         </div>
-        <button className="x" onClick={closeKnowledge} aria-label="Close knowledge graph">
+        <button type="button" className="x" onClick={closeKnowledge} aria-label="Close knowledge graph">
           ×
         </button>
       </div>
@@ -148,7 +148,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
           <span className="tiny-label">Time</span>
           <strong data-testid="knowledge-time">{momentLabel(at, now)}</strong>
           {Math.abs(at - now) >= HOUR_MS && (
-            <button className="link kg-link" onClick={() => setAt(now)}>
+            <button type="button" className="link kg-link" onClick={() => setAt(now)}>
               Back to now
             </button>
           )}
@@ -229,10 +229,10 @@ function GraphNode({ node, focused, onFocus, width }: { node: EgoNode; focused: 
       {node.role === "more" && <text className="kg-more-text" dy="0.35em">{node.label}</text>}
       {node.ring === 1 && node.role !== "more" && showLabel && (
         <>
-          <text className="kg-label" x={dx} dy="-0.1em" textAnchor={right ? "start" : "end"}>
+          <text className="kg-label" x={dx} dy="-0.1em" style={{ textAnchor: right ? "start" : "end" }}>
             {clip(node.label, 16)}
           </text>
-          <text className="kg-type" x={dx} dy="1.1em" textAnchor={right ? "start" : "end"}>
+          <text className="kg-type" x={dx} dy="1.1em" style={{ textAnchor: right ? "start" : "end" }}>
             {mainType(node.types)}
           </text>
         </>

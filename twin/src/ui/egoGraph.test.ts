@@ -76,6 +76,7 @@ describe("egoGraph", () => {
     expect(edge("S1", "f-2")).toBe(true);
     expect(edge("f-1", "marta")).toBe(true);
     expect(ego.nodes.find((n) => localId(n.id) === "M1")?.hasFacts).toBe(true);
+    expect(ego.nodes.find((n) => localId(n.id) === "D1")?.label).toBe("Door to Corridor");
     expect(ego.nodes.find((n) => localId(n.id) === "f-1")).toMatchObject({ number: 1, person: "Marta", anchor: "CNC lathe", role: "note" });
     expect(ego.oldest).toBe(now - DAY_MS);
   });

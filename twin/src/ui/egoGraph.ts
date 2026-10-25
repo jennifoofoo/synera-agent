@@ -130,6 +130,13 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
     .map((fact, index) => ({ fact, index, state: factStateAt(fact, at) }))
     .filter(({ state }) => state === "open" || (state === "ended" && showEnded));
 
+  // unnamed doors and openings are named after the room on the other side ("Door to Flur Nord")
+  const nameOf = (node: LdNode | undefined): string => {
+    if (!node) return "Door";
+    if (node.name) return node.name;
+    const other = (node.connects ?? []).find((id) => id !== roomIri);
+    return other && byId.get(other)?.name ? `Door to ${byId.get(other)?.name}` : "Door";
+  };
   const anchorOf = (fact: LdNode): string => (fact.anchoredAt ?? []).find((id) => aroundIds.has(id)) ?? roomIri;
   const withFacts = new Set(visible.map(({ fact }) => anchorOf(fact)));
 
@@ -161,7 +168,7 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
     const angle = start + index * step;
     angleOf.set(node["@id"], angle);
     const role: Role = node.connects ? (typesOf(node).includes("rec:Door") ? "door" : "connector") : "asset";
-    const label = node.name ?? (role === "door" ? "Door" : localId(node["@id"]));
+    const label = role === "asset" ? (node.name ?? localId(node["@id"])) : nameOf(node);
     nodes.push({ id: node["@id"], ring: 1, role, label, types: typesOf(node), hasFacts: withFacts.has(node["@id"]), ...polar(r1, angle) });
     edges.push({ from: roomIri, to: node["@id"], faded: false });
   });
@@ -204,7 +211,7 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
         number: index + 1,
         text: fact.text ?? "",
         person: person?.name,
-        anchor: anchor === roomIri ? (room.name ?? roomId) : (byId.get(anchor)?.name ?? "Door"),
+        anchor: anchor === roomIri ? (room.name ?? roomId) : nameOf(byId.get(anchor)),
         ...polar(r2, angle),
       });
       edges.push({ from: anchor, to: fact["@id"], faded: state === "ended" });
