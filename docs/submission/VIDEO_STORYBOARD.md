@@ -22,7 +22,7 @@ The single source for the jury video: timing, picture, exact lines, captions, sh
 
 **Rule for the cut:** never say a number aloud that is not on screen. Wanda's spoken numbers come from the LLM phrasing the tool result, so the caption shows the panel's number and the voiceover does not repeat it. Re-read the numbers from the panel on shoot day: the handover `docs/HANDOVER_URBAN_COLAB_FLOORS.md` may add the ground-floor west part (E.06) with more extinguishers, which changes N and X.
 
-Placeholders in the table below: **[N] / [X]** = what the panel shows on shoot day (main today: 7 / 82; with round-per-device: 8 / 107).
+Placeholders in the table below: **[N] / [X]** = **[N stops · X m]** as the panel shows it on shoot day. Today on main: 8 extinguishers, **7 stops · 81.6 m** (per room, North Corridor holds 2). After `feat/round-per-device`: **8 stops · 106.7 m** (per device). Note in the edit which one the footage shows.
 
 ## 1. Storyboard, second by second
 
@@ -33,7 +33,7 @@ Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recor
 | 0:00–0:03 | F | Close-up: Gisela's gloved hand on a fire extinguisher bracket in a corridor, dim. Cut to black on the last word. | VO: "Every building has one person who knows it by heart." | – | **Hook 1** (see §2) |
 | 0:03–0:06 | F | Black, white text appears. | VO: "Last spring, that person retired." | "Last spring, that person retired." | Turn the hook into a loss |
 | 0:06–0:13 | F | Slow push-in on Gisela at the South Corridor entrance, iPhone in hand, looking at a wall full of doors. | VO: "By 2036, 12.9 million people in Germany reach retirement age." | "12.9 million people reach retirement age by 2036 (Destatis, via dbb magazin 9/2024)" | The one sourced number, big |
-| 0:13–0:21 | F | Gisela opens a paper folder: a printed plan, a handwritten list "Feuerlöscher EG", crossed out, coffee stain. | VO: "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked." | – | Concrete: knowledge lives in heads |
+| 0:13–0:21 | F | Gisela opens a paper folder: a printed plan, a handwritten list "Extinguishers, ground floor", crossed out, coffee stain. | VO: "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked." | – | Concrete: knowledge lives in heads |
 | 0:21–0:29 | F | Gisela walks into a dead end (closed door), turns back, checks her phone (generic, no app). Time stamp caption ticks up. | VO: "So the new shift searches. Asks around. Writes it up later, if at all." | "06:12 … 06:31" (ticking) | Pain 2 + 3: time lost, handover lost |
 | 0:29–0:38 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Maintenance software knows what. Location tracking knows roughly where. Nobody tells you, hands-free, where to go, and nobody keeps what you learned there." | "Knows what. Knows roughly where. Nobody guides you. Nobody remembers." | Positioning line = the gap |
 | 0:38–0:41 | F | Logo card: "Wanda – the building that talks back". | VO: "This is Wanda." | "Wanda – the building that talks back" | Product name |
