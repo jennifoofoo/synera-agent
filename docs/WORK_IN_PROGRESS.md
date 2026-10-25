@@ -45,6 +45,12 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
 **Bis zum Freeze nur Fixes, mit einer Ausnahme als Wow-Effekt: Ortswissen mit Zeit** (Notizen, Probleme, Sperrungen "bis morgen" an Ort oder Gerät), Spec `docs/specs/place-knowledge.md`, wartet auf euer Okay. Leonie baut die Seite gegen den Vertrag dort.
 
+## Während Leonie schläft (Jennifer, ca. 03:00): Agenten übernehmen zwei Teile
+- Seite fürs Ortswissen: Plan `docs/specs/place-knowledge-page.md`, Branch `feat/twin-knowledge-page`. Ersetzt Leonies lokale Browser-Notizen (`feat/twin-notes`): Notizen liegen auf dem Server, mit Zeit. Foto-Knopf, Protokoll und Prüfrunde kann Leonie darauf aufsetzen.
+- 3D-Look: Plan `docs/specs/3d-look.md`, Branch `feat/twin-3d-look`.
+- Leonies Frage zur Prüfrunde (zweiter Startknopf): Jennifer entscheidet beim Aufwachen; Vorschlag A (Routenkarte während der Runde ausblenden) ist auch Jennifers Sitzung lieber.
+- Leonies lokale Branches (`feat/twin-round`, `feat/agent-plan-round`, `feat/twin-notes`) sind nicht gepusht; bitte pushen, bevor du weiterbaust.
+
 ## Für Leonies 3D-Look (Jennifers Test 02:50)
 - Boden in 3D: das Punkteraster füllt bei flachem Blick die halbe Fläche bis zum Horizont und wirkt unruhig. Besser: sehr blasses Raster, das mit der Entfernung ausblendet, oder einfarbiger Boden.
 - Kippen begrenzt auf etwa 55 bis 60 Grad und weit entfernte Etiketten ausblenden: macht `fix/twin-trackpad` (Kamera, kleine Änderung in Labels.tsx).
