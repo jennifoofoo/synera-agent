@@ -28,7 +28,7 @@ import {
 import { normalizeSpeech, parseWake } from "./wake";
 import { placeAt, walkMinutes, walkNow } from "./walkInfo";
 import { ABOUT_THERE, walkWithMeDriving } from "./walkWithMe";
-import { inRound, roundDone, roundStatus } from "./round/round";
+import { inRound, roundDone, roundHowFar, roundStatus } from "./round/round";
 import { notesCommand } from "./notes/notesStore";
 
 export type Command = "next" | "back" | "repeat" | "howFar" | "stop" | "where";
@@ -102,7 +102,8 @@ function runLocal(command: Command): void {
       say(steps[step]);
       return;
     case "howFar": {
-      if (left === null) say(`${steps.length - step} steps left.`);
+      if (inRound() && left !== null) say(roundHowFar(left)); // "25 metres to the next stop, 80 metres left in the round."
+      else if (left === null) say(`${steps.length - step} steps left.`);
       else {
         const minutes = walkMinutes(left);
         say(`${walkWithMeDriving() ? "About " : ""}${left} metres left, about ${minutes} minute${minutes === 1 ? "" : "s"}.`);
@@ -145,6 +146,12 @@ export async function handleUtterance(text: string): Promise<void> {
     return;
   }
   const command = parseCommand(text);
+  if (command === "howFar" && inRound() && !walkNow()) {
+    setStatus("listening");
+    say(roundHowFar(null));
+    followUpAfterSpeech();
+    return;
+  }
   if (command === "next" && inRound() && !walkNow()) {
     // At a round stop without a step sheet (the stop is in the room you are in): "done" checks it and goes on.
     setStatus("listening");

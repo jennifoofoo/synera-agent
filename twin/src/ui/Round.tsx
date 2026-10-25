@@ -10,14 +10,16 @@ import { useTwin } from "../store";
 import { areaOptions } from "../round/order";
 import {
   assetLabel,
+  cancelDoor,
   closeRound,
   endRound,
   openRound,
   pickDoorRooms,
+  proposeDoor,
+  roundConfirmDoor,
   roundDone,
   roundStatus,
   roundUndoDoor,
-  roundWhatIfDoor,
   setRoundChoice,
   startRound,
   summary,
@@ -62,7 +64,7 @@ export function Round() {
       </button>
     );
   }
-  const { plan, whatIf, picking, busy, error, checked, finished, suggestion } = round;
+  const { plan, whatIf, picking, busy, error, checked, finished, suggestion, pendingDoor } = round;
   const name = (id: string) => model.spaceById.get(id)?.name ?? id;
   return (
     <section className="round-panel" aria-label="Inspection round" ref={panelRef}>
@@ -76,6 +78,7 @@ export function Round() {
         <label>
           <span className="tiny-label">What</span>
           <select value={round.type} onChange={(event) => void setRoundChoice({ type: event.target.value })}>
+            {!round.type && <option value="">Choose what to check…</option>}
             {types.map(([type, count]) => (
               <option key={type} value={type}>
                 {prettyType(type)} ({count})
@@ -115,7 +118,7 @@ export function Round() {
       </div>
 
       {!plan && !busy && !error && (
-        <button className="primary round-wide" onClick={() => void setRoundChoice({})}>
+        <button className="primary round-wide" onClick={() => void setRoundChoice({})} disabled={!round.type}>
           Plan round
         </button>
       )}
@@ -176,8 +179,24 @@ export function Round() {
               {picking.first ? `${name(picking.first)} — now tap the room next to it.` : "Tap the first room on the map."}
             </p>
           )}
-          {suggestion && !whatIf && !picking && (
-            <button className="link round-suggest" onClick={() => void roundWhatIfDoor(suggestion[0], suggestion[1])} disabled={!!busy}>
+          {pendingDoor && (
+            <div className="round-whatif" role="alertdialog" aria-label="Add a door?">
+              <strong>
+                Add a door between {name(pendingDoor[0])} and {name(pendingDoor[1])}?
+              </strong>
+              <span>This changes the building.</span>
+              <div>
+                <button className="link" onClick={() => void roundConfirmDoor()} disabled={!!busy}>
+                  Yes
+                </button>
+                <button className="link" onClick={cancelDoor}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          {suggestion && !whatIf && !picking && !pendingDoor && (
+            <button className="link round-suggest" onClick={() => proposeDoor(suggestion[0], suggestion[1])} disabled={!!busy}>
               Try a door: {name(suggestion[0])} ↔ {name(suggestion[1])}
             </button>
           )}
