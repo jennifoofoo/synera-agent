@@ -673,7 +673,7 @@ def undo_fact(bm: BuildingMap, state, snapshot) -> None:
     made = getattr(snapshot, "fact_at", None)
     if made is None:
         return
-    if now() - made > UNDO_WINDOW:
+    if now().timestamp() - made.timestamp() > UNDO_WINDOW.total_seconds():  # real seconds, also across DST
         raise ToolError(
             "That note is older than two minutes, so it cannot be undone. Offer to mark it as fixed instead."
         )

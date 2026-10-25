@@ -435,3 +435,17 @@ def test_fixed_with_an_ambiguous_name_picks_the_only_one_with_an_open_problem(se
     say(state, "the drill press is fixed")
     card = call(tools, "resolve_here", place="drill press", text="fixed")
     assert "Drill press H-A1" in card["I understood"] and state.pending.action == "resolve"
+
+
+def test_a_fact_from_the_first_pass_of_the_repeated_dst_hour_is_found_in_the_second(setup, clock):
+    """25 Oct 2026: 02:00-03:00 happens twice. Same-zone datetimes compare by wall time, so this broke live."""
+    bm, state, tools = setup
+    clock["now"] = datetime(2026, 10, 25, 2, 59, tzinfo=kt.TZ)  # fold 0: +02:00, summer time
+    remember_card(bm, state, tools)
+    say(state, "yes")
+    call(tools, "confirm_change", confirmed=True, user_reply="yes")
+    clock["now"] = datetime(2026, 10, 25, 2, 5, fold=1, tzinfo=kt.TZ)  # 6 minutes later in real time, +01:00
+    assert len(state.knowledge.query(bm, at=clock["now"])) == 1
+    say(state, "undo that")
+    with pytest.raises(ToolError):  # more than two real minutes
+        tools["propose_change"](action="undo")
