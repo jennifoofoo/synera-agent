@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { spokenText } from "./voice";
+import { playWithRetry, spokenText } from "./voice";
+
+describe("playWithRetry", () => {
+  it("plays at once when allowed", async () => {
+    let calls = 0;
+    expect(await playWithRetry(() => (calls++, Promise.resolve()), 1)).toBe(true);
+    expect(calls).toBe(1);
+  });
+  it("retries once after a refused play", async () => {
+    let calls = 0;
+    const play = () => (calls++ === 0 ? Promise.reject(new Error("NotAllowedError")) : Promise.resolve());
+    expect(await playWithRetry(play, 1)).toBe(true);
+    expect(calls).toBe(2);
+  });
+  it("gives up after the second refusal (the page then shows Tap to hear Wanda)", async () => {
+    let calls = 0;
+    expect(await playWithRetry(() => (calls++, Promise.reject(new Error("NotAllowedError"))), 1)).toBe(false);
+    expect(calls).toBe(2);
+  });
+});
 
 describe("spokenText", () => {
   it("strips bracketed ids from the caption", () => {

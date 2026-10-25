@@ -87,6 +87,7 @@ export function listen(
   const finish = (send: boolean) => {
     if (finished) return;
     finished = true;
+    liveListeners.delete(cancelListen);
     window.clearTimeout(graceTimer);
     window.clearTimeout(maxTimer);
     recognition.onresult = null;
@@ -111,6 +112,8 @@ export function listen(
     graceTimer = window.setTimeout(() => finish(true), STOP_GRACE_MS);
   };
   const maxTimer = window.setTimeout(stop, MAX_LISTEN_MS);
+  const cancelListen = () => finish(false);
+  liveListeners.add(cancelListen);
 
   recognition.onresult = (event) => {
     const results = Array.from(event.results);
@@ -133,7 +136,7 @@ export function listen(
     error = "start-failed";
     window.setTimeout(() => finish(false), 0);
   }
-  return { stop, cancel: () => finish(false) };
+  return { stop, cancel: cancelListen };
 }
 
 /** @deprecated kept for older callers; use `listen`. */
@@ -151,7 +154,77 @@ export function speechPending(): boolean {
   return pending > 0;
 }
 
+// ---- iOS playback guards: release the mic before a reply plays, retry a refused play(), tap to hear ----
+
+const beforePlayHooks = new Set<() => void>();
+const liveListeners = new Set<() => void>();
+
+/** Run `hook` right before a reply starts playing (wakeListen.ts releases its microphone there). */
+export function onBeforePlay(hook: () => void): () => void {
+  beforePlayHooks.add(hook);
+  return () => beforePlayHooks.delete(hook);
+}
+
+function beforePlay(): void {
+  if (!continuousRecognitionLikely()) for (const cancel of [...liveListeners]) cancel(); // Chrome keeps barge-in
+  for (const hook of beforePlayHooks) {
+    try {
+      hook();
+    } catch {
+      /* a hook must never stop the reply */
+    }
+  }
+}
+
+/** Play, and when the browser refuses (iOS NotAllowedError after a mic session), wait a moment and try once more.
+ * True when one of the two attempts played. */
+export async function playWithRetry(play: () => Promise<void>, retryMs = 300): Promise<boolean> {
+  try {
+    await play();
+    return true;
+  } catch {
+    /* refused: try once more */
+  }
+  await new Promise((resolve) => setTimeout(resolve, retryMs));
+  try {
+    await play();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let blockedUrl: string | null = null;
+const blockedListeners = new Set<() => void>();
+
+function setBlockedReply(url: string | null): void {
+  if (blockedUrl === url) return;
+  blockedUrl = url;
+  for (const listener of blockedListeners) listener();
+}
+
+/** A reply the browser refused to play: the page shows "Tap to hear Wanda" while this is true. */
+export function replyBlocked(): boolean {
+  return blockedUrl !== null;
+}
+export function subscribeReplyBlocked(listener: () => void): () => void {
+  blockedListeners.add(listener);
+  return () => blockedListeners.delete(listener);
+}
+
+/** Call inside a tap: play the refused reply now (a tap always may). */
+export function playBlockedReply(): void {
+  const url = blockedUrl;
+  setBlockedReply(null);
+  if (!url || audioUrl !== url) return;
+  beforePlay();
+  const audio = sharedAudio();
+  audio.src = url;
+  void audio.play().catch(() => setBlockedReply(url));
+}
+
 export function stopSpeaking(): void {
+  setBlockedReply(null);
   const audio = sharedAudio();
   audio.pause();
   if (audioUrl) {
@@ -218,9 +291,15 @@ export async function speak(text: string, serverVoice: boolean): Promise<void> {
       const blob = await api.speak(spoken, "en");
       if (blob) {
         const audio = sharedAudio();
-        audioUrl = URL.createObjectURL(blob);
-        audio.src = audioUrl;
-        await audio.play();
+        const url = URL.createObjectURL(blob);
+        audioUrl = url;
+        beforePlay(); // iOS: no recognition or open mic while she talks (that mutes or reroutes the reply)
+        const played = await playWithRetry(() => {
+          if (audioUrl !== url) return Promise.resolve(); // stopped or replaced meanwhile
+          audio.src = url;
+          return audio.play();
+        });
+        if (!played && audioUrl === url) setBlockedReply(url); // "Tap to hear Wanda" instead of silence
         return;
       }
     } catch {
@@ -326,6 +405,19 @@ export function installAudioUnlock(): void {
     }
   };
   for (const type of events) window.addEventListener(type, unlock, true);
+  // iOS can lose the unlock after a mic session (tap-to-talk, the wake word): every later tap re-primes the element
+  // with the silent clip while nothing plays, so the next reply may start after an await again.
+  const reprime = () => {
+    if (!done || pending > 0 || blockedUrl || liveListeners.size || isSpeaking()) return;
+    const audio = sharedAudio();
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl); // the last reply has ended
+      audioUrl = null;
+    }
+    audio.src = SILENT_WAV;
+    void audio.play()?.catch(() => {});
+  };
+  for (const type of ["touchend", "click"] as const) window.addEventListener(type, reprime, true);
 }
 
 type WakeSentinel = { release: () => Promise<void>; addEventListener: (type: "release", listener: () => void) => void };
