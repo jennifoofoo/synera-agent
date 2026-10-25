@@ -18,6 +18,17 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
                      context.guide_step?: int, see docs/specs/auto-pace.md
   POST /api/speak    {text, lang?, voice_id?}                  audio/mpeg (ElevenLabs), see docs/specs/voice-spike.md
 
+Place knowledge (web/knowledge_api.py, docs/specs/place-knowledge.md; POSTs need a same-origin page):
+  GET  /api/facts?key=&space_id=&asset_id=&element_id=&floor_id=&area=&asset_type=&category=&person=&since=&until=&at=
+                 [&status=open|resolved|expired|all][&history=1]   -> {facts, persons}; open now by default
+  POST /api/facts {building, kind: note|issue, anchor: {space_id?, asset_id?, element_id?, point?, floor_id?}, text,
+                 valid_to?, author?, related?, photo_base64?}   -> {fact, state}; closures only via the chat card
+  GET  /api/facts/photo?key=&id=        image/jpeg (resized, no EXIF)
+  POST /api/facts/undo {building}       removes the newest fact if younger than 2 minutes -> {undone, state}
+  GET  /api/graph?key=[&format=aas][&at=]   JSON-LD with Brick/RealEstateCore types, or the AAS export
+  state_view.facts (open now, all floors), state_view.closed_until {element_id: ISO}; timed closures are applied
+  at the start of every request (no background job)
+
 Level 3, campus (web/campus_api.py; one CampusHolder shared by the page and the chat agent, see docs/specs/level3-campus.md):
   GET  /api/campus[?key=dev/...]        loaded flag, available campus keys, buildings (id, name, floors, origin,
                                         entrances with ids/names/positions, page_key, active), links (id, kind, from/to,
@@ -54,11 +65,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from building_agent.knowledge import DEFAULT_ROOT as KNOWLEDGE_ROOT
+from building_agent.knowledge import KnowledgeError, KnowledgeStore
 from building_agent.pace_guide import pace_kwargs, without_tick_keys
 from building_agent.structured import located_entries
 from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import BuildingMap, MapError
-from web import api, campus_api, level4_api, speech, transfer
+from web import api, campus_api, knowledge_api, level4_api, speech, transfer
 from web.chat import ChatAdapter, chat_available
 from web.chat import backend_name as chat_backend_name
 from web.selection import check_here, check_route_point, check_selection
@@ -87,7 +100,9 @@ class App:
         uploads_root: Path = level4_api.DEFAULT_ALLOWED_ROOT,
         buildings_root: Path = level4_api.BUILDINGS_ROOT,
         campus_roots: tuple[Path, ...] = (CAMPUS_ROOT,),
+        knowledge_root: Path = KNOWLEDGE_ROOT,
     ) -> None:
+        self.knowledge = KnowledgeStore(knowledge_root)
         self.data_root = data_root
         self.buildings_root = buildings_root
         self.level4 = level4_api.PlanStudio(uploads_root, buildings_root)
@@ -137,8 +152,12 @@ class App:
                     directory = api.resolve_building_dir(self.buildings_root, key[len(level4_api.USER_PREFIX) :])
                 else:
                     directory = api.resolve_building_dir(self.data_root, key)
-                self.sessions[key] = api.Session(key, directory, api.RecordingMap.load(directory), campus=self.campus)
-            return self.sessions[key]
+                self.sessions[key] = api.Session(
+                    key, directory, api.RecordingMap.load(directory), campus=self.campus, knowledge=self.knowledge
+                )
+            session = self.sessions[key]
+            knowledge_api.tick(self.knowledge, session.map)  # timed closures on/off for this moment
+            return session
 
     def reset(self, key: str) -> api.Session:
         with self.lock:
@@ -150,7 +169,9 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, self.campus.synced_holder)
+                self.chats[key] = ChatAdapter(
+                    session.directory, session.map, self.level4, self.campus.synced_holder, self.knowledge
+                )
             return self.chats[key]
 
     def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:
@@ -192,6 +213,13 @@ class App:
             with self.lock:
                 session = self.session(key)
                 return 200, api.building_view(session)
+        if path in ("/api/facts", "/api/graph"):
+            key = (query.get("key") or [""])[0]
+            with self.lock:
+                session = self.session(key)
+            if path == "/api/graph":
+                return 200, knowledge_api.graph(self.knowledge, session.map, query)
+            return 200, knowledge_api.list_facts(self.knowledge, session.map, key, query)
         return 404, {"error": f"Unknown endpoint {path}"}
 
     def open_page_maps(self) -> dict[Path, BuildingMap]:
@@ -208,6 +236,27 @@ class App:
             return self.session(key).directory
         except (MapError, OSError, ValueError, KeyError):
             return None
+
+    def fact_photo(self, query: dict) -> bytes:
+        key = (query.get("key") or [""])[0]
+        with self.lock:
+            session = self.session(key)
+        return knowledge_api.photo(self.knowledge, session.map, (query.get("id") or [""])[0])
+
+    def post_facts(self, path: str, body: dict) -> tuple[int, dict]:
+        if not isinstance(body, dict):
+            raise KnowledgeError("Body must be an object.")
+        key = str(body.get("building") or body.get("key") or "")
+        with self.lock:
+            session = self.session(key)
+        if path == "/api/facts":
+            result = knowledge_api.create(self.knowledge, session.map, key, body)
+        elif path == "/api/facts/undo":
+            result = knowledge_api.undo(self.knowledge, session.map, key)
+        else:
+            return 404, {"error": f"Unknown endpoint {path}"}
+        with self.lock:
+            return 200, {**result, "state": api.state_view(session)}
 
     def upload(self, data: bytes) -> tuple[int, dict]:
         return 200, self.level4.upload(data)
@@ -241,6 +290,8 @@ class App:
         if path.startswith("/api/campus/"):
             with self.lock:
                 return self.campus.post(path, body)
+        if path.startswith("/api/facts"):
+            return self.post_facts(path, body)
         key = body.get("building", "")
         if path == "/api/chat":
             message = str(body.get("message", "")).strip()
@@ -292,7 +343,14 @@ class App:
                         "level4": level4,
                     }
                 located = [] if result.get("error") else located_entries(session.map, result.get("reply", ""))
-                return 200, {**result, "located": located, "state": api.state_view(session), "level4": level4}
+                knowledge = knowledge_api.chat_fields(session.map, key)
+                return 200, {
+                    **result,
+                    "located": located,
+                    **knowledge,
+                    "state": api.state_view(session),
+                    "level4": level4,
+                }
         with self.lock:
             session = self.session(key)
             if path == "/api/route":
@@ -434,16 +492,39 @@ def make_handler(app: App) -> type:
                 status, payload = 400, {"error": str(error)}
             except level4_api.Level4Error as error:
                 status, payload = error.status, {"error": str(error)}
+            except KnowledgeError as error:
+                status, payload = error.status, {"error": str(error)}
             except Exception as error:  # noqa: BLE001 - report it, don't kill the server
                 status, payload = 500, {"error": f"{type(error).__name__}: {error}"}
             self.send_json(status, payload, revalidate and status == 200)
 
         def do_GET(self) -> None:
             url = urlparse(self.path)
-            if url.path.startswith("/api/"):
+            if url.path == "/api/facts/photo":
+                self.run_photo(parse_qs(url.query))
+            elif url.path.startswith("/api/"):
                 self.run(lambda: app.get(url.path, parse_qs(url.query)), revalidate=url.path == "/api/building")
             elif not self.serve_static():
                 super().do_GET()
+
+        def run_photo(self, query: dict) -> None:
+            """A fact's photo (made by the server: JPEG, resized, no metadata), looked up by the fact id only."""
+            try:
+                body = app.fact_photo(query)
+            except KnowledgeError as error:
+                self.send_json(error.status, {"error": str(error)})
+                return
+            except (MapError, ValueError, KeyError, OSError):
+                self.send_json(404, {"error": "Unknown building or photo."})
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "private, max-age=3600")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
 
         def speak_request_allowed(self, content_types: tuple[str, ...] = ("application/json",)) -> bool:
             """Browser-origin guard for costly or writing endpoints: same-origin page only, expected body type."""
@@ -512,10 +593,12 @@ def make_handler(app: App) -> type:
             if url.path == "/api/level4/attach":
                 self.run_attach(parse_qs(url.query))
                 return
-            if url.path.startswith(("/api/speak", "/api/level4/")) and not self.speak_request_allowed():
+            if url.path.startswith(("/api/speak", "/api/level4/", "/api/facts")) and not self.speak_request_allowed():
                 return
             length = int(self.headers.get("Content-Length") or 0)
-            if length > MAX_BODY_BYTES:
+            limit = knowledge_api.MAX_POST_BYTES if url.path == "/api/facts" else MAX_BODY_BYTES
+            if length > limit:
+                self.close_connection = True  # the body is not read
                 self.send_json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "Body too large."})
                 return
             try:

@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { NoToneMapping } from "three";
 import { GizmoHelper, GizmoViewcube, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 
 // Postprocessing (N8AO etc.) is planner-only and loaded on demand, so phones never download it.
@@ -66,7 +67,7 @@ function Building({ model }: { model: BuildingModel }) {
         );
       })}
       {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
-      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} />
+      <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} worker={worker} />
       <Markers
         model={model}
         state={state}
@@ -140,7 +141,7 @@ export function Scene() {
     <Canvas
       dpr={dpr}
       frameloop={worker ? "demand" : "always"}
-      gl={{ antialias: !ao || worker, powerPreference: "high-performance", logarithmicDepthBuffer: false }}
+      gl={{ antialias: !ao || worker, powerPreference: "high-performance", logarithmicDepthBuffer: false, toneMapping: NoToneMapping }}
       onPointerMissed={() => select(null)}
       shadows={false}
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
@@ -151,10 +152,11 @@ export function Scene() {
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
       <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
-      {!flat && <fog attach="fog" args={[COLOURS.background, size * 2.5, size * 9]} />}
-      <hemisphereLight args={["#ffffff", "#b8b4ac", 1.0]} />
-      <directionalLight position={[centre[0] + size * 0.6, size * 1.2, centre[2] + size * 0.4]} intensity={1.25} color="#ffffff" />
-      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.35} color="#e8e4dc" />
+      {!flat && <fog attach="fog" args={[COLOURS.groundOuter, size * 2.5, size * 9]} />}
+      {/* soft daylight: a bright sky dome, one steep key light for the wall tops, a cool fill from the other side */}
+      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, 1.6]} />
+      <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={1.3} color={COLOURS.sky} />
+      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.5} color={COLOURS.fill} />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}
@@ -163,14 +165,14 @@ export function Scene() {
       />
       <mesh rotation-x={-Math.PI / 2} position={[centre[0], groundY, centre[2]]} renderOrder={-1}>
         <planeGeometry args={[size * 60, size * 60]} />
-        <meshBasicMaterial color={flat ? COLOURS.plan : COLOURS.ground} />
+        <meshBasicMaterial color={flat ? COLOURS.plan : COLOURS.groundOuter} />
       </mesh>
-      {!flat && <GroundGrid centre={centre} radius={size * 1.6} />}
+      {!flat && <GroundGrid centre={centre} radius={size * 2.2} />}
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {!worker && !flat && (
         <GizmoHelper alignment="bottom-right" margin={[64, 64]} renderPriority={2}>
-          <GizmoViewcube color="#fbfaf8" hoverColor="#eae7e1" textColor="#1d2430" strokeColor="#bdb7ab" opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
+          <GizmoViewcube color={COLOURS.gizmoFace} hoverColor={COLOURS.gizmoHover} textColor="#1d2430" strokeColor={COLOURS.gizmoStroke} opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
         </GizmoHelper>
       )}
       {ao && !worker && !flat && (

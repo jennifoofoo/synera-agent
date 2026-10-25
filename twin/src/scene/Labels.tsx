@@ -1,5 +1,7 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import { controlsRef } from "./FloorMesh";
 import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
@@ -8,7 +10,7 @@ import { areasOf, type Area } from "./areas";
 import { prettyType } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
 import { closedConnectorStops } from "../model/closures";
-import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
+import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
 import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
@@ -24,15 +26,17 @@ interface Props {
 /** Room names shown at every tier: the largest rooms (the zones of the floor). */
 const ZONE_COUNT = 6;
 const FIT_OVERFLOW = 1.15; // a name may run 15 % past its room's width
-const CHAR_PX = 6.8; // average glyph width of the 12 px label font
+const CHAR_PX = 7.0; // average glyph width of the 12 px semibold label font (Inter)
 const LABEL_H_PX = 16;
+const PILL_PAD_PX = 8; // horizontal padding of a pill label (each side); 3D labels and marked rooms are pills
+const PILL_H_PX = 20; // a pill's height (16 px line plus 2 px padding above and below)
 const GAP_PX = 4; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
 const FOUND_NAMES = 3; // found things whose name is shown (in the agent's order); the selected one always tries too
 const FOUND_CHAR_PX = 7.2; // the found names are semibold
 const CHIP_CHAR_PX = 7.4; // 12 px semibold chip text
-const CHIP_H_PX = 20;
+const CHIP_H_PX = 22; // 16 px line plus 3 px padding above and below
 const AREA_CHAR_PX = 8.6; // area names: 14 px semibold with a little tracking
 const AREA_H_PX = 20;
 const AREA_FIT_OVERFLOW = 1.3;
@@ -232,6 +236,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const route = state?.route ?? null;
   // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
   const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
+  // Where the tap pin stands (HerePin.tsx TapPin): the tapped room's name moves above it like above the other markers.
+  const tapPoint = useTwin((s) => (s.selection?.point && s.selection.kind !== "asset" && s.selection.kind !== "opening" ? s.selection.point : null));
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
@@ -248,9 +254,14 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
-    if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
+    if (selectedId) {
+      // The tap pin: 2D above its crosshair, 3D above the head of its stalk. A selection without a spot keeps the
+      // name on the room's anchor. A marker already in the room with a larger lift wins (put keeps the larger lift).
+      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, flat ? 0 : TAP_STALK_M);
+      else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
+    }
     return out;
-  }, [route, state?.position, model, floor.id, selectedId]);
+  }, [route, state?.position, model, floor.id, selectedId, tapPoint, flat]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -287,6 +298,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const here = state?.position;
     const herePoint = here?.floor_id === floor.id ? (here.point ?? model.spaceById.get(here.space_id)?.anchor) : undefined;
     if (herePoint) kept.push(boxOf(herePoint, HERE_RIM_PX, HERE_RIM_PX));
+    // The tap pin with its small crosshair (2D; in 3D the stalk stands up and the layout is approximate anyway).
+    if (flat && tapPoint && selectedId && model.spaceById.get(selectedId)?.floor_id === floor.id) kept.push(boxOf(tapPoint, TAP_CROSS_PX, TAP_CROSS_PX));
     for (const points of routeOnFloor) {
       if (points.length < 2) continue;
       kept.push(boxOf(points[0], START_DOT_PX + 2, START_DOT_PX + 2));
@@ -321,9 +334,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       kept.push(dot.box);
       pins.push(dot.pin);
     }
-    // 4. Closures: "⚠ Kitchen 0.28" on the red circle (or just above / below it), else a bare "⚠" badge, if free.
+    // 4. Closures: "Closed · Kitchen 0.28" on the closed element (or just above / below it), else a bare badge, if free.
     closed.forEach((d, index) => {
-      const text = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
+      const text = d.names.length === 1 ? `Closed · ${d.names[0]}` : `${d.names.length} closed`;
       const title = `Closed: ${d.names.join(", ")}`;
       const [cx, cy] = px(d.point);
       const halfW = (text.length * CHIP_CHAR_PX + 30) / 2; // text, icon and padding
@@ -363,7 +376,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
     const result: Item[] = [];
     for (const item of markedItems) {
-      const box = boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2, LABEL_H_PX / 2, marks.get(item.id)!.lift);
+      // marked rooms are pills in both views
+      const box = boxOf(item.point, (item.kind === "room" ? item.space.name.length * CHAR_PX : 0) / 2 + PILL_PAD_PX, PILL_H_PX / 2, marks.get(item.id)!.lift);
       if (kept.some((other) => overlaps(box, other))) continue;
       kept.push(box);
       result.push(item);
@@ -399,8 +413,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       if (item.kind === "door" || item.kind === "tag") continue; // doors after the second lines, below
       if ((marks.has(item.id) && !(item.kind === "poi" && item.closed)) || replaced.has(item.id)) continue; // a closed glyph always shows
       const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
-      const halfW = item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2;
-      const halfH = item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 : LABEL_H_PX / 2;
+      // 3D: every label is a pill (padding and a taller box); 2D: plain halo text on the plan
+      const pillPad = flat || item.kind === "poi" ? 0 : PILL_PAD_PX;
+      const halfW = (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
+      const halfH = item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 + (flat ? 0 : 2) : flat ? LABEL_H_PX / 2 : PILL_H_PX / 2;
       // An area name may also move up or down a little (inside the area) to make way for a symbol.
       const shifts = item.kind === "area" ? [0, AREA_SHIFT_PX, -AREA_SHIFT_PX] : [0];
       for (const shift of shifts) {
@@ -445,7 +461,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return { shown: result, pins };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint]);
 
   return (
     <group position-y={y + 0.5}>
@@ -456,8 +472,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
           ) : pin.kind === "found" ? (
             <FoundDot count={pin.ids.length} title={pin.title} />
           ) : pin.kind === "closed" ? (
-            <div className="chip chip-danger" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
-              ⚠{pin.text ? ` ${pin.text}` : ""}
+            <div className="chip chip-danger chip-closed" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
+              <ClosedGlyph />
+              {pin.text}
             </div>
           ) : (
             <div className="label label-halo label-plan found-name" style={{ transform: `translate(${pin.dx}px, ${pin.dy}px)` }}>
@@ -468,7 +485,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       ))}
       {shown.map((item) =>
         item.kind === "room" ? (
-          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} />
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} y={y + 0.5} />
         ) : item.kind === "area" ? (
           <Html key={item.id} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[2, 0]} style={{ pointerEvents: "none" }}>
             <div className={`label label-halo label-area ${flat ? "label-plan" : ""} zoom-fade`} data-zoom-kind="area" data-area-rooms={item.area.space_ids.length}>
@@ -511,7 +528,37 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   );
 }
 
-function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean }) {
+/** "No entry" glyph of the closed badge: a circle with a bar. */
+export function ClosedGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.4" />
+      <path d="M7 12h10" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** 3D: a room name further from the camera than this many times the orbit distance is hidden (the far side of a
+ * tilted view, near the horizon, where names pile up). Marked and selected rooms always keep theirs. */
+const FAR_LABEL = 1.3;
+
+function RoomLabel({ item, mark, flat, selected, y }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number }; flat: boolean; selected: boolean; y: number }) {
+  const div = useRef<HTMLDivElement>(null);
+  const cull = !flat && !mark && !selected;
+  useFrame(({ camera }) => {
+    const el = div.current;
+    const c = controlsRef.current;
+    if (!el) return;
+    let hide = false;
+    if (cull && c) {
+      const dx = camera.position.x - item.point[0];
+      const dy = camera.position.y - y;
+      const dz = camera.position.z + item.point[1];
+      hide = Math.hypot(dx, dy, dz) > c.distance * FAR_LABEL;
+    }
+    const want = hide ? "hidden" : "";
+    if (el.style.visibility !== want) el.style.visibility = want;
+  });
   return (
     <Html
       position={[item.point[0], mark ? mark.height - 0.5 : 0, -item.point[1]]} // at the marker's own height
@@ -520,7 +567,8 @@ function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind:
       style={{ pointerEvents: "none" }}
     >
       <div
-        className={`label label-halo ${flat ? "label-plan" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
+        ref={div}
+        className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}

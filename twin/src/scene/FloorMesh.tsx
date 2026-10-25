@@ -4,6 +4,7 @@ import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
+import { tapMap } from "../tapAnswer";
 import { buildFloorGeometry, openingEditsOf, withCutaway } from "./geometry";
 
 interface Props {
@@ -21,7 +22,7 @@ export const cutawayUniforms = { uCamDir: { value: new THREE.Vector2(0, 1) }, uC
 export const controlsRef: { current: import("camera-controls").default | null } = { current: null };
 
 export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
-  const select = useTwin((s) => s.select);
+  const select = tapMap; // a map tap selects, or answers Wanda's "where are you?" (tapAnswer.ts)
   const flat = useTwin((s) => s.viewMode === "2d");
   const reducedMotion = useTwin((s) => s.reducedMotion);
   // Doors added, removed or widened in this session change the walls; the key keeps route updates from rebuilding.
@@ -42,10 +43,10 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
 
   const materials = useMemo(() => {
     const solid = withCutaway(
-      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.0, flatShading: false }),
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.0, flatShading: false }),
       cutawayUniforms,
     );
-    const edges = withCutaway(new THREE.LineBasicMaterial({ color: COLOURS.edge, transparent: true, opacity: 0.85 }), cutawayUniforms);
+    const edges = withCutaway(new THREE.LineBasicMaterial({ color: COLOURS.edge, transparent: true, opacity: 0.7 }), cutawayUniforms);
     const ghostSolid = new THREE.MeshBasicMaterial({
       color: COLOURS.ghost,
       transparent: true,
@@ -59,10 +60,10 @@ export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
   }, []);
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials]);
   useEffect(() => {
-    materials.edges.color.set(flat ? "#a39e94" : COLOURS.edge);
-    materials.edges.opacity = flat ? 1 : 0.85;
-    materials.zones.color.set(flat ? "#b6b6b1" : COLOURS.edgeGhost);
-    materials.solid.roughness = flat ? 1 : 0.92;
+    materials.edges.color.set(flat ? COLOURS.planEdge : COLOURS.edge);
+    materials.edges.opacity = flat ? 1 : 0.7;
+    materials.zones.color.set(flat ? COLOURS.planZone : COLOURS.edgeGhost);
+    materials.solid.roughness = flat ? 1 : 0.95;
   }, [flat, materials]);
 
   const onDoubleClick = (event: ThreeEvent<MouseEvent>) => {

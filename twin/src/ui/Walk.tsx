@@ -17,7 +17,7 @@ export { walkMinutes };
 type Change = { direction: "up" | "down" }[] | undefined;
 
 /** Up or down for a ride step: the n-th "Take/Use … to …" line is the n-th floor change. */
-function rideUp(changes: Change, steps: string[], step: number): boolean {
+export function rideUp(changes: Change, steps: string[], step: number): boolean {
   const index = steps.slice(0, step).filter(isRide).length;
   return changes?.[index]?.direction !== "down";
 }
@@ -27,7 +27,7 @@ function isRide(line: string): boolean {
 }
 
 /** The standard maps pictogram for a step: start dot, straight arrow, stairs/lift up or down, arrival pin. */
-function TurnIcon({ line, up }: { line: string; up: boolean }) {
+export function TurnIcon({ line, up }: { line: string; up: boolean }) {
   const path = /^Start/.test(line)
     ? <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none" />
     : /arrived/i.test(line)
@@ -122,7 +122,9 @@ export function Walk() {
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back
           </button>
-          <button className="primary" onClick={last ? end : () => setWalkStep(step + 1)}>
+          {/* Walk with me following: Next is the fallback (stairs, no motion, noisy halls), so it is a normal button;
+              waiting at stairs/lift (or motion off) it is the main action again. Same 44 px tap target. */}
+          <button className={estimate && motionOn && !estimate.atConnector && !last ? "walk-next" : "walk-next primary"} onClick={last ? end : () => setWalkStep(step + 1)}>
             {last ? "Done" : "Next"}
           </button>
         </div>

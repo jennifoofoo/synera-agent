@@ -18,6 +18,9 @@ interface Props {
 
 const HOME_AZIMUTH = -Math.PI / 4;
 const PLAN_TILT = 0.004;
+/** The flattest 3D view: about 57 degrees from straight down. Flatter, walls hide each other and far labels pile
+ * up; this holds for every input (drag, Option + swipe, keys, the tilt buttons). */
+export const MAX_TILT = 1.0;
 
 /** camera-controls' fitToBox snaps the rotation to 90° steps; fitting the bounding sphere keeps the view angle. */
 function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 1.08, minRadius = 3) {
@@ -132,7 +135,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.maxZoom = Math.max(60, fit * 12);
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
-    c.maxPolarAngle = flat ? PLAN_TILT : Math.PI / 2 - 0.12;
+    c.maxPolarAngle = flat ? PLAN_TILT : MAX_TILT;
     // The plan may be rotated (right drag, two fingers) but never tilted; Home turns it back north up.
     c.minAzimuthAngle = -Infinity;
     c.maxAzimuthAngle = Infinity;
@@ -148,7 +151,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.touches.two = flat ? A.NONE : A.TOUCH_DOLLY_ROTATE;
     if (flat) void c.rotateTo(c.azimuthAngle, PLAN_TILT, false);
     // Light damping: camera-controls smooths critically (no overshoot, no drift after release).
-    c.smoothTime = 0.13;
+    c.smoothTime = profile === "worker" ? 0.13 : 0.18; // fly-tos glide a touch longer on the laptop
     c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
@@ -157,9 +160,10 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.boundaryFriction = 0.2;
     invalidate();
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
-  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height]);
+  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height, profile]);
 
-  // Entering 2D or changing the floor in 2D frames the focused floor.
+  // Entering 2D or changing the floor in 2D frames the focused floor, north up (the plan is axis-aligned; the
+  // label layout in Labels.tsx assumes it too). Q/E and a right drag may still turn it, Home turns it back.
   useEffect(() => {
     const c = controls.current;
     if (!c || !flat || !focusedFloorId) return;
@@ -167,6 +171,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     if (!floor) return;
     const y = floorY(floor.id);
     const box = new THREE.Box3(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
+    void c.rotateTo(0, PLAN_TILT, !reducedMotion);
     fitBox(c, box, !reducedMotion, 0.9);
     invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps

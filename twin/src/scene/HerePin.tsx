@@ -1,10 +1,10 @@
 // The tap pin (where the floor was just tapped) and the draggable "You are here" dot.
 // Both sit on the floor plane in world space, so the circles stay exact whatever the camera does.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { Html } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import type { Point } from "../api/types";
 import { samePoint } from "../model/format";
 import type { BuildingModel } from "../model/model";
@@ -15,7 +15,7 @@ import { Disc, Ring } from "./Markers";
 import { markHereHintSeen } from "../ui/HereChip";
 import { useWalkMotion } from "../walkWithMe";
 import "./HerePin.css";
-import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, ScreenSized } from "./markerLayout";
+import { HERE_CORE_PX, HERE_HALO_PX, HERE_RIM_PX, Pulse, ScreenSized, TAP_CROSS_PX, TAP_DOT_PX, TAP_RING_PX, TAP_RING_W_PX, TAP_STALK_M } from "./markerLayout";
 
 function inPolygon(point: Point, polygon: Point[]): boolean {
   let inside = false;
@@ -53,34 +53,38 @@ export function TapPin({ floorY, visibleFloors, flat }: PinProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, select]);
 
-  const reach = flat ? 4.5 : 3;
+  // A small screen-sized crosshair (px, about 1.5x the ring radius): long lines in metres ran across walls and labels.
   const cross = useMemo(() => {
-    const gap = flat ? 1.1 : 0.8;
+    const gap = TAP_DOT_PX + 2;
+    const reach = TAP_CROSS_PX;
     const verts = [-reach, 0, 0, -gap, 0, 0, gap, 0, 0, reach, 0, 0, 0, 0, -reach, 0, 0, -gap, 0, 0, gap, 0, 0, reach];
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
     return geometry;
-  }, [reach, flat]);
+  }, []);
   useEffect(() => () => cross.dispose(), [cross]);
 
   if (!selection || !active || !selection.point || !visibleFloors.has(selection.floor_id)) return null;
   // The dot already stands here (just pressed "I'm here"): never two markers on one spot.
   if (position && position.floor_id === selection.floor_id && samePoint(position.point, selection.point)) return null;
-  const radius = flat ? 1.1 : 0.8;
   return (
     <group position={[selection.point[0], floorY(selection.floor_id) + 0.07, -selection.point[1]]} name="tap-pin">
-      <Ring radius={radius} colour={COLOURS.selection} width={flat ? 0.16 : 0.12} through order={30} />
-      <lineSegments geometry={cross} renderOrder={19}>
-        <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={false} />
-      </lineSegments>
-      <Disc radius={flat ? 0.28 : 0.2} colour={COLOURS.selection} opacity={1} through y={0.02} order={31} />
+      {/* Ring, dot and crosshair keep their size on screen like the other markers (markerLayout.tsx), so the room's
+          name can sit just above them (Labels.tsx, LABEL_LIFT.tap). In 3D the crosshair is depth-tested: walls hide it. */}
+      <ScreenSized>
+        <Ring radius={TAP_RING_PX} colour={COLOURS.selection} width={TAP_RING_W_PX} through order={30} />
+        <lineSegments geometry={cross} renderOrder={flat ? 19 : 15}>
+          <lineBasicMaterial color={COLOURS.selection} transparent opacity={0.8} depthTest={!flat} depthWrite={false} />
+        </lineSegments>
+        <Disc radius={TAP_DOT_PX} colour={COLOURS.selection} opacity={1} through y={0.02} order={31} />
+      </ScreenSized>
       {!flat && (
         <>
           <mesh position-y={0.55}>
             <cylinderGeometry args={[0.025, 0.025, 1.1, 8]} />
             <meshBasicMaterial color={COLOURS.selection} />
           </mesh>
-          <mesh position-y={1.15}>
+          <mesh position-y={TAP_STALK_M - 0.2}>
             <sphereGeometry args={[0.2, 16, 16]} />
             <meshBasicMaterial color={COLOURS.selection} />
           </mesh>
@@ -96,6 +100,8 @@ interface DotProps {
   visibleFloors: Set<string>;
   flat: boolean;
   reducedMotion: boolean;
+  /** Phones render on demand: no breathing halo there (it would keep the frame loop alive). */
+  worker?: boolean;
   colour: string;
 }
 
@@ -106,7 +112,7 @@ interface Drag {
 
 /** The "You are here" dot. Pointer down on it, move over the floor, release: the new spot is set like "I'm here".
  * The one-time "drag to correct" hint lives in the HereChip bar, off the map. */
-export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps) {
+export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMotion, worker = false }: DotProps) {
   const known = useTwin((s) => s.state?.position ?? null);
   // Walk with me: the dot shows the step estimate instead (local only, never written to state.position).
   const estimate = useWalkMotion((s) => s.estimate);
@@ -127,6 +133,66 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps
   const shownFloor = position && visibleFloors.has(position.floor_id) ? position.floor_id : null;
   // A new position from the server wins over a leftover drag preview.
   useEffect(() => setDrag(null), [known]);
+
+  // A jump of the dot (Next/Back in the step guide, "I'm here") glides for 250 ms instead of teleporting; reduced
+  // motion, a drag, a floor change and the small steps of the Walk with me estimate are drawn at once.
+  const groupRef = useRef<THREE.Group>(null);
+  const tween = useRef<{ from: Point; to: Point; t0: number } | null>(null);
+  const shown = useRef<{ point: Point; floor: string } | null>(null);
+  const target: Point | null = position ? (drag?.point ?? position.point ?? model.spaceById.get(position.space_id)?.anchor ?? null) : null;
+  const targetFloor = position?.floor_id ?? null;
+  useLayoutEffect(() => {
+    const before = shown.current;
+    shown.current = target && targetFloor ? { point: target, floor: targetFloor } : null;
+    const g = groupRef.current;
+    if (!target || !before || !g || before.floor !== targetFloor || drag || reducedMotion) {
+      tween.current = null;
+      return;
+    }
+    if (Math.hypot(target[0] - before.point[0], target[1] - before.point[1]) < 1) {
+      tween.current = null;
+      return;
+    }
+    const from: Point = tween.current ? [g.position.x, -g.position.z] : before.point;
+    tween.current = { from, to: target, t0: performance.now() };
+    g.position.x = from[0];
+    g.position.z = -from[1];
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target?.[0], target?.[1], targetFloor]);
+  useFrame(() => {
+    const t = tween.current;
+    const g = groupRef.current;
+    if (!t || !g) return;
+    const k = Math.min(1, (performance.now() - t.t0) / 250);
+    const e = 1 - (1 - k) ** 3;
+    g.position.x = t.from[0] + (t.to[0] - t.from[0]) * e;
+    g.position.z = -(t.from[1] + (t.to[1] - t.from[1]) * e);
+    if (k >= 1) tween.current = null;
+    else invalidate();
+  });
+
+  // Walking the steps: a confirmed step (Next/Back) that lands outside the visible part of the map pans the camera
+  // to the dot (same zoom). A floor change frames the new floor on its own (CameraRig), so it is left alone here.
+  const walking = useTwin((s) => s.walkStep !== null);
+  const lastKnown = useRef(known);
+  useEffect(() => {
+    const before = lastKnown.current;
+    lastKnown.current = known;
+    const c = controlsRef.current;
+    if (!walking || !c || !known?.point || !before || before.floor_id !== known.floor_id) return;
+    const rect = gl.domElement.getBoundingClientRect();
+    const v = new THREE.Vector3(known.point[0], floorY(known.floor_id), -known.point[1]).project(camera);
+    const x = ((v.x + 1) / 2) * rect.width;
+    const y = ((1 - v.y) / 2) * rect.height;
+    const { topInset, bottomInset, rightInset } = useTwin.getState();
+    const pad = 32;
+    if (x > pad && x < rect.width - rightInset - pad && y > topInset + pad && y < rect.height - bottomInset - pad) return;
+    const t = c.getTarget(new THREE.Vector3());
+    void c.moveTo(known.point[0], t.y, -known.point[1], !reducedMotion);
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [known]);
 
   useEffect(() => {
     const element = gl.domElement;
@@ -229,9 +295,9 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps
   }, [camera, gl, invalidate]);
 
   if (!position || !shownFloor) return null;
-  const point = drag?.point ?? position.point ?? model.spaceById.get(position.space_id)?.anchor ?? [0, 0];
+  const point = target ?? [0, 0];
   return (
-    <group position={[point[0], floorY(position.floor_id), -point[1]]} name={estimate ? "walk-estimate" : "here-dot"}>
+    <group ref={groupRef} position={[point[0], floorY(position.floor_id), -point[1]]} name={estimate ? "walk-estimate" : "here-dot"}>
       {estimate && !drag && (
         <>
           {/* soft uncertainty ring in metres: it grows with the distance walked since the last confirmation */}
@@ -244,7 +310,9 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour }: DotProps
       )}
       {/* the map-app blue dot: constant size on screen, white rim, a calm accuracy halo, no text */}
       <ScreenSized>
-        <Disc radius={HERE_HALO_PX} colour={colour} opacity={0.16} through />
+        <Pulse reducedMotion={reducedMotion || worker} amount={0.3} speed={1}>
+          <Disc radius={HERE_HALO_PX} colour={colour} opacity={0.16} through />
+        </Pulse>
         <Disc radius={HERE_RIM_PX} colour="#ffffff" opacity={1} through y={0.08} order={30} />
         <Disc radius={HERE_CORE_PX} colour={colour} opacity={1} through y={0.1} order={31} />
       </ScreenSized>

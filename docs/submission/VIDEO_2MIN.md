@@ -1,5 +1,7 @@
 # 2-minute video: "The knowledge stays in the building"
 
+> **Status 03:30 (Jennifer's session):** on `main` today: place knowledge server (notes, issues, timed closures with "until", history, graph export), Walk with me, tap answers "where are you", Hey Wanda with follow-up listening. Coming tonight: Wanda's knowledge tools (`feat/knowledge-agent`) and the knowledge page (`feat/twin-knowledge-page`, notes layer, pins, photos). **Not on `main`:** the inspection round (`feat/twin-round`, `feat/agent-plan-round`) and the browser notes (`feat/twin-notes`) exist only on Leonie's laptop; Jennifer decided not to build new features except place knowledge. If the round is not merged by the shoot, use this fallback for 0:25-0:55: Tom asks "Hey Wanda, take me to fire extinguisher H-A2", Walk with me moves the dot, and on arrival Wanda reads Klaus's note; then "lift 1 is out until tomorrow" shows the timed closure and the reroute.
+
 Language: English. Device: Chrome on the laptop (hands-free "Hey Wanda" listens reliably there), laptop on a trolley the technician pushes. Filmed in the Urban Colab with printed signs; the twin shows the dataset building **"Produktion West 39"** (`train/proc-factory-train-015`). Say on screen once: "Demo building from the dataset, acted out in our venue."
 
 **Rule: always say the start point** ("I start at the entrance in Main aisle H-B3"), otherwise Wanda asks for it (no entrance is marked as the main one).

@@ -6,11 +6,11 @@
 
 .omnibox-input {
   display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 14px; border-radius: var(--radius);
-  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float);
-  transition: border-color var(--t-fast);
+  background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
+  transition: box-shadow var(--t-fast);
 }
-.omnibox-input:focus-within { border-color: color-mix(in srgb, var(--signal) 70%, transparent); }
-.omnibox-input.is-listening { border-color: var(--ob-active); }
+.omnibox-input:focus-within { box-shadow: var(--shadow-float), 0 0 0 2px color-mix(in srgb, var(--signal) 35%, transparent); }
+.omnibox-input.is-listening { box-shadow: var(--shadow-float), 0 0 0 2px var(--ob-active); }
 .omnibox-input input {
   flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; /* 16px: no iOS zoom */
   padding: 8px 4px; outline: none; color: var(--text);
@@ -31,12 +31,12 @@
 .ob-icon:focus:not(:focus-visible) { outline: none; }
 .ob-mic {
   width: 42px; height: 42px; min-height: 42px; color: var(--text);
-  background: var(--surface); border: 1px solid var(--line);
+  background: var(--paper-2); border: 0; border-radius: var(--radius-pill);
 }
 .ob-mic:hover { background: color-mix(in srgb, var(--text) 15%, transparent); }
 /* listening, as in Google Maps voice: blue filled mic with a ring pulsing outwards */
 .ob-mic.listening, .ob-talk.listening {
-  background: var(--ob-active); border-color: var(--ob-active); color: #fff; animation: ob-pulse 1.5s ease-out infinite;
+  background: var(--ob-active); color: #fff; animation: ob-pulse 1.5s ease-out infinite;
 }
 @keyframes ob-pulse {
   0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ob-active) 50%, transparent), 0 0 0 0 color-mix(in srgb, var(--ob-active) 30%, transparent); }
@@ -46,11 +46,11 @@
 /* status line: thinking / listening / notice */
 .ob-status {
   align-self: center; display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
-  padding: 4px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--muted);
-  background: var(--surface); border: 1px solid var(--line);
+  padding: 4px 12px; border-radius: var(--radius-pill); font-size: 13px; color: var(--muted);
+  background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-soft);
 }
 .ob-status .x { width: 22px; min-width: 22px; min-height: 22px; font-size: 16px; }
-.ob-notice { color: var(--text); border-color: var(--warn); border-radius: var(--radius); align-self: stretch; justify-content: space-between; }
+.ob-notice { color: var(--text); box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--warn); border-radius: var(--radius); align-self: stretch; justify-content: space-between; }
 .ob-heard { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ob-rec { width: 8px; height: 8px; border-radius: 50%; background: var(--ob-active); flex: none; animation: ob-blink 1s ease-in-out infinite alternate; }
 @keyframes ob-blink { from { opacity: 1; } to { opacity: 0.3; } }
@@ -62,8 +62,8 @@
 
 /* earlier replies */
 .ob-history {
-  list-style: none; margin: 0; padding: 4px; border-radius: var(--radius); background: var(--surface);
-  border: 1px solid var(--line); box-shadow: var(--shadow-float); max-height: 46vh; overflow: auto;
+  list-style: none; margin: 0; padding: 4px; border-radius: var(--radius); background: var(--glass-strong); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
+  max-height: 46vh; overflow: auto;
 }
 
 /* earlier replies */
@@ -90,11 +90,11 @@
 }
 .ob-fabs { display: flex; justify-content: flex-end; gap: 10px; }
 .ob-fab {
-  width: 48px; height: 48px; min-height: 48px; padding: 0; border-radius: var(--radius-sm); display: inline-flex; align-items: center;
-  justify-content: center; color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  width: 48px; height: 48px; min-height: 48px; padding: 0; border-radius: var(--radius-pill); display: inline-flex; align-items: center;
+  justify-content: center; color: var(--text); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
   -webkit-touch-callout: none; user-select: none;
 }
-.ob-fab:hover { background: var(--paper-2); }
+.ob-fab:hover { background: var(--surface); }
 .ob-fab svg { width: 22px; height: 22px; }
 .ob-talk { position: relative; }
 /* spoken replies off: a muted-speaker badge on the Talk button */
@@ -105,21 +105,21 @@
 }
 .ob-fab .ob-badge svg { width: 14px; height: 14px; }
 /* icon plus word ("Ask", "Talk"): an icon alone makes people guess */
-.ob-fab.ob-labelled { width: auto; padding: 0 14px 0 12px; gap: 6px; font-size: 14px; font-weight: 600; }
+.ob-fab.ob-labelled { width: auto; padding: 0 18px 0 14px; gap: 8px; font-size: 14px; font-weight: 600; }
 .ob-fab-label { line-height: 1; }
 .omnibox.collapsed .ob-status { align-self: flex-end; }
 /* suggestion chips above the empty input: send the question as if typed */
 .ob-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ob-chip {
-  min-height: 32px; padding: 4px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);
-  background: var(--surface); color: var(--text); font-size: 13px; box-shadow: var(--shadow-float);
+  min-height: 32px; padding: 4px 14px; border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-soft);
+  color: var(--text); font-size: 13px;
 }
-.ob-chip:hover { background: var(--paper-2); }
+.ob-chip:hover { background: var(--surface); }
 .worker .ob-chip { min-height: 44px; font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .ob-talk.listening { animation: none; } }
 /* Phone: an open input with a bottom sheet below is the sheet's top row (one surface, no floating box above it). */
 .worker .dock:has(> .phone-sheet) > .omnibox.expanded { margin: 0 calc(-8px - var(--safe-r, 0px)) -8px calc(-8px - var(--safe-l, 0px)); position: relative; z-index: 1; }
-.worker .dock:has(> .phone-sheet) > .omnibox.expanded .omnibox-input { border-radius: 12px 12px 0 0; border-width: 1px 0 0; box-shadow: none; padding-left: calc(6px + var(--safe-l, 0px)); padding-right: calc(8px + var(--safe-r, 0px)); }
+.worker .dock:has(> .phone-sheet) > .omnibox.expanded .omnibox-input { border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--glass-strong); padding-left: calc(6px + var(--safe-l, 0px)); padding-right: calc(8px + var(--safe-r, 0px)); }
 .worker .dock:has(> .omnibox.expanded) > .phone-sheet { border-radius: 0; box-shadow: none; }
 .worker .dock:has(> .phone-sheet) > .omnibox.expanded .ob-chips { padding: 0 calc(8px + var(--safe-r, 0px)) 8px calc(8px + var(--safe-l, 0px)); }
 .worker .dock:has(> .omnibox.expanded) > .phone-sheet .sheet-grip { height: 8px; } /* one handle, not one in the middle of the surface */

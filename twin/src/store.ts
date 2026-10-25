@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { api } from "./api/client";
 import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point, Route } from "./api/types";
 import { buildModel, type BuildingModel } from "./model/model";
+import { asksWhereYouAre } from "./asksWhere";
 
 export type FloorMode = "stacked" | "exploded" | "single";
 export type Profile = "planner" | "worker";
@@ -115,6 +116,10 @@ interface TwinState {
   pendingHere: { space_id: string; floor_id: string; point?: Point | null } | null;
   /** "I'm here" without the agent: the position is set at once on screen, the server learns it with the next message. */
   setHere: (here: { space_id: string; floor_id: string; point?: Point | null }) => void;
+  /** Wanda's last reply asked where the person is: the next map tap answers it ("I'm here." + context.here) instead
+   * of opening the room card (see tapAnswer.ts). voice: the question came by voice, so the answer is a voice turn. */
+  awaitingPlace: { voice: boolean } | null;
+  dismissAwaitingPlace: () => void;
   /** True while the "You are here" dot is dragged: camera gestures are off (set by scene/HerePin). */
   dragLock: boolean;
   setDragLock: (on: boolean) => void;
@@ -265,6 +270,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   voiceOut: false,
   hereArmed: false,
   pendingHere: null,
+  awaitingPlace: null,
   dragLock: false,
   campusHook: null,
   campusRoute: false,
@@ -299,7 +305,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
 
   async openBuilding(key) {
-    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null, walkStep: null });
+    set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null, walkStep: null, awaitingPlace: null });
     try {
       const building = await api.building(key);
       const model = buildModel(building);
@@ -392,6 +398,10 @@ export const useTwin = create<TwinState>((set, get) => ({
       hereArmed: false,
       focusedFloorId: here.floor_id,
     }));
+  },
+
+  dismissAwaitingPlace() {
+    set({ awaitingPlace: null });
   },
 
   armHere(hereArmed) {
@@ -533,6 +543,7 @@ export const useTwin = create<TwinState>((set, get) => ({
       chatBusy: true,
       hereArmed: false,
       pendingHere: null,
+      awaitingPlace: null, // any new message (typed, spoken, or the tap's "I'm here.") answers or replaces the question
     }));
     try {
       const routeBefore = routeKey(get().state?.route);
@@ -549,6 +560,7 @@ export const useTwin = create<TwinState>((set, get) => ({
         replyShown: true,
         selection: reply.selection_ignored ? s.selection : null,
         popover: null,
+        awaitingPlace: !reply.error && asksWhereYouAre(reply.reply) ? { voice } : null,
       }));
       if (reply.opened) {
         await get().loadBuildings();
@@ -587,10 +599,10 @@ export const useTwin = create<TwinState>((set, get) => ({
 }));
 
 /** "I'm here" is local until the next chat message (pendingHere): a state from another endpoint (route, close,
- * door) does not know it yet, so the position on screen is kept instead of being wiped (mobile session). */
+ * door) does not know it yet, so the position on screen (newer than the server's) is kept (mobile session). */
 function withPendingHere(next: BuildingState): BuildingState {
   const { pendingHere, state } = useTwin.getState();
-  return pendingHere && !next.position && state?.position ? { ...next, position: state.position } : next;
+  return pendingHere && state?.position ? { ...next, position: state.position } : next;
 }
 
 /** Identity of a drawn route (same ends and length = same route). */

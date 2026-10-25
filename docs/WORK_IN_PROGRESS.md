@@ -25,6 +25,7 @@ Für Leonie und ihren Agenten: damit niemand dieselbe Datei doppelt anfasst. Cod
 | `feat/twin-ux-calm` | UX gegen kognitive Last (`docs/ux-cognitive-load.md`): **zuerst** Möbel nach Pixelgröße (siehe unten), dann "End route" (ein Knopf), Mikrofon beim Begleiten sichtbar, Etagenleiste an einem festen Platz, ein Griff pro Sheet, kompakte Routenkarte, keine Koordinaten, POI-Symbole als kleine weiße Quadrate, klare Symbole statt "⇕"/"⌂", Eingabe am Handy angedockt, Knöpfe mit Text ("Ask", "Talk"), Legende, Vorschlags-Chips | `ui/` (Karte, Walk, Hilfe), `scene/Labels.tsx`, `scene/mapZoom.ts`, `scene/poiIcons.*`, `ui/FloorRail.tsx` |
 | `feat/twin-room-colours` | Raumfarben nach Gruppen (`docs/specs/room-colours.md`): blass Sand (Küche), Aqua (Sanitär), Violett (Treppe, Aufzug), Salbei (Meeting), in Fabriken blass gelbe Gehwege, Sicherheit nur als Symbol in Normfarben, Rest neutral grau; Möbel und Wände heller | `model/palette.ts`, `styles/tokens.css`, `DESIGN.md` |
 | `fix/twin-ghost` | **Geisterbild** (verschwommene große Kopie oben rechts, sobald die Raumkarte aufgeht) und neue **Etagen-Regel**: aktive Etage voll, darüber nichts, darunter nur dünner Umriss, Kamera gleitet beim Etagenwechsel, Route über Etagen gestapelt. Dazu Querformat mit rechter Seitenleiste | `scene/CameraRig.tsx`, `scene/Scene.tsx`, `scene/FloorMesh.tsx` (Sichtbarkeit) |
+| `ui-polish` | UI-Politur: Weißmodell-Look (Glas-Chrome, Inter, weiße Materialien, Routen-Halo, Pill-Labels, ruhige Sperrungen, strukturierte Routenkarte, 2D Norden oben), Plan in `docs/specs/ui-polish.md`, Screenshots `twin/docs/ui-before/` und `twin/docs/ui-after/` | `twin/src/styles/tokens.css`, `twin/src/styles.css`, `twin/src/ui/*.css`, `twin/src/ui/Card.tsx`, `twin/src/model/palette.ts`, `twin/src/scene/{Scene,Effects,GroundGrid,FloorMesh,Things,geometry,RouteLine,Labels,Markers,HerePin,markerLayout,CameraRig}.tsx`, `twin/DESIGN.md` |
 
 **Leonie selbst:** Wake Word "Hey Wanda" (Spec `docs/specs/voice-handsfree.md` Teil B). Bitte vorher pullen, `voice.ts` wurde unten (Ton-Freischaltung, Wake Lock) vom Handy-Fix geändert.
 
@@ -43,6 +44,20 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 - Route gerade durch Türen (Server): `web/api.py`, `web/route_draw.py`
 Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
 **Bis zum Freeze nur Fixes, mit einer Ausnahme als Wow-Effekt: Ortswissen mit Zeit** (Notizen, Probleme, Sperrungen "bis morgen" an Ort oder Gerät), Spec `docs/specs/place-knowledge.md`, wartet auf euer Okay. Leonie baut die Seite gegen den Vertrag dort.
+
+## Stil: ab jetzt nur eine Sitzung (Jennifer und Leonie, ca. 04:00)
+Visuelles Design (Farben, Panels, Schatten, POI-Symbole, 3D-Look) macht nur noch **eine** Sitzung (Jennifers zweite, Ordner `ui-polish`), mit `docs/specs/ui-feedback-akshat.md` und `docs/specs/3d-look.md` als Briefing. Alle anderen Agenten bauen nur Funktion mit den vorhandenen Bausteinen und erfinden keine eigene Optik.
+
+## Während Leonie schläft (Jennifer, ca. 03:00): Agenten übernehmen zwei Teile
+- Seite fürs Ortswissen: Plan `docs/specs/place-knowledge-page.md`, Branch `feat/twin-knowledge-page`. Ersetzt Leonies lokale Browser-Notizen (`feat/twin-notes`): Notizen liegen auf dem Server, mit Zeit. Foto-Knopf, Protokoll und Prüfrunde kann Leonie darauf aufsetzen.
+- 3D-Look: Plan `docs/specs/3d-look.md`. Wird von Jennifers zweiter Sitzung gebaut (Ordner `ui-polish`, Licht, Boden, Wände, Möbel), nicht von einem weiteren Agenten.
+- **Prüfrunde: Spec `docs/specs/inspection-round.md`.** Leonie, bitte `feat/twin-round` und `feat/agent-plan-round` gleich nach dem Aufwachen pushen (spätestens 9:00, Weg A). Sonst baut Jennifers Sitzung den Server-Teil selbst (Weg B). Zwei Startknöpfe: Vorschlag A (Routenkarte während der Runde ausblenden).
+- Leonies lokale Branches (`feat/twin-round`, `feat/agent-plan-round`, `feat/twin-notes`) sind nicht gepusht; bitte pushen, bevor du weiterbaust.
+
+## Für Leonies 3D-Look (Jennifers Test 02:50)
+- Boden in 3D: das Punkteraster füllt bei flachem Blick die halbe Fläche bis zum Horizont und wirkt unruhig. Besser: sehr blasses Raster, das mit der Entfernung ausblendet, oder einfarbiger Boden.
+- Kippen begrenzt auf etwa 55 bis 60 Grad und weit entfernte Etiketten ausblenden: macht `fix/twin-trackpad` (Kamera, kleine Änderung in Labels.tsx).
+- Fadenkreuz des Tipp-Pins kürzer: macht `fix/twin-pin-label`.
 
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
@@ -90,3 +105,11 @@ Vorschlag, eine Zeile in `Card.tsx`, du entscheidest:
 - A: Während eine Runde aktiv ist (`inRound()` aus `twin/src/round/round.ts`), die normale Routenkarte ausblenden.
 - B: "Guide me" startet bei aktiver Runde die Runden-Führung (`startRound()`), sonst wie bisher.
 Leonie empfiehlt A (weniger Knöpfe).
+
+## Leonie: Prüfrunde ist gepusht (Weg A aus `docs/specs/inspection-round.md`)
+Branch **`feat/inspection-round-and-notes`** (auf aktuellem `main`, 822dc44) enthält alles in einem:
+- `feat/twin-round`: Seite, Runde planen/zeichnen, Station für Station, "Try a door" (Demo-Link: `#round=fire%20extinguisher&area=Ground%20floor&building=train/proc-factory-train-015&door=proc-factory-train-015-F0-S002,proc-factory-train-015-F0-S016`, 5 Stopps, 100 m → 62 m).
+- `feat/agent-plan-round`: Werkzeug `plan_round` (`building_agent/round_tools.py`, eine Zeile in `tools.py`, eine Prompt-Regel in `agent.py`), 15 Unit-Tests, `tests/live/test_round.py`, Review-Agent ohne Blocker. Live: "Inspection round: all fire extinguishers on the ground floor. I start at the entrance in Main aisle H-B3." → ein Aufruf, 6,5 s, 99,1 m (Seite sagt 100 m, Start Raummitte statt Eingangspunkt).
+- `feat/twin-notes`: Notizen/Probleme mit Foto als Fakten nach `docs/specs/place-knowledge.md`, nutzt automatisch `/api/facts` (sonst IndexedDB), Pins, Verlauf, Vorlesen beim Begleiten, Einsatzprotokoll.
+- Hey Wanda in `handsFree.ts`: "done/erledigt" hakt die Station ab, "how many left", "note:/merk dir:", "problem:", "what's here", "finished/fertig" (Protokoll).
+Noch offen vor `main`: `scripts/check.sh` auf ruhigem Rechner (einziger roter Test war `test_impact.py::test_sweep_over_all_buildings` mit 117 s statt 90 s unter Last), volle Live-Suite, Testantworten byte-gleich, Entscheidung A zu zwei Startknöpfen (`inRound()` aus `twin/src/round/round.ts` in `ui/Card.tsx`). Sprach-Notizen speichern heute direkt (ohne Karte und Ja); sobald `remember_here` (K2) da ist, kann der Notiz-Teil des Einhängers raus.

@@ -13,7 +13,11 @@ from building_agent import routing
 from web.server import App, make_handler
 
 DATA = Path("data")
-NO_CAMPUS_STATE = {"campus": {"loaded": False, "key": None, "name": None, "route": None, "closed_links": []}}
+NO_CAMPUS_STATE = {
+    "campus": {"loaded": False, "key": None, "name": None, "route": None, "closed_links": []},
+    "facts": [],  # place knowledge (docs/specs/place-knowledge.md): none in a fresh tmp store
+    "closed_until": {},
+}
 
 
 def multi_floor_building_with_lift() -> str:
@@ -28,8 +32,8 @@ def multi_floor_building_with_lift() -> str:
 
 
 @pytest.fixture
-def app() -> App:
-    return App(DATA)
+def app(tmp_path) -> App:
+    return App(DATA, knowledge_root=tmp_path / "knowledge")
 
 
 @pytest.fixture
@@ -71,6 +75,8 @@ def test_building_view_has_everything_the_page_draws(app, key):
         "position": None,
         "guide": None,
         "campus": {"loaded": False, "key": None, "name": None, "route": None, "closed_links": []},
+        "facts": [],
+        "closed_until": {},
     }
 
 
@@ -373,7 +379,8 @@ def test_agent_saving_a_building_in_the_chat_opens_it_on_the_page(tmp_path, key,
     class FakeSession:
         """What building_agent.agent.Session does on save_building: write the file, call swap_building(path)."""
 
-        def __init__(self, building_map, output_directory):
+        def __init__(self, building_map, output_directory, **options):
+            """options: campus and knowledge (the page's shared fact store), passed through since place knowledge."""
             from types import SimpleNamespace
 
             self.map, self.tools = building_map, []
