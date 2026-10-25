@@ -16,7 +16,8 @@ STRAIGHT_DEG = 30.0
 AROUND_DEG = 150.0
 MIN_LEG_M = 0.3
 LANDMARK_RADIUS_M = 7.0
-MAX_RUN = 4
+FEW_M = 3.0
+NAMED_ROOM_TYPES = frozenset({"lobby", "stairwell", "lift", "canteen", "lecture_hall", "library"})
 # Types that are everywhere or look alike; never worth naming (derived from the dataset's type census).
 BORING_TYPES = frozenset(
     {
@@ -216,7 +217,9 @@ def _plan_moves(bm: BuildingMap, route: RouteResult) -> list[_Move]:
         move.point, move.door_id = layers[k][chosen[k]]
     points = [layers[0][0][0], *[m.point for m in moves], layers[-1][0][0]]
     for k, move in enumerate(moves, start=1):
-        if move.kind != "door" or k == 1 or moves[k - 2].kind not in ("door", "enter"):
+        # The walk into the first door (from the start anchor) and out of a lift or stairwell (from its anchor)
+        # gives the facing at that door, so those doors get a turn word too; an entrance does not.
+        if move.kind != "door" or (k > 1 and moves[k - 2].kind == "exit"):
             continue
         before, here, after = points[k - 1], points[k], points[k + 1]
         if before is None or here is None or after is None:
@@ -256,15 +259,24 @@ def _at(landmark: Landmark | None, word: str = "at") -> str:
     return f" {word} {'the ' if landmark.kind == 'asset' else ''}{landmark.label}"
 
 
-def _door_text(bm: BuildingMap, move: _Move, landmark: Landmark | None) -> str:
-    name = bm.spaces[move.current]["name"]
-    if move.turn in ("left", "right"):
-        return f"Turn {move.turn}{_at(landmark)} into {name}."
-    if move.turn == "straight":
-        return f"Go straight on{_at(landmark, 'past')} into {name}."
-    if move.turn == "around":
-        return f"Turn around{_at(landmark)} and go into {name}."
-    return f"Continue{_at(landmark, 'past')} into {name}."
+def metres(distance: float | None) -> str | None:
+    """A walking distance as people say it: 'a few metres' under 3 m, whole metres under 20 m, else steps of 5 m."""
+    if distance is None:
+        return None
+    if distance < FEW_M:
+        return "a few metres"
+    if distance < 20:
+        return f"{round(distance)} m"
+    return f"{5 * round(distance / 5)} m"
+
+
+def helps(bm: BuildingMap, space_id: str) -> bool:
+    """Whether a room's name helps someone walking: lobbies, stairwells, lifts and other rooms you can recognise."""
+    return space_id in bm.spaces and bm.spaces[space_id]["room_type"] in NAMED_ROOM_TYPES
+
+
+def _into(bm: BuildingMap, space_id: str, word: str = "into") -> str:
+    return f" ({word} {bm.spaces[space_id]['name']})" if helps(bm, space_id) else ""
 
 
 def _vertical_step(bm: BuildingMap, move: _Move, used: set[str]) -> TurnStep:
@@ -278,59 +290,116 @@ def _vertical_step(bm: BuildingMap, move: _Move, used: set[str]) -> TurnStep:
     return TurnStep(f"Take {name} ({kind}) to {floor}.{_hint(landmark)}", [move.current], None, landmark)
 
 
-def _group_moves(moves: list[_Move]) -> list[list[int]]:
-    """Indexes of moves per spoken step; consecutive straight-on moves share one step."""
-    groups: list[list[int]] = []
-    for k, move in enumerate(moves):
-        joins = groups and move.turn == "straight" and moves[groups[-1][-1]].turn == "straight"
-        if joins and len(groups[-1]) < MAX_RUN:
-            groups[-1].append(k)
-        else:
-            groups.append([k])
-    return groups
+def _leave_text(bm: BuildingMap, move: _Move, landmark: Landmark | None, distance: str | None) -> str:
+    """The first walking step (facing unknown before it): out of the room, the metres to its door, the turn there."""
+    head = f"Leave {bm.spaces[move.previous]['name']} through the door{_at(landmark, 'by')}"
+    head += f" ({distance})" if distance else ""
+    if move.turn in ("left", "right"):
+        return f"{head}, then turn {move.turn}{_into(bm, move.current, 'towards')}."
+    if move.turn == "around":
+        return f"{head}, then turn around{_into(bm, move.current, 'towards')}."
+    if move.turn == "straight":
+        return f"{head} and go straight on{_into(bm, move.current)}."
+    return f"{head}{_into(bm, move.current)}."
+
+
+def _turn_text(bm: BuildingMap, move: _Move, landmark: Landmark | None, distance: str | None) -> str:
+    walk = f"Walk {distance}" if distance else "Walk on"
+    if move.turn in ("left", "right", "around"):
+        return f"{walk}, then turn {move.turn}{_at(landmark)}{_into(bm, move.current, 'towards')}."
+    lead = f"Walk straight on for {distance}" if distance and move.turn == "straight" else walk
+    return f"{lead}{_at(landmark, 'past')}{_into(bm, move.current)}."
+
+
+def _arrive_text(bm: BuildingMap, move: _Move, distance: str | None, leaving: bool) -> str:
+    """The walk to the destination's door, with the side it is on when the geometry says so."""
+    name = bm.spaces[move.current]["name"]
+    if leaving and (move.turn not in ("left", "right", "straight") or not distance):
+        head = f"Leave {bm.spaces[move.previous]['name']} through the door"
+        return f"{head} into {name}" + (f" ({distance})." if distance else ".")
+    if move.turn in ("left", "right") and distance:
+        return f"Walk {distance} to {name} on your {move.turn}."
+    if move.turn == "straight" and distance:
+        return f"Walk {distance} to {name} straight ahead."
+    return f"Walk {distance} into {name}." if distance else f"Go into {name}."
 
 
 def turn_plan(bm: BuildingMap, route: RouteResult) -> list[TurnStep]:
-    """Spoken steps with turn words: "Turn left at the coffee machine into Corridor 0.01."
+    """Turn-first spoken steps like a navigation app: "Walk 12 m, then turn left at the coffee machine."
 
-    Facing is assumed along the route at the start: the first move never gets a turn word ("Leave Lobby through
-    the door into ..."). At every later door the turn comes from the walk into the door (previous door, or the
-    room anchor) and the walk out of it (next door, or the destination anchor), in the building frame with y up:
-    within 30 degrees is straight on, up to 150 degrees left or right (counter-clockwise is left), beyond that
-    turn around. Moves through lifts, stairs and entrances, moves right after them, and moves whose positions
-    are missing or too close together get plain wording without a turn word. Consecutive straight-on moves merge
-    into one step, so the number of steps never exceeds the number of rooms on the route."""
+    Each step names the action and the metres to the door where it happens; room names come last and only where
+    they help (the destination, lobbies, stairwells, lifts, see NAMED_ROOM_TYPES). The turn at a door comes from
+    the walk into the door (previous door, or the room anchor) and the walk out of it (next door, or the
+    destination anchor), in the building frame with y up: within 30 degrees is straight on, up to 150 degrees
+    left or right (counter-clockwise is left), beyond that turn around. The first step cannot say which way to
+    face, so it reads "Leave <room> through the door (8 m), then turn left." Straight-on doors (and doors without
+    a turn word) merge into the next turn ("Walk 25 m, then turn right."), the walk to the destination's door says
+    which side it is on ("Walk 5 m to Toilet 0.22 on your left."). Lifts, stairs and entrances keep their own
+    wording. Every step enters at least one room, so the number of steps never exceeds the rooms on the route."""
     path = route.space_path
     if len(path) < 2:
         return [TurnStep(f"You are already at {bm.describe_space(path[0])}.", [])]
     moves = _plan_moves(bm, route)
+    points = [_anchor(bm, path[0]), *[m.point for m in moves], _anchor(bm, path[-1])]
+    legs = [
+        None if points[k] is None or points[k + 1] is None else math.dist(points[k], points[k + 1])
+        for k in range(len(moves))
+    ]
     used: set[str] = set()
     arrival = pick_landmark(bm, path[-1], used)
     steps: list[TurnStep] = []
-    for group in _group_moves(moves):
-        first = moves[group[0]]
-        rooms = [moves[k].current for k in group]
-        if len(group) > 1:
-            names = ", then ".join(bm.spaces[room]["name"] for room in rooms)
-            steps.append(TurnStep(f"Go straight on through {names}.", rooms, "straight"))
-        elif first.kind == "vertical":
-            steps.append(_vertical_step(bm, first, used))
-        elif first.kind == "exit":
-            steps.append(TurnStep("Leave the building through the entrance.", rooms))
-        elif first.kind == "enter":
-            steps.append(TurnStep(f"Go through the entrance into {bm.spaces[first.current]['name']}.", rooms))
-        else:
-            landmark = None if group[0] == len(moves) - 1 else _door_landmark(bm, first, used)
-            if landmark:
-                used.add(landmark.id)
-            if group[0] == 0:
-                text = (
-                    f"Leave {bm.spaces[first.previous]['name']}{_at(landmark, 'by')} "
-                    f"and go into {bm.spaces[first.current]['name']}."
-                )
+    run: list[int] = []  # straight-on doors waiting for the next turn
+
+    def walked(indexes: list[int]) -> str | None:
+        found = [legs[k] for k in indexes]
+        return None if any(leg is None for leg in found) else metres(sum(found))
+
+    def door_landmark(move: _Move, rooms: list[str]) -> Landmark | None:
+        landmark = _door_landmark(bm, move, used)
+        if landmark and landmark.id not in rooms and landmark.label not in {bm.spaces[r]["name"] for r in rooms}:
+            used.add(landmark.id)
+            return landmark
+        return None
+
+    def flush() -> None:
+        if not run:
+            return
+        last = moves[run[-1]]
+        landmark = door_landmark(last, [moves[k].current for k in run])
+        text = _turn_text(bm, _Move(last.previous, last.current, "door", turn="straight"), landmark, walked(run))
+        steps.append(TurnStep(text, [moves[k].current for k in run], "straight", landmark, last.point))
+        run.clear()
+
+    for k, move in enumerate(moves):
+        is_last = k == len(moves) - 1
+        leaving = k == 0 or moves[k - 1].kind in ("vertical", "enter")
+        if move.kind != "door":
+            flush()
+            if move.kind == "vertical":
+                steps.append(_vertical_step(bm, move, used))
+            elif move.kind == "exit":
+                steps.append(TurnStep("Leave the building through the entrance.", [move.current]))
             else:
-                text = _door_text(bm, first, landmark)
-            steps.append(TurnStep(text, rooms, first.turn, landmark, first.point))
+                steps.append(
+                    TurnStep(f"Go through the entrance into {bm.spaces[move.current]['name']}.", [move.current])
+                )
+            continue
+        if is_last:
+            rooms = [*(moves[i].current for i in run), move.current]
+            text = _arrive_text(bm, move, walked([*run, k]), leaving and not run)
+            run.clear()
+            steps.append(TurnStep(text, rooms, move.turn, None, move.point))
+            continue
+        if not leaving and move.turn in ("straight", None):
+            run.append(k)
+            continue
+        rooms = [*(moves[i].current for i in run), move.current]
+        distance = walked([*run, k])
+        run.clear()
+        landmark = door_landmark(move, rooms)
+        text = _leave_text(bm, move, landmark, distance) if leaving else _turn_text(bm, move, landmark, distance)
+        steps.append(TurnStep(text, rooms, move.turn, landmark, move.point))
+    flush()
     steps.append(TurnStep(f"You have arrived at {bm.describe_space(path[-1])}.{_hint(arrival)}", [], None, arrival))
     return steps
 
