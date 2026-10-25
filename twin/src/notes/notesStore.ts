@@ -766,12 +766,14 @@ export function notesCommand(text: string): Promise<string> | null {
 /** In an inspection round (walking it, or just finished it), typed or spoken "note: …" and "finished" are answered
  * on the device (store.ask, before the agent): the note lands on the current stop's device, "finished" shows the job
  * report. Outside a round everything goes to Wanda as before. */
-export function roundCommand(text: string): Promise<string> | null {
+export function roundCommand(text: string): Promise<{ text: string; card: boolean }> | null {
   const round = useRound.getState();
   const inRound = !!currentStop() || !!useNotes.getState().job?.round || (round.finished && !!round.plan);
   if (!inRound) return null;
   const wake = parseWake(text); // typed or heard "Wanda, note: …"
-  return notesCommand(wake?.rest || text);
+  const answer = notesCommand(wake?.rest || text);
+  // The job report sheet is the answer to "finished": no reply card stacked under it.
+  return answer ? answer.then((said) => ({ text: said, card: !useNotes.getState().report })) : null;
 }
 setLocalAnswer(roundCommand);
 

@@ -89,6 +89,7 @@ describe("typed commands in an inspection round", () => {
       const reply = await useTwin.getState().ask(said);
       expect(reply?.reply).toContain("Round finished: 2 of 2 stops checked.");
       expect(useNotes.getState().report?.round?.checked).toEqual(["3.01", "3.02"]);
+      expect(useTwin.getState().replyShown).toBe(false); // the report is the answer, no reply card under it
     }
     expect(chat).not.toHaveBeenCalled();
   });
