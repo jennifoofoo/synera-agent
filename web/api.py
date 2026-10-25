@@ -118,6 +118,9 @@ class Session:
             "start_point": recorded.get("start_point") if recorded else None,
             "destination_point": recorded.get("destination_point") if recorded else None,
         }
+        planned = getattr(self.map, "planned_round", None)  # plan_round's stops, so the page can guide stop by stop
+        if planned and planned.get("route") is route:
+            self.route_request["round"] = planned["info"]
         self.route_version += 1
         return True
 
@@ -438,7 +441,7 @@ def current_route(session: Session) -> dict | None:
         return None
     request = session.route_request
     try:
-        return draw_route(
+        drawn = draw_route(
             session,
             request["start"],
             request["destination"],
@@ -447,6 +450,7 @@ def current_route(session: Session) -> dict | None:
             request.get("start_point"),
             request.get("destination_point"),
         )
+        return {**drawn, "round": request["round"]} if request.get("round") else drawn
     except MapError as error:
         return {"ok": False, "error": str(error), "message": readable_error(session.map, str(error)), **request}
 

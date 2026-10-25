@@ -191,6 +191,17 @@ def plan_round(
     via, destination = (order, start_id) if return_to_start else (order[:-1], order[-1])
     route = routing.route(bm, start_id, destination, step_free, via)
     bm.located_asset_ids = [a["id"] for room in order for a in by_room[room]]
+    # For the page (web/api.py adopt_agent_route): this route is a round, so the page can guide it stop by stop.
+    bm.planned_round = {
+        "route": route,
+        "info": {
+            "device_type": asset_type or what,
+            "start": start_id,
+            "stops": [{"space_id": room, "asset_ids": [a["id"] for a in by_room[room]]} for room in order],
+            "return_to_start": return_to_start,
+            "step_free": step_free,
+        },
+    }
     stops, here = [], start_id
     for number, room in enumerate(order, start=1):
         stops.append(
