@@ -26,7 +26,7 @@ Jeder Techniker kann per Sprache oder Tippen Wissen an einen Ort oder ein Gerät
   "valid_from": "ISO-Zeit", "valid_to": "ISO-Zeit | null",
   "status": "open | resolved | expired",
   "resolved_by": "<fact id> | null",
-  "author": "Techniker A | null", "source": "voice | text | tap", "utterance": "Originalsatz", "photo": "url | null",
+  "author": "Techniker A | null", "person_id": "techniker-a | null", "related": [], "source": "voice | text | tap", "utterance": "Originalsatz", "photo": "url | null",
   "created_at": "ISO-Zeit"
 }
 ```
@@ -59,6 +59,14 @@ Regeln: Fakten nur nach Karte und klarem "Ja" (wie jede Änderung). Zeitwörter 
 - **Fotos:** optional, Handy-Kamera, verkleinert, EXIF und Ortsdaten entfernt.
 - **Speicher:** pro Gebäude in einer Datei, bleibt nach Neustart erhalten.
 - **Bestätigung:** Notizen und Probleme per Sprache/Chat: kurze Karte, dann "Ja". Sperrungen: Karte mit Wirkung auf die Wege wie heute. Knopf "Notiz hier" in der Seite: Absenden gilt als Bestätigung.
+
+## Wissensgraph (mit Jennifer abgestimmt)
+Mit dieser Spec ist es ein zeitlicher Wissensgraph über das Gebäude, ohne Graph-Datenbank:
+- **Knoten:** Räume, Türen, Aufzüge, Treppen, Geräte (gibt es), Fakten (neu), **Personen** (neu: `person_id` aus dem Autornamen, normalisiert; Abfrage "Was hat Techniker A diese Woche gemeldet?").
+- **Kanten:** Fakt `hängt an` Raum/Gerät/Element; Fakt `löst ab` älteren Fakt; Fakt `gemeldet von` Person; vorhanden: Tür `verbindet` Räume, Gerät `steht in` Raum, Raum `liegt auf` Etage. Jede Fakt-Kante gilt **von bis**.
+- **Abfragen über Beziehungen** (vor dem Freeze): `facts_here` bzw. `GET /api/facts` filtern nach Status (offen/erledigt/abgelaufen), Gerätetyp oder Kategorie, Bereich/Zone/Etage/Raum, Person und Zeitraum. Beispiel: "alle offenen Probleme an Pumpen in Halle A diese Woche".
+- **Export** `GET /api/graph?key=…` als **JSON-LD** mit Typen aus **Brick Schema** und **RealEstateCore** (Zuordnungstabelle unserer `room_type`/Gerätetypen, z. B. `kitchen` → `rec:Kitchen`, `fire_extinguisher` → `brick:Fire_Extinguisher`, Unbekanntes als `rec:Room` bzw. `brick:Equipment`), Fakten mit `validFrom`/`validTo`, `resolves`, `reportedBy`. Für Video und Technik-Text: "Gebäude plus Menschenwissen, mit Zeit, im Gebäude-Standard."
+- **Vorbereitet, nach dem Freeze:** ein Fakt an mehreren Knoten (Feld `related: [ids]` im Datenmodell schon anlegen, Wanda füllt es noch nicht), Asset Administration Shell für Maschinen, Graphiti bei vielen Gebäuden.
 
 ## Aufteilung
 | Teil | Wer | Dateien |
