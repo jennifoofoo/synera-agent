@@ -25,6 +25,7 @@ import { useState } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { frameSize } from "./markerLayout";
+import { controlsRef } from "./FloorMesh";
 
 export type MapTier = "area" | "far" | "mid" | "near";
 
@@ -54,14 +55,16 @@ export function tierOf(metresPerPixel: number, extentM = 0): MapTier {
 
 const centre = new THREE.Vector3();
 
-function metresPerPixelOf(camera: THREE.Camera, canvasWidth: number, canvasHeight: number, focus: THREE.Vector3): number {
+/** Metres per screen pixel at the focus. In 3D from the zoom alone (the orbit distance, when there are controls), so
+ * tilting, rotating or panning never changes the tier (label-rules.md: measured at the floor's centre, they did). */
+export function metresPerPixelOf(camera: THREE.Camera, canvasWidth: number, canvasHeight: number, focus: THREE.Vector3): number {
   const [width, height] = frameSize(camera, canvasWidth, canvasHeight);
   if ((camera as THREE.OrthographicCamera).isOrthographicCamera) {
     const ortho = camera as THREE.OrthographicCamera;
     return (ortho.right - ortho.left) / ortho.zoom / Math.max(1, width);
   }
   const perspective = camera as THREE.PerspectiveCamera;
-  const distance = camera.position.distanceTo(focus);
+  const distance = controlsRef.current?.distance ?? camera.position.distanceTo(focus);
   return (2 * distance * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) / Math.max(1, height);
 }
 

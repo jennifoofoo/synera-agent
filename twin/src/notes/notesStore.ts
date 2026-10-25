@@ -715,7 +715,12 @@ const FINISH_SAID = /^(?:finished|i'?m finished|i am finished|job done|finish(?:
 /** One call for the hands-free handler: a notes command ("note: …", "what's here", "finished") runs here and
  * returns the sentence to speak; anything else returns null. While walking, "finished"/"fertig" before the last step
  * is left to the walking commands ("fertig" = next station). */
+/** A time limit in the sentence ("until Friday", "bis morgen", "for two hours"): only Wanda's chat reads it (card with
+ * the end time, then yes), so such a note is not saved by the device shortcut. */
+const UNTIL_SAID = /\b(?:until|till|bis|for (?:the next )?(?:\d+|an?|one|two|three) (?:minutes?|hours?|days?|weeks?)|für (?:\d+|eine?n?|zwei|drei) (?:minuten?|stunden?|tage?n?|wochen?))\b/i;
+
 export function notesCommand(text: string): Promise<string> | null {
+  if ((ISSUE_SAID.test(text) || NOTE_SAID.test(text)) && UNTIL_SAID.test(text)) return null; // to Wanda, who reads the end time
   const issue = ISSUE_SAID.exec(text);
   if (issue && issue[1].trim().length > 1) return addNoteHere(issue[1].trim(), "issue");
   const note = NOTE_SAID.exec(text);
