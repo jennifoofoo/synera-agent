@@ -70,7 +70,7 @@ from urllib.parse import parse_qs, urlparse
 from building_agent.knowledge import DEFAULT_ROOT as KNOWLEDGE_ROOT
 from building_agent.knowledge import KnowledgeError, KnowledgeStore
 from building_agent.pace_guide import pace_kwargs, without_tick_keys
-from building_agent.structured import located_entries
+from building_agent.structured import located_entries, located_spaces
 from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import BuildingMap, MapError
 from web import api, campus_api, knowledge_api, level4_api, speech, transfer
@@ -342,14 +342,18 @@ class App:
                         **result,
                         "opened": opened,
                         "located": [],
+                        "located_spaces": [],
                         "state": api.state_view(session),
                         "level4": level4,
                     }
                 located = [] if result.get("error") else located_entries(session.map, result.get("reply", ""))
+                here_space = (session.position or {}).get("space_id")
+                rooms = [] if result.get("error") else located_spaces(session.map, result.get("reply", ""), here_space)
                 knowledge = knowledge_api.chat_fields(session.map, key)
                 return 200, {
                     **result,
                     "located": located,
+                    "located_spaces": rooms,
                     **knowledge,
                     "state": api.state_view(session),
                     "level4": level4,

@@ -644,6 +644,13 @@ export const useTwin = create<TwinState>((set, get) => ({
         const ids = reply.located.map((entry) => entry.asset_id);
         get().setHighlight("found", { ids, colour: "#004fab" });
         get().flyTo(ids[0]);
+      } else if (!newRoute && !reply.state?.guide?.active && reply.located_spaces?.length) {
+        // "Where is Project Room West?", an event's room: the reply names rooms only; show them (floor included).
+        const ids = reply.located_spaces.map((entry) => entry.space_id).filter((id) => get().model?.spaceById.has(id));
+        if (ids.length) {
+          get().setHighlight("found", { ids, colour: "#004fab" });
+          get().flyTo(ids[0]);
+        }
       }
       return reply;
     } catch (error) {

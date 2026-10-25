@@ -210,6 +210,9 @@ export interface ChatReply {
   error?: string;
   state?: BuildingState;
   located?: Located[];
+  /** Rooms the reply names, in its order (server: building_agent/structured.located_spaces): highlighted and flown
+   * to when the turn found no thing and drew no new route. */
+  located_spaces?: { space_id: string; space_name: string; floor_id: string; floor_level: number }[];
   selection_ignored?: string;
   here_ignored?: string;
   here_note?: string;

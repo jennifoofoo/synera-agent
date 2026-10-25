@@ -77,3 +77,28 @@ def test_several_numbers_on_the_answer_line_are_flagged():
     flagged = structured_entry("q", "count", bm, "Answer: 13 desks on floor 0")
     assert flagged["warnings"]
     assert "warnings" not in structured_entry("q", "count", bm, "Answer: 13")
+
+
+def test_located_spaces_longest_name_first_and_own_room_excluded():
+    from types import SimpleNamespace
+
+    from building_agent.structured import located_spaces
+
+    floors = {"F0": {"level": 0}, "F1": {"level": 1}}
+    spaces = {
+        "a": {"id": "a", "name": "Project Room West", "floor_id": "F0"},
+        "b": {"id": "b", "name": "Project Room", "floor_id": "F0"},
+        "c": {"id": "c", "name": "Foyer", "floor_id": "F0"},
+        "t1": {"id": "t1", "name": "Toilets", "floor_id": "F1"},
+        "t0": {"id": "t0", "name": "Toilets", "floor_id": "F0"},
+        "k": {"id": "k", "name": "Kitchenette", "floor_id": "F1"},
+    }
+    bm = SimpleNamespace(spaces=spaces, floors=floors)
+
+    def ids(reply, exclude=None):
+        return [entry["space_id"] for entry in located_spaces(bm, reply, exclude)]
+
+    assert ids("Project Room West is on the Ground floor, next to the Foyer.", "c") == ["a"]
+    assert ids("Go via the Project Room to the toilets.") == ["b", "t0", "t1"]
+    assert ids("The Kitchenettes are closed. Kitchenette on Floor 1.") == ["k"]
+    assert ids("Nothing here.") == []

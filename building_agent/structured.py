@@ -4,6 +4,8 @@ The kit's warm-up scorer reads the map state after a conversation (last route, l
 number from the reply for counts. The Sunday PDF asks for the same facts as data: the located item or room id,
 the route as an ordered list of node ids and the length in metres. One function serves both formats."""
 
+import re
+
 from benchmark.score import committed_answer, numbers_in
 from starter_agent.building_map import BuildingMap
 
@@ -42,6 +44,48 @@ def located_entries(bm: BuildingMap, reply: str = "") -> list[dict]:
                 "floor_level": bm.floors[asset["floor_id"]]["level"],
             }
         )
+    return entries
+
+
+MAX_LOCATED_SPACES = 6
+
+
+def located_spaces(bm: BuildingMap, reply: str, exclude: str | None = None) -> list[dict]:
+    """Rooms the reply names, in the order it names them, for the page (highlight and camera; no facts change).
+
+    'Where is Project Room West?', an event's room or 'the Kitchenette on Floor 1' only exist as text: the page had
+    nothing to show. Longest names win ('Project Room West' is not also 'Project Room'); a name several rooms share
+    gives all of them. `exclude` is the person's own room (a reply says 'from the Foyer')."""
+    text = reply.casefold()
+    names = sorted(
+        {space["name"].strip() for space in bm.spaces.values() if len(str(space.get("name") or "").strip()) >= 3},
+        key=len,
+        reverse=True,
+    )
+    taken = [False] * len(text)
+    hits: list[tuple[int, str]] = []
+    for name in names:
+        for match in re.finditer(rf"(?<!\w){re.escape(name.casefold())}(?!\w)", text):
+            if any(taken[match.start() : match.end()]):
+                continue
+            taken[match.start() : match.end()] = [True] * (match.end() - match.start())
+            hits.append((match.start(), name))
+    entries: list[dict] = []
+    for _, name in sorted(hits):
+        rooms = sorted(
+            (s for s in bm.spaces.values() if str(s.get("name") or "").strip() == name and s["id"] != exclude),
+            key=lambda s: (bm.floors[s["floor_id"]]["level"], s["id"]),
+        )
+        for space in rooms:
+            if len(entries) < MAX_LOCATED_SPACES and all(e["space_id"] != space["id"] for e in entries):
+                entries.append(
+                    {
+                        "space_id": space["id"],
+                        "space_name": space["name"],
+                        "floor_id": space["floor_id"],
+                        "floor_level": bm.floors[space["floor_id"]]["level"],
+                    }
+                )
     return entries
 
 

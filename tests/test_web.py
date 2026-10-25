@@ -509,3 +509,18 @@ def test_tunnel_origin_is_allowed_only_when_switched_on_and_same_origin(monkeypa
     assert not server.tunnel_origin("https://a-b.trycloudflare.com", "evil.example.com")
     assert not server.tunnel_origin("http://a-b.trycloudflare.com", "a-b.trycloudflare.com")
     assert not server.tunnel_origin("https://evil.example.com", "evil.example.com")
+
+
+def test_chat_reply_carries_the_rooms_the_reply_names(app, key, monkeypatch):
+    """Regression (phone verifier): 'Where is Project Room West?' or an event's room came back with located=[] and
+    the map did not move. The reply's named rooms come back as located_spaces (the page highlights and flies)."""
+    bm = app.session(key).map
+    room = max((s for s in bm.spaces.values() if len(s["name"] or "") >= 3), key=lambda s: len(s["name"]))
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    monkeypatch.setattr(
+        "web.chat.ChatAdapter.ask", lambda adapter, text: {"reply": f"{room['name']} is here.", "backend": "fake"}
+    )
+    _, reply = app.post("/api/chat", {"building": key, "message": "where is it?"})
+    assert reply["located_spaces"][0]["space_id"] == room["id"]
+    assert reply["located_spaces"][0]["floor_id"] == room["floor_id"]
