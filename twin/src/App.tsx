@@ -16,6 +16,7 @@ import { Omnibox } from "./ui/Omnibox";
 import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
+import { TapToHear } from "./ui/TapToHear";
 import { Planner } from "./ui/Planner";
 import { Round, RoundCard } from "./ui/Round";
 import { SIDEBAR_MIN_WIDTH, Sidebar, SidebarExpand, useMinWidth, useReframeOnColumn, useSidebar } from "./ui/Sidebar";
@@ -89,6 +90,7 @@ export function App() {
       <NewBuilding />
       <KeyHelp />
       <TiltHint />
+      <TapToHear />
       {loading && <div className="overlay">Loading {building?.name ?? "building"}…</div>}
       {error && <div className="overlay error">{error}</div>}
     </div>

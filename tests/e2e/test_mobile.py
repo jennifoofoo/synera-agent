@@ -343,9 +343,11 @@ def test_audio_unlock(open_page):
     page.wait_for_timeout(300)
     second = page.evaluate("() => window.__plays")
     assert second > first, "a refused unlock is not tried again on the next tap"
+    # Changed on purpose (iPhone: the second reply was silent): iOS can lose the unlock after a mic session, so every
+    # later tap re-primes the shared element with the silent clip while nothing is playing.
     page.touchscreen.tap(page.viewport_size["width"] / 2, page.viewport_size["height"] / 3)
     page.wait_for_timeout(300)
-    assert page.evaluate("() => window.__plays") == second, "unlock keeps playing after it went through"
+    assert page.evaluate("() => window.__plays") > second, "a later tap does not re-prime the audio element"
 
 
 # ---------- chat and keyboard ----------
