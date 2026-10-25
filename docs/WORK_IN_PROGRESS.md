@@ -202,3 +202,12 @@ Vorschlag für den Merge nach `main`: alles auf einmal (Basis + UI-Fixes + Runde
 
 ## Entschieden (Leonie, Sonntag ~07:45): Produktname
 **"Wanda – the building that talks back"** (so schon in `docs/submission/FORM_TECH_TEXT.md` und als Claim im Video). Bitte überall gleich verwenden: Video-Titel und Abspann, Formular, Pitch-Folie, ggf. Seitentitel.
+
+## Jennifer an Leonie (Sonntag 08:20): Urban Colab wird geometrisch aufgeräumt, bitte `building.json` gerade nicht anfassen
+Jennifers Sitzung arbeitet auf **`fix/mucl-geometry`** an `demo/buildings/plan-89323a15/building.json` (nur diese Datei plus ein Test):
+- Überlappungen weg (EG 9 Raumpaare, z. B. Flur Süd mit Lager und Treppe, Foyer mit Auditorium; 1. OG 8, z. B. Flur mit Terrasse). Flure werden Rechtecke, Räume werden aus ihnen herausgeschnitten.
+- Schräge Kanten und das Fünfeck an Flur Nord gerade gezogen.
+- Ausgänge nach dem Fluchtplan ergänzt (heute 2, auf dem Plan 8: 5 nach Süden, 2 nach Norden, 1 Nordost).
+- Türen gegen die Plan-Fotos geprüft, auch deine zwei Funde (Flur West → Treppe durch ELT/EDV/Umkleide, Project Room → Foyer 55 m).
+- **Alle Raum-, Tür- und Geräte-IDs bleiben gleich** (`demo_seed.py`, `test_demo_urban_colab.py`). Die Längen der Runde und der Routen ändern sich (kürzer, gerader), bitte Zahlen im Drehbuch danach neu nehmen.
+Fertig etwa 09:15, dann Preflight plus Routen-Check und Merge nach `main`; Meldung hier.
