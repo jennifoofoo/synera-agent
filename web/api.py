@@ -34,11 +34,20 @@ class RecordingMap(BuildingMap):
         return result
 
     def remember_route(
-        self, start: str, destination: str, step_free: bool, via, result, start_point=None, destination_point=None
+        self,
+        start: str,
+        destination: str,
+        step_free: bool,
+        via,
+        result,
+        start_point=None,
+        destination_point=None,
+        via_points=None,
     ) -> None:
         request = {
             "start_point": list(start_point) if start_point else None,
             "destination_point": list(destination_point) if destination_point else None,
+            "via_points": [list(p) if p else None for p in via_points] if via_points else None,
             "start": start,
             "destination": destination,
             "step_free": step_free,
@@ -64,11 +73,21 @@ def record_people_routes() -> None:
         return
 
     def recorded_route(
-        bm, start, destination, step_free=False, via=None, start_point=None, start_floor=None, destination_point=None
+        bm,
+        start,
+        destination,
+        step_free=False,
+        via=None,
+        start_point=None,
+        start_floor=None,
+        destination_point=None,
+        via_points=None,
     ):
-        result = people_route(bm, start, destination, step_free, via, start_point, start_floor, destination_point)
+        result = people_route(
+            bm, start, destination, step_free, via, start_point, start_floor, destination_point, via_points
+        )
         if isinstance(bm, RecordingMap):
-            bm.remember_route(start, destination, step_free, via, result, start_point, destination_point)
+            bm.remember_route(start, destination, step_free, via, result, start_point, destination_point, via_points)
         return result
 
     recorded_route.records_route_requests = True
@@ -118,6 +137,7 @@ class Session:
             "via": via,
             "start_point": recorded.get("start_point") if recorded else None,
             "destination_point": recorded.get("destination_point") if recorded else None,
+            "via_points": recorded.get("via_points") if recorded else None,
         }
         planned = getattr(self.map, "planned_round", None)  # plan_round's stops, so the page can guide stop by stop
         if planned and planned.get("route") is route:
@@ -361,9 +381,11 @@ def route_view(
     via=None,
     start_point=None,
     destination_point=None,
+    via_points=None,
 ) -> dict:
     """A route the page asks for: remembered (newest wins over the chat agent's), then drawn.
-    start_point / destination_point are [x, y] in model metres, already checked against their rooms.
+    start_point / destination_point are [x, y] in model metres, already checked against their rooms; via_points
+    (one per via stop, None for the room) only come from plan_round (the devices of a round).
     Step-free mode (session.step_free) makes every route step-free, whatever the request says."""
     step_free = bool(step_free) or session.step_free
     via = [stop for stop in via or [] if stop]
@@ -375,9 +397,10 @@ def route_view(
         "via": via,
         "start_point": start_point,
         "destination_point": destination_point,
+        "via_points": via_points,
     }
     session.route_version += 1
-    return draw_route(session, start, destination, step_free, via, start_point, destination_point)
+    return draw_route(session, start, destination, step_free, via, start_point, destination_point, via_points)
 
 
 def round_view(
@@ -427,7 +450,14 @@ def round_view(
     via = planned["via"]
     destination = info["start"] if return_to_start else info["stops"][-1]["space_id"]
     route = route_view(
-        session, info["start"], destination, step_free, via, info["start_point"], planned["destination_point"]
+        session,
+        info["start"],
+        destination,
+        step_free,
+        via,
+        info["start_point"],
+        planned["destination_point"],
+        planned["via_points"],
     )
     session.route_request["round"] = info
     return {"ok": True, **result, "info": info, "route": route}
@@ -441,6 +471,7 @@ def draw_route(
     via: list[str],
     start_point=None,
     destination_point=None,
+    via_points=None,
 ) -> dict:
     """Shortest route in the people model (the one the agent's find_route and give_directions use), plus per-floor
     polylines (start anchor -> doors -> end anchor) and floor changes.
@@ -449,7 +480,14 @@ def draw_route(
     kept = (bm.last_route, getattr(bm, "last_route_request", None), list(getattr(bm, "route_requests", None) or []))
     try:
         result = people_route(
-            bm, start, destination, step_free, via, start_point=start_point, destination_point=destination_point
+            bm,
+            start,
+            destination,
+            step_free,
+            via,
+            start_point=start_point,
+            destination_point=destination_point,
+            via_points=via_points,
         )
         used = list(bm.last_route_points)  # the kit route below overwrites it
         kit = kit_route(bm, start, destination, step_free, via)
@@ -460,10 +498,19 @@ def draw_route(
     stops = [result.start_space_id, *[bm.resolve_space(stop) for stop in via], result.destination_space_id]
     # the same checked (maybe moved in) points the route used
     ends = (used[0][1] if start_point else None, used[-1][1] if destination_point else None)
-    legs = route_legs(bm, stops, step_free, result.space_path, ends[0], ends[1])
+    middle = None
+    if via_points:  # the same checked points the route used
+        given = routing.stop_points(stops, None, via_points, None)[1:-1]
+        middle = [None if p is None else routing.check_point(bm, stop, p) for stop, p in zip(stops[1:-1], given)]
+    legs = route_legs(bm, stops, step_free, result.space_path, ends[0], ends[1], middle)
     line_stops = stops if legs is not None else [stops[0], stops[-1]]
     geometry = route_geometry(
-        bm, line_stops, legs if legs is not None else anchor_legs(bm, result.space_path), ends[0], ends[1]
+        bm,
+        line_stops,
+        legs if legs is not None else anchor_legs(bm, result.space_path),
+        ends[0],
+        ends[1],
+        middle if legs is not None else None,
     )
     return {
         "ok": True,
@@ -506,6 +553,7 @@ def current_route(session: Session) -> dict | None:
             request["via"],
             request.get("start_point"),
             request.get("destination_point"),
+            request.get("via_points"),
         )
         return {**drawn, "round": request["round"]} if request.get("round") else drawn
     except MapError as error:
@@ -595,10 +643,11 @@ def route_legs(
     space_path: list[str],
     start_point=None,
     destination_point=None,
+    via_points=None,
 ) -> list[list[tuple]] | None:
     """The door and connector nodes of each leg, from the same graph and search as routing.route (which only
     returns spaces). None if there is none; the line then runs through room anchors."""
-    return routing.leg_portals(bm, step_free, stops, start_point, destination_point)
+    return routing.leg_portals(bm, step_free, stops, start_point, destination_point, via_points)
 
 
 def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:
@@ -619,21 +668,28 @@ def anchor_legs(bm: BuildingMap, space_path: list[str]) -> list[list[tuple]]:
 
 
 def route_geometry(
-    bm: BuildingMap, stops: list[str], legs: list[list[tuple]], start_point=None, destination_point=None
+    bm: BuildingMap,
+    stops: list[str],
+    legs: list[list[tuple]],
+    start_point=None,
+    destination_point=None,
+    via_points=None,
 ) -> dict:
     """Drawable segments per floor plus markers where the route changes floor.
 
     The people model walks door to door: the line starts at the start room's anchor, runs through every door
     (and connector stop, which sits at its room's anchor), touches the anchor of each via stop, and ends at the
     destination's anchor. Walking outside between two entrances is its own dashed segment. An exact start (end)
-    point replaces the first (last) anchor vertex, so the line begins where the person stands.
+    point replaces the first (last) anchor vertex, so the line begins where the person stands. A via stop with an
+    exact point (a round's device) is drawn at that point instead of its room's anchor.
 
     Drawing only (web/route_draw.py): a room anchor that sits on an asset moves to the nearest free point, and
     the line ends (and starts) at the door of a big hall or zone instead of crossing it to its anchor (never at an
     exact point)."""
     path: list[tuple] = [("x", start_point, stops[0]) if start_point else ("a", None, stops[0])]
-    for stop, nodes in zip(stops[1:], legs, strict=True):
-        path += [*nodes, ("a", None, stop)]
+    middle = [*routing.stop_points(stops, None, via_points, None)[1:-1], None]
+    for stop, nodes, point in zip(stops[1:], legs, middle, strict=True):
+        path += [*nodes, ("x", point, stop) if point is not None else ("a", None, stop)]
     if destination_point:
         path[-1] = ("x", destination_point, stops[-1])
     path = trim_big_room_ends(bm, path)

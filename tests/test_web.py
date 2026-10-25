@@ -571,3 +571,24 @@ def test_chat_reply_carries_the_rooms_the_reply_names(app, key, monkeypatch):
     _, reply = app.post("/api/chat", {"building": key, "message": "where is it?"})
     assert reply["located_spaces"][0]["space_id"] == room["id"]
     assert reply["located_spaces"][0]["floor_id"] == room["floor_id"]
+
+
+def test_round_line_runs_through_every_device_and_is_as_long_as_the_round(app):
+    """The drawn round is the legs device to device (via stops with via_points): every device lies on the line,
+    route.length_m equals total_m, and a two-floor round still has its floor change."""
+    from shapely.geometry import LineString, Point
+
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    for area in ("Ground floor", ""):
+        _, reply = app.post("/api/round", {"building": key, "type": "fire extinguisher", "area": area, "start": start})
+        planned, route = reply["round"], reply["state"]["route"]
+        assert route["length_m"] == pytest.approx(planned["total_m"], abs=0.1)
+        for stop in planned["info"]["stops"]:
+            floor_id = bm.assets[stop["asset_id"]]["floor_id"]
+            lines = [s["points"] for s in route["segments"] if s["floor_id"] == floor_id and len(s["points"]) > 1]
+            gap = min(LineString(points).distance(Point(stop["position"])) for points in lines)
+            assert gap < 0.3, (stop["name"], gap)
+    assert {stop["floor"] for stop in planned["stops"]} == {"Ground floor", "Floor 1"}
+    assert route["floor_changes"]
