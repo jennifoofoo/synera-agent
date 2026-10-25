@@ -42,6 +42,21 @@ def public(fact: Fact, key: str) -> dict:
     return data
 
 
+def chat_fields(bm, key: str) -> dict:
+    """What facts_here found this turn, for the page: facts with photo URLs, and the photo to open."""
+    facts = []
+    for found in getattr(bm, "found_facts", None) or []:
+        data = dict(found)
+        data["photo"] = photo_url(key, data["id"]) if data.get("photo") and data.get("id") else None
+        facts.append(data)
+    shown = getattr(bm, "open_photo", None)
+    fact_id = shown.get("fact_id") if isinstance(shown, dict) else None
+    return {
+        "facts": facts,
+        "open_photo": {"fact_id": fact_id, "photo_url": photo_url(key, fact_id)} if fact_id else None,
+    }
+
+
 def first(query: dict, name: str) -> str | None:
     value = (query.get(name) or [None])[0]
     return value if value not in (None, "") else None

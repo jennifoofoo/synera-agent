@@ -343,7 +343,14 @@ class App:
                         "level4": level4,
                     }
                 located = [] if result.get("error") else located_entries(session.map, result.get("reply", ""))
-                return 200, {**result, "located": located, "state": api.state_view(session), "level4": level4}
+                knowledge = knowledge_api.chat_fields(session.map, key)
+                return 200, {
+                    **result,
+                    "located": located,
+                    **knowledge,
+                    "state": api.state_view(session),
+                    "level4": level4,
+                }
         with self.lock:
             session = self.session(key)
             if path == "/api/route":
