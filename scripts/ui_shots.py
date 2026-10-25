@@ -31,9 +31,7 @@ WAIT_MODEL = (
     "() => !!(window.__twinStore && window.__twinStore.getState().model && window.__twinControls"
     " && window.__twinControls.current)"
 )
-WAIT_ROUTE = (
-    "() => { const s = window.__twinStore.getState().state; return !!(s && s.route && s.route.ok); }"
-)
+WAIT_ROUTE = "() => { const s = window.__twinStore.getState().state; return !!(s && s.route && s.route.ok); }"
 SILENT = "(() => { try { if (window.speechSynthesis) window.speechSynthesis.speak = () => {}; } catch (e) {} })();"
 
 
