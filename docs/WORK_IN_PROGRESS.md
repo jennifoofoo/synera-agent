@@ -102,3 +102,11 @@ Vorschlag, eine Zeile in `Card.tsx`, du entscheidest:
 - A: Während eine Runde aktiv ist (`inRound()` aus `twin/src/round/round.ts`), die normale Routenkarte ausblenden.
 - B: "Guide me" startet bei aktiver Runde die Runden-Führung (`startRound()`), sonst wie bisher.
 Leonie empfiehlt A (weniger Knöpfe).
+
+## Leonie: Prüfrunde ist gepusht (Weg A aus `docs/specs/inspection-round.md`)
+Branch **`feat/inspection-round-and-notes`** (auf aktuellem `main`, 822dc44) enthält alles in einem:
+- `feat/twin-round`: Seite, Runde planen/zeichnen, Station für Station, "Try a door" (Demo-Link: `#round=fire%20extinguisher&area=Ground%20floor&building=train/proc-factory-train-015&door=proc-factory-train-015-F0-S002,proc-factory-train-015-F0-S016`, 5 Stopps, 100 m → 62 m).
+- `feat/agent-plan-round`: Werkzeug `plan_round` (`building_agent/round_tools.py`, eine Zeile in `tools.py`, eine Prompt-Regel in `agent.py`), 15 Unit-Tests, `tests/live/test_round.py`, Review-Agent ohne Blocker. Live: "Inspection round: all fire extinguishers on the ground floor. I start at the entrance in Main aisle H-B3." → ein Aufruf, 6,5 s, 99,1 m (Seite sagt 100 m, Start Raummitte statt Eingangspunkt).
+- `feat/twin-notes`: Notizen/Probleme mit Foto als Fakten nach `docs/specs/place-knowledge.md`, nutzt automatisch `/api/facts` (sonst IndexedDB), Pins, Verlauf, Vorlesen beim Begleiten, Einsatzprotokoll.
+- Hey Wanda in `handsFree.ts`: "done/erledigt" hakt die Station ab, "how many left", "note:/merk dir:", "problem:", "what's here", "finished/fertig" (Protokoll).
+Noch offen vor `main`: `scripts/check.sh` auf ruhigem Rechner (einziger roter Test war `test_impact.py::test_sweep_over_all_buildings` mit 117 s statt 90 s unter Last), volle Live-Suite, Testantworten byte-gleich, Entscheidung A zu zwei Startknöpfen (`inRound()` aus `twin/src/round/round.ts` in `ui/Card.tsx`). Sprach-Notizen speichern heute direkt (ohne Karte und Ja); sobald `remember_here` (K2) da ist, kann der Notiz-Teil des Einhängers raus.
