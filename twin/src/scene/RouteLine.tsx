@@ -180,7 +180,7 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
         points={points}
         color={COLOURS.routeGlow}
         lineWidth={casingWidth}
-        transparent={guided}
+        transparent
         opacity={guided ? 0.6 : 1}
         dashed
         dashSize={total}
@@ -206,8 +206,8 @@ export function RouteLine({ route, guideSegments, model, floorY, onlyFloor, redu
       <Line ref={flow} points={points} color={COLOURS.routeGlow} lineWidth={FLOW_PX} transparent opacity={0} dashed dashSize={FLOW_DASH_M} gapSize={FLOW_GAP_M} {...depth} renderOrder={21.5} />
       {legPoints && (
         <>
-          <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} {...depth} renderOrder={22} />
-          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} {...depth} renderOrder={23} />
+          <Line points={legPoints} color={COLOURS.routeGlow} lineWidth={casingWidth} transparent {...depth} renderOrder={22} />
+          <Line points={legPoints} color={lineColour} lineWidth={lineWidth} transparent {...depth} renderOrder={23} />
         </>
       )}
       {/* ends: constant size on screen. The start is a paper dot with a blue ring (or nothing when "You are here"
@@ -265,8 +265,8 @@ function DestinationPin({ colour, reducedMotion }: { colour: string; reducedMoti
   const pop = useRef<THREE.Group>(null);
   const born = useRef(performance.now());
   useFrame(({ invalidate }) => {
-    if (!pop.current || reducedMotion) return;
-    const t = (performance.now() - born.current) / 1000 / POP_S;
+    if (!pop.current) return;
+    const t = reducedMotion ? 1 : (performance.now() - born.current) / 1000 / POP_S;
     if (t >= 1) {
       pop.current.scale.setScalar(1);
       return;

@@ -157,7 +157,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.boundaryFriction = 0.2;
     invalidate();
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
-  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height]);
+  }, [bounds, size, topY, flat, invalidate, camera, model, viewport.width, viewport.height, profile]);
 
   // Entering 2D or changing the floor in 2D frames the focused floor, north up (the plan is axis-aligned; the
   // label layout in Labels.tsx assumes it too). Q/E and a right drag may still turn it, Home turns it back.

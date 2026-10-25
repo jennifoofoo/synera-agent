@@ -24,6 +24,8 @@ button {
   transition: background-color var(--t-fast), box-shadow var(--t-fast), color var(--t-fast);
 }
 button:hover { background: var(--hairline-strong); }
+/* glass buttons on the canvas: hover brightens to solid white, never a dark wash */
+.recenter:hover, .planner-toggle:hover, .campus-recenter:hover, .campus-view-toggle:hover, .hf-btn:hover, .building-name:hover { background: var(--surface); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 button.active { background: var(--signal-soft); box-shadow: inset 0 0 0 1.5px var(--signal); }
 button.danger { box-shadow: inset 0 0 0 1px var(--danger); color: var(--danger); }
@@ -99,7 +101,7 @@ button.x:hover { color: var(--text); background: transparent; }
 }
 /* 2D map: graphite text with a paper halo, no box */
 .label.label-plan {
-  background: transparent; border: 0; padding: 0; color: var(--ink); font-size: 12px; font-weight: 500;
+  background: transparent; border: 0; box-shadow: none; padding: 0; color: var(--ink); font-size: 12px; font-weight: 500;
   text-shadow: 0 0 3px var(--paper), 0 0 3px var(--paper), 0 0 2px var(--paper), 0 0 2px var(--paper);
 }
 /* 2D: machine names (near) are smaller and grey; landmarks of the directions are ink and a touch bolder */
