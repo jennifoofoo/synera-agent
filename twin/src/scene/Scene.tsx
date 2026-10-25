@@ -10,6 +10,7 @@ import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
 import { FollowCam } from "./FollowCam";
+import { Declutter } from "./Declutter";
 import { FloorRise } from "./FloorRise";
 import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
@@ -89,6 +90,7 @@ function Building({ model }: { model: BuildingModel }) {
       <FactPins model={model} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
       <FollowCam model={model} floorY={floorY} />
+      <Declutter />
     </group>
   );
 }
