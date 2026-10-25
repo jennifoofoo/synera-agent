@@ -68,6 +68,41 @@ describe("planRound", () => {
     expect(useRound.getState()).toMatchObject({ area: "Ground floor", startId: "S1", error: null });
   });
 
+  it("keeps the newest choice when an older plan answers later, and shows the round's floor", async () => {
+    setUp();
+    let slow: (value: { round: PlannedRound; state: BuildingState }) => void = () => {};
+    vi.spyOn(api, "round")
+      .mockReturnValueOnce(new Promise((resolve) => (slow = resolve)))
+      .mockResolvedValueOnce({ round: serverRound(["S3", "S2"], 99.1, [60, 39.1]), state: emptyState });
+    useTwin.setState({ focusedFloorId: null });
+    const first = planRound(); // "whole building", slow
+    await planRound(); // "Floor 3", answered first
+    slow({ round: serverRound(["S2"], 871, [871]), state: emptyState });
+    await first;
+    expect(useRound.getState().plan?.lengthM).toBe(99.1);
+    expect(useTwin.getState().focusedFloorId).toBe("F0");
+  });
+
+  it("starts a one-floor round at that floor's stairs when nobody is placed", async () => {
+    setUp();
+    const upper = { id: "F3", level: 3, name: "Floor 3", elevation_m: 9, height_m: 3 };
+    const all = [...spaces, { id: "E0", name: "Foyer", floor_id: "F0", ref: null, anchor: [0, 0] }, { id: "L3", name: "Lift", floor_id: "F3", ref: null, anchor: [0, 0] }, { id: "T3", name: "Main Stairs", floor_id: "F3", ref: null, anchor: [0, 0] }];
+    const connectors = [
+      { id: "V1", kind: "lift", name: "Lift", floor_ids: ["F0", "F3"], space_ids: ["S1", "L3"], step_free: true },
+      { id: "V2", kind: "stairs", name: "Main Stairs", floor_ids: ["F0", "F3"], space_ids: ["S2", "T3"], step_free: false },
+    ];
+    const openings = [{ id: "O1", kind: "entrance", space_ids: ["E0"] }];
+    const building = { key: "b", floors: [floor, upper], spaces: all, assets, openings, connectors } as unknown as Building;
+    useTwin.setState({ building });
+    useRound.setState({ area: "Floor 3", startId: null });
+    const round = vi.spyOn(api, "round").mockResolvedValue({ round: { ok: false, error: "x" }, state: emptyState });
+    await planRound();
+    expect(round.mock.calls[0][2]).toMatchObject({ start: "T3" });
+    useRound.setState({ area: "Whole building" });
+    await planRound();
+    expect(round.mock.calls[1][2]).toMatchObject({ start: "E0" });
+  });
+
   it("shows the server's refusal and plans nothing on the page", async () => {
     setUp();
     const route = vi.spyOn(api, "route");

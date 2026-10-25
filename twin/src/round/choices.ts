@@ -2,7 +2,7 @@
 // area choices of a building and where a round starts when nobody is placed. The order itself is planned on the server
 // (POST /api/round, the same plan_round the chat agent uses).
 
-import type { Asset, Floor, Opening, Space } from "../api/types";
+import type { Asset, Connector, Floor, Opening, Space } from "../api/types";
 
 /** "Fire extinguishers", "fire_extinguisher" and "Fire extinguisher" are the same type. */
 export function normType(text: string): string {
@@ -44,6 +44,19 @@ export function entranceRoom(openings: Opening[], spaces: Space[] = []): string 
     return /lobby|foyer|entrance|reception/.test(kind) ? 0 : /corridor|hall/.test(kind) ? 1 : 2;
   };
   return rooms.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))[0] ?? null;
+}
+
+/** Where a round on one floor starts when nobody is placed: that floor's stairwell (or lift) space, where someone
+ * coming up arrives. Stairs before lifts, then the connector serving the most floors (the main stairs), then by id.
+ * null: the area is not one floor, or that floor has no stairs or lift (the entrance is used then). */
+export function floorStart(area: string, floors: Floor[], connectors: Connector[], spaces: Space[]): string | null {
+  const floor = floors.find((candidate) => (candidate.name || `Level ${candidate.level}`) === area);
+  if (!floor) return null;
+  const onFloor = (connector: Connector) => connector.space_ids.find((id) => spaces.find((space) => space.id === id)?.floor_id === floor.id);
+  const candidates = connectors.filter((connector) => onFloor(connector));
+  const rank = (connector: Connector) => (connector.kind === "stairs" ? 0 : 1);
+  candidates.sort((a, b) => rank(a) - rank(b) || b.floor_ids.length - a.floor_ids.length || a.id.localeCompare(b.id));
+  return candidates.length ? (onFloor(candidates[0]) ?? null) : null;
 }
 
 /** Why no round can be planned on this map, or null: no devices at all, or none of the type asked for. */

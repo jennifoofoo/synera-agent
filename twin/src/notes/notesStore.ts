@@ -472,8 +472,8 @@ function startJob(): void {
 }
 
 /** End the job and show its report. Returns the report, or null when there was nothing to report. A round that was
- * completed counts its last leg in full. */
-function endJob(quietIfShort: boolean, roundComplete = false): Job | null {
+ * completed counts its last leg in full. show false: the job ends without opening the report sheet. */
+function endJob(quietIfShort: boolean, roundComplete = false, show = true): Job | null {
   const job = useNotes.getState().job;
   if (!job) return null;
   const endedAt = Date.now();
@@ -490,8 +490,9 @@ function endJob(quietIfShort: boolean, roundComplete = false): Job | null {
   const report = { ...job, endedAt, walkedM, arrived };
   const short = endedAt - job.startedAt < MIN_JOB_MS && !job.noteIds.length;
   if (job.round) lastRoundReport = report;
-  useNotes.setState({ job: null, guide: null, report: quietIfShort && short ? null : report });
-  return quietIfShort && short ? null : report;
+  const shown = show && !(quietIfShort && short) ? report : null;
+  useNotes.setState({ job: null, guide: null, report: shown });
+  return shown;
 }
 
 export function closeReport(): void {
@@ -626,7 +627,8 @@ export function installNotes(): () => void {
       const inRound = !!useNotes.getState().job?.round || useRound.getState().guiding;
       if (!inRound && before.walkStep === null && now.walkStep !== null) startJob();
       if (now.walkStep !== null) trackStep(now.walkStep);
-      if (!inRound && before.walkStep !== null && now.walkStep === null) endJob(true);
+      // A plain route (arrived or ended) closes its job quietly: the job report is for rounds (and "finished").
+      if (!inRound && before.walkStep !== null && now.walkStep === null) endJob(true, false, false);
       updateGuide(now.walkStep);
     }
   });

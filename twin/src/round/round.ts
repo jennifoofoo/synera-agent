@@ -16,7 +16,7 @@ import type { AgentRound, Building, BuildingState, PlannedRound, Route } from ".
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { walkMinutes } from "../walkInfo";
-import { areaOptions, entranceRoom, missingDevicesNote, typeMatches } from "./choices";
+import { areaOptions, entranceRoom, floorStart, missingDevicesNote, typeMatches } from "./choices";
 
 export const ROUND_BLUE = "#004fab";
 
@@ -116,9 +116,19 @@ export const useRound = create<RoundState>(() => ({
 /** The round last drawn by this page or taken over from the chat, so the watcher below opens each round once. */
 let adoptedKey = "";
 
-function startRoom(building: Building, chosen: string | null): string | null {
-  return chosen ?? useTwin.getState().state?.position?.space_id ?? entranceRoom(building.openings, building.spaces);
+/** The start: the room picked, else where I am, else (a round on one floor) that floor's stairs, else the entrance. */
+function startRoom(building: Building, chosen: string | null, area: string): string | null {
+  return (
+    chosen ??
+    useTwin.getState().state?.position?.space_id ??
+    floorStart(area, building.floors, building.connectors, building.spaces) ??
+    entranceRoom(building.openings, building.spaces)
+  );
 }
+
+/** Each planRound call gets a number; a reply that is not the newest is dropped (a slow "whole building" plan must
+ * not overwrite the "Floor 3" plan picked right after it). */
+let planSeq = 0;
 
 /** The stops of a planned round, in its order; null when the building does not have one of its rooms. */
 function roundStops(round: AgentRound): RoundStop[] | null {
@@ -189,7 +199,7 @@ export async function planRound(): Promise<RoundPlan | null> {
     useRound.setState({ plan: null, error: null });
     return null;
   }
-  const start = startRoom(building, startId);
+  const start = startRoom(building, startId, area);
   if (!start) {
     useRound.setState({ plan: null, error: "No start room: tap “I'm here” first." });
     return null;
@@ -197,7 +207,9 @@ export async function planRound(): Promise<RoundPlan | null> {
   // Starting where I am: the first leg starts at the dot, not in the middle of the room.
   const position = useTwin.getState().state?.position;
   const startPoint = position && position.space_id === start ? (position.point ?? null) : null;
+  const seq = ++planSeq;
   const reply = await api.round(buildingKey, type, { area, start, startPoint, returnToStart });
+  if (seq !== planSeq) return useRound.getState().plan; // a newer choice was planned meanwhile: its reply counts
   const planned = reply.round;
   // The drawn round carries its stops (state.route.round): it is ours, the chat watcher below must not take it over.
   if (planned.ok) adoptedKey = agentRoundKey(buildingKey, planned.info);
@@ -213,7 +225,12 @@ export async function planRound(): Promise<RoundPlan | null> {
   }
   useRound.setState({ plan, error: null });
   showStops(plan, null);
-  useTwin.getState().requestCamera({ kind: "object", ids: [plan.startId, ...plan.stops.map((stop) => stop.spaceId)] });
+  // A round on one floor shows that floor (not the floor of an entrance below), with the start only when it is there.
+  const floors = [...new Set(plan.stops.map((stop) => stop.floorId))];
+  const startFloor = model.spaceById.get(plan.startId)?.floor_id;
+  if (floors.length === 1) useTwin.getState().focusFloor(floors[0]);
+  const withStart = floors.length !== 1 || startFloor === floors[0];
+  useTwin.getState().requestCamera({ kind: "object", ids: [...(withStart ? [plan.startId] : []), ...plan.stops.map((stop) => stop.spaceId)] });
   return plan;
 }
 

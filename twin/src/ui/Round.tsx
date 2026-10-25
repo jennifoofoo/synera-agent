@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { walkMinutes } from "../walkInfo";
-import { areaOptions, assetInArea, entranceRoom } from "../round/choices";
+import { areaOptions, assetInArea, entranceRoom, floorStart } from "../round/choices";
 import {
   assetLabel,
   cancelDoor,
@@ -131,8 +131,10 @@ export function RoundCard() {
   if (!round.open) return null;
 
   const { plan, whatIf, picking, busy, error, checked, finished, suggestion, pendingDoor } = round;
-  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings, model.building.spaces);
-  const startKind = round.startId ? null : hereId ? "Here" : "Entrance";
+  // A round on one floor starts at that floor's stairs when nobody is placed (not at the entrance floors below).
+  const floorStartId = floorStart(round.area, model.building.floors, model.building.connectors, model.building.spaces);
+  const startId = plan?.startId ?? round.startId ?? hereId ?? floorStartId ?? entranceRoom(model.building.openings, model.building.spaces);
+  const startKind = round.startId ? null : hereId ? "Here" : floorStartId ? null : "Entrance";
   const hintType = round.type || types[0]?.[0] || "fire_extinguisher";
   const hintArea = round.area && round.area !== "Whole building" ? ` on the ${round.area.toLowerCase()}` : "";
   const resume = !!plan && checked.length > 0 && !finished;
@@ -367,7 +369,7 @@ export function RoundCard() {
 }
 
 /** On top of the step sheet while a round is walked: which stop, and Done. */
-export function RoundBar() {
+export function RoundBar({ done = true }: { done?: boolean } = {}) {
   const round = useRound();
   if (!round.guiding || !round.plan) return null;
   const status = roundStatus();
@@ -385,9 +387,11 @@ export function RoundBar() {
           </>
         )}
       </span>
-      <button className="round-bar-done" onClick={() => void roundDone()} disabled={!!round.busy} title={status.returning ? "Back at the start: finish the round" : "Checked: go to the next stop"}>
-        Done
-      </button>
+      {done && (
+        <button className="round-bar-done" onClick={() => void roundDone()} disabled={!!round.busy} title={status.returning ? "Back at the start: finish the round" : "Checked: go to the next stop"}>
+          Done
+        </button>
+      )}
       <button className="link round-bar-exit" onClick={endRound} title="Leave the round (checks are kept)">
         Pause
       </button>
