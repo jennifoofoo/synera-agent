@@ -14,9 +14,9 @@ import { readable } from "../walkInfo";
 import { honestLine, useWalkMotion } from "../walkWithMe";
 import { buildFollowPath, newPathPoint, pointOnPath } from "./followPath";
 
-const WALKED_GREY = "#8a9099";
-const WALKED_OPACITY = 0.35;
-/** Above the route's own lines and flow (19 to 21.5), below the guide leg (22, 23). */
+/** Opaque, like the route itself: translucent copies of the line double-blend at its joints. */
+const WALKED_GREY = "#c9cdd3";
+/** Above the route's own lines (20, 21), below the guide leg (22, 23). */
 const WALKED_ORDER = 21.6;
 
 const closest = new THREE.Vector3();
@@ -79,8 +79,8 @@ export function WalkedLine({ points, lengths, floorY, lift, lineWidth, casingWid
   const depth = { depthTest, depthWrite: false };
   return (
     <group name="route-walked">
-      <Line ref={wash} points={points} color={COLOURS.routeGlow} lineWidth={casingWidth} transparent opacity={0.7} dashed dashSize={1e-3} gapSize={total + 1} {...depth} renderOrder={WALKED_ORDER} />
-      <Line ref={grey} points={points} color={WALKED_GREY} lineWidth={lineWidth} transparent opacity={WALKED_OPACITY} dashed dashSize={1e-3} gapSize={total + 1} {...depth} renderOrder={WALKED_ORDER + 0.05} />
+      <Line ref={wash} points={points} color={COLOURS.routeGlow} lineWidth={casingWidth} dashed dashSize={1e-3} gapSize={total + 1} {...depth} renderOrder={WALKED_ORDER} />
+      <Line ref={grey} points={points} color={WALKED_GREY} lineWidth={lineWidth} dashed dashSize={1e-3} gapSize={total + 1} {...depth} renderOrder={WALKED_ORDER + 0.05} />
     </group>
   );
 }
