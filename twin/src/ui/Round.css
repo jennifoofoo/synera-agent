@@ -71,8 +71,12 @@
 /* Phones: full width under the top bar, above the dock */
 /* Phones: compact, under the top bar, the map stays visible (the stops are numbered on the map and walked one by one) */
 /* left of the centred building name: an icon-only 44 px button (the changes pill sits under it) */
-.app.worker .round-toggle { top: 8px; left: 8px; width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; font-size: 0; }
-.app.worker .round-toggle svg { width: 20px; height: 20px; }
+/* phone: a 44 px square with the word under the check, so the icon is never the only label */
+.app.worker .round-toggle {
+  top: var(--head-y, 8px); left: calc(var(--safe-l, 0px) + 8px); width: 48px; height: 44px; min-height: 44px; padding: 0;
+  flex-direction: column; justify-content: center; gap: 1px; font-size: 12px; line-height: 1; font-weight: 600;
+}
+.app.worker .round-toggle svg { width: 18px; height: 18px; }
 .app.worker .round-panel {
   left: 10px; right: 10px; width: auto; top: 60px; gap: 8px; padding: 10px 12px 12px;
   max-height: min(52vh, calc(var(--vvh, 100dvh) - 60px - var(--dock-h, 90px) - var(--safe-b, 0px) - 16px));

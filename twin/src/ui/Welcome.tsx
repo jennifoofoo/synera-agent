@@ -68,6 +68,8 @@ export function Welcome() {
               key={text}
               type="button"
               className="welcome-chip"
+              // The card lets the map through everywhere but its chips; a scroll over a chip still zooms the map.
+              onWheel={(event) => document.querySelector("canvas")?.dispatchEvent(new WheelEvent("wheel", event.nativeEvent))}
               onClick={() => {
                 setPhase("leaving");
                 void useTwin.getState().ask(text);

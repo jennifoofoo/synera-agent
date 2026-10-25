@@ -167,6 +167,7 @@ export function NotesButton() {
           <path d="M12 3 21 8l-9 5-9-5z" />
           <path d="m3 12.5 9 5 9-5M3 16.5l9 5 9-5" />
         </svg>
+        <span>On map</span>
       </button>
     </div>
   );
