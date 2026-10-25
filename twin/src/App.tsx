@@ -17,7 +17,7 @@ import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
-import { Round } from "./ui/Round";
+import { Round, RoundCard } from "./ui/Round";
 import { SIDEBAR_MIN_WIDTH, Sidebar, SidebarExpand, useMinWidth, useSidebar } from "./ui/Sidebar";
 import { Walk } from "./ui/Walk";
 import { Welcome } from "./ui/Welcome";
@@ -56,6 +56,7 @@ export function App() {
             <>
               <CampusCard />
               <NotesDock />
+              <RoundCard />
               {walking ? <Walk /> : <Card />}
             </>
           }
@@ -75,6 +76,7 @@ export function App() {
         <div className="dock">
           <CampusCard />
           <NotesDock />
+          <RoundCard />
           {/* While walking: the step sheet and only the Talk button (say "next" while walking). */}
           {walking ? <Walk /> : <Card />}
           <Omnibox walking={walking} />
