@@ -8,7 +8,6 @@ import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
 import { acceptWalkWithMeHint, declineWalkWithMeHint, honestLine, toggleWalkWithMe, useWalkMotion, walkWithMeAvailable } from "../walkWithMe";
-import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import { RoundBar } from "./Round";
 import { inRound, roundDone } from "../round/round";
@@ -90,7 +89,6 @@ export function Walk() {
   // What is left from the current step on: the metres named in the remaining step lines, scaled to the route length.
   // Walk with me on: the module's estimate (walking metres only), shown as "about".
   const length = estimate ? Math.round(estimate.distanceLeftM) : metresLeft(steps, step, route.length_m);
-  const minutes = length !== null ? walkMinutes(length) : null;
   // The hint stands in for the switch while it shows (one "Walk with me" on the phone, not two).
   const showHint = step === 0 && !motionOn && !motionAnswered && walkWithMeAvailable();
   const end = () => {
@@ -103,17 +101,17 @@ export function Walk() {
       <section className="card card-walk" aria-label="Directions">
         <RoundBar />
         <div className="card-head">
-          <span className="card-kicker">
-            Step {step + 1} of {steps.length}
+          {/* One short line on a phone: step and metres left. Minutes add little on routes inside a building. */}
+          <span className="card-kicker walk-kicker">
+            Step {step + 1}/{steps.length}
             {length !== null && (
               <span className="card-muted">
                 {" "}
                 · {estimate ? "about " : ""}
-                <span className="walk-left">{length}</span> m left · {minutes} min
+                <span className="walk-left">{length}</span> m left
               </span>
             )}
           </span>
-          <HandsFreeButton />
           {/* One clear way out: ends the guide and clears the route (Esc does the same). */}
           <button className="walk-end" onClick={end} title="End the route (Esc)">
             End route
@@ -123,7 +121,6 @@ export function Walk() {
           <TurnIcon line={steps[step]} up={rideUp(route.floor_changes, steps, step)} />
           <p aria-live="polite">{steps[step]}</p>
         </div>
-        <HandsFreeStatus />
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>
             Back

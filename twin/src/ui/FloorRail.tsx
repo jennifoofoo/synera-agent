@@ -17,6 +17,8 @@ export function FloorRail() {
   const profile = useTwin((s) => s.profile);
   const topInset = useTwin((s) => s.topInset);
   const directionsOpen = useTwin((s) => s.directions !== null);
+  // While walking the rail keeps only the floors: no view switch, no "all floors" (the walk frames the route).
+  const walking = useTwin((s) => s.walkStep !== null);
   if (!model) return null;
   const flat = viewMode === "2d";
   const routeFloors = new Set(state?.route?.ok ? state.route.floors : []);
@@ -30,10 +32,12 @@ export function FloorRail() {
       style={directionsOpen && topInset > 0 && profile === "worker" ? ({ "--rail-top": `${topInset + 8}px` } as React.CSSProperties) : undefined}
     >
       {/* 2D/3D at every width; real phones start in 2D but may switch to 3D (no ambient occlusion there) */}
-      <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
-        {flat ? "3D" : "2D"}
-      </button>
-      {!flat && model.floors.length > 1 && (
+      {!walking && (
+        <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
+          {flat ? "3D" : "2D"}
+        </button>
+      )}
+      {!flat && !walking && model.floors.length > 1 && (
         <button
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}
           onClick={() => setFloorMode(floorMode === "exploded" ? "single" : "exploded")}

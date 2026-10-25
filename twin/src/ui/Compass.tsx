@@ -113,7 +113,8 @@ function TiltIcon({ flatter = false }: { flatter?: boolean }) {
   );
 }
 
-/** One-time hint in 3D on the laptop: "Option + drag to tilt" (remembered in localStorage). */
+/** One-time hint in 3D on the laptop: "Option + drag to tilt", shown after the first plain drag on the map (not at
+ * start, where the welcome card is), remembered in localStorage. */
 export function TiltHint() {
   const flat = useTwin((s) => s.viewMode === "2d");
   const worker = useTwin((s) => s.profile === "worker");
@@ -121,17 +122,37 @@ export function TiltHint() {
   const [show, setShow] = useState(false);
   useEffect(() => {
     if (flat || worker || !model) return;
-    let seen = false;
     try {
-      seen = localStorage.getItem(HINT_KEY) === "1";
-      localStorage.setItem(HINT_KEY, "1");
+      if (localStorage.getItem(HINT_KEY) === "1") return;
     } catch {
-      // storage blocked: show it this once anyway
+      // storage blocked: show it after the first drag anyway
     }
-    if (seen) return;
-    setShow(true);
-    const timer = setTimeout(() => setShow(false), 7000);
-    return () => clearTimeout(timer);
+    let start: { x: number; y: number } | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onDown = (event: PointerEvent) => {
+      const onMap = event.target instanceof Element && event.target.closest("canvas");
+      start = onMap && !event.altKey ? { x: event.clientX, y: event.clientY } : null;
+    };
+    const onUp = (event: PointerEvent) => {
+      if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) < 8) return;
+      start = null;
+      try {
+        localStorage.setItem(HINT_KEY, "1");
+      } catch {
+        // storage blocked
+      }
+      window.removeEventListener("pointerdown", onDown, { capture: true });
+      window.removeEventListener("pointerup", onUp, { capture: true });
+      setShow(true);
+      timer = setTimeout(() => setShow(false), 7000);
+    };
+    window.addEventListener("pointerdown", onDown, { capture: true });
+    window.addEventListener("pointerup", onUp, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", onDown, { capture: true });
+      window.removeEventListener("pointerup", onUp, { capture: true });
+      if (timer) clearTimeout(timer);
+    };
   }, [flat, worker, model]);
   if (!show || flat) return null;
   return (

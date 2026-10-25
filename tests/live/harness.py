@@ -116,7 +116,8 @@ def cache_file(
     building_directory: Path, user_turns: list[str], model: str, voice: bool = False, pace: str = "off"
 ) -> Path:
     version = (
-        agent_module.CALCULATION_RULES
+        agent_module.PERSONA
+        + agent_module.CALCULATION_RULES
         + agent_module.CONVERSATION_RULES
         + agent_module.KNOWLEDGE_RULES
         + json.dumps({name: kind.description for name, kind in load_kinds().items()}, sort_keys=True)

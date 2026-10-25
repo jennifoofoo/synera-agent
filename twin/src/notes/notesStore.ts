@@ -137,6 +137,15 @@ export const useNotes = create<NotesState>(() => ({
   dismissed: [],
 }));
 
+/** True once a name was saved on this device (the add form asks for it only before that). */
+export function authorRemembered(): boolean {
+  try {
+    return localStorage.getItem(AUTHOR_PREF) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function setAuthor(name: string): void {
   const author = name.trim() || DEFAULT_AUTHOR;
   useNotes.setState({ author });
@@ -636,6 +645,12 @@ export function installNotes(): () => void {
     const { storage, buildingKey } = useNotes.getState();
     if (storage?.kind === "server" && buildingKey) void storage.list(buildingKey).then((notes) => useNotes.setState({ notes: mergeStateFacts(notes) }), () => {});
   });
+  // The sheet never opens just because a position was set; only when the room you are now in has notes.
+  const unsubscribePosition = useTwin.subscribe((now, before) => {
+    const space = now.state?.position?.space_id ?? null;
+    if (!space || space === (before.state?.position?.space_id ?? null) || now.walkStep !== null) return;
+    if (useNotes.getState().sheet === "closed" && notesIn([space]).length) openNotes("here");
+  });
   const unsubscribeNotes = useNotes.subscribe((now, before) => {
     if (now.notes !== before.notes) updateGuide(useTwin.getState().walkStep);
   });
@@ -644,6 +659,7 @@ export function installNotes(): () => void {
     unsubscribe();
     unsubscribeRound();
     unsubscribeFacts();
+    unsubscribePosition();
     unsubscribeNotes();
   };
 }

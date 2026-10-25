@@ -20,12 +20,16 @@
 
 /* phone: the card leaves the floor rail free (right edge, 44 px at right 12 px; on its side the rail is on the left) */
 .worker .welcome { top: calc(var(--head-y) + 56px); left: calc(var(--safe-l) + 12px); right: calc(var(--safe-r) + 64px); width: auto; transform: none; }
-.worker .welcome-card { padding: 20px 16px 16px; }
+.worker .welcome-card { padding: 14px 14px 12px; max-height: 40vh; overflow: hidden; }
+.worker .welcome-sub { margin: 4px 0 10px; font-size: 14px; }
+.worker .welcome-chips { gap: 6px; }
 @media (orientation: landscape) and (max-height: 520px) {
   .worker .welcome { left: calc(var(--safe-l) + 64px); right: calc(var(--safe-r) + 12px); }
 }
-.worker .welcome-title { font-size: var(--fs-20); }
-.worker .welcome-chip { min-height: 44px; font-size: 15px; }
+.worker .welcome-title { font-size: 18px; }
+.worker .welcome-chip { min-height: 44px; padding: 4px 12px; font-size: 14px; }
+/* phone portrait: three chips, so the card does not cover most of the plan */
+@media (orientation: portrait) { .worker .welcome-chip:nth-child(n + 4) { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .welcome-card { animation: none; transition: opacity var(--t-base); }

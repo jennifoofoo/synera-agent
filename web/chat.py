@@ -52,6 +52,7 @@ class ChatAdapter:
         self.starter = None
         self.session = None
         self.saved_paths: list[Path] = []  # buildings the agent saved during the current turn (Level 4 save_building)
+        self.step_free_start = False  # the page's step-free value for an agent not created yet
         self.lock = threading.Lock()
 
     def ask(
@@ -133,6 +134,7 @@ class ChatAdapter:
                 **({"campus": campus} if campus else {}),
                 **({"knowledge": self.knowledge} if self.knowledge is not None else {}),
             )
+            self.session.guide.step_free = self.step_free_start
             self.watch_saves(self.session)
             self.add_level4_tools()
         elif campus is not getattr(self.session, "campus", None):
@@ -169,6 +171,17 @@ class ChatAdapter:
         if info is not None:  # additive: what the page needs to start its pace timer
             info.update(pace_guide.view(self.session.map, self.session.guide))
         return info
+
+    def step_free(self, page_value: bool) -> bool:
+        """Step-free mode as the agent holds it (set_step_free); before the first chat turn, the page's value."""
+        return self.session.guide.step_free if self.session is not None else page_value
+
+    def set_step_free(self, enabled: bool) -> None:
+        """The page's chip turned the mode on or off: the agent's next routes follow (no agent yet: nothing to do,
+        a new agent starts from the page's value, see ensure_session)."""
+        self.step_free_start = bool(enabled)
+        if self.session is not None:
+            self.session.guide.step_free = bool(enabled)
 
     def position_view(self) -> dict | None:
         """What state_view shows: {space_id, floor_id, point, source} or None."""

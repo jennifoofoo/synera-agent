@@ -257,24 +257,46 @@ START_WALK = """async () => {
 
 
 def test_hands_free_control_shown_once(twin):
-    """One hands-free button and at most one "Say Hey Wanda" line, in the bottom bar or (while walking) the sheet."""
+    """One voice entry point: the bottom bar has only the orb (no hands-free or stop button next to it), at most one
+    "Say Hey Wanda" line shows, and while walking the orb itself mutes and unmutes hands-free. The guide sheet has no voice controls of its own."""
     page, _ = twin
     page.evaluate("() => window.__twinStore.getState().setHandsFree(true)")
     page.wait_for_timeout(800)
-    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 0
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") <= 1
-    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .wb-stop") == 0
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .ob-talk") == 1
 
     assert page.evaluate(START_WALK), "no route found to walk"
     page.wait_for_function("() => !!document.querySelector('.card-walk')", timeout=15000)
     page.wait_for_function("() => window.__twinStore.getState().handsFree", timeout=15000)
     page.wait_for_timeout(800)
-    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
-    assert page.evaluate(VISIBLE_COUNT, ".card-walk .hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .hf-btn") == 0
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .ob-talk") == 1
+    assert page.get_attribute(".ob-fabs .ob-talk", "aria-label") == "Mute Wanda"
+    assert page.evaluate(VISIBLE_COUNT, ".card-walk .hf-btn") == 0
+    assert page.evaluate(VISIBLE_COUNT, ".card-walk .hf-status") == 0
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") <= 1
+    # While walking the bar's caption never repeats the step: only that Wanda listens or speaks, or nothing.
+    caption = page.evaluate("() => document.querySelector('.wb-text')?.textContent ?? ''")
+    assert caption in ("", "Listening…", "Speaking…"), caption
+    # While walking the map stays free: no Notes / On map buttons, no 2D/3D switch, no second label lines.
+    for selector in (".notes-fab", ".notes-layer", ".rail-view", ".label-sub"):
+        assert page.evaluate(VISIBLE_COUNT, selector) == 0, selector
 
     # After something was said, the hint does not come back.
     assert page.evaluate("(t) => window.__say(t)", "hey wanda repeat")
     page.wait_for_timeout(1500)
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") == 0 or "Hey Wanda" not in page.inner_text(".hf-status")
-    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .hf-btn") == 0
+
+    # The orb mutes hands-free while walking, and a second tap brings it back.
+    page.wait_for_function(
+        "() => document.querySelector('.ob-fabs .ob-talk')?.getAttribute('aria-label') === 'Mute Wanda'", timeout=10000
+    )
+    page.click(".ob-fabs .ob-talk")
+    page.wait_for_function("() => !window.__twinStore.getState().handsFree", timeout=5000)
+    assert page.get_attribute(".ob-fabs .ob-talk", "aria-label") == "Unmute Wanda"
+    page.click(".ob-fabs .ob-talk")
+    page.wait_for_function("() => window.__twinStore.getState().handsFree", timeout=5000)
+    assert page.get_attribute(".ob-fabs .ob-talk", "aria-label") == "Mute Wanda"

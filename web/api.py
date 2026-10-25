@@ -89,6 +89,7 @@ class Session:
     route_request: dict | None = None
     position: dict | None = None  # where the chat thinks the person is: {space_id, floor_id, point, source}
     guide_info: dict | None = None  # the leg being guided (rooms), from the chat; state_view draws it
+    step_free: bool = False  # step-free mode (the chat's set_step_free or the page chip): page routes avoid steps
     route_version: int = 0  # bumped by every route the page asks for or clears; newer page routes win
     campus: object | None = None  # web.campus_api.CampusService (shared by all sessions), or None
     knowledge: object | None = None  # building_agent.knowledge.KnowledgeStore (shared), or None
@@ -274,6 +275,7 @@ def state_view(session: Session) -> dict:
         "added_doors": [opening_summary(bm, opening_id) for opening_id in session.added_door_ids],
         "route": current_route(session),
         "position": session.position,
+        "step_free": session.step_free,
         "guide": guide_view(session),
         "campus": campus_state(session),
         **edit_state(bm),
@@ -361,7 +363,9 @@ def route_view(
     destination_point=None,
 ) -> dict:
     """A route the page asks for: remembered (newest wins over the chat agent's), then drawn.
-    start_point / destination_point are [x, y] in model metres, already checked against their rooms."""
+    start_point / destination_point are [x, y] in model metres, already checked against their rooms.
+    Step-free mode (session.step_free) makes every route step-free, whatever the request says."""
+    step_free = bool(step_free) or session.step_free
     via = [stop for stop in via or [] if stop]
     # Remember the request even if it fails, so the page shows "no route" instead of a stale line.
     session.route_request = {
@@ -390,6 +394,7 @@ def round_view(
     from building_agent.round_tools import plan_round  # imported here: keeps the web module light to import
 
     bm = session.map
+    step_free = bool(step_free) or session.step_free  # step-free mode, as for page routes
     floor_level, said = None, area.strip()
     folded = said.lower()
     if folded in ("", "all", "building", "whole building"):
@@ -760,6 +765,12 @@ def set_closed(session: Session, element: str, closed: bool) -> dict:
 def add_door(session: Session, first: str, second: str, step_free: bool = True) -> dict:
     opening = session.map.add_door(first, second, step_free=step_free)
     return {"door": opening_summary(session.map, opening["id"]), "state": state_view(session)}
+
+
+def set_step_free(session: Session, enabled: bool) -> dict:
+    """The page's step-free chip (its ×): the flag the page routes read. The server mirrors it into the chat."""
+    session.step_free = bool(enabled)
+    return {"state": state_view(session)}
 
 
 def clear_route(session: Session) -> dict:
