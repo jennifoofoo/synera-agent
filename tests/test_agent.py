@@ -12,7 +12,7 @@ def test_agent_wires_kind_tools_and_calculation_rules_without_api_key():
     assert set(load_kinds()) <= names
     assert "find_space" in names
     assert CALCULATION_RULES in agent.system[0]["text"]
-    assert agent.system[0]["text"].startswith(PERSONA)  # the agent knows her name (Wanda)
+    assert agent.system[0]["text"].endswith(PERSONA)  # the agent knows her name (Wanda), last so the rules come first
     assert "set_step_free" in names
 
 

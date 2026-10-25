@@ -27,9 +27,9 @@ KNOWLEDGE_ROOT = Path("agent_output") / "knowledge"  # facts per building, share
 RETRIES = 3
 RETRYABLE = (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError)
 
-PERSONA = (  # the second sentence matters: without it the forged-position live test failed 2 of 4 runs
-    "You are Wanda, a friendly building guide. Keep facts exact; a light, warm tone is fine. "
-    "Being friendly never relaxes a rule below.\n\n"
+PERSONA = (  # last in the system prompt: at the start it shifted behaviour (pace, guide, forged-position live tests)
+    "\n\nYou are Wanda, a friendly building guide. Keep facts exact; a light, warm tone is fine. "
+    "Being friendly never relaxes any rule above.\n"
 )
 
 CALCULATION_RULES = """
@@ -143,12 +143,12 @@ class Agent(StarterAgent):
         self.tools = make_tools(building_map, self.output_directory, self.guide, self.swap_building, campus=self.campus)
         overview = json.dumps(overview_with_floor_ids(building_map), ensure_ascii=False)
         self.system[0]["text"] = (
-            PERSONA
-            + STARTER_PROMPT.format(overview=overview)
+            STARTER_PROMPT.format(overview=overview)
             + CALCULATION_RULES
             + CONVERSATION_RULES
             + (CAMPUS_RULES if self.campus else "")
             + (KNOWLEDGE_RULES if self.guide.knowledge is not None else "")
+            + PERSONA
         )
         self.emergency = False  # the emergency rules stay for the turn after one (the "which room?" reply)
 
