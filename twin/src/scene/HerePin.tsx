@@ -121,6 +121,8 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMot
   // Walk with me: the dot shows the step estimate instead (local only, never written to state.position).
   const estimate = useWalkMotion((s) => s.estimate);
   const uncertaintyM = useWalkMotion((s) => s.uncertaintyM);
+  // The "estimated" ring and tag only while Walk with me is on; Guide me alone moves the dot along the step.
+  const motionOn = useWalkMotion((s) => s.on);
   const position = useMemo(
     () => (estimate ? { space_id: "", floor_id: estimate.floorId, point: estimate.point as Point } : known),
     [estimate, known],
@@ -303,7 +305,7 @@ export function HereDot({ model, floorY, visibleFloors, flat, colour, reducedMot
   const ringPx = Math.min(ESTIMATE_RING_MAX_PX, ESTIMATE_RING_PX + 4 * Math.max(0, uncertaintyM - 1));
   return (
     <group ref={groupRef} position={[point[0], floorY(position.floor_id), -point[1]]} name={estimate ? "walk-estimate" : "here-dot"}>
-      {estimate && !drag && (
+      {estimate && motionOn && !drag && (
         <>
           {/* soft "estimated" ring, constant size on screen like the dot (a ring in metres filled the phone screen once
               the follow-cam came close); it grows a little with the uncertainty, never past ESTIMATE_RING_MAX_PX */}
