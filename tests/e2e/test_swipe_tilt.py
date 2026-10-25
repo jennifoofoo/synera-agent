@@ -213,6 +213,22 @@ def test_swipe_down_in_3d_goes_back_to_the_plan(open_twin):
     assert not page.errors, page.errors
 
 
+def test_short_swipe_down_in_3d_still_goes_back(open_twin):
+    """A swipe down that ends about 10 degrees short of straight down goes back to the plan (phone report)."""
+    page = open_twin("phone")
+    zoom_on_floor_centre(page)
+    cx, cy = centre(page)
+    two_finger(page, (cx - 60, cy + 80), (cx + 60, cy + 80), (0, -120), (0, -120))
+    page.wait_for_timeout(800)
+    assert page.evaluate(CAMERA)["mode"] == "3d"
+    down = 60  # leaves the view at about 0.22 rad (13 degrees) from straight down, not below 0.12
+    two_finger(page, (cx - 60, cy - 120), (cx + 60, cy - 120), (0, down), (0, down), steps=24)
+    page.wait_for_timeout(800)
+    back = page.evaluate(CAMERA)
+    assert back["mode"] == "2d" and back["flat"], back
+    assert not page.errors, page.errors
+
+
 def test_button_switch_sets_no_handover(open_twin):
     page = open_twin("phone")
     zoom_on_floor_centre(page)
