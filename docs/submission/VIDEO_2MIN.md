@@ -28,7 +28,7 @@ Demo link (opens the round and the "Try a door" button): `#round=fire%20extingui
 | 0:55–1:00 | End of the round | Gisela (Talk): "Finished." Job report: 5 of 5 stops, 2 notes with photos. | report |
 | 1:00–1:25 | Diagram: voice → Wanda (agent) → tools → building graph | Voiceover: "Every fact comes from code, not from the language model: areas from polygons, shared walls, floors in 3D, door widths, door-to-door routes on Synera's route model. The model picks the tool and phrases the answer; the shortest round is computed, not guessed. That's why all 145 benchmark answers are reproducible." | |
 | 1:25–1:45 | A floor plan image turning into the twin | Voiceover: "It works on any building, even from a floor plan: every furniture symbol becomes an asset, so we tell kitchens from offices." | Level 4 |
-| 1:45–2:00 | Map full of note pins; roadmap card | Voiceover: "As easy as the maps you already use, and you just talk to it. The knowledge stays in the building. Today Gisela confirms where she is; with 6G, the building will know." Logo, team names. | |
+| 1:45–2:00 | Map full of note pins; roadmap card | Voiceover: "As easy as the maps you already use, and you just talk to it. The knowledge stays in the building. Today Gisela confirms where she is. Built today, ready for the 6G building." Logo, team names. | |
 
 Cut first if too long: the report (0:55–1:00). The what-if door (facility manager level) is not in the video; mention it in the live pitch or Q&A only.
 
