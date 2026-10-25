@@ -118,7 +118,7 @@ describe("facts", () => {
     const reply = await server.add("b", { kind: "note", anchor: base.anchor, text: "Lever", author: "Klaus" });
     expect(reply.fact.photo).toBe("/api/facts/photo?key=b&id=f-1");
     expect(reply.state).toEqual({ facts: [saved] });
-    expect(await server.undo("b", "f-1")).toEqual({ state: { facts: [] } });
+    expect(await server.undo("b", "f-1")).toEqual({ state: { facts: [] }, undoneId: "f-1" }); // the id the server removed, checked by the caller
     await expect(server.undo("b", "f-other")).rejects.toThrow();
     expect(bodies).toEqual(["f-1", "f-other"]); // the server undoes by id, so another person's note is never hit
     expect(calls.filter((c) => c.startsWith("POST"))).toEqual(["POST /api/facts", "POST /api/facts/undo", "POST /api/facts/undo"]);

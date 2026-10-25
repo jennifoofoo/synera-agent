@@ -65,7 +65,7 @@ export interface FactsStorage {
   /** Mark done: the fact gets valid_to = now and status resolved (local only; the server resolves through the chat). */
   resolve?(buildingKey: string, id: string, author: string | null): Promise<Fact>;
   /** Undo right after creating (typos); the only real delete. Returns the new state from the server, if any. */
-  undo?(buildingKey: string, id: string): Promise<{ state?: unknown } | void>;
+  undo?(buildingKey: string, id: string): Promise<{ state?: unknown; undoneId?: string } | void>;
 }
 
 /** Valid now: started, not ended, not resolved (spec "jetzt gültig"). */
@@ -254,11 +254,12 @@ export class ServerFacts implements FactsStorage {
   }
 
   /** POST /api/facts/undo with the note's id removes exactly that note if it is younger than 2 minutes, so undo
-   * never removes another person's note saved in between. */
-  async undo(buildingKey: string, id: string): Promise<{ state?: unknown }> {
+   * never removes another person's note saved in between. `undoneId` is the id the server removed (checked by the caller). */
+  async undo(buildingKey: string, id: string): Promise<{ state?: unknown; undoneId?: string }> {
     const reply = await postJson("/api/facts/undo", { key: buildingKey, id });
     if (!reply.undone) throw new Error("Too late to undo.");
-    return { state: reply.state };
+    const undone = reply.undone as { id?: unknown };
+    return { state: reply.state, undoneId: typeof undone.id === "string" ? undone.id : undefined };
   }
 }
 

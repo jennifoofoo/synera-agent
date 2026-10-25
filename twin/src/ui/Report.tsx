@@ -16,19 +16,38 @@ function notesWith(ids: string[], notes: Note[]): Note[] {
 
 function walkedLine(job: Job): string | null {
   if (job.walkedM === null) return null;
-  if (job.lengthM !== null && !job.arrived) return `${job.walkedM} m of ${job.lengthM} m`;
+  // A round: walked against its planned length (legs walked differently, e.g. a stop skipped, show here).
+  if (job.lengthM !== null && (!job.arrived || job.round)) return `${job.walkedM} m of ${job.lengthM} m`;
   return `${job.walkedM} m`;
+}
+
+/** "4 of 5" and the names checked / not checked, for a round. */
+export function stopsLine(job: Job): { count: string; checked: string[]; missed: string[] } | null {
+  if (!job.round) return null;
+  const { stops, checked } = job.round;
+  const done = new Set(checked);
+  return {
+    count: `${stops.filter((stop) => done.has(stop.spaceId)).length} of ${stops.length}`,
+    checked: stops.filter((stop) => done.has(stop.spaceId)).map((stop) => stop.name),
+    missed: stops.filter((stop) => !done.has(stop.spaceId)).map((stop) => stop.name),
+  };
 }
 
 /** The report as plain text (Copy, Share). */
 export function reportText(job: Job, notes: Note[], seen: Note[], model: BuildingModel | null, building: string | null): string {
   const where = (note: Note) => (model ? placeName(model, note.anchor.space_id, note.anchor.asset_id) : note.anchor.space_id);
   const lines = [`Job report${building ? ` · ${building}` : ""}`];
-  if (job.title) lines.push(`${job.title.startsWith("Round") ? "Round" : "Destination"}: ${job.title}${job.arrived ? " (arrived)" : job.lengthM !== null ? " (ended early)" : ""}`);
+  const stops = stopsLine(job);
+  if (job.title && stops) lines.push(`${job.title}${job.arrived ? " (complete)" : " (ended early)"}`);
+  else if (job.title) lines.push(`${job.title.startsWith("Round") ? "Round" : "Destination"}: ${job.title}${job.arrived ? " (arrived)" : job.lengthM !== null ? " (ended early)" : ""}`);
   const end = job.endedAt ?? Date.now();
   lines.push(`Time: ${clockLabel(job.startedAt)} to ${clockLabel(end)} (${durationLabel(end - job.startedAt)})`);
   const walked = walkedLine(job);
   if (walked) lines.push(`Walked: ${walked}`);
+  if (stops) {
+    lines.push(`Stops checked: ${stops.count}${stops.checked.length ? ` (${stops.checked.join(", ")})` : ""}`);
+    if (stops.missed.length) lines.push(`Not checked: ${stops.missed.join(", ")}`);
+  }
   lines.push(`Closures: ${job.closures.length ? job.closures.join(", ") : "none on the way"}`);
   if (notes.length) {
     lines.push(`Notes (${notes.length}):`);
@@ -53,6 +72,7 @@ export function Report() {
   const text = reportText(report, notes, seen, model, building);
   const end = report.endedAt ?? Date.now();
   const walked = walkedLine(report);
+  const stops = stopsLine(report);
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const copy = async () => {
@@ -108,12 +128,25 @@ export function Report() {
               <dd>{walked}</dd>
             </div>
           )}
+          {stops && (
+            <div>
+              <dt>Stops checked</dt>
+              <dd>{stops.count}</dd>
+            </div>
+          )}
           <div>
             <dt>Notes</dt>
             <dd>{notes.length}</dd>
           </div>
         </dl>
-        {report.title && (
+        {stops && (
+          <p className="card-line">
+            {stops.checked.length ? `Checked: ${stops.checked.join(", ")}` : "No stop checked"}
+            {stops.missed.length ? ` · Not checked: ${stops.missed.join(", ")}` : ""}
+            {report.closures.length ? ` · Avoided closed ${report.closures.join(", ")}` : ""}
+          </p>
+        )}
+        {report.title && !stops && (
           <p className="card-line">
             {report.arrived ? "Arrived" : report.lengthM !== null ? "Ended before the destination" : ""}
             {report.closures.length ? `${report.arrived || report.lengthM !== null ? " · " : ""}Avoided closed ${report.closures.join(", ")}` : ""}
@@ -136,7 +169,7 @@ export function Report() {
         )}
         {seen.length > 0 && (
           <p className="card-line report-seen">
-            Read on the way: {[...new Set(seen.map((note) => `${note.author} at ${model ? placeName(model, note.anchor.space_id, note.anchor.asset_id) : note.anchor.space_id}`))].join(", ")}
+            Read {stops ? "during the round" : "on the way"}: {[...new Set(seen.map((note) => `${note.author} at ${model ? placeName(model, note.anchor.space_id, note.anchor.asset_id) : note.anchor.space_id}`))].join(", ")}
           </p>
         )}
         <div className="card-actions">
