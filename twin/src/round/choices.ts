@@ -35,9 +35,15 @@ export function assetInArea(asset: Asset, area: string, floors: Floor[], spaceNa
 }
 
 /** Where a round starts when nobody is placed: the room behind the building's first entrance (by room id). */
-export function entranceRoom(openings: Opening[]): string | null {
-  const rooms = openings.filter((opening) => opening.kind === "entrance" && opening.space_ids.length).map((opening) => opening.space_ids[0]);
-  return rooms.sort()[0] ?? null;
+export function entranceRoom(openings: Opening[], spaces: Space[] = []): string | null {
+  const rooms = [...new Set(openings.filter((opening) => opening.kind === "entrance" && opening.space_ids.length).map((opening) => opening.space_ids[0]))];
+  // The main entrance: a lobby or entrance hall first, then a corridor, then any room (the first by id breaks ties).
+  const rank = (id: string) => {
+    const space = spaces.find((s) => s.id === id);
+    const kind = `${space?.room_type ?? ""} ${space?.type ?? ""} ${space?.name ?? ""}`.toLowerCase();
+    return /lobby|foyer|entrance|reception/.test(kind) ? 0 : /corridor|hall/.test(kind) ? 1 : 2;
+  };
+  return rooms.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))[0] ?? null;
 }
 
 /** Why no round can be planned on this map, or null: no devices at all, or none of the type asked for. */

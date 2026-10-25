@@ -120,7 +120,7 @@ export function RoundCard() {
   if (!round.open) return null;
 
   const { plan, whatIf, picking, busy, error, checked, finished, suggestion, pendingDoor } = round;
-  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings);
+  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings, model.building.spaces);
   const startKind = round.startId ? null : hereId ? "Here" : "Entrance";
   const hintType = round.type || types[0]?.[0] || "fire_extinguisher";
   const hintArea = round.area && round.area !== "Whole building" ? ` on the ${round.area.toLowerCase()}` : "";

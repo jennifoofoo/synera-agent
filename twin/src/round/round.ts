@@ -117,7 +117,7 @@ export const useRound = create<RoundState>(() => ({
 let adoptedKey = "";
 
 function startRoom(building: Building, chosen: string | null): string | null {
-  return chosen ?? useTwin.getState().state?.position?.space_id ?? entranceRoom(building.openings);
+  return chosen ?? useTwin.getState().state?.position?.space_id ?? entranceRoom(building.openings, building.spaces);
 }
 
 /** The stops of a planned round, in its order; null when the building does not have one of its rooms. */
