@@ -20,7 +20,7 @@ export const PIN_HEIGHT_PX = PIN_HEAD_Y_PX + PIN_HEAD_PX + 1.5; // with the pape
 
 /** How far above its marker a room label's bottom edge sits (px). */
 export const LABEL_LIFT = {
-  here: HERE_RIM_PX + BADGE_GAP_PX, // just above the dot's white rim
+  here: HERE_RIM_PX + BADGE_GAP_PX + 6, // above the dot's white rim, with room for the frame the HTML label lags behind a gliding camera
   end: PIN_HEIGHT_PX + 3, // just above the destination pin's head
   start: START_DOT_PX + 12, // just above the start dot
 };
