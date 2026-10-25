@@ -49,6 +49,11 @@ describe("Wanda's reply names facts", () => {
     expect(useFacts.getState().photo?.url).toBe("/api/facts/photo?key=k&id=f-9");
   });
 
+  it("open_photo from the server opens that photo", () => {
+    onReply({ reply: "Here.", backend: "x", facts: [fact], open_photo: { fact_id: "f-1", photo_url: "/api/facts/photo?key=k&id=f-1" } }, "can I see it?");
+    expect(useFacts.getState().photo).toEqual({ url: "/api/facts/photo?key=k&id=f-1", caption: "Valve drips" });
+  });
+
   it("a reply without facts clears the highlight", () => {
     useFacts.setState({ highlighted: ["f-1"] });
     onReply({ reply: "ok", backend: "x" }, "next");

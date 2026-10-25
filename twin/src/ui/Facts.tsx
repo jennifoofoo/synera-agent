@@ -288,7 +288,11 @@ export function onReply(reply: ChatReply, message: string): void {
     if (place) useTwin.getState().requestCamera({ kind: "point", point: place.point, floorId: place.floor_id, radius: 12 });
     if (place) useTwin.setState({ focusedFloorId: place.floor_id });
   }
-  if (PHOTO_WORDS.test(message)) {
+  if (reply.open_photo?.photo_url) {
+    const of = known.get(reply.open_photo.fact_id) ?? named.find((fact) => fact.id === reply.open_photo!.fact_id);
+    facts.showPhoto({ url: reply.open_photo.photo_url, caption: of?.text ?? "Photo" });
+  } else if (PHOTO_WORDS.test(message)) {
+    // fallback while the server does not send open_photo: the asked-for photo of a named fact or a URL in the text
     const withPhoto = named.find((fact) => fact.photo);
     const url = withPhoto?.photo ?? reply.reply.match(PHOTO_URL)?.[0];
     if (url) facts.showPhoto({ url, caption: withPhoto?.text ?? "Photo" });

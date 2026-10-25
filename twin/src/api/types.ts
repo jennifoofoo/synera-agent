@@ -211,6 +211,8 @@ export interface ChatReply {
   stale?: boolean;
   /** Place knowledge the reply is about (Wanda's fact tools): highlighted on the map like `located`. */
   facts?: (Fact | string)[];
+  /** "Show me the photo": the photo to open now. */
+  open_photo?: { fact_id: string; photo_url: string } | null;
 }
 
 export interface Status {
