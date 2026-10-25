@@ -270,8 +270,9 @@ function autoProfile(): Profile {
 
 /** Words answered on the device before any agent call, typed or spoken (registered by notes/notesStore: "note: …" and
  * "finished" in an inspection round, so a note lands on the stop's device and "finished" shows the job report). store.ts
- * cannot import notesStore (it imports this store): a hook. Returns the sentence to show, or null for the agent. */
-type LocalAnswer = (message: string) => Promise<string> | null;
+ * cannot import notesStore (it imports this store): a hook. Returns the sentence (card false: another sheet, e.g. the
+ * job report, already shows the answer), or null for the agent. */
+type LocalAnswer = (message: string) => Promise<{ text: string; card: boolean }> | null;
 let localAnswer: LocalAnswer | null = null;
 export function setLocalAnswer(answer: LocalAnswer | null): void {
   localAnswer = answer;
@@ -599,8 +600,8 @@ export const useTwin = create<TwinState>((set, get) => ({
     const local = localAnswer?.(message.trim());
     if (local) {
       set((s) => ({ chat: [...s.chat, { id: ++messageId, role: "user", text: message }], awaitingPlace: null, pendingHere: null, hereArmed: false }));
-      const text = await local;
-      set((s) => ({ chat: [...s.chat, { id: ++messageId, role: "agent", text }], replyShown: true }));
+      const { text, card } = await local;
+      set((s) => ({ chat: [...s.chat, { id: ++messageId, role: "agent", text }], replyShown: card }));
       return { reply: text, backend: "local" };
     }
     if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
