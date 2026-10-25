@@ -7,7 +7,7 @@
 // Owner: chat/search session, see ARCHITECTURE.md.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTwin, walkSteps } from "../store";
+import { useTwin } from "../store";
 import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
 import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
@@ -54,7 +54,6 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   const requestCamera = useTwin((s) => s.requestCamera);
   const handsFreeStatus = useTwin((s) => s.handsFreeStatus);
   const handsFreeHeard = useTwin((s) => s.handsFreeHeard);
-  const walkStep = useTwin((s) => s.walkStep);
 
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
@@ -351,11 +350,10 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
     return "";
   }, [chat]);
 
-  // The bar's state, most urgent first: hearing, thinking, speaking, the reply lingering, the walk step, idle.
+  // The bar's state, most urgent first: hearing, thinking, speaking, the reply lingering, guiding, idle.
   const hfHeard = handsFreeOn && handsFreeStatus === "heard";
   const followUpListening = followUpOpen && !handsFreeOn;
   const hearing = listening || hfHeard || followUpListening;
-  const step = walking && walkStep !== null ? (walkSteps()[walkStep] ?? "") : "";
   let mode: "listening" | "thinking" | "speaking" | "reply" | "idle" = "idle";
   let caption: string;
   if (hearing) {
@@ -370,8 +368,9 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   } else if (lingering && lastReply) {
     mode = "reply";
     caption = lastReply;
-  } else if (step) {
-    caption = step;
+  } else if (walking) {
+    // The step itself is the big line of the walk sheet (and the map pill): the bar only says how to talk.
+    caption = "Guiding · say “Wanda”";
   } else if (!chatAvailable && !walking) {
     caption = "Search rooms and things";
   } else {

@@ -111,3 +111,11 @@
 /* "From: Main aisle H-B3" in a place card: the "You are here" pill hides while the card is open */
 .card-from { display: flex; align-items: center; gap: 7px; }
 .card-from .here-dot { flex: none; width: 7px; height: 7px; }
+
+/* walk sheet header: "Step 1 of 7 · about 57 m left · 1 min" stays on one line beside hands-free and End route */
+.card-walk .card-head .card-kicker { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) {
+  .worker .card-walk .card-head { gap: 6px; }
+  .worker .card-walk .card-head .card-kicker { font-size: 12px; }
+  .worker .card-walk .card-head .walk-end { padding: 4px 4px; }
+}
