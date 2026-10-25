@@ -81,6 +81,9 @@ class ChatAdapter:
                 if backend == "building_agent":
                     reply = self.ask_building_agent(text, selection, here, voice, pace, tick, tick_step)
                     result = {"reply": reply, "backend": backend}
+                    guide = self.session.guide
+                    if getattr(guide, "asked_position", False) and guide.position is None:
+                        result["needs_position"] = True  # Wanda waits for a place: the page's next tap answers
                     if tick and not reply:
                         result["tick_ignored"] = True  # no guide, forged, stale or a repeat: nothing to say
                 elif tick and not text.strip():
@@ -97,6 +100,7 @@ class ChatAdapter:
         self, text: str, selection=None, here=None, voice: bool = False, pace="off", tick=False, tick_step=None
     ) -> str:
         self.ensure_session()
+        self.session.guide.asked_position = False  # set again this turn by a tool that needs the unknown position
         if tick and not text.strip():  # a tick is only a tick without words; it never reaches the model as text
             return pace_guide.run_turn(self.session, "", pace, True, tick_step, voice)
         if self.level4 is not None:
