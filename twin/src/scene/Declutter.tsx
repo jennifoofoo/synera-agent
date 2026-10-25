@@ -267,18 +267,18 @@ export function Declutter() {
     invalidate(); // one more frame: a zoom step taken while this pass waited is seen at once (phones render on demand)
   };
 
-  useFrame(({ camera, size, scene }) => {
-    if (pending.current !== null) return;
+  // Checked after the frame (like the pass): inside useFrame the controls may not have moved the camera yet, and a
+  // phone renders on demand, so a frame that came too early would leave the last zoom step unseen.
+  const tick = () => {
+    pending.current = null;
     if (settle.current > 0) {
       // a decision is under way: one more frame so labels re-rendered for it (and their transforms) are on screen
       settle.current--;
-      invalidate();
-      if (settle.current === 0) {
-        const wait = Math.max(0, THROTTLE_MS - (performance.now() - last.current));
-        pending.current = window.setTimeout(pass, wait); // after this frame's <Html> transforms are written
-      }
+      if (settle.current === 0) pass();
+      else invalidate();
       return;
     }
+    const { camera, size, scene } = state();
     const c = controlsRef.current;
     const focus = c ? c.getTarget(target) : target.set(0, 0, 0);
     const mpp = metresPerPixelOf(camera, size.width, size.height, focus);
@@ -295,6 +295,12 @@ export function Declutter() {
     labelDecision.epoch++;
     settle.current = 2;
     invalidate(); // phones render on demand
+  };
+
+  useFrame(() => {
+    if (pending.current !== null) return;
+    const wait = settle.current > 0 ? 0 : Math.max(0, THROTTLE_MS - (performance.now() - last.current));
+    pending.current = window.setTimeout(tick, wait); // after this frame's <Html> transforms are written
   });
   return null;
 }
