@@ -181,6 +181,8 @@ def test_walk_with_me_moves_the_estimate_and_never_sends_it(page):
     if len(steps) > 1 and steps[0].startswith(("Start in ", "Start at ")):
         steps = steps[1:]  # the guide leaves out the opening "Start in X" line (store.ts walkLines)
     ride = next(i for i, line in enumerate(steps) if line.startswith(("Take ", "Use ")))
+    # This test drives the switch itself; the first-time hint (which stands in for the switch) is answered already.
+    page.evaluate("() => window.__walkMotion.setState({ answered: true })")
     page.evaluate("() => window.__twinStore.getState().startWalk()")
     page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
     switch = page.get_by_role("switch", name="Walk with me")
@@ -280,12 +282,15 @@ def test_walk_hint_turns_it_on_once_and_is_not_asked_again(page):
     _start_guide(page)
     hint = page.get_by_role("group", name="Walk with me hint")
     assert hint.is_visible()
-    assert "Walk with me? I'll move along as you walk." in hint.inner_text()
+    assert page.get_by_role("switch", name="Walk with me").count() == 0, "one Walk with me control at a time"
+    assert "Walk with me?" in hint.inner_text()
+    assert len(hint.inner_text().split()) <= 6, "one short line, no explanation text on the phone"
     hint.get_by_role("button", name="Turn on").click()
     page.wait_for_function("() => window.__walkMotion.getState().on", timeout=5000)
     assert page.get_by_role("switch", name="Walk with me").is_checked()
     assert page.evaluate("() => localStorage.getItem('twin.walkWithMe')") == "1"
     assert not hint.is_visible()
+    assert page.get_by_role("switch", name="Walk with me").is_visible(), "the switch is back once answered"
     # switched off again later: still answered, the hint stays away
     page.get_by_role("switch", name="Walk with me").click()
     _restart_guide(page)

@@ -26,7 +26,9 @@
 .card-walk .walk-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .card-walk .walk-hint p { margin: 0; font-size: 13px; color: var(--ink-2); }
 .card-walk .walk-hint-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.card-walk .walk-hint-close { min-width: 32px; padding: 0 6px; background: transparent; border: 0; color: var(--ink-2); font-size: 18px; line-height: 1; }
 .worker .card-walk .walk-hint-actions button { min-height: 44px; }
+.worker .card-walk .walk-hint-close { min-width: 44px; }
 .card-walk .walk-motion-note { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); }
 .card-walk .walk-motion-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-2); }
 .card-walk .walk-motion-switch input { width: 18px; height: 18px; margin: 0; accent-color: var(--signal); }
