@@ -183,8 +183,12 @@ interface TwinState {
   followUpOpen: boolean;
   followUpHeard: string;
 
-  loadBuildings: () => Promise<void>;
-  openBuilding: (key: string) => Promise<void>;
+  /** fresh: the real page load only (App's first call), see openBuilding. */
+  loadBuildings: (opts?: { fresh?: boolean }) => Promise<void>;
+  /** fresh: before loading, the server forgets the position, route and conversation an earlier load or another tab
+   * left (POST /api/fresh). Only the page load passes it: a building opened mid-session (Level 4 save, campus leg,
+   * the building menu) keeps its chat and route. */
+  openBuilding: (key: string, opts?: { fresh?: boolean }) => Promise<void>;
   applyState: (state: BuildingState) => void;
   setProfile: (profile: Profile | null) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -318,21 +322,29 @@ export const useTwin = create<TwinState>((set, get) => ({
   followUpOpen: false,
   followUpHeard: "",
 
-  async loadBuildings() {
+  async loadBuildings(opts = {}) {
     try {
       const [buildings, status] = await Promise.all([api.buildings(), api.status()]);
       set({ buildings, chatAvailable: status.chat_available, speechAvailable: status.speech_available });
       const wanted = new URLSearchParams(location.search).get("building") ?? localStorage.getItem("twin.building");
       const first = buildings.find((b) => b.key === wanted) ?? buildings.find((b) => b.key.includes("factory")) ?? buildings[0];
-      if (first && !get().buildingKey) await get().openBuilding(first.key);
+      if (first && !get().buildingKey) await get().openBuilding(first.key, opts);
     } catch (error) {
       set({ error: `Cannot reach the API: ${(error as Error).message}` });
     }
   },
 
-  async openBuilding(key) {
+  async openBuilding(key, opts = {}) {
     set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null, walkStep: null, awaitingPlace: null });
     try {
+      if (opts.fresh) {
+        // The page load: the demo never starts with "You are here: Toilets" or a route from before.
+        try {
+          await api.fresh(key);
+        } catch {
+          /* an older server without /api/fresh: keep its state */
+        }
+      }
       const building = await api.building(key);
       const model = buildModel(building);
       localStorage.setItem("twin.building", key);
@@ -627,7 +639,7 @@ export const useTwin = create<TwinState>((set, get) => ({
         return reply;
       }
       if (reply.state) {
-        set({ state: reply.state });
+        set({ state: withPendingHere(reply.state) }); // a tap during the turn stays on screen
         if (reply.state.route?.ok && reply.state.route.floors?.length && !reply.state.guide) {
           set({ focusedFloorId: reply.state.route.floors[0] });
         }
@@ -644,6 +656,13 @@ export const useTwin = create<TwinState>((set, get) => ({
         const ids = reply.located.map((entry) => entry.asset_id);
         get().setHighlight("found", { ids, colour: "#004fab" });
         get().flyTo(ids[0]);
+      } else if (!newRoute && !reply.state?.guide?.active && reply.located_spaces?.length) {
+        // "Where is Project Room West?", an event's room: the reply names rooms only; show them (floor included).
+        const ids = reply.located_spaces.map((entry) => entry.space_id).filter((id) => get().model?.spaceById.has(id));
+        if (ids.length) {
+          get().setHighlight("found", { ids, colour: "#004fab" });
+          get().flyTo(ids[0]);
+        }
       }
       return reply;
     } catch (error) {

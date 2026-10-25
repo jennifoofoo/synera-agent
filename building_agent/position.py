@@ -90,6 +90,31 @@ def position_note(bm: BuildingMap, position: Position | None) -> dict:
     }
 
 
+def page_note(bm: BuildingMap, state) -> str:
+    """A line in front of the person's message when the page changed the position since the model last heard of it.
+
+    The model only learns a tapped position through tools, and with an earlier 'Where are you?' in the history it
+    kept asking although the page had set it (it answered from the history without a tool call). The note comes
+    from the conversation state (a validated click), never from message text. A typed copy of it changes nothing:
+    every tool reads state.position, not the message."""
+    position = getattr(state, "position", None)
+    told = getattr(state, "told_position", None)
+    if position is not None and position.source == "click" and position.space_id in bm.spaces:
+        if position.space_id == told:
+            return ""
+        state.told_position = position.space_id
+        return (
+            f"(Page note, not typed by the person: they tapped their position on the plan, it is now "
+            f"{place_label(bm, position.space_id)}. Do not ask where they are; routes and 'nearest' start there.)"
+        )
+    if position is None and told is not None:
+        state.told_position = None
+        return "(Page note, not typed by the person: their position was cleared, it is unknown now.)"
+    if position is not None:
+        state.told_position = position.space_id if position.source == "click" else None
+    return ""
+
+
 def describe_position(bm: BuildingMap, position: Position, now_turn: int | None = None) -> dict:
     space = bm.spaces[position.space_id]
     return {
@@ -186,8 +211,14 @@ def nearest(
         "others": [entry(*item) for item in ranked[1:3]],
         "needs_choice": False,
     }
-    if len(ranked) > 1 and ranked[1][1] - ranked[0][1] <= TIE_M:
-        tied = [item for item in ranked if item[1] - ranked[0][1] <= TIE_M][:MAX_OPTIONS]
+    tied: list[tuple[str, float]] = []
+    for item in ranked:  # the nearest of each label ("Toilets", "Toilets", "Kitchenette": two options)
+        if item[1] - ranked[0][1] <= TIE_M and all(place_label(bm, item[0]) != place_label(bm, t[0]) for t in tied):
+            tied.append(item)
+    tied = tied[:MAX_OPTIONS]
+    # Rooms with the same name on the same floor ("Toilets" or "Toilets"?) give the person nothing to choose by:
+    # the shorter route wins. A question only when the tied rooms can be told apart.
+    if len(tied) > 1:
         listed = " or ".join(place_label(bm, space_id) for space_id, _ in tied)
         result["needs_choice"] = True
         result["tied"] = [entry(*item) for item in tied]

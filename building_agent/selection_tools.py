@@ -18,6 +18,19 @@ def make_selection_tools(bm: BuildingMap, state) -> list:
         """The room, machine or spot the person clicked on the plan. Call it first when they say 'here', 'this',
         'it' or 'that' and a selection may exist. For placement use hint {'point': point} from the result."""
         selection = getattr(state, "selection", None)
+        position = getattr(state, "position", None)
+        if selection is None and position is not None and position.source == "click" and position.turn == state.turn:
+            # "I'm here." right after a tap: the tap set the position this turn, it is what 'here' means.
+            floor = bm.floors.get(position.floor_id)
+            return as_json(
+                {
+                    "position_tapped": True,
+                    "space_id": position.space_id,
+                    "space_name": bm.spaces[position.space_id]["name"],
+                    "floor": floor["name"] if floor else None,
+                    "note": "Nothing is selected, but the person just tapped their position here: confirm it.",
+                }
+            )
         if selection is None:
             raise ToolError(NOTHING_SELECTED)
         space = bm.spaces.get(selection.space_id) if selection.space_id else None
