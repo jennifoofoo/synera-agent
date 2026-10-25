@@ -214,8 +214,8 @@ let cameraNonce = 0;
 const prefersReducedMotion =
   typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-/** A real phone: coarse pointer AND a small screen. Only phones start in 2D and have no 3D toggle (3D is too heavy
- * there); tablets and narrow laptop windows use the phone layout but keep the 2D/3D toggle. */
+/** A real phone: coarse pointer AND a small screen. Phones start in 2D (lighter, easier to read while walking) but
+ * keep the 2D/3D toggle like tablets and narrow laptop windows; ambient occlusion stays off in the phone profile. */
 export function isPhone(): boolean {
   if (typeof window === "undefined") return false;
   return !!window.matchMedia?.("(pointer: coarse)").matches && Math.min(window.innerWidth, window.innerHeight) < 600;
@@ -327,7 +327,6 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" && isPhone() ? { viewMode: "2d" as const } : {}) });
   },
   setViewMode(viewMode) {
-    if (viewMode === "3d" && isPhone()) return; // phones are 2D only (narrow windows and tablets may use 3D)
     set({ viewMode });
   },
   setBottomInset(bottomInset) {

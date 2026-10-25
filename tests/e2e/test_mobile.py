@@ -166,12 +166,15 @@ def test_viewport_meta(open_page):
     assert "width=device-width" in content and "initial-scale=1" in content and "viewport-fit=cover" in content, content
 
 
-@audit("ok", "worker profile, 2D only, no 3D toggle")
+@audit("ok", "worker profile starts in 2D, 3D toggle available")
 def test_worker_profile_2d(open_page):
     page = open_page()
     s = page.evaluate("() => { const s = window.__twinStore.getState(); return [s.profile, s.viewMode]; }")
     assert s == ["worker", "2d"], s
-    assert page.locator(".rail-view").count() == 0
+    page.locator(".rail-view").tap()
+    page.wait_for_timeout(500)
+    assert page.evaluate("() => window.__twinStore.getState().viewMode") == "3d"
+    assert not page.errors, page.errors
 
 
 @audit("ok", "no horizontal overflow, no errors (portrait and landscape)")
