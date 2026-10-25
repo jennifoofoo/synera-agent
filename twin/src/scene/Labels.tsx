@@ -13,6 +13,9 @@ import { closedConnectorStops } from "../model/closures";
 import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
+import { blocked, capped, densityBudget, rankOfClass, type LabelClass } from "./labelRules";
+import { useRound } from "../round/round";
+import { labelDecision } from "./Declutter";
 import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
 
 interface Props {
@@ -84,6 +87,34 @@ type Pin =
 
 function overlaps(a: Box, b: Box): boolean {
   return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+}
+
+/** Overlap hysteresis of the layout (labelRules.ts): a label shown at the last decision keeps its place while its box
+ * (which carries GAP_PX of free space) overlaps another by at most a quarter of the gap, so the texts never touch; a new
+ * one needs the whole gap. */
+const LAYOUT_HYSTERESIS = { hold: GAP_PX / 4, reveal: 0 };
+
+/** The class of a candidate in the shared priority list (labelRules.ts LABEL_PRIORITY). */
+function classOf(item: Item, zones: ReadonlySet<string>, roundStopId: string | null): LabelClass {
+  switch (item.kind) {
+    case "poi":
+      return item.closed ? "closure" : item.poi === "extinguisher" ? "furniture" : "poi";
+    case "tag":
+      return "closure";
+    case "thing":
+      return item.landmark ? "landmark" : "machine";
+    case "area":
+      return "zone";
+    case "room":
+      return item.id === roundStopId ? "roundStop" : zones.has(item.id) ? "zone" : "room";
+    default:
+      return "detail";
+  }
+}
+
+/** The class of a marked room: the destination, "you are here" (and the route's start), the tapped room. */
+function markClassOf(kind: "end" | "start" | "here" | "selected"): LabelClass {
+  return kind === "end" ? "destination" : kind === "selected" ? "selected" : "here";
 }
 
 /** Does the segment p-q (screen px) pass through the box? Liang-Barsky clipping. */
@@ -161,7 +192,8 @@ function candidates(
   flat: boolean,
   landmarks: ReadonlySet<string>,
   closedStops: ReadonlyMap<string, string>,
-): Item[] {
+  roundStopId: string | null,
+): { items: Item[]; classes: Map<Item, LabelClass> } {
   const pois: Item[] = [];
   const later: Item[] = []; // symbols that yield to room names (fire extinguishers: many, and not sought after)
   const rooms: Space[] = [];
@@ -194,8 +226,7 @@ function candidates(
     machineNames.sort((a, b) => a.id.localeCompare(b.id));
   }
   const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, meeting: 4, step: 5, firstaid: 6, extinguisher: 7, coffee: 8, printer: 9 };
-  // Closed lifts and stairs first: they must never yield to another symbol.
-  const rankOf = (item: Item) => (item.kind === "poi" ? (item.closed ? -1 : poiRank[item.poi]) : 0);
+  const rankOf = (item: Item) => (item.kind === "poi" ? poiRank[item.poi] : 0);
   pois.sort((a, b) => rankOf(a) - rankOf(b) || a.id.localeCompare(b.id));
   later.sort((a, b) => a.id.localeCompare(b.id));
   // Near, 2D: the clear width of wide doors, last (they yield to everything else).
@@ -213,7 +244,7 @@ function candidates(
     const areas = areasOf(floor)
       .filter((area) => area.name.length * AREA_CHAR_PX * scale <= area.width * AREA_FIT_OVERFLOW && AREA_H_PX * scale <= area.height * AREA_FIT_OVERFLOW_H)
       .map((area): Item => ({ kind: "area", id: area.id, point: area.point, area }));
-    return [...pois, ...landmarkItems, ...areas];
+    return inPriorityOrder([...pois, ...landmarkItems, ...areas], new Set(), roundStopId);
   }
   // Every tier: the zones (largest rooms), whatever their size on screen. Mid and near add every room whose
   // name (nearly) fits inside it at this scale. Tiers are cumulative, like a street map.
@@ -226,8 +257,19 @@ function candidates(
           const [w, h] = spanOf(space.polygon);
           return space.name.length * CHAR_PX * scale <= w * FIT_OVERFLOW && LABEL_H_PX * scale <= h;
         });
-  const named = [...zones, ...fitting].slice(0, limit).map((space): Item => ({ kind: "room", id: space.id, point: space.anchor, space }));
-  return [...pois, ...landmarkItems, ...named, ...machineNames, ...later, ...doors];
+  // The current round stop always tries to carry its name, like the zones.
+  const stop = roundStopId ? rooms.find((space) => space.id === roundStopId) : undefined;
+  const listed = [...zones, ...fitting].slice(0, limit);
+  if (stop && !listed.includes(stop)) listed.push(stop);
+  const named = listed.map((space): Item => ({ kind: "room", id: space.id, point: space.anchor, space }));
+  return inPriorityOrder([...pois, ...landmarkItems, ...named, ...machineNames, ...later, ...doors], new Set(zones.map((space) => space.id)), roundStopId);
+}
+
+/** The candidates sorted by the shared priority list; a stable sort, so inside one class the order above stays
+ * (symbols by kind, rooms by size, things by id). */
+function inPriorityOrder(items: Item[], zones: ReadonlySet<string>, roundStopId: string | null): { items: Item[]; classes: Map<Item, LabelClass> } {
+  const classes = new Map(items.map((item) => [item, classOf(item, zones, roundStopId)]));
+  return { items: [...items].sort((a, b) => rankOfClass(classes.get(a)) - rankOfClass(classes.get(b))), classes };
 }
 
 /** Everything with text or an icon on the focused floor, laid out together in screen px so nothing overlaps
@@ -251,6 +293,11 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
   // Where the tap pin stands (HerePin.tsx TapPin): the tapped room's name moves above it like above the other markers.
   const tapPoint = useTwin((s) => (s.selection?.point && s.selection.kind !== "asset" && s.selection.kind !== "opening" ? s.selection.point : null));
+  // The stop of the round being walked to (notesStore.ts currentStop): its name ranks just below the marked rooms.
+  const buildingKey = useTwin((s) => s.buildingKey);
+  const roundStopId = useRound((s) => (s.plan && s.guiding && !s.returning && s.plan.building === buildingKey ? (s.plan.stops[s.index]?.spaceId ?? null) : null));
+  // What the last decision showed (keys `${kind}-${id}`), for the overlap hysteresis (labelRules.ts).
+  const lastShown = useRef<ReadonlySet<string>>(new Set());
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number; kind: "end" | "start" | "here" | "selected" }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, kind: "end" | "start" | "here" | "selected", height = 0) => {
@@ -296,7 +343,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
   const changes = useMemo(() => (flat && route?.ok ? (route.floor_changes ?? []).filter((change) => change.from_floor === floor.id) : []), [flat, route, floor.id]);
 
-  const { shown, pins } = useMemo(() => {
+  const { shown, pins, classes } = useMemo(() => {
+    // One decision (label-rules.md): this layout only runs when the zoom step, the floor, the route, the selection,
+    // the round or the building change, never while the map only pans or rotates.
+    const was = lastShown.current;
+    const classes = new Map<string, LabelClass>();
+    const budget = densityBudget(scale); // Töpfer: capped labels per screen area grow with sqrt(zoom)
+    const free = (box: Box, key: string) => !kept.some((other) => blocked(box, other, was.has(key), LAYOUT_HYSTERESIS));
     // Layout in screen pixels at the bucket's coarsest scale (y flipped: north is up on screen).
     const px = ([x, yy]: Point): Point => [x / scale, -yy / scale];
     const routePx = routeOnFloor.map((points) => points.map(px));
@@ -363,7 +416,25 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         break;
       }
     });
-    // 5. Names of the first found things (and the selected one): beside the dot, right / left / above / below, if free.
+    const result: Item[] = [];
+    // 5. Room names of marked rooms, in the shared priority order (destination, "you are here", the tapped room):
+    // they keep their name (above their marker) unless a marker above sits there.
+    const markedItems = floor.spaces
+      .filter((space) => space.name && marks.has(space.id))
+      .sort((a, b) => rankOfClass(markClassOf(marks.get(a.id)!.kind)) - rankOfClass(markClassOf(marks.get(b.id)!.kind)) || a.id.localeCompare(b.id))
+      .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
+    for (const item of markedItems) {
+      // marked rooms are pills in both views
+      const mark = marks.get(item.id)!;
+      const dest = mark.kind === "end";
+      const chars = item.kind === "room" ? item.space.name.length * (dest ? DEST_CHAR_PX : CHAR_PX) : 0;
+      const box = boxOf(item.point, chars / 2 + (dest ? DEST_PAD_PX : PILL_PAD_PX), (dest ? DEST_H_PX : PILL_H_PX) / 2, mark.lift);
+      if (!free(box, `room-${item.id}`)) continue;
+      kept.push(box);
+      result.push(item);
+      classes.set(`room-${item.id}`, markClassOf(mark.kind));
+    }
+    // 6. Names of the first found things (and the selected one): beside the dot, right / left / above / below, if free.
     const top = new Set(found.slice(0, FOUND_NAMES).map((item) => item.id));
     const named = dots.filter((dot) => dot.pin.ids.length === 1 && (top.has(dot.pin.id) || dot.pin.id === selectedAssetId));
     named.sort((a, b) => Number(b.pin.id === selectedAssetId) - Number(a.pin.id === selectedAssetId));
@@ -376,27 +447,12 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       const spots: [number, number][] = [[r + halfW, 0], [-(r + halfW), 0], [0, -(r + halfH)], [0, r + halfH]];
       for (const [dx, dy] of spots) {
         const box = { x0: cx + dx - halfW - GAP_PX / 2, y0: cy + dy - halfH - GAP_PX / 2, x1: cx + dx + halfW + GAP_PX / 2, y1: cy + dy + halfH + GAP_PX / 2 };
-        if (kept.some((other) => overlaps(box, other))) continue;
+        if (!free(box, `name-${dot.pin.id}`)) continue;
         kept.push(box);
         pins.push({ kind: "name", id: dot.pin.id, point: dot.pin.point, text, dx, dy });
+        classes.set(`name-${dot.pin.id}`, "found");
         break;
       }
-    }
-    // 6. Room names of marked rooms: they keep their name (above their marker) unless a marker above sits there.
-    const markedItems = floor.spaces
-      .filter((space) => space.name && marks.has(space.id))
-      .sort((a, b) => Number(b.id === selectedId) - Number(a.id === selectedId) || a.id.localeCompare(b.id)) // the tapped room first
-      .map((space): Item => ({ kind: "room", id: space.id, point: marks.get(space.id)!.point, space }));
-    const result: Item[] = [];
-    for (const item of markedItems) {
-      // marked rooms are pills in both views
-      const mark = marks.get(item.id)!;
-      const dest = mark.kind === "end";
-      const chars = item.kind === "room" ? item.space.name.length * (dest ? DEST_CHAR_PX : CHAR_PX) : 0;
-      const box = boxOf(item.point, chars / 2 + (dest ? DEST_PAD_PX : PILL_PAD_PX), (dest ? DEST_H_PX : PILL_H_PX) / 2, mark.lift);
-      if (kept.some((other) => overlaps(box, other))) continue;
-      kept.push(box);
-      result.push(item);
     }
     // 7. Points of interest and room names, by priority; no other name sits on the tapped room.
     const selected = selectedId ? model.spaceById.get(selectedId) : undefined;
@@ -406,7 +462,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       return routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)));
     };
     const roomBoxes = new Map<string, Box>();
-    const all = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops);
+    const { items: all, classes: candidateClasses } = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops, roundStopId);
     const showTag = tier === "mid" || tier === "near"; // "Closed" beside a closed glyph, from the mid tier on
     // Closed lifts and stairs come first in `all`; once they are placed, each gets its "Closed" tag (right of the
     // glyph, else left), before any other symbol or name.
@@ -417,9 +473,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       for (const item of closedPlaced) {
         for (const dx of [POI_PX / 2 + GAP_PX + CLOSED_TAG_PX / 2, -(POI_PX / 2 + GAP_PX + CLOSED_TAG_PX / 2)]) {
           const tagBox = boxOf([item.point[0] + dx * scale, item.point[1]], CLOSED_TAG_PX / 2, LABEL_H_PX / 2);
-          if (kept.some((other) => overlaps(tagBox, other))) continue;
+          if (!free(tagBox, `tag-${item.id}`)) continue;
           kept.push(tagBox);
           result.push({ kind: "tag", id: item.id, point: item.point, dx });
+          classes.set(`tag-${item.id}`, "closure");
           break;
         }
       }
@@ -445,11 +502,15 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
           box.x0 += poi3d.shift;
           box.x1 += poi3d.shift;
         }
-        if (kept.some((other) => overlaps(box, other))) continue;
+        const key = `${item.kind}-${item.id}`;
+        const cls = candidateClasses.get(item) ?? "room";
+        if (!free(box, key)) continue;
         if ((item.kind === "room" || item.kind === "area") && selectedPx && boxOnPolygon(box, selectedPx)) continue;
         if ((item.kind === "room" || item.kind === "area" || (item.kind === "thing" && !item.landmark)) && onRoute(box)) continue; // landmarks keep their name on the route
+        if (capped(cls) && !budget.take(box)) continue; // the density cap drops the lowest ranked first
         kept.push(box);
         result.push(shift ? { ...item, point } : item);
+        classes.set(key, cls);
         if (item.kind === "room") roomBoxes.set(item.id, box);
         if (item.kind === "poi" && item.closed) closedPlaced.push(item);
         break;
@@ -468,22 +529,26 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         const halfW = (text.length * SUB_CHAR_PX) / 2;
         const box = { x0: cx - halfW - GAP_PX / 2, y0: cy + SUB_DY_PX - SUB_H_PX / 2, x1: cx + halfW + GAP_PX / 2, y1: cy + SUB_DY_PX + SUB_H_PX / 2 + GAP_PX / 2 };
         const own = roomBoxes.get(space.id);
-        if (kept.some((other) => other !== own && overlaps(box, other))) continue;
+        if (kept.some((other) => other !== own && blocked(box, other, was.has(`sub-${space.id}`), LAYOUT_HYSTERESIS))) continue;
         if (selectedPx && space.id !== selectedId && boxOnPolygon(box, selectedPx)) continue;
         if (onRoute(box)) continue;
+        if (!budget.take(box)) continue;
         kept.push(box);
         result.push({ kind: "sub", id: space.id, point: item.point, text });
+        classes.set(`sub-${space.id}`, "detail");
       }
     }
     for (const item of all) {
       if (item.kind !== "door") continue;
       const box = boxOf(item.point, (item.text.length * DOOR_CHAR_PX) / 2, DOOR_H_PX / 2);
-      if (kept.some((other) => overlaps(box, other))) continue;
+      if (!free(box, `door-${item.id}`) || !budget.take(box)) continue;
       kept.push(box);
       result.push(item);
+      classes.set(`door-${item.id}`, "detail");
     }
-    return { shown: result, pins };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint]);
+    lastShown.current = new Set(classes.keys());
+    return { shown: result, pins, classes };
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId]);
 
   return (
     <group position-y={y + 0.5}>
@@ -494,12 +559,12 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
           ) : pin.kind === "found" ? (
             <FoundDot count={pin.ids.length} title={pin.title} />
           ) : pin.kind === "closed" ? (
-            <div className="chip chip-danger chip-closed" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
+            <div className="chip chip-danger chip-closed" data-label-class="marker" title={pin.title} style={{ transform: `translateY(${pin.dy}px)` }}>
               <ClosedGlyph />
               {pin.text}
             </div>
           ) : (
-            <div className="label label-halo label-plan found-name" style={{ transform: `translate(${pin.dx}px, ${pin.dy}px)` }}>
+            <div className="label label-halo label-plan found-name" data-label-class="found" style={{ transform: `translate(${pin.dx}px, ${pin.dy}px)` }}>
               {pin.text}
             </div>
           )}
@@ -507,45 +572,45 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       ))}
       {shown.map((item) =>
         item.kind === "room" ? (
-          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} y={y + 0.5} />
+          <RoomLabel key={item.id} item={item} mark={marks.get(item.id)} flat={flat} selected={item.id === selectedId} y={y + 0.5} labelClass={classes.get(`room-${item.id}`) ?? "room"} />
         ) : item.kind === "area" ? (
           <Html key={item.id} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[2, 0]} style={{ pointerEvents: "none" }}>
-            <div className={`label label-halo label-area ${flat ? "label-plan" : ""} zoom-fade`} data-zoom-kind="area" data-area-rooms={item.area.space_ids.length}>
+            <div className={`label label-halo label-area ${flat ? "label-plan" : ""} zoom-fade`} data-zoom-kind="area" data-label-class="zone" data-area-rooms={item.area.space_ids.length}>
               {item.area.name}
             </div>
           </Html>
         ) : item.kind === "sub" ? (
           <Html key={`sub-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
-            <div className="label label-halo label-plan label-sub zoom-fade" data-zoom-kind="sub" style={{ transform: `translateY(${SUB_DY_PX}px)` }}>
+            <div className="label label-halo label-plan label-sub zoom-fade" data-zoom-kind="sub" data-label-class="detail" style={{ transform: `translateY(${SUB_DY_PX}px)` }}>
               {item.text}
             </div>
           </Html>
         ) : item.kind === "door" ? (
           <Html key={`door-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
-            <div className="label label-halo label-plan label-door zoom-fade" data-zoom-kind="door" title={item.title}>
+            <div className="label label-halo label-plan label-door zoom-fade" data-zoom-kind="door" data-label-class="detail" title={item.title}>
               {item.text}
             </div>
           </Html>
         ) : item.kind === "tag" ? (
           <Html key={`tag-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-            <div className={`label label-halo ${flat ? "label-plan" : ""} closed-tag zoom-fade`} data-zoom-kind="closed-tag" data-closed-space={item.id} style={{ transform: `translateX(${item.dx}px)` }}>
+            <div className={`label label-halo ${flat ? "label-plan" : ""} closed-tag zoom-fade`} data-zoom-kind="closed-tag" data-label-class="closure" data-closed-space={item.id} style={{ transform: `translateX(${item.dx}px)` }}>
               Closed
             </div>
           </Html>
         ) : item.kind === "thing" ? (
           <Html key={`thing-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[1, 0]} style={{ pointerEvents: "none" }}>
-            <div className={`label label-halo label-plan label-thing ${item.landmark ? "label-landmark" : ""} zoom-fade`} data-zoom-kind="thing" data-label-asset={item.asset.id} style={{ transform: `translateY(calc(-50% - ${THING_LIFT_PX}px))` }}>
+            <div className={`label label-halo label-plan label-thing ${item.landmark ? "label-landmark" : ""} zoom-fade`} data-zoom-kind="thing" data-label-class={classes.get(`thing-${item.id}`) ?? "machine"} data-label-asset={item.asset.id} style={{ transform: `translateY(calc(-50% - ${THING_LIFT_PX}px))` }}>
               {item.asset.name}
             </div>
           </Html>
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             {flat ? (
-              <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
+              <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-label-class={classes.get(`poi-${item.id}`) ?? "poi"} data-poi-space={item.id}>
                 <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
               </div>
             ) : (
-              <PoiPin item={item} tier={tier} />
+              <PoiPin item={item} tier={tier} labelClass={classes.get(`poi-${item.id}`) ?? "poi"} />
             )}
           </Html>
         ),
@@ -565,16 +630,22 @@ export function ClosedGlyph() {
 }
 
 /** 3D: a room name further from the camera than this many times the orbit distance is hidden (the far side of a
- * tilted view, near the horizon, where names pile up). Marked and selected rooms always keep theirs. */
+ * tilted view, near the horizon, where names pile up). Marked and selected rooms always keep theirs. Decided only at
+ * the decision points of Declutter.tsx (label-rules.md, rule 5), not while the view pans or orbits. */
 const FAR_LABEL = 1.3;
 
-function RoomLabel({ item, mark, flat, selected, y }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number; kind: string }; flat: boolean; selected: boolean; y: number }) {
+function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number; kind: string }; flat: boolean; selected: boolean; y: number; labelClass: LabelClass }) {
   const div = useRef<HTMLDivElement>(null);
   const cull = !flat && !mark && !selected;
+  const decided = useRef(-1);
+  useEffect(() => {
+    decided.current = -1; // decide again for the new role
+  }, [cull]);
   useFrame(({ camera }) => {
     const el = div.current;
     const c = controlsRef.current;
-    if (!el) return;
+    if (!el || decided.current === labelDecision.epoch) return;
+    decided.current = labelDecision.epoch;
     let hide = false;
     if (cull && c) {
       const dx = camera.position.x - item.point[0];
@@ -597,6 +668,7 @@ function RoomLabel({ item, mark, flat, selected, y }: { item: Extract<Item, { ki
         className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} ${mark?.kind === "end" ? "label-dest" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"
+        data-label-class={labelClass}
         style={mark ? { transform: `translateY(calc(-50% - ${mark.lift}px))` } : undefined}
       >
         {item.space.name}
@@ -616,10 +688,10 @@ function poiLayout3d(item: Extract<Item, { kind: "poi" }>, tier: MapTier): { siz
 }
 
 /** A 3D point of interest: a coloured dot, or a round badge with its glyph and the name beside it (Apple Maps style). */
-function PoiPin({ item, tier }: { item: Extract<Item, { kind: "poi" }>; tier: MapTier }) {
+function PoiPin({ item, tier, labelClass }: { item: Extract<Item, { kind: "poi" }>; tier: MapTier; labelClass: LabelClass }) {
   const { size, text } = poiLayout3d(item, tier);
   return (
-    <div className={`poi-pin poi-pin-${item.poi} ${size === POI_DOT_PX ? "poi-pin-dot" : ""} zoom-fade`} data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
+    <div className={`poi-pin poi-pin-${item.poi} ${size === POI_DOT_PX ? "poi-pin-dot" : ""} zoom-fade`} data-zoom-kind={`poi-${item.poi}`} data-label-class={labelClass} data-poi-space={item.id}>
       <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
       {text && <span className="label label-halo poi-pin-name">{text}</span>}
     </div>
