@@ -152,7 +152,9 @@ def test_round_on_the_demo_building(page):
           return (await r.json()).route.length_m; }""",
         [DEMO, start, stops],
     )
-    assert abs(same_order - plan["length"]) <= 1
+    # since the round goes device to device (feat/round-per-device, 25.10.) its legs end at the devices, not at the
+    # room anchors the room-to-room route uses: the round is never longer than that route, but no longer equal to it
+    assert plan["length"] <= same_order + 1, (plan["length"], same_order)
     assert 95 <= plan["length"] <= 105, "spec: about 100 m"
     assert page.get_by_text("5 stops", exact=False).first.is_visible()
     # Leonie's question, decision A: the round panel is the only start button while it owns the route.
