@@ -11,24 +11,10 @@ const SANITARY_NAME = /\b(wc|toilets?|toiletten?|restrooms?|sanit)/i;
 const FOOD_NAME = /(k(ü|ue)che|kitchen|caf(é|e)|kantine|canteen|cafeteria|mensa|bistro)/i;
 const MEETING_NAME = /(seminar|meeting|besprechung|konferenz|conference)/i;
 
-/** First screen: a welcome card with questions this building can actually answer. Gone for good after the first interaction. */
-export function Welcome() {
+/** Up to four questions this building can actually answer (also the empty laptop chat column, ui/Sidebar.tsx). */
+export function useWelcomeChips(): string[] {
   const model = useTwin((s) => s.model);
-  const name = useTwin((s) => s.building?.name);
-  const chatCount = useTwin((s) => s.chat.length);
-  const routed = useTwin((s) => !!s.state?.route?.ok);
-  const selected = useTwin((s) => s.selection !== null);
-  const onSite = useCampus((s) => s.mode === "site");
-  // Any panel or sheet open (a round taken over on load, notes, a report, directions): the card would cover it.
-  const roundOpen = useRound((s) => s.open);
-  const notesOpen = useNotes((s) => s.sheet !== "closed" || s.report !== null);
-  const directionsOpen = useTwin((s) => s.directions !== null);
-  const sheetOpen = roundOpen || notesOpen || directionsOpen;
-  const [phase, setPhase] = useState<"open" | "leaving" | "gone">("open");
-  const worker = useTwin((s) => s.profile === "worker");
-  const card = useRef<HTMLDivElement>(null);
-
-  const chips = useMemo(() => {
+  return useMemo(() => {
     if (!model) return [];
     const spaces = [...model.spaceById.values()];
     const group = (s: (typeof spaces)[number]) => spaceGroup(s.type, s.room_type);
@@ -46,6 +32,26 @@ export function Welcome() {
     if (lift && out.length < 4) out.push(`What if ${lift.name} is closed?`);
     return out.slice(0, 4);
   }, [model]);
+}
+
+/** First screen: a welcome card with questions this building can actually answer. Gone for good after the first interaction. */
+export function Welcome() {
+  const model = useTwin((s) => s.model);
+  const name = useTwin((s) => s.building?.name);
+  const chatCount = useTwin((s) => s.chat.length);
+  const routed = useTwin((s) => !!s.state?.route?.ok);
+  const selected = useTwin((s) => s.selection !== null);
+  const onSite = useCampus((s) => s.mode === "site");
+  // Any panel or sheet open (a round taken over on load, notes, a report, directions): the card would cover it.
+  const roundOpen = useRound((s) => s.open);
+  const notesOpen = useNotes((s) => s.sheet !== "closed" || s.report !== null);
+  const directionsOpen = useTwin((s) => s.directions !== null);
+  const sheetOpen = roundOpen || notesOpen || directionsOpen;
+  const [phase, setPhase] = useState<"open" | "leaving" | "gone">("open");
+  const worker = useTwin((s) => s.profile === "worker");
+  const card = useRef<HTMLDivElement>(null);
+
+  const chips = useWelcomeChips();
 
   useEffect(() => {
     if (chatCount > 0 || routed || selected || sheetOpen) setPhase((p) => (p === "open" ? "leaving" : p));

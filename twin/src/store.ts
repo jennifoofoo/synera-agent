@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { api } from "./api/client";
 import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point, Route } from "./api/types";
 import { buildModel, type BuildingModel } from "./model/model";
-import { asksWhereYouAre } from "./asksWhere";
+import { waitsForPlace } from "./asksWhere";
 
 export type FloorMode = "stacked" | "exploded" | "single";
 export type Profile = "planner" | "worker";
@@ -619,7 +619,7 @@ export const useTwin = create<TwinState>((set, get) => ({
         replyShown: true,
         selection: reply.selection_ignored ? s.selection : null,
         popover: null,
-        awaitingPlace: !reply.error && asksWhereYouAre(reply.reply) ? { voice } : null,
+        awaitingPlace: waitsForPlace(reply, message) ? { voice } : null,
       }));
       if (reply.opened) {
         await get().loadBuildings();

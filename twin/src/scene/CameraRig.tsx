@@ -231,7 +231,11 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.dollyToCursor = true;
     c.infinityDolly = false;
     const margin = size * 0.25; // the target stays near the building: a drag can not carry it into empty space
-    c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, -1, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
+    // The box must contain every target the rig itself sets (home framing puts it at the plinth, below y = 0): a
+    // target outside the box in y makes camera-controls' _encloseToBoundary divide by zero on the next pan (offset
+    // horizontal, clamp vertical: dot = 0) and the camera becomes NaN, the map goes blank.
+    const lowY = Math.min(-1, ...model.floors.map((floor) => floorY(floor.id))) - Math.max(5, size * 0.25);
+    c.setBoundary(new THREE.Box3(new THREE.Vector3(bounds.minX - margin, lowY, -bounds.maxY - margin), new THREE.Vector3(bounds.maxX + margin, topY + size, -bounds.minY + margin)));
     c.boundaryFriction = 0.2;
     invalidate();
     // `camera` is a dependency on purpose: drei recreates the controls when the default camera changes (2D <-> 3D).
@@ -491,9 +495,28 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   // Cutaway: outer walls facing the camera are lowered. In 2D, note when the view was panned away from the floor.
   const direction = new THREE.Vector2();
   const target = new THREE.Vector3();
+  // Last line of defence: a NaN in the camera blanks the map until reload. Keep the last finite view and restore it.
+  const goodTarget = useRef<THREE.Vector3 | null>(null);
+  const goodPosition = useRef<THREE.Vector3 | null>(null);
   useFrame(() => {
     const w = window as unknown as { __twinFrames?: number };
     w.__twinFrames = (w.__twinFrames ?? 0) + 1;
+    {
+      const c = controls.current;
+      if (c) {
+        c.getTarget(target);
+        const p = camera.position;
+        const finite = Number.isFinite(target.x + target.y + target.z) && Number.isFinite(p.x + p.y + p.z);
+        if (finite) {
+          (goodTarget.current ??= new THREE.Vector3()).copy(target);
+          (goodPosition.current ??= new THREE.Vector3()).copy(p);
+        } else if (goodTarget.current && goodPosition.current) {
+          const [t, q] = [goodTarget.current, goodPosition.current];
+          void c.setLookAt(q.x, q.y, q.z, t.x, t.y, t.z, false);
+          invalidate();
+        }
+      }
+    }
     {
       const pc = camera as THREE.PerspectiveCamera & THREE.OrthographicCamera;
       const { bottom, top, right } = insets.current;

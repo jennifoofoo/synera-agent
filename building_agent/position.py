@@ -47,8 +47,12 @@ class Position:
 
 
 def no_position_error(state) -> str:
-    """The message when a route has no start: ask the person, except in a benchmark message ('Answer:')."""
-    return BENCHMARK_START if "answer:" in str(getattr(state, "last_user_text", "")).lower() else NO_POSITION
+    """The message when a route has no start: ask the person, except in a benchmark message ('Answer:').
+    Asking marks state.asked_position: the chat reply then tells the page it waits for a place (needs_position)."""
+    if "answer:" in str(getattr(state, "last_user_text", "")).lower():
+        return BENCHMARK_START
+    state.asked_position = True
+    return NO_POSITION
 
 
 def make_position(bm: BuildingMap, space_id: str, point=None, source: str = "said", turn: int = 0) -> Position:
