@@ -118,19 +118,11 @@ def write_csv(path: Path, questions: list[Question], replies: dict[str, str]) ->
 
 
 def write_json(path: Path, questions: list[Question], replies: dict[str, str]) -> None:
-    """answers.json: one entry per id; `answer` is the full reply (as in the CSV), `answer_line` the scored text."""
-    entries = [
-        {
-            "question_id": question.id,  # as in the kit's submission CSV and Synera's judge app
-            "id": question.id,  # as in the challenge brief
-            # the full reply, like the kit CSV: the official scorer reads the last "Answer:" line out of it
-            "answer": replies.get(question.id, ""),
-            "answer_line": committed_answer(replies.get(question.id, "")),
-        }
-        for question in questions
-    ]
+    """answers.json as Synera asks for it (Discord 25.10. 11:16): a list of {question_id, answer}; `answer` is the full
+    reply as in the kit CSV, the official scorer reads its last "Answer:" line."""
+    entries = [{"question_id": question.id, "answer": replies.get(question.id, "")} for question in questions]
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"answers": entries}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(entries, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def check_csv(path: Path, expected_ids: list[str]) -> list[str]:

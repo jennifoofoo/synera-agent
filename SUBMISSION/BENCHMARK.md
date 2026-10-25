@@ -57,19 +57,18 @@ directory for the command above.
 
 ## Format of `answers.json`
 
+A list of dictionaries with the keys `question_id` and `answer`, as the organisers asked (Discord, 25.10. 11:16):
+
 ```json
-{"answers": [
-  {"question_id": "osm-way363805324-H01", "id": "osm-way363805324-H01",
-   "answer": "The largest one is Generic room 1.02 with 162.33 square metres.\nAnswer: Generic room 1.02, 162.33 m²",
-   "answer_line": "Generic room 1.02, 162.33 m²"}
-]}
+[
+  {"question_id": "osm-way363805324-H01",
+   "answer": "The largest one is Generic room 1.02 with 162.33 square metres.\nAnswer: Generic room 1.02, 162.33 m²"}
+]
 ```
 
-- `question_id` / `id`: the question id (both names, as in the kit CSV and the challenge brief).
-- `answer`: the full reply, exactly as in the kit's submission CSV. The official scorer (`benchmark/score.py`) reads the
-  last line starting with `Answer:` from it. All 145 entries have exactly such a line, and `answer` is the same text as
-  in `team_synera.csv`.
-- `answer_line`: the text of that final `Answer:` line, for convenience.
+`answer` is the full reply, exactly as in the kit's submission CSV. The official scorer (`benchmark/score.py`) reads the
+last line starting with `Answer:` from it. All 145 entries have exactly such a line, and `answer` is the same text as in
+`team_synera.csv`.
 
 ## Check without a key
 
