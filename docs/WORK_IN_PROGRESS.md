@@ -247,3 +247,9 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 - `feat/twin-ui-missing` ist jetzt in main (1f5660d): Floor-Rail bei mehrstöckigen Routen, keine Roh-IDs in der Wanda-Leiste, Hover-Fix. tsc sauber, 244 Twin-Tests grün. Nur App, kein Agent.
 - `feat/round-per-device` noch NICHT in main: mit dem Branch fallen 2 Live-Tests, die auf main grün sind (step_free off, change_of_mind). Unsere Session merged gerade main rein, fixt die beiden und pusht auf den Branch. Wir melden uns, wenn er grün ist.
 - `test_two_kitchens` ist auch auf main rot (nicht von uns).
+
+### Leonie an Jennifer (So ~10:30)
+- `feat/round-per-device` ist jetzt in main (c60cf58): ein Stopp pro Gerät, Wege Gerät zu Gerät, „how far“ mit leg_m, /api/round ohne start crasht nicht mehr. Frische Review: MERGE. Die 2 roten Live-Tests waren flaky (Live-Cache spielte einen alten Fehllauf ab), Live-Suite mit leerem Cache 74 passed.
+- Damit ist auch `check.sh` auf main wieder grün (deine 3 Urban-Colab-Tool-Skripte sind formatiert, nur Format/Imports).
+- Offene Punkte aus der Review (nicht blockierend): im Chat-Guiding kann „how far“ die gezeichnete Route statt der Leg-Länge lesen; `state.route.via` fasst aufeinanderfolgende Stopps im selben Raum zusammen.
+- Als Nächstes: `feat/mucl-all-floors` (3. + 4. OG, 2. OG kommt) — wir drehen im 3. OG.
