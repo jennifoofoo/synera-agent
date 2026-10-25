@@ -232,13 +232,24 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           );
         })}
 
-      {/* closed lifts and stairs: pale red hatching on their slab (2D and 3D); the glyph and tag come from Labels.tsx */}
-      {[...closedStops.keys()].map((spaceId) => {
+      {/* closed lifts and stairs: pale red hatching on their slab (2D and 3D); in 2D the glyph and tag come from
+          Labels.tsx, in 3D (no POI glyphs there) a "Closed · name" badge floats above the stop */}
+      {[...closedStops.entries()].map(([spaceId, name]) => {
         const space = model.spaceById.get(spaceId);
         if (!space || !shown(space.floor_id)) return null;
         return (
           <group key={`closed-fill-${spaceId}`} position-y={floorY(space.floor_id)}>
             <ClosedFill polygon={space.polygon} spaceId={spaceId} />
+            {!flat && (
+              <group position={[space.anchor[0], 1.6, -space.anchor[1]]}>
+                <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                  <div className="chip chip-danger chip-closed">
+                    <ClosedGlyph />
+                    {`Closed · ${name}`}
+                  </div>
+                </Html>
+              </group>
+            )}
           </group>
         );
       })}
