@@ -230,3 +230,6 @@ Unser Branch `feat/twin-ui-fixes` zeigte auf GitHub nur die Basis (a3976bc), die
 - `2f86769` keine Willkommenskarte, solange das Runden-Panel offen ist.
 - `9cf723c` Hover am eingeschalteten Sprachknopf (falls es den Knopf nach deinem Umbau noch gibt, sonst weg).
 Der Rest (`3cbcd85`, `ec25974`, `000e799` scharfe Labels; `8401008` ruhige Fundstücke) ist durch deine Commits abgedeckt.
+
+## Leonie (Sonntag ~08:55): fehlende UI-Stücke selbst nachgezogen, `feat/twin-ui-missing` (auf aktuellem `main`, gepusht)
+Nur was in `main` noch fehlte, deine Versionen bleiben: (1) Etagenleiste: bei einer Route über mehrere Etagen zeigt ein Klick nur diese Etage, "alle Etagen" stapelt wieder (beim Gehen bleibt dein Verhalten ohne "alle Etagen"); (2) keine rohen IDs im Untertitel der Wanda-Leiste (`withoutIds` in `voice.ts`, Test); (3) Hover am eingeschalteten Sprachknopf (harmlos, falls der Knopf weg ist). Willkommenskarte bei offener Runde hattest du schon. tsc, Build, vitest 230 grün. `feat/twin-ui-fixes` bitte nicht mehr mergen, ist hiermit erledigt.
