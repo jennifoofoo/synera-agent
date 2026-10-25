@@ -23,6 +23,7 @@ from starter_agent.building_map import BuildingMap
 
 OUTPUT_DIRECTORY = Path("agent_output") / "scratch"
 CACHE_DIRECTORY = Path("agent_output") / "cache"
+KNOWLEDGE_ROOT = Path("agent_output") / "knowledge"  # facts per building, shared with the page's facts API
 RETRIES = 3
 RETRYABLE = (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError)
 
@@ -76,6 +77,19 @@ confirm_change(false) and start over. Never apply a change in the same turn you 
 """
 
 
+KNOWLEDGE_RULES = """
+
+Place knowledge (notes, problems, closures with an end; never in a message with 'Answer:'):
+- 'Remember here: ...', 'merk dir ...' or a problem at a place ('the valve at press 2 drips'): remember_here (text in \
+their words, place as named, empty for here). 'Lift 1 is out until tomorrow': propose_change(action='close', element, \
+until=their time words, reason). 'Fixed', 'repariert', 'erledigt' about a problem or closure: resolve_here. Each makes \
+a card: say it in one or two sentences, wait for a clear yes in the next message, then confirm_change. If the tool \
+asks (needs_choice, where_are_you, needs_time), ask that. While guiding, a bare 'done' or 'erledigt' is a step.
+- 'What's here?', notes for a place, history ('this week'), open issues by type or area, what a person reported, what \
+is closed now, 'show me the photo': facts_here with the matching filters. Say at most three, each with since and by; \
+never add facts. A guided step with 'fact': read that one line after the step."""
+
+
 CAMPUS_RULES = """
 
 Campus (several buildings, tools list_buildings, campus_route, link_what_changes, connect_buildings, close_link, \
@@ -102,10 +116,11 @@ class Agent(StarterAgent):
         output_directory: Path,
         client: anthropic.Anthropic | None = None,
         campus: CampusHolder | None = None,
+        knowledge=None,
     ) -> None:
         self.campus = campus  # several buildings: adds the campus tools and rules
         super().__init__(building_map, output_directory, client)
-        self.guide = GuideState()
+        self.guide = GuideState(knowledge=knowledge)  # knowledge: a KnowledgeStore (page sessions), None otherwise
         self.output_directory = output_directory
         self.install_building(building_map)
 
@@ -123,8 +138,20 @@ class Agent(StarterAgent):
             + CALCULATION_RULES
             + CONVERSATION_RULES
             + (CAMPUS_RULES if self.campus else "")
+            + (KNOWLEDGE_RULES if self.guide.knowledge is not None else "")
         )
         self.emergency = False  # the emergency rules stay for the turn after one (the "which room?" reply)
+
+    def refresh_knowledge(self) -> None:
+        """Timed closures start and end by the clock: applied at each message (no background job). The page reads
+        what this turn's facts_here found from map.found_facts and map.open_photo."""
+        self.map.found_facts, self.map.open_photo = [], None
+        if self.guide.knowledge is None:
+            return
+        from building_agent.knowledge import apply_timed_closures
+        from building_agent.knowledge_tools import now
+
+        apply_timed_closures(self.map, self.guide.knowledge, now())
 
     def swap_building(self, path) -> None:
         self.install_building(BuildingMap.load(Path(path)))
@@ -133,6 +160,7 @@ class Agent(StarterAgent):
         """If the API call dies mid-turn, drop the half-written turn so the conversation stays valid."""
         self.guide.begin_turn()
         self.guide.last_user_text = user_text
+        self.refresh_knowledge()
         mark = len(self.messages)
         base = self.system[0]["text"]
         urgent = is_emergency(user_text)
@@ -150,13 +178,23 @@ class Agent(StarterAgent):
 
 
 class Session(Agent):
-    """One conversation on an existing BuildingMap (the 2D page's), so edits and routes show up there."""
+    """One conversation on an existing BuildingMap (the 2D page's), so edits and routes show up there. It has place
+    knowledge: the same store the page's facts API reads (agent_output/knowledge)."""
 
     def __init__(
-        self, building_map: BuildingMap, output_directory: Path = OUTPUT_DIRECTORY, client=None, campus=None
+        self,
+        building_map: BuildingMap,
+        output_directory: Path = OUTPUT_DIRECTORY,
+        client=None,
+        campus=None,
+        knowledge=None,
     ) -> None:
         output_directory.mkdir(parents=True, exist_ok=True)
-        super().__init__(building_map, output_directory, client, campus)
+        if knowledge is None:
+            from building_agent.knowledge import KnowledgeStore
+
+            knowledge = KnowledgeStore(KNOWLEDGE_ROOT)
+        super().__init__(building_map, output_directory, client, campus, knowledge)
 
 
 def cache_key(building_directory: Path, question_text: str) -> str:

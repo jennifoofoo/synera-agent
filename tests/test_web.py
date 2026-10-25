@@ -379,7 +379,8 @@ def test_agent_saving_a_building_in_the_chat_opens_it_on_the_page(tmp_path, key,
     class FakeSession:
         """What building_agent.agent.Session does on save_building: write the file, call swap_building(path)."""
 
-        def __init__(self, building_map, output_directory):
+        def __init__(self, building_map, output_directory, **options):
+            """options: campus and knowledge (the page's shared fact store), passed through since place knowledge."""
             from types import SimpleNamespace
 
             self.map, self.tools = building_map, []

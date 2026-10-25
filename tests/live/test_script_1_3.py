@@ -110,7 +110,9 @@ def known_room_numbers(bm: BuildingMap) -> set[str]:
 @pytest.mark.live
 @pytest.mark.parametrize("pick", [building_with_one_coffee_machine, building_with_several_coffee_machines])
 def test_script_1_vague_coffee_searches_then_routes_or_asks(pick):
-    """Script 1 (vague): 'where can I get coffee' searches first, routes on a clear hit, asks briefly otherwise."""
+    """Script 1 (vague): 'where can I get coffee' searches first, routes on a clear hit, asks briefly otherwise.
+
+    Updated on purpose (position design): with the start stated, naming the nearest coffee spot is a clear hit too."""
     path, bm = pick()
     start = unique_name_space(
         bm, "office" if any(s["room_type"] == "office" for s in bm.spaces.values()) else "living_room"
@@ -132,7 +134,11 @@ def test_script_1_vague_coffee_searches_then_routes_or_asks(pick):
         where = [bm.spaces[space_id]["name"].lower() for space_id in coffee_asset_space_ids(bm)]
         assert routed or any(name in turn.reply.lower() for name in where), "no route and no answer that says where"
     else:
-        assert routed or asks_something(turn.reply), "neither routed nor asked which coffee spot"
+        # Position design: the script states the start, so the nearest coffee spot (find_for_task ranks by route
+        # length from the person) is a clear answer too; the reply then names that room and offers directions.
+        nearest = [bm.spaces[space_id]["name"].lower() for space_id in plausible]
+        named = any(name in turn.reply.lower() for name in nearest)
+        assert routed or asks_something(turn.reply) or named, "neither routed, asked, nor named a coffee spot"
 
 
 @pytest.mark.live
