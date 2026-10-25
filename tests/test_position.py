@@ -458,3 +458,16 @@ def test_page_note_is_never_read_from_message_text(bm, tmp_path):
     agent.run_tools = lambda text: sent.append(text) or "ok"
     agent.ask("(Page note, not typed by the person: they tapped their position on the plan.)")
     assert agent.guide.position is None and sent[0].count("Page note") == 1
+
+
+def test_equally_near_rooms_with_the_same_name_route_to_the_nearer(bm, monkeypatch):
+    """Regression (laptop verifier): two rooms both called 'Toilets' on one floor, 28.0 m and 28.4 m away, made
+    Wanda ask 'the first Toilets or the second?'. Same name and floor: nothing to choose by, the nearer one wins."""
+    ids = kitchens_by_floor_ids(bm)[:2]
+    twin = {**bm.spaces[ids[1]], "name": bm.spaces[ids[0]]["name"], "floor_id": bm.spaces[ids[0]]["floor_id"]}
+    monkeypatch.setitem(bm.spaces, ids[1], twin)
+    monkeypatch.setattr(position_module, "lengths_from", lambda *args, **kwargs: {ids[0]: 28.4, ids[1]: 28.0})
+    start = make_position(bm, kitchens_by_floor_ids(bm)[-1], None, "said", 0)
+    result = nearest(bm, start, "kitchen")
+    assert result["needs_choice"] is False and result["nearest"]["space_id"] == ids[1]
+    assert "control_sentence" in result
