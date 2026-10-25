@@ -425,3 +425,13 @@ def test_here_with_a_named_machine_of_the_room_anchors_on_the_machine(setup):
     state.pending = None
     call(tools, "remember_here", text="the floor is wet")
     assert state.pending.extra["anchor"]["asset_id"] is None  # nothing named: the note stays on the room
+
+
+def test_fixed_with_an_ambiguous_name_picks_the_only_one_with_an_open_problem(setup):
+    bm, state, tools = setup
+    remember_card(bm, state, tools)
+    say(state, "yes")
+    call(tools, "confirm_change", confirmed=True, user_reply="yes")
+    say(state, "the drill press is fixed")
+    card = call(tools, "resolve_here", place="drill press", text="fixed")
+    assert "Drill press H-A1" in card["I understood"] and state.pending.action == "resolve"

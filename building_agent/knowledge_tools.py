@@ -780,6 +780,26 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
         facts = [fact_dict(f) for f in store.query(bm, at=current, **filters)]
         return [f for f in facts if f.get("status") == "open"]
 
+    def only_open_match(place: str | None) -> Anchor | None:
+        """The anchor of the one open fact whose place the words name, when the words alone match several places."""
+        wanted = set(words_of(place or "")) - {"the", "a", "der", "die", "das"}
+        if not wanted:
+            return None
+        anchors = {}
+        for fact in store_of(state).query(bm, at=now()):
+            found = fact.anchor or {}
+            label = anchor_label(bm, found)
+            if wanted <= set(words_of(label)):
+                anchors[(found.get("asset_id"), found.get("element_id"), found.get("space_id"))] = found
+        if len(anchors) != 1:
+            return None
+        found = next(iter(anchors.values()))
+        if found.get("asset_id") in bm.assets:
+            return asset_anchor(bm, found["asset_id"])
+        if found.get("element_id") in bm.connectors or found.get("element_id") in bm.openings:
+            return element_anchor(bm, found["element_id"], state)
+        return space_anchor(bm, found["space_id"])
+
     @beta_tool
     def resolve_here(place: str | None = None, text: str = "") -> str:
         """The person says a reported problem or closure is fixed ('repariert', 'fixed', 'erledigt', 'works
@@ -794,7 +814,10 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
         try:
             anchor = resolve_anchor(bm, state, place)
         except NeedsAnswer as asked:
-            return as_json({**asked.payload, "resolved": False})
+            single = only_open_match(place)  # 'the drill press is fixed': only one drill press has an open problem
+            if single is None:
+                return as_json({**asked.payload, "resolved": False})
+            anchor = single
         candidates = open_facts_at(anchor)
         if not candidates:
             return as_json({"nothing_open": True, "place": anchor.label, "say": "Say nothing is open there."})
