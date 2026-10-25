@@ -1,4 +1,4 @@
-"""Place knowledge with time: facts (notes, issues, timed closures) anchored at rooms, assets and elements.
+"""Place knowledge with time: facts (notes, issues, timed closures, events) anchored at rooms, assets and elements.
 
 See docs/specs/place-knowledge.md. A fact is valid from `valid_from` until `valid_to` (open-ended if None). Nothing
 is deleted: "resolved" adds a resolving fact and ends the old one (`valid_to`, `resolved_by`); only `undo_last`
@@ -7,6 +7,8 @@ removes a fact, and only within two minutes of creating it. Status is computed a
   resolved  resolved_by is set and its time (the old fact's valid_to) <= at; resolving facts are always resolved
   expired   valid_to <= at without a resolution
 Timed closures act on routing through `apply_timed_closures`, called at the start of every request (no job).
+Events (docs/specs/events.md: sessions, room bookings) are the only kind that may start at another time than now
+(also in the future, status 'future' until then); they never affect routing.
 
 Storage: <root>/<building id>/facts.json (list, creation order) plus photos/<fact id>.jpg. Atomic writes
 (temp file + os.replace) under one lock. Nothing from a client becomes a path: the folder comes from the building
@@ -34,7 +36,7 @@ from starter_agent.building_map import BuildingMap, MapError
 DEFAULT_ROOT = Path("agent_output") / "knowledge"
 FACTS_NAME = "facts.json"
 PHOTOS_DIR = "photos"
-KINDS = ("note", "issue", "closure")
+KINDS = ("note", "issue", "closure", "event")
 SOURCES = ("voice", "text", "tap")
 STATUSES = ("open", "resolved", "expired", "all")
 MAX_TEXT_CHARS = 500
@@ -445,6 +447,7 @@ class KnowledgeStore:
         anchor: dict,
         text: str,
         valid_to=None,
+        valid_from=None,
         author: str | None = None,
         source: str = "text",
         utterance: str = "",
@@ -452,7 +455,9 @@ class KnowledgeStore:
         photo_bytes: bytes | None = None,
         now: datetime | None = None,
     ) -> Fact:
-        """Validate and store one fact (valid from now). valid_to: ISO text or datetime, must be in the future."""
+        """Validate and store one fact (valid from now). valid_to: ISO text or datetime, must be in the future.
+
+        Only an event may name its own start (`valid_from`, past or future); its end must lie after its start."""
         if kind not in KINDS:
             raise KnowledgeError(f"kind must be one of {', '.join(KINDS)}.")
         if source not in SOURCES:
@@ -463,8 +468,15 @@ class KnowledgeStore:
         utterance = clean_text(utterance or None, "utterance", MAX_UTTERANCE_CHARS, required=False) or ""
         clean_anchor = check_anchor(bm, anchor, kind)
         clean_related = check_related(bm, related, clean_anchor)
+        start = parse_time(valid_from)
+        if start is not None and kind != "event":
+            raise KnowledgeError("Only an event can start at another time than now.")
         end = parse_time(valid_to)
-        if end is not None and end <= current:
+        if kind == "event":
+            start = start or current.astimezone(UTC)
+            if end is None or end <= start:
+                raise KnowledgeError("An event needs an end (valid_to) after its start.")
+        elif end is not None and end <= current:
             raise KnowledgeError("valid_to must be in the future.")
         photo = clean_photo(photo_bytes) if photo_bytes is not None else None
         fact = Fact(
@@ -474,7 +486,7 @@ class KnowledgeStore:
             anchor=clean_anchor,
             related=clean_related,
             text=text,
-            valid_from=iso(current),
+            valid_from=iso(start) if start else iso(current),
             valid_to=iso(end) if end else None,
             status="open",
             author=author,
@@ -583,7 +595,8 @@ class KnowledgeStore:
         history: bool = False,
     ) -> list[Fact]:
         """Facts matching every given filter; `status` is computed at `at` (default now) on the returned copies.
-        Default: open now. history=True (or status='all'): every status, newest first. since/until keep facts
+        Default: open now. history=True (or status='all'): every status (also events that have not started yet,
+        status 'future'), newest first. since/until keep facts
         whose validity overlaps that period. space_id also matches facts on assets in the room and on doors/lifts
         touching it; every filter also looks at `related`."""
         if status not in STATUSES:
@@ -596,7 +609,7 @@ class KnowledgeStore:
         found: list[tuple[int, Fact]] = []
         for index, fact in enumerate(self.load(bm)):
             state = status_at(fact, moment)
-            if state == "future" or (wanted_status != "all" and state != wanted_status):
+            if wanted_status != "all" and state != wanted_status:
                 continue
             if start is not None or end is not None:
                 begins, ends = parse_time(fact.valid_from), parse_time(fact.valid_to)
