@@ -110,7 +110,7 @@ export function declineWalkWithMeHint(): void {
 
 /** While true, Walk with me moves the guide. A time-based auto-pace timer must not run then (one driver only). */
 export function walkWithMeDriving(): boolean {
-  return useWalkMotion.getState().on && running !== null;
+  return (useWalkMotion.getState().on || simForced) && running !== null;
 }
 
 /** Step lines as people should hear them while the estimate drives: no "you have arrived" from a guess. */
@@ -283,7 +283,7 @@ function instance(): WalkWithMe {
     if (voiceOut || handsFree) setTimeout(() => void speak(ABOUT_THERE, speechAvailable), 1500); // after the step line
   });
   walk.on("status", (status) => {
-    if (status === "unsupported" && simulating) return; // the desktop demo feeds its own steps
+    if (simulating || simForced) return; // the desktop demo / e2e feeds its own steps, whatever the sensors say
     const text = STATUS_TEXT[status];
     if (text && running) showNotice(text);
   });
@@ -291,6 +291,7 @@ function instance(): WalkWithMe {
 }
 
 let simulating = false;
+let simForced = false; // __walkSim runs the estimate even with Walk with me off or the sensors refused
 
 function onPosition(p: WalkPosition): void {
   if (!running) return;
@@ -357,7 +358,7 @@ function sync(): void {
   const { on } = useWalkMotion.getState();
   const route = state?.route;
   const key = route?.ok && buildingKey ? `${buildingKey}|${routeKey(route)}` : "";
-  if (!on || walkStep === null || !key || !route) return stop();
+  if ((!on && !simForced) || walkStep === null || !key || !route) return stop();
   if (!running || running.key !== key) return start(route, key);
   // "I'm here", a dragged dot or a position set by voice: the person says where they are.
   const position = positionKey(state);
@@ -485,9 +486,13 @@ if (typeof window !== "undefined") {
   });
   // Desktop demo and e2e: synthetic steps through the real detector, no phone needed. __walkSim(0) stops.
   window.__walkSim = (stepsPerSecond: number) => {
+    // Runs regardless of the switch and the motion permission (a refused or missing sensor must not block the demo).
+    simForced = stepsPerSecond > 0;
+    if (simForced) sync();
     if (!running) return;
     simulating = stepsPerSecond > 0;
     instance().simulate(stepsPerSecond);
+    if (!simForced) sync(); // switch off: stop the estimate unless Walk with me itself is on
   };
   (window as unknown as { __walkMotion: typeof useWalkMotion }).__walkMotion = useWalkMotion;
   // e2e: the confirmed dot's point for a step of the drawn route (stepStart on the guide's lines).
