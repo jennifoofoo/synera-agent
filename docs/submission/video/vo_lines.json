@@ -5,13 +5,13 @@
     {"id": "S02", "slot": "0:03-0:06", "target_s": 3, "text": "Last spring, that person retired."},
     {"id": "S03", "slot": "0:06-0:13", "target_s": 7, "text": "By 2036, 12.9 million people in Germany reach retirement age."},
     {"id": "S04", "slot": "0:13-0:19", "target_s": 6, "text": "What they knew was never written down. Which extinguisher has the loose bracket."},
-    {"id": "S05", "slot": "0:19-0:28", "target_s": 9, "text": "Forty-two percent of a company's knowledge sits with one single person. Searching for it costs a large company millions every year."},
+    {"id": "S05", "slot": "0:19-0:28", "target_s": 9, "text": "Forty-two percent of a company's knowledge sits with one single person. When that person leaves, the money walks out with them."},
     {"id": "S06", "slot": "0:28-0:35", "target_s": 7, "text": "Software knows what. Tracking knows roughly where. Nobody guides you, and nobody keeps what you learned."},
     {"id": "S07", "slot": "0:35-0:38", "target_s": 3, "text": "This is Wanda."},
     {"id": "S08", "slot": "0:38-0:48", "target_s": 10, "text": "Gisela plans her round on the laptop: the shortest order, computed on the building's own plans."},
     {"id": "S09", "slot": "1:28-1:37", "target_s": 9, "text": "Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays with the company, even when people retire."},
     {"id": "S10", "slot": "1:37-1:46", "target_s": 9, "text": "Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks."},
-    {"id": "S11", "slot": "1:46-1:50", "target_s": 4, "text": "All 145 benchmark answers are reproducible."},
+    {"id": "S11", "slot": "1:46-1:50", "target_s": 4, "text": "Every answer is computed, so every answer can be checked."},
     {"id": "S12", "slot": "1:50-1:56", "target_s": 6, "text": "It works on any building, even from the evacuation plan on the wall."},
     {"id": "S13", "slot": "1:56-2:00", "target_s": 4, "text": "The knowledge stays in the building."}
   ]
