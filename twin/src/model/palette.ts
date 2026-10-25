@@ -27,7 +27,7 @@ export const GROUP_COLOURS: Record<SpaceGroup, { slab: string; wall: string; lab
   food: { slab: "#f2dbaa", wall: "#f8edd4", label: "Food and break" }, // token --room-food
   sanitary: { slab: "#bde1ea", wall: "#def0f4", label: "Toilets" }, // token --room-sanitary
   vertical: { slab: "#d0c6ea", wall: "#e8e2f4", label: "Stairs and lifts" }, // token --room-vertical
-  meeting: { slab: "#c9e4bb", wall: "#e4f2dd", label: "Meeting" }, // token --room-meeting
+  meeting: { slab: "#d1e4c5", wall: "#e8f1e2", label: "Meeting" }, // token --room-meeting
   walkway: { slab: "#f1ecc3", wall: "#f8f6e1", label: "Walkways" }, // token --room-walkway
   circulation: { slab: "#f5f4f1", wall: "#faf9f8", label: "Corridors" },
   work: { slab: "#ecebe7", wall: "#f5f5f3", label: "Work and living" },

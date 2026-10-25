@@ -34,7 +34,7 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 | `--room-food` | #f2dbaa | kitchen, canteen (sand) |
 | `--room-sanitary` | #bde1ea | toilet, bathroom, locker room (pale aqua) |
 | `--room-vertical` | #d0c6ea | stairs and lifts, also the 3D shafts (muted violet) |
-| `--room-meeting` | #c9e4bb | meeting, seminar, lecture hall, library (pale sage) |
+| `--room-meeting` | #d1e4c5 | meeting, seminar, lecture hall, library (pale sage) |
 | `--room-walkway` | #f1ecc3 | main aisles and traffic lanes in factory halls (pale lemon floor marking) |
 | `--safety-red` / `--safety-green` | #a52019 / #237f52 | safety icons only (fire extinguisher; first aid, eyewash, defibrillator, exit) |
 | `--radius-sm` / `--radius` / `--radius-lg` | 10 / 14 / 18 px | buttons and inputs, cards and panels, sheets |
@@ -51,7 +51,7 @@ Scene only (palette.ts `COLOURS`): wall top edges #9aa0a8 (ghost floors #c4c8ce)
 
 Lights and post-processing: `NoToneMapping` (so the near-white slabs keep their values), hemisphere light 1.6 (sky `#ffffff`, ground `#dcd9d3`), key light 1.3, fill light 0.5, and N8AO with radius 1.4, intensity 1.1 and the neutral tint above, so contact shadows stay soft and never turn into a grey wash.
 
-Label contrast (ink #1d2430 on the slab, WCAG formula): corridors 14.2, outdoor 13.3, work 13.1, walkway 13.0, logistics 12.4, production 12.3, food 11.5, technical 11.4, meeting 11.4, sanitary 11.2, stairs and lifts 9.6 (the darkest slab, #d0c6ea). Every slab is above 9.5:1, far over the 4.5:1 AA limit. Secondary text (`--ink-2`) is still not used for room labels. Scene labels are `--glass-strong` pills with ink text.
+Label contrast (ink #1d2430 on the slab, WCAG formula): corridors 14.2, outdoor 13.3, work 13.1, walkway 13.0, logistics 12.4, production 12.3, food 11.5, technical 11.4, meeting 11.6, sanitary 11.2, stairs and lifts 9.6 (the darkest slab, #d0c6ea). Every slab is above 9.5:1, far over the 4.5:1 AA limit. Secondary text (`--ink-2`) is still not used for room labels. Scene labels are `--glass-strong` pills with ink text.
 
 ## Typography
 Inter Variable, self-hosted via `@fontsource-variable/inter` (imported in `src/main.tsx`), no external font request. Tabular numerals globally (`font-feature-settings: "tnum"`). Scale 12 / 14 / 16 / 20 / 28 px with weights 400, 500 and 600 only; the building name is 20 px / 600. Uppercase tracking only on tiny section labels (`.tiny-label`, planner headings).

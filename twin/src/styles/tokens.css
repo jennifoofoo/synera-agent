@@ -42,7 +42,7 @@
   --room-food: #f2dbaa; /* kitchen, canteen: sand */
   --room-sanitary: #bde1ea; /* toilet, bathroom, locker room: pale aqua */
   --room-vertical: #d0c6ea; /* stairs and lifts: muted violet (also the shafts) */
-  --room-meeting: #c9e4bb; /* meeting, seminar, lecture hall, library: pale sage */
+  --room-meeting: #d1e4c5; /* meeting, seminar, lecture hall, library: pale sage */
   --room-walkway: #f1ecc3; /* main aisles in factory halls: pale lemon, like a floor marking */
 
   /* safety (ISO 7010 / ISO 3864), icons only, never room fills */
