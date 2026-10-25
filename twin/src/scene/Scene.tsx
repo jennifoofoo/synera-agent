@@ -19,7 +19,7 @@ import { FactPins } from "./FactPins";
 import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
 import { RoundMarks } from "./RoundMarks";
-import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
+import { FloorOutline, floorLayout, floorRoles, useRouteFloorsKey } from "./floorVisibility";
 import { Things } from "./Things";
 import { Plinth, StudioLight, StudioShadows, useSoftwareGl } from "./Studio";
 import { openingEditsOf } from "./geometry";
@@ -44,7 +44,7 @@ function Building({ model }: { model: BuildingModel }) {
   const focused = focusedFloorId ?? model.floors[0]?.id ?? null;
   // Floor rule (floorVisibility.tsx): active floor full, floors below as outlines, floors above hidden; a route over
   // several floors shows exactly its floors, stacked apart.
-  const routeFloorsKey = flat ? "" : (routeFloorIds(state?.route)?.join("|") ?? "");
+  const routeFloorsKey = useRouteFloorsKey();
   const routeFloors = useMemo(() => (routeFloorsKey ? routeFloorsKey.split("|") : null), [routeFloorsKey]);
   const elevations = useMemo(
     () => new Map(model.floors.map((floor) => [floor.id, floorLayout(floor, model, floorMode, routeFloors)])),
