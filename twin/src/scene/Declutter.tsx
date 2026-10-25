@@ -13,7 +13,9 @@
 // here" spot, the selection, the round, the view or the building, and a resize.
 // Who wins: the shared priority list (labelRules.ts, `data-label-class` on every label). Hysteresis: a shown label
 // stays until it really touches another, a hidden one only comes back with REVEAL_PX of free space around it.
-// Hiding is only `visibility` on drei's wrapper; nothing about the look changes.
+// At rest: if a rotation brought two shown labels together, the lower ranked one fades to 0 once the camera has been
+// still for REST_MS (and fades back when they part), so nothing flickers during the motion.
+// Hiding is only `visibility` (fading only `opacity`) on drei's wrapper; nothing about the look changes.
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
@@ -30,6 +32,12 @@ const TOUCH_PX = 0.5; // boxes may touch by this much (rounding), any more and t
 const REVEAL_PX = 3; // a hidden label only comes back with this much free space around it
 const HYSTERESIS = { hold: TOUCH_PX, reveal: REVEAL_PX };
 const HIDDEN = "declutter-hidden";
+const FADED = "declutter-faded";
+/** After a rotation two shown labels may touch (the visible set stays while the view only moves): once the camera has
+ * been still this long, the lower ranked one of such a pair fades out; it stays in the set and comes back at rest or
+ * at the next decision. Nothing changes while the camera moves. */
+const REST_MS = 300;
+const FADE_MS = 200;
 
 /** Bumped at every decision. Per-frame label rules elsewhere (the far-label cull of 3D room names in Labels.tsx)
  * re-decide only when it changes, so they keep still while the map pans or rotates, too. */
@@ -165,10 +173,13 @@ export function Declutter() {
   const settle = useRef(0);
   const decided = useRef<{ mpp: number | null; camera: string; size: string; markers: string }>({ mpp: null, camera: "", size: "", markers: "" });
   const checked = useRef(0);
+  const pose = useRef("");
+  const rest = useRef<number | null>(null);
 
   useEffect(
     () => () => {
       if (pending.current !== null) window.clearTimeout(pending.current);
+      if (rest.current !== null) window.clearTimeout(rest.current);
     },
     [],
   );
@@ -216,15 +227,12 @@ export function Declutter() {
     };
   }, [invalidate]);
 
-  const pass = () => {
-    pending.current = null;
-    last.current = performance.now();
-    const { scene, camera } = state();
+  /** The map's drei <Html> labels with their rank and screen box, highest rank first (shown ones first on ties). */
+  const measure = () => {
     // drei <Html> appends its wrappers here (Html.js: events.connected || gl.domElement.parentNode)
     const target = (events.connected as HTMLElement | undefined) ?? (gl.domElement.parentNode as HTMLElement | null);
-    if (!target) return;
-    const rect = gl.domElement.getBoundingClientRect();
     const items: { wrapper: HTMLElement; rank: number; shown: boolean; order: number; box: Box }[] = [];
+    if (!target) return items;
     let order = 0;
     for (const child of Array.from(target.children)) {
       const wrapper = child as HTMLElement;
@@ -237,9 +245,26 @@ export function Declutter() {
       const measured = (kind.startsWith("poi-") && content.firstElementChild) || content;
       const r = measured.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) continue;
-      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: grown({ x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }) });
+      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom } });
     }
     items.sort((a, b) => a.rank - b.rank || Number(b.shown) - Number(a.shown) || a.order - b.order);
+    return items;
+  };
+
+  const fade = (wrapper: HTMLElement, out: boolean) => {
+    if (out === wrapper.classList.contains(FADED)) return;
+    wrapper.classList.toggle(FADED, out);
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    wrapper.style.transition = still ? "" : `opacity ${FADE_MS}ms`;
+    wrapper.style.opacity = out ? "0" : "";
+  };
+
+  const pass = () => {
+    pending.current = null;
+    last.current = performance.now();
+    const { scene, camera } = state();
+    const rect = gl.domElement.getBoundingClientRect();
+    const items = measure().map((item) => ({ ...item, box: grown(item.box) }));
     const shownBefore = new Map(items.map((item) => [item, item.shown]));
     const markers = markerBoxes(scene, camera, rect);
     const fixed = markers.fixed.map(grown);
@@ -259,12 +284,27 @@ export function Declutter() {
     for (const item of items) {
       const hide = kept.some((other) => blocked(item.box, other, shownBefore.get(item)!, HYSTERESIS));
       if (!hide) kept.push(item.box);
+      fade(item.wrapper, false); // a decision starts from a clear map: no pair touches
       if (hide !== item.wrapper.classList.contains(HIDDEN)) {
         item.wrapper.classList.toggle(HIDDEN, hide);
         item.wrapper.style.visibility = hide ? "hidden" : "";
       }
     }
     invalidate(); // one more frame: a zoom step taken while this pass waited is seen at once (phones render on demand)
+  };
+
+  /** At rest after a move: the lower ranked of two shown labels that touch fades out, a faded one that is free again
+   * fades back. The visible set (hidden or not) stays as decided. */
+  const restPass = () => {
+    rest.current = null;
+    const { scene, camera } = state();
+    const items = measure().filter((item) => item.shown);
+    const kept = markerBoxes(scene, camera, gl.domElement.getBoundingClientRect()).fixed;
+    for (const item of items) {
+      const out = kept.some((other) => touches(item.box, other));
+      if (!out) kept.push(item.box);
+      fade(item.wrapper, out);
+    }
   };
 
   // Checked after the frame (like the pass): inside useFrame the controls may not have moved the camera yet, and a
@@ -279,6 +319,14 @@ export function Declutter() {
       return;
     }
     const { camera, size, scene } = state();
+    // the camera moved: look for touching labels once it has been still for REST_MS
+    const e = camera.matrixWorld.elements;
+    const poseKey = `${camera.uuid}:${e.map((x) => x.toFixed(3)).join(",")}:${size.width}x${size.height}`;
+    if (poseKey !== pose.current) {
+      pose.current = poseKey;
+      if (rest.current !== null) window.clearTimeout(rest.current);
+      rest.current = window.setTimeout(restPass, REST_MS);
+    }
     const c = controlsRef.current;
     const focus = c ? c.getTarget(target) : target.set(0, 0, 0);
     const mpp = metresPerPixelOf(camera, size.width, size.height, focus);
