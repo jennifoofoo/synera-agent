@@ -42,7 +42,7 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 - Sperrungen sichtbar: `scene/Labels.tsx`, `scene/Markers.tsx`, `scene/poiIcons.*`, `ui/Card.tsx`, `ui/Card.css`, `ui/Directions.tsx`, `ui/KeyHelp.tsx`, `audit.ts`, `DESIGN.md`, neu `model/closures.ts`, `ui/AvoidsClosed.tsx`
 - Route gerade durch Türen (Server): `web/api.py`, `web/route_draw.py`
 Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
-**Bis zum Freeze werden keine neuen Funktionen gebaut, nur Fehler behoben und aufgeräumt** (Entscheidung Jennifer).
+**Bis zum Freeze nur Fixes, mit einer Ausnahme als Wow-Effekt: Ortswissen mit Zeit** (Notizen, Probleme, Sperrungen "bis morgen" an Ort oder Gerät), Spec `docs/specs/place-knowledge.md`, wartet auf euer Okay. Leonie baut die Seite gegen den Vertrag dort.
 
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
