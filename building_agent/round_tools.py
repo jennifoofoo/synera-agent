@@ -3,16 +3,18 @@
 `plan_round` finds the matching devices, makes one stop per DEVICE (two devices in one room are two stops),
 measures every device-to-device walk on the door-to-door route model (`routing`, the same graph and in-room walks
 as find_route with start_point / destination_point: from the device through its room's doors to the next device)
-and orders the stops: exact over all orders for up to EXACT_MAX_STOPS stops, else nearest neighbour from the start
+and orders the stops: exact (Held-Karp) for up to EXACT_MAX_STOPS stops, else nearest neighbour from the start
 followed by 2-opt until nothing improves. Ties go to the smaller asset id, so the same question always gives the
-same round. The round is drawn once with `routing.route` through the stops' rooms, ending at the last device, and
-remembered like find_route, so the plan shows it and "guide me" can start. The model only picks the arguments and
+same round. The round is drawn once with `routing.route` through every device (via stops with via_points), so the
+drawn line touches each device and its length is total_m; it is remembered like find_route, so the plan shows it
+and "guide me" can start. The model only picks the arguments and
 phrases the result."""
 
 import itertools
 import re
 
 import networkx as nx
+import numpy as np
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
@@ -25,7 +27,7 @@ from building_agent.walk import WALK_M_PER_S, remember_route
 from starter_agent.building_map import LENGTH_DECIMALS, BuildingMap, MapError
 from starter_agent.tools import as_json
 
-EXACT_MAX_STOPS = 8
+EXACT_MAX_STOPS = 16  # Held-Karp up to here (about 0.1 s for 16 stops); above it nearest neighbour + 2-opt
 MAX_STOPS = 60
 START = "@start"  # the start's key in the distance matrix (asset ids are the other keys)
 MAX_ENTRANCES = 6
@@ -99,15 +101,42 @@ def path_length(matrix: dict, start: str, order: tuple, back: bool) -> float:
     return sum(matrix[a][b] for a, b in itertools.pairwise(stops))
 
 
-def exact_order(matrix: dict, start: str, stops: list[str], back: bool) -> tuple:
-    """Shortest of all orders; permutations of the sorted ids come in lexicographic order, so the first of equal
-    lengths wins (the tie-break by id)."""
-    best, best_length = (), float("inf")
-    for order in itertools.permutations(sorted(stops)):
-        length = path_length(matrix, start, order, back)
-        if length < best_length - EPSILON_M:
-            best, best_length = order, length
-    return best
+def held_karp(matrix: dict, start: str, stops: list[str], back: bool) -> list[str]:
+    """The shortest order by Held-Karp dynamic programming (O(n² · 2ⁿ), numpy over all subsets of one size at a
+    time), run over the rest of the round: rest[mask, j] is the shortest walk that starts at stop j, visits the
+    stops in `mask` and ends (or goes back to the start). The order is then read from the front, and every minimum
+    takes the first index on a tie, so of equally long rounds the one with the smaller asset ids first wins."""
+    order = sorted(stops)
+    n = len(order)
+    if n == 0:
+        return []
+    inf = float("inf")
+    between = np.array([[matrix[a].get(b, inf) for b in order] for a in order])
+    from_start = np.array([matrix[start].get(b, inf) for b in order])
+    to_start = np.array([matrix[a].get(start, inf) for a in order]) if back else np.zeros(n)
+    rest = np.full((1 << n, n), inf)
+    then = np.full((1 << n, n), -1, dtype=np.int16)  # the stop after j in the best rest
+    bits = 1 << np.arange(n)
+    rest[bits, np.arange(n)] = to_start
+    masks = np.arange(1 << n)
+    sizes = np.array([m.bit_count() for m in range(1 << n)])
+    for size in range(1, n):
+        layer = masks[sizes == size]
+        through = between.T[None, :, :] + rest[layer][:, :, None]  # (masks, k, j): j, then the rest from k
+        following = through.argmin(axis=1)  # first k on a tie: the smaller id goes next
+        length = np.take_along_axis(through, following[:, None, :], axis=1)[:, 0, :]
+        for j in range(n):
+            free = (layer & bits[j]) == 0
+            target = layer[free] | bits[j]
+            rest[target, j] = length[free, j]
+            then[target, j] = following[free, j]
+    mask = (1 << n) - 1
+    here = int((from_start + rest[mask]).argmin())
+    path = []
+    while here >= 0:
+        path.append(order[here])
+        here, mask = int(then[mask, here]), mask ^ (1 << here)
+    return path
 
 
 def nearest_neighbour(matrix: dict, start: str, stops: list[str]) -> list[str]:
@@ -137,7 +166,7 @@ def two_opt(matrix: dict, start: str, order: list[str], back: bool) -> list[str]
 
 def best_order(matrix: dict, start: str, stops: list[str], back: bool) -> tuple[list[str], str]:
     if len(stops) <= EXACT_MAX_STOPS:
-        return list(exact_order(matrix, start, stops, back)), "exact (all orders compared)"
+        return held_karp(matrix, start, stops, back), "exact (Held-Karp, shortest of all orders)"
     return two_opt(matrix, start, nearest_neighbour(matrix, start, stops), back), "nearest neighbour + 2-opt"
 
 
@@ -224,8 +253,8 @@ def plan_round(
     start_point=None,
 ) -> dict:
     """The shortest round from `start` (a space id or name; `start_point` an exact [x, y] in it, e.g. the person's
-    dot) to every matching device, one stop per device. Sets bm.last_route (routing.route through the stops' rooms,
-    ending at the last device) and bm.located_asset_ids (the devices, for highlighting)."""
+    dot) to every matching device, one stop per device. Sets bm.last_route (routing.route through every device, the
+    same legs as the stops' leg_m) and bm.located_asset_ids (the devices, for highlighting)."""
     assets, asset_type, tied = resolve_assets(bm, what)
     if tied:
         return {
@@ -268,13 +297,14 @@ def plan_round(
     naive = sorted(reachable, key=lambda i: (natural_key(by_id[i]["name"]), i))
     total = path_length(matrix, START, tuple(order), return_to_start)
     naive_total = path_length(matrix, START, tuple(naive), return_to_start)
+    # The drawn round is the legs themselves: start -> device 1 -> ... (-> start), every via stop at its device.
     rooms = [by_id[i]["space_id"] for i in order]
-    rooms = [room for index, room in enumerate(rooms) if index == 0 or room != rooms[index - 1]]
+    at = [points[i] for i in order]
     if return_to_start:
-        via, destination, end_point = rooms, start_id, start_point
+        via, via_points, destination, end_point = rooms, at, start_id, start_point
     else:
-        via, destination, end_point = rooms[:-1], rooms[-1], points[order[-1]]
-    route = routing.route(bm, start_id, destination, step_free, via, start_point, None, end_point)
+        via, via_points, destination, end_point = rooms[:-1], at[:-1], rooms[-1], at[-1]
+    route = routing.route(bm, start_id, destination, step_free, via, start_point, None, end_point, via_points)
     bm.located_asset_ids = list(order)
     legs, here = [], START
     for asset_id in order:
@@ -289,6 +319,7 @@ def plan_round(
     bm.planned_round = {
         "route": route,
         "via": via,
+        "via_points": [list(point) if point is not None else None for point in via_points],
         "destination_point": list(end_point) if end_point is not None else None,
         "info": {
             "device_type": asset_type or what,
@@ -367,7 +398,7 @@ def make_round_tools(bm: BuildingMap, guide: GuideState) -> list:
         replace_guide: bool = False,
     ) -> str:
         """Inspection round: the SHORTEST order to visit every device of one type ('check all fire extinguishers
-        on the ground floor'), computed here (exact for up to 8 devices). One stop per device, walked device to
+        on the ground floor'), computed here (exact for up to 16 devices). One stop per device, walked device to
         device. Returns the stops in order with metres per leg, total metres, minutes and compare_hint (how much shorter than
         name order); the round is drawn on the plan and can be guided. Never order stops yourself.
 

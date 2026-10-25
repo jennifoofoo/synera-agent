@@ -90,3 +90,21 @@ def test_round_on_the_urban_colab_with_extinguishers_in_some_rooms(tmp_path):
             }
         )
     assert_round_matches_route(app_with(tmp_path, building), building)
+
+
+def test_whole_building_round_is_exact_and_no_longer_than_before(tmp_path):
+    """15 extinguishers on both floors from the Project Room: Held-Karp (exact up to 16 stops), at most the 294 m
+    the team measured with nearest neighbour + 2-opt."""
+    building = json.loads((DEMO / "building.json").read_text(encoding="utf-8"))
+    devices = [a for a in building["assets"] if a["type"] == "fire_extinguisher"]
+    if len(devices) != 15:
+        pytest.skip("the Urban Colab extinguishers changed")
+    start = next(s["id"] for s in building["spaces"] if s["name"].startswith("Project Room"))
+    _, reply = app_with(tmp_path, building).post(
+        "/api/round", {"building": KEY, "type": "fire extinguisher", "area": "", "start": start}
+    )
+    planned = reply["round"]
+    assert planned["ok"] and len(planned["stops"]) == 15
+    assert planned["order"].startswith("exact")
+    assert planned["total_m"] <= 294.5
+    assert reply["state"]["route"]["length_m"] == pytest.approx(planned["total_m"], abs=0.1)
