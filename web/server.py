@@ -65,6 +65,7 @@ from collections import deque
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
 from building_agent.knowledge import DEFAULT_ROOT as KNOWLEDGE_ROOT
@@ -400,6 +401,12 @@ class App:
                 return 200, {"round": view, "state": api.state_view(session)}
             if path == "/api/route/clear":
                 return 200, api.clear_route(session)
+            if path == "/api/here/clear":  # the "You are here" chip's x: forget the position, no chat turn
+                chat = self.chat(key)
+                if chat.session is not None:
+                    chat.apply_here(SimpleNamespace(clear=True))
+                session.position = chat.position_view()
+                return 200, {"state": api.state_view(session)}
             if path == "/api/step_free":
                 enabled = body.get("enabled") is True
                 self.chat(key).set_step_free(enabled)

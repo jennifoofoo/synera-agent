@@ -3,6 +3,7 @@
 // Owner: the Card/Position session.
 
 import { useEffect, useState } from "react";
+import { api } from "../api/client";
 import { useTwin } from "../store";
 
 const HINT_KEY = "twin.here.dragHint";
@@ -27,7 +28,6 @@ export function HereChip() {
   const model = useTwin((s) => s.model);
   const buildingKey = useTwin((s) => s.buildingKey);
   const position = useTwin((s) => s.state?.position ?? null);
-  const ask = useTwin((s) => s.ask);
   const flyTo = useTwin((s) => s.flyTo);
   const [clearing, setClearing] = useState(false);
   // First time a position shows: a short line that the dot can be dragged (off the map, so it covers nothing).
@@ -51,11 +51,16 @@ export function HereChip() {
   const space = model.spaceById.get(position.space_id);
   const name = space?.name || model.connectorBySpace.get(position.space_id)?.name || position.space_id;
 
-  // The position only changes through the server: context.here {clear: true} travels with one chat message; the agent's reply shows in the card.
+  // Silent: the server forgets the position (POST /api/here/clear), no chat turn, no tap-to-place. A later map tap
+  // shows the normal place card.
   const clear = async () => {
     setClearing(true);
     try {
-      await ask("Forget where I am.", false, { here: { clear: true } });
+      const { state } = await api.clearHere(buildingKey);
+      useTwin.setState({ state, pendingHere: null, hereArmed: false });
+    } catch {
+      // Server unreachable: forget it on screen at least.
+      useTwin.setState((s) => ({ state: s.state ? { ...s.state, position: null } : s.state, pendingHere: null, hereArmed: false }));
     } finally {
       setClearing(false);
     }

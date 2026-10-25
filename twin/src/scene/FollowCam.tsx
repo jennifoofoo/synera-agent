@@ -137,6 +137,9 @@ export function FollowCam({ model, floorY }: Props) {
       const back = saved.current;
       saved.current = null;
       const now = controlsRef.current;
+      // The plan is north up again once the walk ends (the follow cam turned it heading up).
+      const store = useTwin.getState();
+      if (now && store.viewMode === "2d" && !store.viewHandover) void now.rotateTo(0, now.polarAngle, !store.reducedMotion);
       // Only the same controls on the same building (2D/3D switch or a new building: nothing to go back to).
       if (!back || !now || now !== back.controls || back.model !== useTwin.getState().model) return;
       const animate = !useTwin.getState().reducedMotion;
