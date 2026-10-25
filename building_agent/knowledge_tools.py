@@ -18,7 +18,7 @@ from anthropic.lib.tools import ToolError
 
 from building_agent.find_space import find_space
 from building_agent.find_tools import find_asset, words_of
-from building_agent.time_words import names_a_time, until_time, when_is_later
+from building_agent.time_words import clock_of, names_a_time, until_time, when_is_later
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
@@ -582,6 +582,234 @@ def facts_lookup(bm: BuildingMap, state):
     return lookup
 
 
+# ---------- events and room bookings (docs/specs/events.md) ----------
+
+NOW_WHEN = re.compile(r"\b(now|right now|currently|at the moment|jetzt|gerade|momentan|aktuell)\b", re.IGNORECASE)
+CLOCK_AT = re.compile(
+    r"\b(?:(?P<pre>at|um|gegen|ab|from|by)\s+)?(?P<hour>\d{1,2})(?:[:.](?P<minute>\d{2}))?\s*"
+    r"(?P<ampm>am|pm|a\.m\.|p\.m\.)?\s*(?P<uhr>uhr|h\b|o'?clock)?",
+    re.IGNORECASE,
+)
+DAY_PARTS = [  # (pattern, from hour, to hour) on the named day
+    (r"\b(morning|vormittag|früh|frueh)\b", 6, 12),
+    (r"\b(noon|midday|lunch ?time|mittag)\b", 11, 14),
+    (r"\b(afternoon|nachmittag)\b", 12, 18),
+    (r"\b(evening|tonight|abend)\b", 18, 24),
+]
+DAY_AFTER = re.compile(r"(?:\b|^)(übermorgen|uebermorgen|day after tomorrow)\b", re.IGNORECASE)
+TOMORROW = re.compile(r"(?<![\wäöüß])(tomorrow|morgen)\b", re.IGNORECASE)
+YESTERDAY = re.compile(r"\b(yesterday|gestern)\b", re.IGNORECASE)
+WEEKDAY_WORD = re.compile(rf"\b({_DAYS})\b", re.IGNORECASE)
+DATE_WORD = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?!\d)|\b(\d{4})-(\d{2})-(\d{2})\b")
+AFTERNOON_HOURS = range(1, 7)  # 'at 2', 'um 3' without am/pm during a working day mean the afternoon
+ASK_WHEN = "Which day and time do you mean? For example today at 15:00 or tomorrow morning."
+TITLE_STOP = {"the", "a", "an", "der", "die", "das", "event", "events", "session", "is", "ist", "wann", "when", "where"}
+
+
+@dataclass
+class EventWindow:
+    """The moment or period a question means; start == end for a moment ('at 14:00', 'now')."""
+
+    start: datetime
+    end: datetime
+    words: str
+
+
+def clock_in(text: str) -> tuple[int, int] | None:
+    """(hour, minute) of a clock time in the words ('at 14:00', 'um 15 Uhr', '3pm', '14.30'), None without one.
+    'at 2' or 'um 3' (1 to 6, no am/pm, no leading zero) is the afternoon: 14:00, 15:00."""
+    for match in CLOCK_AT.finditer(text):
+        if match.group("pre") or match.group("minute") or match.group("ampm") or match.group("uhr"):
+            clock = clock_of(match)
+            if clock is None:
+                continue
+            raw = match.group("hour")
+            if not match.group("ampm") and clock[0] in AFTERNOON_HOURS and not raw.startswith("0"):
+                return clock[0] + 12, clock[1]
+            return clock
+    return None
+
+
+def named_day(text: str, midnight: datetime) -> tuple[datetime | None, str]:
+    """The day the words name (today, tomorrow, übermorgen, yesterday, a weekday, 25.10. or 2026-10-25) at
+    midnight, and the words with a date removed (so '12.10.' is never read as 12:10). None when no day is named."""
+    date = DATE_WORD.search(text)
+    if date:
+        rest = text[: date.start()] + " " + text[date.end() :]
+        try:
+            if date.group(4):
+                day = midnight.replace(year=int(date.group(4)), month=int(date.group(5)), day=int(date.group(6)))
+            else:
+                year = date.group(3)
+                year = midnight.year if not year else int(year) + (2000 if len(year) == 2 else 0)
+                day = midnight.replace(year=year, month=int(date.group(2)), day=int(date.group(1)))
+        except ValueError:
+            return None, rest
+        return day, rest
+    if DAY_AFTER.search(text):
+        return midnight + timedelta(days=2), text
+    if YESTERDAY.search(text):
+        return midnight - timedelta(days=1), text
+    if TOMORROW.search(text) and "heute morgen" not in text and "this morgen" not in text:
+        return midnight + timedelta(days=1), text
+    weekday = WEEKDAY_WORD.search(text)
+    if weekday:
+        return midnight + timedelta(days=(WEEKDAY[weekday.group(1).lower()] - midnight.weekday()) % 7), text
+    if re.search(r"\b(today|heute)\b", text):
+        return midnight, text
+    return None, text
+
+
+def forward_period(text: str, current: datetime) -> tuple[datetime, datetime] | None:
+    """'this week' / 'this month' for events: the whole week or month, so upcoming events count too."""
+    midnight = at_clock(current, time(0, 0))
+    if re.search(r"\b(this week|diese woche|dieser woche|the week|der woche)\b", text):
+        monday = midnight - timedelta(days=current.weekday())
+        return monday, monday + timedelta(days=7)
+    if re.search(r"\b(this month|diesen monat|diesem monat)\b", text):
+        first = midnight.replace(day=1)
+        return first, (first + timedelta(days=32)).replace(day=1)
+    if re.search(r"\b(next week|nächste woche|naechste woche|nächsten woche|naechsten woche)\b", text):
+        monday = midnight - timedelta(days=current.weekday()) + timedelta(days=7)
+        return monday, monday + timedelta(days=7)
+    return period_bounds(text, current)
+
+
+def event_window(when: str | None, current: datetime) -> EventWindow | None:
+    """What 'now', 'at 14:00', 'this afternoon', 'today', 'tomorrow morning', 'übermorgen', 'Friday', '25.10.',
+    'this week' mean for events; None when the words name no time the tool can read (the caller asks back).
+    'morgen früh' is tomorrow morning, 'heute morgen' this morning."""
+    text = " ".join(str(when or "").lower().split())
+    if not text:
+        return None
+    midnight = at_clock(current, time(0, 0))
+    day, rest = named_day(text, midnight)
+    clock = clock_in(rest)
+    if NOW_WHEN.search(text) and clock is None and day is None:
+        return EventWindow(current, current, "now")
+    if day is None and DATE_WORD.search(text):
+        return None  # an impossible date ('31.02.')
+    base = day if day is not None else midnight
+    label = day_words(base, current)
+    if clock is not None:
+        moment = base.replace(hour=clock[0], minute=clock[1])
+        return EventWindow(moment, moment, f"{label} {clock_words(moment)}")
+    for pattern, begin, finish in DAY_PARTS:
+        if re.search(pattern, rest) or ("heute morgen" in text and begin == 6):
+            return EventWindow(base + timedelta(hours=begin), base + timedelta(hours=finish), f"{label} {text}")
+    if day is not None:
+        return EventWindow(day, day + timedelta(days=1), label)
+    bounds = forward_period(text, current)
+    if bounds:
+        return EventWindow(bounds[0], bounds[1], text)
+    return None
+
+
+def event_spaces(bm: BuildingMap, fact: dict) -> list[str]:
+    """Rooms of an event: its anchor room first, then the rooms of its related places."""
+    from building_agent.knowledge import node_spaces
+
+    found = [(fact.get("anchor") or {}).get("space_id")]
+    for node in fact.get("related") or []:
+        found += node_spaces(bm, node)
+    return [space for space in dict.fromkeys(found) if space in bm.spaces]
+
+
+def stem(word: str) -> str:
+    for ending in ("es", "s", "en", "e"):
+        if len(word) > 4 and word.endswith(ending):
+            return word[: -len(ending)]
+    return word
+
+
+def title_score(query: str | None, title: str) -> int:
+    """How many of the query's words the title has (plural and German endings ignored)."""
+    wanted = {stem(word) for word in words_of(query or "") if word not in TITLE_STOP and len(word) > 1}
+    have = {stem(word) for word in words_of(title)}
+    return len(wanted & have)
+
+
+def event_line(bm: BuildingMap, fact: dict, current: datetime) -> dict:
+    """One event as Wanda reads it: title, rooms, start and end in words, running now, by."""
+    start, end = as_time(fact.get("valid_from")), as_time(fact.get("valid_to"))
+    starts = f"{day_words(start, current)} {clock_words(start)}"
+    ends = f"{day_words(end, current)} {clock_words(end)}" if end else "open end"
+    same_day = end is not None and start.date() == end.date()
+    running = start <= current and (end is None or current < end)
+    return {
+        "title": fact.get("text"),
+        "rooms": [room_label(bm, space) for space in event_spaces(bm, fact)],
+        "when": f"{starts} to {clock_words(end)}" if same_day else f"{starts} to {ends}",
+        "starts": starts,
+        "ends": ends,
+        "running_now": running,
+        "status": "running now" if running else ("ended" if end is not None and end <= current else "upcoming"),
+        "by": fact.get("author") or "unknown",
+    }
+
+
+def overlaps(fact: dict, start: datetime, end: datetime) -> bool:
+    """The event runs at the moment `start` (start == end) or overlaps the period [start, end)."""
+    begins, ends = as_time(fact.get("valid_from")), as_time(fact.get("valid_to"))
+    if start == end:
+        return begins <= start and (ends is None or start < ends)
+    return begins < end and (ends is None or ends > start)
+
+
+def all_events(bm: BuildingMap, store, current: datetime) -> list[dict]:
+    """Every event of the building (past, running, upcoming), never a resolved one."""
+    return [
+        fact_dict(fact)
+        for fact in store.query(bm, status="all", at=current)
+        if fact.kind == "event" and not fact.resolves and fact.status != "resolved"
+    ]
+
+
+def search_events(
+    bm: BuildingMap,
+    store,
+    current: datetime,
+    query: str | None = None,
+    when: str | None = None,
+    space_ids: set[str] | None = None,
+) -> tuple[list[dict], EventWindow | None]:
+    """Events (store dicts) matching title words, time and rooms, sorted by start. Without a time: every matching
+    event when a title is named, else the ones not ended yet."""
+    window = event_window(when, current)
+    events = all_events(bm, store, current)
+    if space_ids:
+        events = [fact for fact in events if set(event_spaces(bm, fact)) & space_ids]
+    if window is not None:
+        events = [fact for fact in events if overlaps(fact, window.start, window.end)]
+    if query and title_score(query, query):
+        scores = [title_score(query, fact.get("text") or "") for fact in events]
+        best = max(scores, default=0)
+        events = [fact for fact, score in zip(events, scores, strict=True) if best and score == best]
+    elif window is None:
+        events = [fact for fact in events if as_time(fact.get("valid_to")) > current]
+    events.sort(key=lambda fact: (as_time(fact.get("valid_from")), fact.get("text") or ""))
+    return events, window
+
+
+def room_free(bm: BuildingMap, store, space_id: str, current: datetime, when: str | None = None) -> dict:
+    """Is the room free at that moment (or for that whole period)? {free, time, busy_with: [event lines]}; without
+    `when` it means now. Time words it cannot read give only the question back, never a guess at `free`."""
+    window = event_window(when, current)
+    if window is None and when and str(when).strip():
+        return {"time_not_understood": when, "question": ASK_WHEN}
+    window = window or EventWindow(current, current, "now")
+    busy = [
+        fact
+        for fact in all_events(bm, store, current)
+        if space_id in event_spaces(bm, fact) and overlaps(fact, window.start, window.end)
+    ]
+    return {
+        "free": not busy,
+        "time": window.words,
+        "busy_with": [event_line(bm, fact, current) for fact in busy],
+    }
+
+
 # ---------- confirm_change calls this for remember and resolve ----------
 
 
@@ -778,7 +1006,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
         if not filters:
             filters = {"space_id": anchor.space_id}
         facts = [fact_dict(f) for f in store.query(bm, at=current, **filters)]
-        return [f for f in facts if f.get("status") == "open"]
+        return [f for f in facts if f.get("status") == "open" and f.get("kind") != "event"]
 
     def only_open_match(place: str | None) -> Anchor | None:
         """The anchor of the one open fact whose place the words name, when the words alone match several places."""
@@ -787,6 +1015,8 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             return None
         anchors = {}
         for fact in store_of(state).query(bm, at=now()):
+            if fact.kind == "event":  # a booking is never 'fixed'
+                continue
             found = fact.anchor or {}
             label = anchor_label(bm, found)
             if wanted <= set(words_of(label)):
@@ -940,7 +1170,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             if value:
                 filters[name] = value.strip().lower().replace(" ", "_") if name == "asset_type" else value.strip()
         try:
-            facts = [fact_dict(f) for f in store.query(bm, **filters)]
+            facts = [fact_dict(f) for f in store.query(bm, **filters) if f.kind != "event"]  # events: find_events
         except (MapError, ValueError, KeyError) as error:
             raise ToolError(str(error)) from error
         bm.found_facts = facts
@@ -961,4 +1191,71 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             result["say"] = "Say the photo is on screen." if photos else "Say there is no photo there."
         return as_json(result)
 
-    return [remember_here, resolve_here, facts_here]
+    def event_rooms(place: str) -> set[str] | dict:
+        """The room(s) a place names for events; a name several rooms share is narrowed to rooms with events,
+        else the question to ask comes back as a dict."""
+        if is_here(place):
+            here = getattr(getattr(state, "position", None), "space_id", None)
+            if here is None:
+                return {"where_are_you": True, "question": "Where are you? Name the room."}
+            return {here}
+        try:
+            return {resolve_anchor(bm, state, place).space_id}
+        except NeedsAnswer as asked:
+            wanted = set(words_of(place)) - TITLE_STOP
+            rooms = {
+                space
+                for fact in all_events(bm, store_of(state), now())
+                for space in event_spaces(bm, fact)
+                if wanted
+                and wanted
+                <= {stem(w) for w in words_of(bm.spaces[space]["name"])} | set(words_of(bm.spaces[space]["name"]))
+            }
+            return rooms if len(rooms) == 1 else asked.payload
+
+    @beta_tool
+    def find_events(query: str | None = None, when: str | None = None, place: str | None = None) -> str:
+        """Events, sessions, deadlines and room bookings with their time and room: 'where are the pitches?'
+        (query='pitches'), 'wann ist der Code Freeze?' (query='code freeze'), 'what is on this afternoon?'
+        (when='this afternoon'), 'what is happening now?' (when='now'), 'is the Project Room free at 10:00?'
+        (place='Project Room', when='at 10:00'; the result says free and busy_with). Say title, room and time from
+        the result only, then offer the way there (give_directions to the room). Never for a message with 'Answer:'.
+
+        Args:
+            query: Words of the event's title as the person said them ('pitches', 'lunch', 'code freeze'); leave it
+                out for 'is room X free'.
+            when: The person's time words ('now', 'today', 'at 14:00', 'um 15 Uhr', 'this afternoon').
+            place: A room the person asks about ('Project Room', 'seminar room').
+        """
+        if benchmark(state):
+            raise ToolError("No events in a message with 'Answer:'. Answer the question only.")
+        store = store_of(state)
+        current = now()
+        rooms = event_rooms(place) if place else None
+        if isinstance(rooms, dict):
+            return as_json(rooms)
+        if when and str(when).strip() and event_window(when, current) is None:
+            return as_json({"time_not_understood": when, "question": ASK_WHEN, "say": "Ask this question only."})
+        events, window = search_events(bm, store, current, query, when, rooms)
+        lines = [event_line(bm, fact, current) for fact in events]
+        bm.found_facts = events
+        result: dict = {"now": f"today {clock_words(current)}", "count": len(lines), "events": lines[:5]}
+        if window is not None:
+            result["time"] = window.words
+        if rooms:
+            space_id = min(rooms)
+            result["place"] = room_label(bm, space_id)
+            if not query:
+                result.update(room_free(bm, store, space_id, current, when))
+        if lines:
+            result["say"] = (
+                "Name each event with title, room and time from this result only (at most three), then offer the "
+                "way to its room."
+            )
+        elif result.get("free"):
+            result["say"] = "Say the room is free then; invent nothing."
+        else:
+            result["say"] = "Nothing matching is planned; say so, invent no event, time or room."
+        return as_json(result)
+
+    return [remember_here, resolve_here, facts_here, find_events]

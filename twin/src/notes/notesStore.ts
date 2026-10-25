@@ -13,7 +13,7 @@ import { metresLeft, readable } from "../walkInfo";
 import { normalizeSpeech } from "../wake";
 import { prettyType } from "../model/palette";
 import { endRound, useRound, type RoundStop } from "../round/round";
-import { isCurrent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
+import { isCurrent, isUpcomingEvent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
 
 /** The name notes are signed with until the person types their own (remembered per device). */
 export const DEFAULT_AUTHOR = "Technician";
@@ -244,7 +244,7 @@ export function notesIn(spaceIds: Iterable<string>): Note[] {
   const now = Date.now();
   return useNotes
     .getState()
-    .notes.filter((note) => note.kind !== "closure" && ids.has(note.anchor.space_id) && isCurrent(note, now))
+    .notes.filter((note) => note.kind !== "closure" && ids.has(note.anchor.space_id) && (isCurrent(note, now) || isUpcomingEvent(note, now)))
     .sort(newestFirst);
 }
 

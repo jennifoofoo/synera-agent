@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { downscalePhoto, endedLabel, sinceLabel, type Note } from "../notes/notes";
+import { downscalePhoto, endedLabel, eventLabel, sinceLabel, type Note } from "../notes/notes";
 import {
   DEFAULT_AUTHOR,
   addNote,
@@ -105,15 +105,24 @@ function NoteRow({ note, past = false }: { note: Note; past?: boolean }) {
   const model = useTwin((s) => s.model);
   const asset = note.anchor.asset_id ? model?.assetById.get(note.anchor.asset_id)?.name : null;
   const undo = !past && canUndo(note);
-  const resolve = !past && !undo && canResolve(note);
+  const event = note.kind === "event";
+  const resolve = !past && !undo && !event && canResolve(note);
   return (
     <li className={`note-row ${past ? "past" : ""}`}>
       <NoteThumb photo={note.photo} />
       <div className="note-row-body">
         <div className="note-meta">
           {note.kind === "issue" && <span className="note-kind">Problem</span>}
-          <strong>{note.author || "Someone"}</strong> · {sinceLabel(note, false)}
-          {past ? ` · ${endedLabel(note)}` : ""}
+          {event && <span className="note-kind event">Event</span>}
+          {event ? (
+            eventLabel(note)
+          ) : (
+            <>
+              <strong>{note.author || "Someone"}</strong> · {sinceLabel(note, false)}
+            </>
+          )}
+          {event && note.author ? ` · by ${note.author}` : ""}
+          {past && !event ? ` · ${endedLabel(note)}` : ""}
           {asset && <span> · {asset}</span>}
         </div>
         {note.text && <p className="note-text">{note.text}</p>}

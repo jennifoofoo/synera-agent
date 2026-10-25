@@ -5,8 +5,9 @@
 
 import type { Point } from "../api/types";
 
-export type FactKind = "note" | "issue" | "closure";
-export type FactStatus = "open" | "resolved" | "expired";
+export type FactKind = "note" | "issue" | "closure" | "event";
+/** "future": an event that has not started yet (only events may start later, docs/specs/events.md). */
+export type FactStatus = "open" | "resolved" | "expired" | "future";
 
 export interface FactAnchor {
   space_id: string;
@@ -347,6 +348,19 @@ export function sinceLabel(fact: Fact, withAuthor = true, now = Date.now()): str
   const by = withAuthor && fact.author ? `, by ${fact.author}` : "";
   const until = fact.valid_to && isCurrent(fact, now) ? ` · until ${whenLabel(fact.valid_to, now)}` : "";
   return `since ${whenLabel(fact.valid_from, now)}${by}${until}`;
+}
+
+/** An event's time: "today 14:00 to 16:00", "yesterday 09:00 to today 18:00". */
+export function eventLabel(fact: Fact, now = Date.now()): string {
+  const start = whenLabel(fact.valid_from, now);
+  if (!fact.valid_to) return start;
+  const sameDay = new Date(fact.valid_from).toDateString() === new Date(fact.valid_to).toDateString();
+  return `${start} to ${sameDay ? clockLabel(fact.valid_to) : whenLabel(fact.valid_to, now)}`;
+}
+
+/** Events not ended yet (running or later), for "What's here?" next to the current notes. */
+export function isUpcomingEvent(fact: Fact, now = Date.now()): boolean {
+  return fact.kind === "event" && fact.status !== "resolved" && (!fact.valid_to || Date.parse(fact.valid_to) > now);
 }
 
 /** For past facts in the history list: "resolved today 12:40" / "expired yesterday 18:00". */

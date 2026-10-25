@@ -1,0 +1,119 @@
+"""Seed today's hackathon events and room bookings for the demo building (Munich Urban Colab, plan-89323a15), so Wanda
+can answer "Where are the pitches?" or "Is the Project Room free at 10:00?" (docs/specs/events.md).
+
+    uv run python scripts/demo_events_seed.py [building_dir] [--root agent_output/knowledge]
+
+Dates are relative to today (Europe/Berlin). Idempotent: an event with the same title and start is skipped, and a
+demo event seeded on another day is replaced by today's (no second hackathon on day two). Events never change routes. Demo data only, never for benchmark buildings.
+"""
+
+import argparse
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+from building_agent.agent import KNOWLEDGE_ROOT
+from building_agent.knowledge import KnowledgeStore, berlin_now, parse_time
+from starter_agent.building_map import BuildingMap
+
+DEFAULT_BUILDING = Path("agent_output") / "buildings" / "plan-89323a15"
+
+# Rooms as (space id suffix, name): anchored by id, which stays when the plan's room names change; the name is the
+# fallback and the printout.
+FOYER = ("F0-S012", "Foyer")
+SEMINAR = ("F1-S002", "Seminar Rooms 1-3")
+AUDITORIUM = ("F0-S013", "Auditorium (Arena)")
+CAFE = ("F0-S014", "Café")
+PROJECT_ROOM = ("F0-S002", "Project Room")
+PROJECT_ROOM_WEST = ("F0-S001", "Project Room West")
+
+# (title, rooms (first = anchor), start (days from today, hour, minute), end (days, hour, minute), organiser)
+EVENTS = [
+    ("Manage & More × UVC × Anthropic Hackathon", [FOYER, SEMINAR], (-1, 9, 0), (0, 18, 0), None),
+    ("Code freeze", [FOYER], (0, 13, 0), (0, 13, 15), None),
+    ("Pitches", [AUDITORIUM], (0, 14, 0), (0, 16, 0), None),
+    ("Lunch", [CAFE], (0, 12, 30), (0, 13, 30), None),
+    ("Project Room booked: Team Synera", [PROJECT_ROOM], (0, 9, 0), (0, 12, 0), "Leonie"),
+    ("Project Room West booked: Jury prep", [PROJECT_ROOM_WEST], (0, 13, 0), (0, 14, 0), None),
+]
+
+
+def room_id(bm: BuildingMap, room: tuple[str, str]) -> str:
+    """The room by id (<building id>-<suffix>) when its name matches; else the room with that name; else the id alone
+    (the plan renamed it). Stops when neither exists."""
+    suffix, name = room
+    space_id = f"{bm.data['building']['id']}-{suffix}"
+    if space_id in bm.spaces and bm.spaces[space_id]["name"] == name:
+        return space_id
+    found = [space["id"] for space in bm.spaces.values() if space["name"] == name]
+    if found:
+        return found[0]
+    if space_id in bm.spaces:
+        return space_id
+    raise SystemExit(f"No room {space_id} or named {name!r} in this building.")
+
+
+def at_day(today: datetime, days: int, hour: int, minute: int) -> datetime:
+    return (today + timedelta(days=days)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+
+def seed_events(bm: BuildingMap, store: KnowledgeStore, now: datetime | None = None, quiet: bool = False) -> int:
+    """Add the demo events around `now` (default: the real time). Returns how many were added."""
+    current = berlin_now(now)
+    today = current.replace(hour=0, minute=0, second=0, microsecond=0)
+    planned = {(title, parse_time(at_day(today, *start))) for title, _, start, _, _ in EVENTS}
+    titles = {title for title, _ in planned}
+    with store.lock:  # demo events seeded on another day go (the store has no delete call, so edit its list)
+        facts = store.load(bm)
+        kept = [
+            fact
+            for fact in facts
+            if not (
+                fact.kind == "event" and fact.text in titles and (fact.text, parse_time(fact.valid_from)) not in planned
+            )
+        ]
+        if len(kept) != len(facts):
+            store.save(bm, kept)
+            if not quiet:
+                print(f"{len(facts) - len(kept)} demo events from another day replaced.")
+    known = {
+        (fact.text, parse_time(fact.valid_from))
+        for fact in store.query(bm, status="all", at=current)
+        if fact.kind == "event"
+    }
+    added = 0
+    for title, rooms, start, end, organiser in EVENTS:
+        begins, ends = at_day(today, *start), at_day(today, *end)
+        if (title, parse_time(begins)) in known:
+            continue
+        ids = [room_id(bm, name) for name in rooms]
+        store.add(
+            bm,
+            kind="event",
+            anchor={"space_id": ids[0]},
+            related=ids[1:],
+            text=title,
+            valid_from=begins,
+            valid_to=ends,
+            author=organiser,
+            now=current,
+        )
+        added += 1
+        if not quiet:
+            print(f"{begins:%a %d.%m %H:%M} to {ends:%H:%M}  {', '.join(name for _, name in rooms):34}  {title}")
+    if not quiet:
+        print(f"{added} events added, {len(EVENTS) - added} already there ({bm.data['building']['id']}).")
+    return added
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("building_dir", type=Path, nargs="?", default=DEFAULT_BUILDING)
+    parser.add_argument("--root", type=Path, default=KNOWLEDGE_ROOT)
+    arguments = parser.parse_args()
+    seed_events(BuildingMap.load(arguments.building_dir), KnowledgeStore(arguments.root))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

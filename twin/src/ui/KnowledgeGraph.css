@@ -29,6 +29,7 @@
 .kg-node.more > circle:not(.kg-hit) { fill: var(--paper-2); stroke: none; }
 .kg-node.note > rect { fill: var(--surface); stroke: var(--ink); }
 .kg-node.issue > rect { fill: var(--ink); stroke: var(--ink); }
+.kg-node.event > rect { fill: var(--surface); stroke: var(--ink); stroke-dasharray: 3 2; }
 .kg-node.closure > rect { fill: var(--surface); stroke: var(--danger); stroke-width: 2; }
 .kg-node .kg-bar { stroke: var(--danger); stroke-width: 2; }
 .kg-node.person > circle:not(.kg-hit) { fill: var(--paper-2); stroke: var(--ink-2); }
@@ -74,6 +75,7 @@
   border: 1.25px solid var(--ink); font-size: 11px; font-weight: 600;
 }
 .kg-num.issue { background: var(--ink); color: var(--surface); border-radius: 50%; }
+.kg-num.event { border-style: dashed; }
 .kg-num.closure { border-color: var(--danger); color: var(--danger); border-radius: 50%; }
 .kg-fact-text { min-width: 0; overflow-wrap: anywhere; }
 .kg-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 6px; border-top: 1px solid var(--hairline); }
