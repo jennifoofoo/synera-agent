@@ -36,10 +36,12 @@ export function Welcome() {
     if (spaces.some((s) => is(s, "food", FOOD_NAME))) out.push("Where can I get a coffee?");
     const named = (g: string, name?: RegExp) =>
       spaces.find((s) => (name ? is(s, g, name) : group(s) === g) && s.name.trim() && s.type !== "corridor");
-    const place = named("production") ?? named("meeting", MEETING_NAME);
+    // Everyday questions first (toilet, coffee, a meeting room, the way out); the closed-lift what-if only fills up.
+    const place = named("meeting", MEETING_NAME) ?? named("production");
     if (place) out.push(`Where is ${place.name}?`);
+    if (model.building.openings.some((o) => o.kind === "entrance")) out.push("Where is the nearest exit?");
     const lift = [...model.connectorById.values()].find((c) => c.kind === "lift" && c.name.trim());
-    if (lift) out.push(`What if ${lift.name} is closed?`);
+    if (lift && out.length < 4) out.push(`What if ${lift.name} is closed?`);
     return out.slice(0, 4);
   }, [model]);
 
