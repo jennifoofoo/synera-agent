@@ -15,6 +15,7 @@ from building_agent import routing
 from building_agent.campus_tools import CampusHolder
 from building_agent.exit_tools import EMERGENCY_RULES, is_emergency
 from building_agent.guide_tools import GuideState
+from building_agent.position import page_note
 from building_agent.question_parser import answer_deterministic
 from building_agent.registry import load_kinds
 from building_agent.tools import make_tools
@@ -192,11 +193,14 @@ class Agent(StarterAgent):
         prompt = base + EMERGENCY_RULES if urgent or self.emergency else base  # this turn only
         self.emergency = urgent
         self.system[0]["text"] = with_voice_rules(prompt, voice, user_text)  # this turn only
+        told = getattr(self.guide, "told_position", None)
+        note = page_note(self.map, self.guide)  # a position tapped on the page since the last message
         try:
-            reply = self.run_tools(user_text)
+            reply = self.run_tools(f"{note}\n{user_text}" if note else user_text)
             return question_last(reply) if voice_applies(voice, user_text) else reply
         except Exception:
             del self.messages[mark:]
+            self.guide.told_position = told  # the note left the history with the turn: send it again next time
             raise
         finally:
             self.system[0]["text"] = base

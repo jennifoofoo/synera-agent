@@ -261,3 +261,12 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 - Basement from U.02 (photo hangs turned 90°, anchored on the lift): Car Park (visible part), Main Stairs (joins V02), Lift (V01), Basement Corridor, Storage B.01–B.04, Server Room 1/2, Fire Alarm Panel, Emergency Radio, Main Switchboard; 4 extinguishers, 1 call point. Storage B.01 → Foyer 43.3 m. Round Basement from the lift: 4 extinguishers, 2 stops, 39.6 m. Script `add_basement.py`. All four floors done; preflight 25 OK / 5 WARN / 0 FAIL.
 - Bonus Floor 2 from a new photo OG2-04 (photos/OG2-04_floor2.jpeg): 22 spaces (Meeting Room 2.01–2.04, Side Room, core, Lift Lobby, Open Office, Think Tank 2.01, Terrace East, Office 2.01–2.05, Void), 5 extinguishers, 1 call point (the plan shows only one; no kitchenette drawn, so no first aid kit); crop `crops/OG2-04_floor2.jpg`; V01/V02 now B1–F4 on every floor. Round F2 from Main Stairs: 5 extinguishers, 3 stops, 44.4 m. Floor 3 numbers unchanged (Café → Meeting Room 3.03 71.1 m, round 127.9 m). Script `add_floor2.py`.
 - ~10:40 merged origin/main (round-per-device). One stop per device now: Floor 3 from Main Stairs 6 stops, 114.2 m (from Lift 104.5 m); Floor 2 from Main Stairs 5 stops, 99.1 m; ground floor from South Corridor 12 stops, 172.2 m. Demo-building and round tests (26) green.
+## Jennifer an Leonie (Sonntag ~10:44): Tipps fürs Demo-Video
+Aus einem UI-Check mit Screenshots (Vorschau 8815, Laptop und iPhone, Urban Colab). Diese Stellen beim Dreh umgehen:
+- **Nicht von "Main Stairs" starten.** Die Treppe gibt es auf beiden Etagen, Wanda fragt zurück und zeichnet keine Route. Eindeutigen Start nehmen, z. B. "from the Project Room West to the Café".
+- **Nicht die Kaffee-Frage aus den Vorschlägen.** Die Antwort beginnt mit "There's no coffee machine" und klingt unsicher. Nächste Toilette oder nächster Ausgang wirken stärker.
+- **Handy: Begrüßungskarte vor der Aufnahme schließen.** Der dritte Vorschlag ist dort abgeschnitten.
+- **Laptop: Runde erst nach einer Frage öffnen.** Solange der Chat die Begrüßung zeigt, liegt das Runden-Panel halb über dem Text.
+- **Notizenliste nur kurz zeigen.** Viele Einträge sind von "Someone", das wirkt wie Testdaten.
+- **Bei hervorgehobenen Zielen nicht ganz reinzoomen.** Die Füllfarbe wirkt aus der Nähe matt.
+- Handy-Sheet: bei Rückfragen erscheint manchmal ein Meta-Satz wie "I'll ask which one." Wenn er im Bild ist, die Szene neu aufnehmen.

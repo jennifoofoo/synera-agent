@@ -68,7 +68,8 @@
 }
 .sidebar .sb-tools .round-toggle svg, .sidebar .sb-tools .notes-fab svg, .sidebar .sb-tools .notes-layer svg { width: 16px; height: 16px; color: currentColor; }
 .sidebar .sb-tools .round-toggle:hover, .sidebar .sb-tools .notes-fab:hover, .sidebar .sb-tools .notes-layer:hover { background: var(--paper-2); color: var(--ink); }
-.sidebar .sb-tools .notes-layer.on { background: var(--signal-soft); color: var(--signal-dark); }
+.sidebar .sb-tools .notes-layer.on,
+.sidebar .sb-tools [aria-pressed="true"] { background: var(--signal-soft); color: var(--signal-dark); }
 .sidebar .sb-tools .notes-count { min-width: 18px; height: 18px; line-height: 18px; font-size: 11px; }
 /* an open round panel takes the column's width under the tools (its own card is styled by the round session) */
 .sidebar .sb-tools .round-panel { position: relative; left: auto; top: auto; width: 100%; flex-basis: 100%; max-height: 50vh; margin: 6px 0 0; }

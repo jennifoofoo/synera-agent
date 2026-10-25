@@ -107,6 +107,12 @@ def test_trackpad_swipe_pans_and_pinch_zooms(mode, page_in):
     assert not errors, errors
 
 
+def pick_more(page, test_id):
+    """North up and tilt sit behind the floor rail's "…" menu (FloorRail.tsx); it closes after each pick."""
+    page.get_by_test_id("rail-more").click()
+    page.get_by_test_id(test_id).click()
+
+
 @pytest.mark.parametrize("mode", ["3d", "2d"])
 def test_alt_wheel_rotates_and_compass_resets_north(mode, page_in):
     page, errors = page_in(mode)
@@ -116,7 +122,7 @@ def test_alt_wheel_rotates_and_compass_resets_north(mode, page_in):
     assert abs(turned["azimuth"] - before["azimuth"]) > 0.2, (before, turned)
     assert math.dist(before["target"], turned["target"]) < 0.5, "Alt + swipe must not pan"
 
-    page.get_by_test_id("compass").click()
+    pick_more(page, "compass")
     reset = settle(page, 1500)
     assert abs(math.remainder(reset["azimuth"], 2 * math.pi)) < 0.02, reset
     assert reset["polar"] < 0.1, "the compass turns the view straight down"
@@ -149,11 +155,11 @@ def test_alt_drag_and_tilt_buttons_tilt_within_the_limit(page_in):
     assert swiped["polar"] > 0.5, swiped
 
     # The tilt buttons: steeper goes towards top-down, flatter towards the horizon but never past MAX_TILT.
-    page.get_by_test_id("tilt-steeper").click()
+    pick_more(page, "tilt-steeper")
     steeper = settle(page, 1000)
     assert steeper["polar"] < swiped["polar"] - 0.1, (swiped, steeper)
     for _ in range(12):
-        page.get_by_test_id("tilt-flatter").click()
+        pick_more(page, "tilt-flatter")
         page.wait_for_timeout(60)
     flattest = settle(page, 1200)
     assert flattest["polar"] > steeper["polar"] + 0.2, (steeper, flattest)

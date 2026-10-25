@@ -31,15 +31,22 @@ import {
 import { PhoneSheet } from "./PhoneSheet";
 import "./Round.css";
 
-/** The "Round" button over the map (and the #round= trigger). The card is RoundCard, in the dock. */
-export function Round() {
+/** The "Round" button over the map (and the #round= trigger). The card is RoundCard, in the dock.
+ * `docked` (laptop tool row): the button stays while the round is open, pressed, so the row never shifts. */
+export function Round({ docked = false }: { docked?: boolean }) {
   const model = useTwin((s) => s.model);
   const walking = useTwin((s) => s.walkStep !== null);
   const shown = useRound((s) => s.open || (s.guiding && !!s.plan));
   useHashTrigger();
-  if (!model || walking || shown) return null;
+  if (!model || walking || (shown && !docked)) return null;
   return (
-    <button className="round-toggle" onClick={() => void openRound()} title="Plan an inspection round" aria-label="Inspection round">
+    <button
+      className="round-toggle"
+      onClick={() => (shown ? closeRound() : void openRound())}
+      title={shown ? "Close the inspection round" : "Plan an inspection round"}
+      aria-label="Inspection round"
+      aria-pressed={docked ? shown : undefined}
+    >
       <RoundIcon /> Round
     </button>
   );

@@ -302,7 +302,7 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
   let bottom = -Infinity;
   for (const node of nodes) {
     const lineCount = node.lines?.length ?? 0;
-    const above = node.ring === 1 ? (lineCount * LINE_H + (node.hasFacts ? TYPE_H : 0)) / 2 : 0;
+    const above = node.ring === 1 ? (lineCount * LINE_H) / 2 : 0;
     const below = node.role === "person" ? PERSON_R + 6 + lineCount * LINE_H : above;
     const body = node.ring === 0 ? ROOM_R + 3 : node.ring === 2 ? FACT_R : node.ring === 3 ? PERSON_R : ASSET_R + 2;
     top = Math.min(top, node.y - Math.max(body, above));
@@ -319,7 +319,6 @@ export const ASSET_R = 7;
 export const FACT_R = 10;
 export const PERSON_R = 12;
 export const LINE_H = 12;
-export const TYPE_H = 11;
 
 /** The flagged items on evenly spaced slots (so things with notes do not bunch up), the rest in order between. */
 export function spreadOut<T>(items: T[], flagged: (item: T) => boolean): T[] {

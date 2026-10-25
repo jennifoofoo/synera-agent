@@ -9,6 +9,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   GET  /api/building?key=dev/...        floors, spaces, openings, connectors, assets, state
   POST /api/route    {start, destination, step_free, via: [], start_point?: {x, y, floor_id?}, destination_point?: {x, y}}
   POST /api/route/clear
+  POST /api/fresh    {building}   a fresh page load: drops position, route and the chat conversation (edits stay)
   POST /api/step_free {building, enabled}  step-free mode on/off (the page chip's ×); state.step_free, see docs/specs/step-free-mode.md
   POST /api/close    {element, closed: true|false}       lift/stairs/door/room id or name
   POST /api/door     {first, second, step_free}
@@ -71,7 +72,7 @@ from urllib.parse import parse_qs, urlparse
 from building_agent.knowledge import DEFAULT_ROOT as KNOWLEDGE_ROOT
 from building_agent.knowledge import KnowledgeError, KnowledgeStore
 from building_agent.pace_guide import pace_kwargs, without_tick_keys
-from building_agent.structured import located_entries
+from building_agent.structured import located_entries, located_spaces
 from building_agent.voice_rules import voice_kwargs
 from starter_agent.building_map import BuildingMap, MapError
 from web import api, campus_api, knowledge_api, level4_api, speech, transfer
@@ -327,15 +328,17 @@ class App:
                 result = {**result, "here_ignored": here.reason}
             elif here.note:
                 result = {**result, "here_note": here.note}
-            session.position = chat.position_view()
-            session.guide_info = chat.guide_info()
-            session.step_free = chat.step_free(session.step_free)
             saved_path = result.pop("saved_path", None)
             with self.lock:
                 current = self.session(key)
                 level4 = self.level4.chat_info()
-                if current is not session:  # the building was reset while the agent was thinking
+                # The building was reset, or a fresh page load replaced the conversation, while the agent was
+                # thinking: this turn's position, guide and step-free belong to the old one and are not written back.
+                if current is not session or self.chats.get(key) is not chat:
                     return 200, {**result, "stale": True, "state": api.state_view(current), "level4": level4}
+                session.position = chat.position_view()
+                session.guide_info = chat.guide_info()
+                session.step_free = chat.step_free(session.step_free)
                 session.adopt_agent_route(previous_route, version)
                 opened = self.open_saved(chat, saved_path) if saved_path else None
                 if opened:  # the page switches to the new building and fetches it from /api/building
@@ -343,14 +346,18 @@ class App:
                         **result,
                         "opened": opened,
                         "located": [],
+                        "located_spaces": [],
                         "state": api.state_view(session),
                         "level4": level4,
                     }
                 located = [] if result.get("error") else located_entries(session.map, result.get("reply", ""))
+                here_space = (session.position or {}).get("space_id")
+                rooms = [] if result.get("error") else located_spaces(session.map, result.get("reply", ""), here_space)
                 knowledge = knowledge_api.chat_fields(session.map, key)
                 return 200, {
                     **result,
                     "located": located,
+                    "located_spaces": rooms,
                     **knowledge,
                     "state": api.state_view(session),
                     "level4": level4,
@@ -408,6 +415,11 @@ class App:
                     view = {"ok": False, "error": str(error)}
                 return 200, {"round": view, "state": api.state_view(session)}
             if path == "/api/route/clear":
+                return 200, api.clear_route(session)
+            if path == "/api/fresh":  # a fresh page load: nothing from an earlier load or another tab carries over
+                self.chats.pop(key, None)  # new conversation: no old position, walk or 'Where are you?' history
+                self.chat(key).set_step_free(session.step_free)  # step-free stays on (the chip still shows it)
+                session.position = session.guide_info = None
                 return 200, api.clear_route(session)
             if path == "/api/here/clear":  # the "You are here" chip's x: forget the position, no chat turn
                 chat = self.chat(key)

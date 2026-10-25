@@ -1,4 +1,4 @@
-// Planner list (laptop only): one small "List" button top right opens a slim sheet beside the 3D with three
+// Planner list (laptop only): "All rooms and things" in the building menu (TopBar.tsx) or L opens a slim sheet beside the 3D with three
 // sections, no tabs: Changes (everything that differs from the loaded building), Rooms and Things (grouped by
 // floor, searchable). Tap = fly + select. Keys: L toggles, Esc closes, arrows move between rows.
 // Every fact comes from `state` / `model` (the API); "What changes?" asks the agent and only shows its words.
@@ -9,7 +9,7 @@ import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { withoutAnswerLine } from "../voice";
-import { useNewBuilding } from "./newBuildingStore";
+import { create } from "zustand";
 import "./Planner.css";
 
 const IMPACT = "impact";
@@ -26,11 +26,18 @@ interface Row {
   undo?: { label: string; run: () => void };
 }
 
+/** Open state of the list sheet: the building menu (TopBar) opens it, L toggles, Esc closes. */
+export const usePlannerList = create<{ open: boolean; setOpen: (open: boolean) => void }>((set) => ({
+  open: false,
+  setOpen: (open) => set({ open }),
+}));
+
 export function Planner() {
   const profile = useTwin((s) => s.profile);
   const model = useTwin((s) => s.model);
   const draft = useTwin((s) => s.draft);
-  const [open, setOpen] = useState(false);
+  const open = usePlannerList((s) => s.open);
+  const setOpen = usePlannerList((s) => s.setOpen);
   const enabled = profile === "planner" && !!model && !draft;
 
   useEffect(() => {
@@ -45,35 +52,16 @@ export function Planner() {
         setOpen(false);
       } else if (!typing && (event.key === "l" || event.key === "L")) {
         event.preventDefault();
-        setOpen((value) => !value);
+        setOpen(!usePlannerList.getState().open);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, open]);
+  }, [enabled, open, setOpen]);
 
   if (!enabled) return null;
   return (
     <>
-      <button
-        type="button"
-        className="planner-add"
-        aria-label="New building"
-        title="New building (upload floor plans)"
-        onClick={() => useNewBuilding.getState().open()}
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </button>
-      <button
-        className={`planner-toggle ${open ? "active" : ""}`}
-        onClick={() => setOpen(!open)}
-        title="Rooms, things and changes (L)"
-        aria-expanded={open}
-      >
-        List
-      </button>
       {open && <Sheet model={model!} onClose={() => setOpen(false)} />}
     </>
   );
