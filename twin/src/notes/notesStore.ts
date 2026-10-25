@@ -9,6 +9,7 @@ import { closedOnRoute } from "../model/closures";
 import { useTwin, walkSteps } from "../store";
 import { isSpeaking, speak, speechPending } from "../voice";
 import { metresLeft, readable } from "../walkInfo";
+import { normalizeSpeech } from "../wake";
 import { newNoteId, notesStorage, whenLabel, type Note } from "./notes";
 
 export const AUTHORS = ["Klaus", "Tom"] as const;
@@ -435,6 +436,26 @@ function reportSpeech(job: Job): string {
   return parts.join(" ");
 }
 
+const NOTE_SAID = /^\s*(?:note|take a note|make a note|merk dir|merke dir|merk|notiz|notiere)\b\s*(?:that|this|here|hier|dass|das)?\s*[:,.-]?\s*(.+)$/i;
+const HERE_SAID = /^(?:what'?s here|what is here|any notes(?: here)?|notes here|was gibt'?s hier|was gibt es hier|gibt es hier notizen)$/;
+const FINISH_SAID = /^(?:finished|i'?m finished|i am finished|job done|finish(?: the)? job|end(?: the)? job|fertig|ich bin fertig|feierabend|auftrag fertig)$/;
+
+/** One call for the hands-free handler: a notes command ("note: …", "what's here", "finished") runs here and
+ * returns the sentence to speak; anything else returns null. While walking, "finished"/"fertig" before the last step
+ * is left to the walking commands ("fertig" = next station). */
+export function notesCommand(text: string): Promise<string> | null {
+  const note = NOTE_SAID.exec(text);
+  if (note && note[1].trim().length > 1) return addNoteHere(note[1].trim());
+  const said = normalizeSpeech(text).replace(/^(?:please|bitte) /, "").replace(/ (?:please|bitte)$/, "");
+  if (HERE_SAID.test(said)) return Promise.resolve(notesHere());
+  if (FINISH_SAID.test(said)) {
+    const { walkStep } = useTwin.getState();
+    if (walkStep !== null && walkStep < walkSteps().length - 1 && said === "fertig") return null;
+    return Promise.resolve(finishJob());
+  }
+  return null;
+}
+
 if (typeof window !== "undefined") {
-  (window as unknown as { __twinNotes: unknown }).__twinNotes = { useNotes, addNoteHere, notesHere, finishJob, openNotes, spacesAtStep };
+  (window as unknown as { __twinNotes: unknown }).__twinNotes = { useNotes, addNoteHere, notesHere, finishJob, notesCommand, openNotes, spacesAtStep };
 }

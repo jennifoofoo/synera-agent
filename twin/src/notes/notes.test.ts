@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { durationLabel, whenLabel } from "./notes";
-import { spacesNamed } from "./notesStore";
+import { notesCommand, spacesNamed } from "./notesStore";
 
 const model = {
   spaceById: new Map([
@@ -37,5 +37,18 @@ describe("labels", () => {
   it("gives durations in minutes and hours", () => {
     expect(durationLabel(4 * 60_000)).toBe("4 min");
     expect(durationLabel(65 * 60_000)).toBe("1 h 05 min");
+  });
+});
+
+describe("notesCommand", () => {
+  it("leaves everything else to the agent", () => {
+    expect(notesCommand("where is the kitchen")).toBeNull();
+    expect(notesCommand("next")).toBeNull();
+    expect(notesCommand("notebook on the desk?")).toBeNull();
+  });
+  it("takes note, what's here and finished (English and German)", () => {
+    for (const said of ["note: always release the left lever first", "Merk dir: Halterung locker", "what's here?", "Was gibt's hier", "finished", "Fertig"]) {
+      expect(notesCommand(said)).not.toBeNull();
+    }
   });
 });
