@@ -31,6 +31,9 @@ const MAX_POLAR = 1.3;
 /** The target sits this far ahead of the dot (3D, metres), so the dot stays in the lower third of the visible map,
  * clear of the step card or the bottom sheet. */
 const AHEAD_M = 5;
+/** Narrow frames: the lens widens (up to MAX_FOV degrees) until this much of the building shows across. */
+const VIEW_WIDTH_M = 22;
+const MAX_FOV = 80;
 /** 2D: metres across the shorter side of the canvas, and the share of it the target leads the dot. */
 const PLAN_SPAN_M = 26;
 const PLAN_AHEAD = 0.06;
@@ -87,6 +90,8 @@ export function FollowCam({ model, floorY }: Props) {
     polar: POLAR,
     distance: DISTANCE_M,
     zoom: 1,
+    fov: 0,
+    baseFov: 0,
     target: new THREE.Vector3(),
     want: new THREE.Vector3(),
     position: new THREE.Vector3(),
@@ -112,8 +117,18 @@ export function FollowCam({ model, floorY }: Props) {
     s.step = -1;
     s.needInit = true;
     s.pausedUntil = 0;
+    const lens = camera as THREE.PerspectiveCamera;
+    if (lens.isPerspectiveCamera) {
+      s.baseFov = lens.fov;
+      s.fov = lens.fov;
+    }
     invalidate();
     return () => {
+      // The wider lens used on narrow screens goes back with the view.
+      if (lens.isPerspectiveCamera && s.baseFov > 0 && lens.fov !== s.baseFov) {
+        lens.fov = s.baseFov;
+        lens.updateProjectionMatrix();
+      }
       if (s.published) {
         s.published = false;
         if (!walkWithMeDriving()) useWalkMotion.setState({ estimate: null, uncertaintyM: 0, arrived: false });
@@ -304,6 +319,8 @@ export function FollowCam({ model, floorY }: Props) {
         }
       }
     }
+    // A wider lens shows more ground per metre of lead: lead more to keep the dot in the lower third.
+    if (!flat && !ortho && s.baseFov > 0 && s.fov > 0) lead *= s.fov / s.baseFov;
     // Ahead of the dot along the smoothed heading: the walking direction is -(sin θ, cos θ) in world x/z.
     s.want.set(point.x - Math.sin(s.azimuth) * lead, y, -point.y - Math.cos(s.azimuth) * lead);
     const kMove = instant ? 1 : 1 - Math.exp(-dt / MOVE_TAU_S);
@@ -316,6 +333,19 @@ export function FollowCam({ model, floorY }: Props) {
     s.polar += (wantPolar - s.polar) * kFrame;
     s.distance += (wantDistance - s.distance) * kFrame;
     s.zoom += (wantZoom - s.zoom) * kFrame;
+    // Narrow frames (a phone under its sheet is about 0.3 wide) get a wider lens so that about VIEW_WIDTH_M of the
+    // building shows across at the dot; wide screens keep the lens as it is.
+    let wantFov = s.baseFov;
+    if (!ortho && !flat && s.baseFov > 0) {
+      const lens = camera as THREE.PerspectiveCamera;
+      const need = 2 * Math.atan(VIEW_WIDTH_M / 2 / (wantDistance * Math.max(0.1, lens.aspect)));
+      wantFov = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(need), s.baseFov, MAX_FOV);
+      s.fov += (wantFov - s.fov) * kFrame;
+      if (Math.abs(lens.fov - s.fov) > 1e-3) {
+        lens.fov = s.fov;
+        lens.updateProjectionMatrix();
+      }
+    }
 
     const sinPolar = Math.sin(s.polar);
     s.position.set(
@@ -327,7 +357,7 @@ export function FollowCam({ model, floorY }: Props) {
     if (ortho && Math.abs(camera.zoom - s.zoom) > 1e-3) void c.zoomTo(s.zoom, false);
 
     const settled =
-      gap < 0.01 && Math.abs(turn) < 0.002 && Math.abs(wantPolar - s.polar) < 0.002 && Math.abs(wantDistance - s.distance) < 0.01 && Math.abs(wantZoom - s.zoom) < 0.01;
+      gap < 0.01 && Math.abs(turn) < 0.002 && Math.abs(wantPolar - s.polar) < 0.002 && Math.abs(wantDistance - s.distance) < 0.01 && Math.abs(wantZoom - s.zoom) < 0.01 && Math.abs(wantFov - s.fov) < 0.05;
     if (moving || !settled) invalidate();
   });
 
