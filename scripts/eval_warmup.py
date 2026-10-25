@@ -68,7 +68,10 @@ def run(
         if oracle:
             reply = oracle_answer(question, bm)
         else:
-            session = Session(bm, OUTPUT_DIRECTORY / building_directory.name)
+            # The warm-up measures the benchmark kinds: Opus (the starter's model, or --model), not the page chat model.
+            session = Session(
+                bm, OUTPUT_DIRECTORY / building_directory.name, model=starter_module.MODEL, effort=starter_module.EFFORT
+            )
             try:
                 reply = session.ask(question["question"])
             except anthropic.APIError as error:

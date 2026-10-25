@@ -94,6 +94,14 @@ describe("egoGraph", () => {
     expect(ego.oldest).toBe(now - DAY_MS);
   });
 
+  it("shows an event in ring 2 only once the time slider reaches its start (docs/specs/events.md)", () => {
+    const event: LdNode = { "@id": `${B}:fact:f-7`, "@type": ["wanda:Fact", "wanda:Event"], kind: "event", text: "Pitches", validFrom: iso(4 * 3_600_000), validTo: iso(6 * 3_600_000), anchoredAt: [room], isLocatedIn: room };
+    const ring2 = (at: number) => egoGraph([...graph(), event], "S1", { at }).nodes.filter((n) => n.ring === 2);
+    expect(ring2(now).some((n) => localId(n.id) === "f-7")).toBe(false);
+    expect(ring2(now + 5 * 3_600_000).find((n) => localId(n.id) === "f-7")).toMatchObject({ role: "event", state: "open", text: "Pitches" });
+    expect(ring2(now + 7 * 3_600_000).some((n) => localId(n.id) === "f-7")).toBe(false); // ended and hidden by default
+  });
+
   it("keeps lifts and stairs in ring 1 next to the noted things, and a note on a door brings the door out", () => {
     const withStairs = [...graph(), { "@id": `${B}:connector:ST1`, "@type": ["rec:Stairs", "brick:Stairs"], name: "Stairs East", connects: [room, `${B}:space:S2`] } as LdNode];
     const ring1 = egoGraph(withStairs, "S1", { at: now }).nodes.filter((n) => n.ring === 1 && n.role !== "more");
