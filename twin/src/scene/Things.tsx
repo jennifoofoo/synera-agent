@@ -108,26 +108,34 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
   // Focus mode: with a route, things in rooms off the route fade like their rooms (FloorMesh.tsx); landmarks never.
   const pathKey = state?.route?.ok ? (state.route.space_path ?? []).join("|") : "";
   const onRoute = useMemo(() => (pathKey ? new Set(pathKey.split("|")) : null), [pathKey]);
+  // Highlighted things (the agent's finds) are tinted in their highlight colour themselves, no ring around them;
+  // in 3D they stand up as bodies so a found extinguisher reads as an object, not a flat footprint.
+  const highlights = useTwin((s) => s.highlights);
+  const tints = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const highlight of Object.values(highlights)) for (const id of highlight.ids) out.set(id, highlight.colour);
+    return out;
+  }, [highlights]);
   // 2D: a shape is drawn once its larger side covers MIN_SHAPE_PX on screen (per scale bucket, so cheap); far away
   // the machines form the pattern of the building and chairs vanish on their own. Landmarks always.
   const assets = useMemo(
     () =>
       flat
         ? all.filter((asset) => {
-            if (landmarks.has(asset.id)) return true;
+            if (landmarks.has(asset.id) || tints.has(asset.id)) return true;
             const [w, , d] = assetSize(asset);
             return Math.max(w, d) / scale >= MIN_SHAPE_PX;
           })
         : all,
-    [all, flat, scale, landmarks],
+    [all, flat, scale, landmarks, tints],
   );
   // 3D: bodies are machines and the landmarks of the directions; the rest lies flat. 2D: everything is a flat slab.
   const split = useMemo(() => {
     const body: Asset[] = [];
     const slab: Asset[] = [];
-    for (const asset of assets) (!flat && (asset.category === "machine" || landmarks.has(asset.id)) ? body : slab).push(asset);
+    for (const asset of assets) (!flat && (asset.category === "machine" || landmarks.has(asset.id) || tints.has(asset.id)) ? body : slab).push(asset);
     return { body, slab };
-  }, [assets, flat, landmarks]);
+  }, [assets, flat, landmarks, tints]);
   const capacity = all.length;
 
   useEffect(() => {
@@ -147,6 +155,8 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
     };
     const planColour = (asset: Asset) => (landmarks.has(asset.id) ? PLAN_LANDMARK : routeShown ? PLAN_THING_FAINT : PLAN_THING);
     const focus = (asset: Asset) => {
+      const tint = tints.get(asset.id);
+      if (tint) return colour.set(tint);
       if (onRoute && !landmarks.has(asset.id) && !onRoute.has(asset.space_id)) colour.lerp(paper, FOCUS_FADE);
       return colour;
     };
@@ -178,7 +188,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       body.computeBoundingSphere();
       shadow.computeBoundingSphere();
     }
-  }, [split, moved, flat, landmarks, routeShown, onRoute]);
+  }, [split, moved, flat, landmarks, routeShown, onRoute, tints]);
 
   const onClick = (list: Asset[]) => (event: ThreeEvent<MouseEvent>) => {
     // 2D: a tap on a shape only selects the thing when zoomed in; farther out it goes to the room below.

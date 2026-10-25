@@ -57,6 +57,41 @@ export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: {
   return <group ref={group}>{children}</group>;
 }
 
+/** A ring that grows and fades a few times when it appears, then stays hidden: attention on arrival, calm after.
+ * Asks for frames only while it runs (no per-frame invalidate afterwards); nothing under reduced motion. */
+export function ArrivalPulse({ radius, colour, reducedMotion, beats = 3, period = 1.1 }: { radius: number; colour: string; reducedMotion: boolean; beats?: number; period?: number }) {
+  const group = useRef<THREE.Group>(null);
+  const material = useRef<THREE.MeshBasicMaterial>(null);
+  const start = useRef<number | null>(null);
+  const done = useRef(reducedMotion);
+  useFrame(({ clock, invalidate }) => {
+    const g = group.current;
+    if (!g || !material.current || done.current) return;
+    if (start.current === null) start.current = clock.elapsedTime;
+    const t = (clock.elapsedTime - start.current) / period;
+    if (t >= beats) {
+      done.current = true;
+      g.visible = false;
+      invalidate(); // one last frame without the ring
+      return;
+    }
+    const phase = t % 1;
+    const s = 0.4 + 0.9 * phase;
+    g.scale.set(s, 1, s);
+    material.current.opacity = 0.55 * (1 - phase);
+    invalidate();
+  });
+  if (reducedMotion) return null;
+  return (
+    <group ref={group}>
+      <mesh rotation-x={-Math.PI / 2} position-y={0.07} renderOrder={15}>
+        <ringGeometry args={[Math.max(0.05, radius - 0.14), radius, 48]} />
+        <meshBasicMaterial ref={material} color={colour} transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
 /** Children are authored in px on the floor plane (x/z); the group scales them so they keep that size on screen.
  * The y axis stays in metres, so the small lifts above the floor stay the same. With `uniform` the y axis is in px
  * too (for markers authored on a camera-facing plane, such as the destination pin). */

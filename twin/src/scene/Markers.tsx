@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { Html } from "./SharpHtml";
 import { useFrame } from "@react-three/fiber";
-import type { BuildingState, Point } from "../api/types";
+import type { BuildingState, Point, Position } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { closedConnectorStops } from "../model/closures";
@@ -15,7 +15,7 @@ import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
 import { ClosedGlyph } from "./Labels";
-import { Pulse } from "./markerLayout";
+import { ArrivalPulse, Pulse } from "./markerLayout";
 import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
 
@@ -162,6 +162,25 @@ export function closedSpaces(model: BuildingModel, closed: string[]): { id: stri
   return spaces;
 }
 
+/** How many found things get a name chip in 3D (the rest are only tinted, Things.tsx). */
+const FOUND_CHIPS = 5;
+
+/** The found things that get a name chip: the FOUND_CHIPS nearest to "you are here" (same floor first), else the
+ * first ones in the agent's order. */
+export function foundChipIds(model: BuildingModel, ids: string[], position: Position | null | undefined, limit = FOUND_CHIPS): Set<string> {
+  const assets = ids.flatMap((id, order) => {
+    const asset = model.assetById.get(id);
+    return asset ? [{ id, order, asset }] : [];
+  });
+  const here = position ? (position.point ?? model.spaceById.get(position.space_id)?.anchor) : undefined;
+  if (position && here) {
+    const cost = (a: (typeof assets)[number]) =>
+      (a.asset.floor_id === position.floor_id ? 0 : 1e6) + Math.hypot(a.asset.position[0] - here[0], a.asset.position[1] - here[1]);
+    assets.sort((a, b) => cost(a) - cost(b) || a.order - b.order);
+  }
+  return new Set(assets.slice(0, limit).map((a) => a.id));
+}
+
 export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
   const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
@@ -175,6 +194,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
     </Html>
   );
 
+  const routeDestination = state?.route?.ok ? state.route.destination : null;
+  const foundIds = highlights.found?.ids;
+  const chipIds = useMemo(() => foundChipIds(model, foundIds ?? [], state?.position), [model, foundIds, state?.position]);
   const added = state?.added_assets ?? {};
   const moved = state?.moved_assets ?? {};
   const removed = state?.removed_assets ?? [];
@@ -300,11 +322,13 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
         );
       })}
 
-      {/* highlights (finds etc.); found things in 2D are dots laid out by Labels.tsx, collision-free */}
+      {/* highlights (finds etc.); found things in 2D are dots laid out by Labels.tsx, collision-free. In 3D the things
+          themselves are tinted (Things.tsx): a short pulse on arrival, a name chip for the nearest few only. */}
       {Object.entries(highlights).flatMap(([name, highlight]) =>
         highlight.ids.map((id) => {
           const space = model.spaceById.get(id);
-          if (space && shown(space.floor_id)) {
+          // the route destination is already painted blue below: no second overlay on it
+          if (space && shown(space.floor_id) && space.id !== routeDestination) {
             return (
               <group key={`${name}-${id}`} position-y={floorY(space.floor_id)}>
                 <SpaceOverlay polygon={space.polygon} height={0.2} colour={highlight.colour} opacity={0.4} outline />
@@ -315,11 +339,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           if (asset && shown(asset.floor_id) && !flat) {
             const size = assetSize(asset);
             return (
-              <group key={`${name}-${id}`} position={at(asset.floor_id, asset.position)}>
-                <Pulse reducedMotion={reducedMotion} speed={1.2} amount={0.2}>
-                  <Ring radius={Math.max(size[0], size[2]) * 0.8 + 0.5} colour={highlight.colour} width={0.16} />
-                </Pulse>
-                <group position-y={size[1] + 0.9}>{chip(asset.name, "accent")}</group>
+              <group key={`${name}-${id}-${highlight.ids.join("|")}`} position={at(asset.floor_id, asset.position)}>
+                <ArrivalPulse radius={Math.max(size[0], size[2]) * 0.6 + 0.4} colour={highlight.colour} reducedMotion={reducedMotion} />
+                {(name !== "found" || chipIds.has(id)) && <group position-y={size[1] + 0.9}>{chip(asset.name, "accent")}</group>}
               </group>
             );
           }
