@@ -1,70 +1,44 @@
-/* Place knowledge: layer switch, pin card, "Note here", photo viewer, saved chip, walk line (ui/Facts.tsx). */
+/* Place knowledge (ui/Facts.tsx, ui/NoteHere.tsx): layout only, existing tokens, no own look. The design session
+   restyles these classes: .rail-notes, .fact-mark, .fact-card (.fact-entry, .fact-thumb, .fact-history), .note-here,
+   .photo-viewer, .saved-chip, .walk-facts. */
 
-/* the switch in the floor rail: the note glyph; a small count of the notes while the layer is off */
-.rail-notes svg { width: 17px; height: 17px; }
-.rail-notes-count {
-  position: absolute; right: 3px; top: 3px; min-width: 13px; height: 13px; padding: 0 3px; box-sizing: border-box; border-radius: 7px;
-  background: var(--signal); color: var(--signal-ink); font: 700 9px/13px var(--font); text-align: center;
-}
+.rail-notes svg { width: 16px; height: 16px; }
+.rail-notes-count { position: absolute; right: 3px; top: 3px; min-width: 13px; height: 13px; padding: 0 3px; box-sizing: border-box; border-radius: var(--radius-pill); background: var(--signal); color: var(--signal-ink); font-size: 9px; font-weight: 600; line-height: 13px; text-align: center; }
 
-/* glyph in the card head and the walk line: the pin's look */
-.fact-mark {
-  flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-  background: var(--paper-2); color: var(--ink);
-}
+.fact-mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--paper-2); color: var(--ink); }
 .fact-mark svg { width: 15px; height: 15px; }
-.fact-mark.fact-issue { background: var(--issue); color: #fff; }
-.fact-mark.small { width: 18px; height: 18px; }
-.fact-mark.small svg { width: 12px; height: 12px; }
+.fact-mark.fact-issue { background: var(--ink); color: var(--surface); }
 
-/* pin card */
 .fact-entry { margin-top: 8px; }
 .fact-entry + .fact-entry { padding-top: 8px; border-top: 1px solid var(--hairline-strong); }
-.fact-text { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
-.fact-kind { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: var(--radius-pill); background: var(--issue); color: #fff; font-size: 11.5px; font-weight: 600; line-height: 18px; vertical-align: 1px; }
-.fact-meta { font-variant-numeric: tabular-nums; }
-.card .fact-thumb { display: block; margin-top: 8px; padding: 0; border: 0; background: transparent; border-radius: var(--radius-sm); overflow: hidden; min-height: 0; cursor: zoom-in; }
-.fact-thumb img { display: block; max-width: 100%; max-height: 120px; border-radius: var(--radius-sm); object-fit: cover; }
+.fact-text { overflow-wrap: anywhere; }
+.fact-kind { margin-right: 6px; font-weight: 600; }
+.card .fact-thumb { display: block; margin-top: 8px; padding: 0; border: 0; background: transparent; min-height: 0; }
+.fact-thumb img { display: block; max-width: 100%; max-height: 120px; border-radius: var(--radius-sm); }
 .fact-history { margin-top: 8px; }
-.fact-history-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 30vh; overflow: auto; font-size: 13px; }
-.fact-history-list li { display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 4px 0; border-top: 1px solid var(--hairline); }
-.fact-when { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.fact-history-resolved > span:last-child, .fact-history-expired > span:last-child { color: var(--ink-2); }
+.fact-history-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 30vh; overflow: auto; font-size: var(--fs-12); }
+.fact-history-list li { display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 4px 0; }
+.fact-when { color: var(--ink-2); white-space: nowrap; }
 
-/* "Note here" in the room card */
-.card button.link.note-here-open { margin-top: 10px; }
 .note-here { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
-.note-here input[type="text"] {
-  width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; border: 0; border-radius: var(--radius-sm);
-  background: var(--paper-2); color: var(--ink); font: inherit; font-size: 15px;
-}
-.note-here input[type="text"]:focus { outline: 2px solid var(--signal); outline-offset: 0; }
-.note-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
-.note-issue { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); cursor: pointer; }
-.note-issue input { accent-color: var(--issue); width: 16px; height: 16px; margin: 0; }
+.card button.link.note-here-open { margin-top: 10px; }
+.note-here input[type="text"] { width: 100%; box-sizing: border-box; }
+.note-name-label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-12); color: var(--ink-2); }
+.note-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.note-issue { display: inline-flex; align-items: center; gap: 6px; }
 .note-spacer { flex: 1; }
-.card .note-send { min-width: 72px; }
-.note-name-label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-2); }
+.card .note-row button { flex: none; }
 
-/* photo viewer: the photo over everything, tap to close */
-.photo-viewer {
-  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px;
-  background: rgba(29, 36, 48, 0.82); animation: card-in var(--t-base);
-}
-.photo-viewer figure { margin: 0; max-width: 100%; max-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.photo-viewer img { max-width: 100%; max-height: calc(100vh - 96px); border-radius: var(--radius); box-shadow: var(--shadow-float); }
-.photo-viewer figcaption { color: #fff; font-size: 14px; text-align: center; }
-.photo-viewer .x { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%; background: var(--glass-strong); color: var(--ink); border: 0; font-size: 20px; }
+.photo-viewer { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(29, 36, 48, 0.82); }
+.photo-viewer figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.photo-viewer img { max-width: 100%; max-height: calc(100vh - 96px); }
+.photo-viewer figcaption { color: var(--surface); }
+.photo-viewer .x { position: absolute; top: 12px; right: 12px; }
 
-/* "Note saved · Undo" */
-.saved-chip { gap: 4px; }
-.saved-chip .here-name { color: var(--ink); }
-.saved-chip button.saved-undo { border: 0; background: transparent; padding: 2px 8px; min-height: 28px; color: var(--signal); font-weight: 600; font-size: 13px; }
-.saved-chip .x { border: 0; background: transparent; min-height: 28px; color: var(--muted); }
+.saved-chip button.link { border: 0; background: transparent; padding: 2px 8px; min-height: 28px; color: var(--signal); }
+.saved-chip .x { border: 0; background: transparent; }
 
-/* while walking: one quiet line with the notes of the room the step enters */
-.walk-facts { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--paper-2); font-size: 13px; line-height: 1.35; }
+.walk-facts { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .walk-facts-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.card .walk-facts button.link { flex: none; }
-
-@media (prefers-reduced-motion: reduce) { .photo-viewer { animation: none; } }
+.walk-facts .fact-mark { width: 18px; height: 18px; }
+.walk-facts .fact-mark svg { width: 12px; height: 12px; }

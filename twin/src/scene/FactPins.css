@@ -1,27 +1,8 @@
-/* Place knowledge pins (22 px, see FACT_PIN_PX): the POI badge family. A note is a white chip with an ink speech
-   bubble, an open problem an amber chip (--issue) with a white "!". A photo adds a small blue corner, several facts on
-   one spot a count. The pin the card is open for, or one Wanda's reply named, gets a signal ring. */
-.fact-pin {
-  position: relative; width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 50%; border: 0; box-sizing: border-box;
-  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto;
-  background: var(--glass-strong, rgba(255, 255, 255, 0.92)); color: var(--ink, #1d2430);
-  box-shadow: 0 1px 2px rgba(29, 36, 48, 0.18), 0 0 0 1px rgba(29, 36, 48, 0.05);
-  transition: box-shadow var(--t-fast, 150ms ease-out);
-  -webkit-tap-highlight-color: transparent;
-}
-/* a larger invisible tap target (44 px) without a larger pin */
-.fact-pin::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; }
-.fact-pin svg { width: 15px; height: 15px; }
-.fact-pin.fact-issue { background: var(--issue, #a35f00); color: #fff; }
-.fact-pin.fact-hot { box-shadow: 0 0 0 2px var(--surface, #fff), 0 0 0 4px var(--signal, #004fab), 0 2px 6px rgba(29, 36, 48, 0.25); }
-.fact-pin:hover { box-shadow: 0 1px 2px rgba(29, 36, 48, 0.18), 0 0 0 2px var(--signal-soft, #ebf1ff); }
-.fact-pin.fact-hot:hover { box-shadow: 0 0 0 2px var(--surface, #fff), 0 0 0 4px var(--signal, #004fab); }
-.fact-pin:focus-visible { outline: 2px solid var(--signal, #004fab); outline-offset: 2px; }
-.fact-photo-corner {
-  position: absolute; right: -1px; top: -1px; width: 8px; height: 8px; border-radius: 2px 50% 2px 2px;
-  background: var(--signal, #004fab); box-shadow: 0 0 0 1.5px var(--surface, #fff);
-}
-.fact-count {
-  position: absolute; right: -6px; bottom: -5px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; box-sizing: border-box;
-  background: var(--ink, #1d2430); color: #fff; font: 700 9.5px/14px var(--font, system-ui, sans-serif); text-align: center;
-}
+/* Place knowledge pins: structure only, the look comes from .poi-badge (poiIcons.css). The design session restyles
+   .fact-pin, .fact-note, .fact-issue, .fact-hot, .fact-photo-corner and .fact-count. */
+.fact-pin { position: relative; padding: 0; min-height: 0; cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
+.fact-pin::before { content: ""; position: absolute; inset: -11px; border-radius: 50%; } /* 44 px tap target */
+.fact-pin.fact-issue { background: var(--ink); color: var(--surface); }
+.fact-pin.fact-hot { outline: 2px solid var(--signal); outline-offset: 2px; }
+.fact-photo-corner { position: absolute; right: -1px; top: -1px; width: 7px; height: 7px; border-radius: 50%; background: var(--signal); }
+.fact-count { position: absolute; right: -6px; bottom: -5px; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: var(--radius-pill); background: var(--ink); color: var(--surface); font-size: 9.5px; font-weight: 600; line-height: 14px; text-align: center; }

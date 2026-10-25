@@ -41,7 +41,7 @@ export function Card() {
   if (directions) card = <DirectionsCard model={model} />;
   else if (factPin)
     card = (
-      <Sheet key={factPin.id} className="card-fact" label="Note" onClose={() => closePin(null)}>
+      <Sheet key={factPin.id} className="card-fact fact-card" label="Note" onClose={() => closePin(null)}>
         <FactCard model={model} />
       </Sheet>
     );

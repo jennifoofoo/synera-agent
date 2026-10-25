@@ -42,7 +42,7 @@ export function FactPin({ group, dx, dy }: { group: FactPinGroup; dx: number; dy
   return (
     <button
       type="button"
-      className={`fact-pin ${issue ? "fact-issue" : "fact-note"} ${highlighted || isOpen ? "fact-hot" : ""} zoom-fade`}
+      className={`poi-badge fact-pin ${issue ? "fact-issue" : "fact-note"} ${highlighted || isOpen ? "fact-hot" : ""} zoom-fade`}
       style={{ transform: `translate(${dx}px, ${dy}px)` }}
       data-zoom-kind="fact"
       data-testid="fact-pin"
