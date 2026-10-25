@@ -252,8 +252,10 @@ function applyServerState(state: unknown): void {
 export const UNDO_MS = 2 * 60_000;
 
 export function canUndo(note: Note): boolean {
-  const { storage } = useNotes.getState();
-  return !!storage?.undo && Date.now() - Date.parse(note.created_at) < UNDO_MS;
+  const { storage, notes } = useNotes.getState();
+  if (!storage?.undo || Date.now() - Date.parse(note.created_at) >= UNDO_MS) return false;
+  // The server undoes only the building's newest fact.
+  return storage.kind !== "server" || [...notes].sort(newestFirst)[0]?.id === note.id;
 }
 
 export function canResolve(note: Note): boolean {
