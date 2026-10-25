@@ -99,7 +99,8 @@ export function Walk() {
   return (
     <PhoneSheet open label="Directions" tall={list} onClose={() => setList(false)} onToggle={() => setList(!list)}>
       <section className="card card-walk" aria-label="Directions">
-        <RoundBar />
+        {/* On the last step the sheet's own Done checks the stop: one Done, not two. */}
+        <RoundBar done={!last} />
         <div className="card-head">
           {/* One short line on a phone: step and metres left. Minutes add little on routes inside a building. */}
           <span className="card-kicker walk-kicker">

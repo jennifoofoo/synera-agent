@@ -101,6 +101,21 @@ describe("typed commands in an inspection round", () => {
     expect(useNotes.getState().report?.round).toBeTruthy();
   });
 
+  it("a plain route's arrival opens no job report (only rounds do)", () => {
+    vi.useFakeTimers();
+    try {
+      useTwin.setState({ state: state(route("S0", "S2")) });
+      useTwin.setState({ walkStep: 0 });
+      vi.advanceTimersByTime(60_000); // long enough that the old code showed a report
+      useTwin.setState({ walkStep: 1 });
+      useTwin.setState({ walkStep: null });
+      expect(useNotes.getState().job).toBeNull();
+      expect(useNotes.getState().report).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("outside a round 'note: …' still goes to Wanda", async () => {
     await useTwin.getState().ask("note: hose cracked");
     expect(chat).toHaveBeenCalledOnce();
