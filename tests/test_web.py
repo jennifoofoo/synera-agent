@@ -262,6 +262,21 @@ def test_round_endpoint_plans_like_the_agent_and_draws_the_round(app):
     assert bad["round"]["ok"] is False and bad["round"]["error"]
 
 
+def test_round_endpoint_without_a_start_uses_the_position_or_asks(app):
+    """No "start": the person's position (dot) if the chat knows it, else needs_start with the entrances, no crash."""
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    body = {"building": key, "type": "fire extinguisher", "area": "Ground floor"}
+    _, asked = app.post("/api/round", body)
+    assert asked["round"]["ok"] is False and asked["round"]["needs_start"]
+    assert asked["round"]["question"] and asked["round"]["entrances"]
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    app.session(key).position = {"space_id": start, "floor_id": bm.spaces[start]["floor_id"], "point": None}
+    _, here = app.post("/api/round", body)
+    _, named = app.post("/api/round", {**body, "start": start})
+    assert here["round"]["ok"] and here["round"]["total_m"] == named["round"]["total_m"]
+
+
 def test_round_endpoint_starts_at_the_persons_dot(app):
     """start_point (the page's "You are here" dot) is checked like /api/route and used for the first leg."""
     key = "dev/proc-factory-dev-003"

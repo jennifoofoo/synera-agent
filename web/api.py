@@ -389,9 +389,19 @@ def round_view(
     chat and panel), drawn as a page route that carries its stops (state.route.round). `area` is a floor ("Ground
     floor", "Level 1", a floor name), the whole building ("", "all") or a room area plan_round understands. One stop
     per device; `start_point` [x, y] is an exact start in the start room (the person's dot)."""
-    from building_agent.round_tools import plan_round  # imported here: keeps the web module light to import
+    from building_agent.round_tools import entrance_options, plan_round  # imported here: keeps the module light
 
     bm = session.map
+    if not start:  # no start chosen: where the person is (their dot), else ask with the entrances like the agent
+        here = session.position or {}
+        if here.get("space_id") not in bm.spaces:
+            return {
+                "ok": False,
+                "needs_start": True,
+                "question": "Where do you start the round?",
+                "entrances": entrance_options(bm),
+            }
+        start, start_point = here["space_id"], here.get("point")
     floor_level, said = None, area.strip()
     folded = said.lower()
     if folded in ("", "all", "building", "whole building"):
