@@ -10,6 +10,15 @@ export type FloorMode = "stacked" | "exploded" | "single";
 export type Profile = "planner" | "worker";
 export type ThingsMode = "near" | "all" | "off";
 export type ViewMode = "2d" | "3d";
+/** The view a gesture hands from one camera to the other (2D <-> 3D). `scale` is px per metre in the image centre
+ * (the orthographic zoom; for 3D CameraRig turns it into a distance with the real camera's field of view). */
+export interface ViewHandover {
+  mode: ViewMode;
+  target: [number, number, number];
+  scale: number;
+  azimuth: number;
+  polar: number;
+}
 
 export interface Selection {
   kind: "space" | "asset" | "point" | "opening" | "connector";
@@ -82,9 +91,13 @@ interface TwinState {
 
   profile: Profile;
   profileForced: boolean;
-  /** 2D = orthographic plan of the focused floor, 3D = the twin. Phones (worker) are 2D only: setViewMode("3d")
-   * is ignored there and the 3D/postprocessing code paths are never reached. */
+  /** 2D = orthographic plan of the focused floor, 3D = the twin. Phones start in 2D and may switch to 3D (FloorRail
+   * button, two-finger swipe up); ambient occlusion stays off in the phone profile. */
   viewMode: ViewMode;
+  /** Set by a gesture that switches 2D <-> 3D (tiltTo3d, tiltTo2d): the view the new camera takes over, so the
+   * same spot stays in the middle at the same scale. CameraRig applies and clears it; the button and key T leave
+   * it null and behave as before. */
+  viewHandover: ViewHandover | null;
   /** Height in px of UI covering the bottom of the viewport (dock / sheet); the camera frames above it. */
   bottomInset: number;
   /** Width in px of UI covering the right edge (planner side sheet); the camera frames left of it. */
@@ -172,6 +185,10 @@ interface TwinState {
   applyState: (state: BuildingState) => void;
   setProfile: (profile: Profile | null) => void;
   setViewMode: (mode: ViewMode) => void;
+  /** Gesture switch from the plan to 3D, keeping the view (see viewHandover). */
+  tiltTo3d: (handover: Omit<ViewHandover, "mode">) => void;
+  /** Gesture switch from 3D to the plan, keeping the view (see viewHandover). */
+  tiltTo2d: (handover: Omit<ViewHandover, "mode">) => void;
   setBottomInset: (px: number) => void;
   setRightInset: (px: number) => void;
   setTopInset: (px: number) => void;
@@ -247,6 +264,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   profile: autoProfile(),
   profileForced: false,
   viewMode: isPhone() ? "2d" : "3d",
+  viewHandover: null,
   bottomInset: 0,
   rightInset: 0,
   topInset: 0,
@@ -333,7 +351,15 @@ export const useTwin = create<TwinState>((set, get) => ({
     set({ profile: next, profileForced: profile !== null, ao: next === "planner", ...(next === "worker" && isPhone() ? { viewMode: "2d" as const } : {}) });
   },
   setViewMode(viewMode) {
-    set({ viewMode });
+    set({ viewMode, viewHandover: null });
+  },
+  tiltTo3d(handover) {
+    if (get().viewMode === "3d") return;
+    set({ viewMode: "3d", viewHandover: { ...handover, mode: "3d" } });
+  },
+  tiltTo2d(handover) {
+    if (get().viewMode === "2d") return;
+    set({ viewMode: "2d", viewHandover: { ...handover, mode: "2d" } });
   },
   setBottomInset(bottomInset) {
     if (bottomInset !== get().bottomInset) set({ bottomInset });
