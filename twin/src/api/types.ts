@@ -141,6 +141,7 @@ export interface BuildingState {
   added_doors: { id: string; floor_id: string; space_ids: string[]; position: Point; step_free: boolean }[];
   route: Route | null;
   position: Position | null;
+  step_free?: boolean; // step-free mode: every route avoids stairs (docs/specs/step-free-mode.md)
   guide: Guide | null;
   added_assets?: Record<string, AssetEdit>;
   moved_assets?: Record<string, AssetEdit>;

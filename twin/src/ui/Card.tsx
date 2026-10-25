@@ -12,7 +12,7 @@ import { prettyType } from "../model/palette";
 import { HERE, useTwin, walkLines, type Selection } from "../store";
 import { withoutAnswerLine } from "../voice";
 import "./Card.css";
-import { HereChip } from "./HereChip";
+import { HereChip, StepFreeChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
 import { readable } from "../walkInfo";
@@ -47,6 +47,7 @@ export function Card() {
   return (
     <>
       <HereChip />
+      <StepFreeChip />
       <TapWhereHint />
       {directions && <DirectionsPanel model={model} />}
       {card}
