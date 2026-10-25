@@ -12,6 +12,7 @@ Usage: python add_floor3.py demo/buildings/plan-89323a15/building.json
 
 import json
 import sys
+from pathlib import Path
 
 from shapely.geometry import Point, box
 from shapely.ops import unary_union
@@ -157,7 +158,7 @@ devices = [
 ]
 
 # ---- write ---------------------------------------------------------------------------------------------------------
-b = json.load(open(PATH))
+b = json.loads(Path(PATH).read_text())
 assert all(f["id"] != F for f in b["floors"]), "F3 already there"
 b["floors"].append({"id": F, "level": 3, "name": "Floor 3", "elevation_m": 9.0, "height_m": 3.0})
 b["floors"].sort(key=lambda f: f["level"])
@@ -230,5 +231,5 @@ for vc in b["vertical_connectors"]:
     key = {"lift": "lift", "stairs": "stairs"}[vc["kind"]]
     vc["floor_ids"].append(F)
     vc["space_ids"].append(ids[key])
-json.dump(b, open(PATH, "w"), indent=1, ensure_ascii=False)
+Path(PATH).write_text(json.dumps(b, indent=1, ensure_ascii=False))
 print("F3:", len(rooms), "spaces,", len(doors), "openings,", sum(count.values()), "devices", count)
