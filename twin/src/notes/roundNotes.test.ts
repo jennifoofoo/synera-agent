@@ -35,7 +35,6 @@ const plan: RoundPlan = {
     { spaceId: "S3", floorId: "F0", name: "Hall C", assetIds: ["A3"] },
   ],
   lengthM: 100,
-  measured: "route",
   unreachable: [],
   returnToStart: false,
 };
