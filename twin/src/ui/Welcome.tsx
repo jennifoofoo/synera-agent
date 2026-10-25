@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCampus } from "../campus/campusStore";
 import { spaceGroup } from "../model/palette";
 import { useNotes } from "../notes/notesStore";
@@ -25,6 +25,8 @@ export function Welcome() {
   const directionsOpen = useTwin((s) => s.directions !== null);
   const sheetOpen = roundOpen || notesOpen || directionsOpen;
   const [phase, setPhase] = useState<"open" | "leaving" | "gone">("open");
+  const worker = useTwin((s) => s.profile === "worker");
+  const card = useRef<HTMLDivElement>(null);
 
   const chips = useMemo(() => {
     if (!model) return [];
@@ -72,10 +74,27 @@ export function Welcome() {
     return () => window.clearTimeout(timer);
   }, [phase]);
 
+  const visible = !!model && phase === "open" && !sheetOpen && !onSite && chips.length > 0;
+  // Phone: the card covers the top of the plan, so while it is open the camera frames the plan in the free area
+  // below it (topInset, like the directions sheet); when it closes the header inset comes back and the plan
+  // recentres in the whole screen.
+  useLayoutEffect(() => {
+    const el = card.current;
+    if (!worker || !visible || !el) return;
+    const inset = Math.round(el.getBoundingClientRect().bottom + 8);
+    const { setTopInset, requestCamera } = useTwin.getState();
+    if (useTwin.getState().topInset >= inset) return;
+    setTopInset(inset);
+    requestCamera({ kind: "home" });
+    return () => {
+      if (useTwin.getState().topInset === inset) useTwin.getState().setTopInset(0); // Phone.tsx puts the header back
+    };
+  }, [worker, visible]);
+
   if (!model || phase === "gone" || sheetOpen || onSite || chips.length === 0) return null;
   return (
     <div className={`welcome ${phase === "leaving" ? "leaving" : ""}`}>
-      <div className="welcome-card" role="dialog" aria-label="Welcome">
+      <div className="welcome-card" role="dialog" aria-label="Welcome" ref={card}>
         <h1 className="welcome-title">Hi, I'm Wanda. Welcome to {name ?? "the building"}.</h1>
         <p className="welcome-sub">What can I help you find?</p>
         <div className="welcome-chips">
