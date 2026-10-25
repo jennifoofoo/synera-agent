@@ -209,7 +209,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // go down to 0.2 px/m: the floor was a few pixels in a blank grey plane).
     const largest = Math.max(1, ...model.floors.map((floor) => floor.bounds.size));
     const fit = Math.min(viewport.width, viewport.height) / largest;
-    c.minZoom = fit * 0.35;
+    c.minZoom = fit * 0.6;
     c.maxZoom = Math.max(60, fit * 12);
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
@@ -233,7 +233,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
-    const margin = size * 0.25; // the target stays near the building: a drag can not carry it into empty space
+    const margin = Math.max(2, size * 0.08); // the target stays inside the building (plus a little): a drag or pinch can not carry it off screen
     // The box must contain every target the rig itself sets (home framing puts it at the plinth, below y = 0): a
     // target outside the box in y makes camera-controls' _encloseToBoundary divide by zero on the next pan (offset
     // horizontal, clamp vertical: dot = 0) and the camera becomes NaN, the map goes blank.
