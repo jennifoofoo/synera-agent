@@ -10,6 +10,10 @@ import { useCameraMouse } from "./cameraMouse";
 import { controlsRef, cutawayUniforms } from "./FloorMesh";
 import { orthoZoomToDistance } from "./twoFinger";
 import { STACK_POLAR, useRouteFloorsKey } from "./floorVisibility";
+import { ROUTE_POLAR_MAX, fitPointsInRect, framePad, freeRect, routeFramePoints, withEndMarkers, type Rect } from "./routeFrame";
+
+/** The UI that can lie over the map: top bar, floor rail, dock (input and sheet), laptop chat column, directions. */
+const COVER_SELECTOR = ".topbar, .floorrail, .dock, .sidebar, .directions";
 
 interface Props {
   model: BuildingModel;
@@ -157,7 +161,6 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
   const rightInset = useTwin((s) => s.rightInset);
   const topInset = useTwin((s) => s.topInset);
   const route = useTwin((s) => s.state?.route ?? null);
-  const directionsOpen = useTwin((s) => s.directions !== null);
   const viewMode = useTwin((s) => s.viewMode);
   const focusedFloorId = useTwin((s) => s.focusedFloorId);
   const walking = useTwin((s) => s.walkStep !== null);
@@ -210,23 +213,54 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     invalidate();
   }, [camera, viewport.width, viewport.height, bottomInset, rightInset, topInset, invalidate]);
 
-  // Directions open: a new route is framed as a whole (its visible floors).
-  const routeKey = route?.ok ? `${route.start}|${route.destination}|${route.length_m}` : null;
-  useEffect(() => {
-    const c = controls.current;
-    if (!c || !routeKey || !directionsOpen || !route?.segments || routeFloorsKey || useTwin.getState().viewHandover) return;
-    const box = new THREE.Box3();
-    for (const segment of route.segments) {
-      if (flat && segment.floor_id !== focusedFloorId) continue;
-      const y = floorY(segment.floor_id);
-      for (const [x, z] of segment.points) box.expandByPoint(new THREE.Vector3(x, y, -z));
-    }
-    if (box.isEmpty()) return;
-    box.expandByScalar(3);
-    fitBox(c, box, !reducedMotion, 1.15);
-    invalidate();
+  // A new route (from the chat, directions or a planned round) is framed as a whole on the shown floor (the focused
+  // floor in 2D, the route's first floor when its floors stand stacked in 3D), start dot to end pin, inside the part of
+  // the map no UI covers (routeFrame.ts). Waits a moment so the sheet that opens with the route has its height.
+  const routeKey = route?.ok ? `${route.start}|${route.destination}|${route.length_m}|${route.segments?.length ?? 0}` : null;
+  const gl = useThree((s) => s.gl);
+  const frameRoute = useCallback(
+    (animate: boolean) => {
+      const c = controls.current;
+      const state = useTwin.getState();
+      const shown = state.state?.route;
+      if (!c || !shown?.ok || !shown.segments?.length) return false;
+      const floors = shown.segments.map((segment) => segment.floor_id);
+      const focused = state.focusedFloorId && floors.includes(state.focusedFloorId) ? state.focusedFloorId : floors[0];
+      const floorId = flat || !routeFloorsKey ? focused : floors[0];
+      const points = routeFramePoints(shown.segments, floorId, floorY);
+      if (!points.length) return false;
+      const canvasBox = gl.domElement.getBoundingClientRect();
+      const canvas: Rect = { left: 0, top: 0, right: canvasBox.width, bottom: canvasBox.height };
+      const covers: Rect[] = [];
+      document.querySelectorAll<HTMLElement>(COVER_SELECTOR).forEach((element) => {
+        const box = element.getBoundingClientRect();
+        if (box.width < 1 || box.height < 1) return;
+        covers.push({ left: box.left - canvasBox.left, top: box.top - canvasBox.top, right: box.right - canvasBox.left, bottom: box.bottom - canvasBox.top });
+      });
+      // 3D gets twice the air: the walls along the route stand up into the picture
+      const free = withEndMarkers(freeRect(canvas, covers, framePad(canvasBox.width, canvasBox.height) * (flat ? 1 : 2)));
+      applyFrame();
+      // 3D: look down enough that the route is not hidden behind the walls it passes
+      const polar = !flat && routeFloorsKey ? STACK_POLAR : flat ? c.polarAngle : Math.min(c.polarAngle, ROUTE_POLAR_MAX);
+      const fit = fitPointsInRect(camera, points, free, { width: canvasBox.width, height: canvasBox.height }, c.azimuthAngle, polar);
+      if (!fit) return false;
+      void c.setLookAt(fit.position.x, fit.position.y, fit.position.z, fit.target.x, fit.target.y, fit.target.z, animate);
+      if (fit.zoom !== undefined) void c.zoomTo(fit.zoom, animate);
+      setTimeout(invalidate, 0);
+      return true;
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeKey, directionsOpen, camera]);
+    [flat, routeFloorsKey, floorY, gl, camera, invalidate],
+  );
+  useEffect(() => {
+    if (!routeKey || walking) return;
+    const timer = setTimeout(() => {
+      if (useTwin.getState().walkStep !== null || useTwin.getState().viewHandover) return;
+      frameRoute(!useTwin.getState().reducedMotion);
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey, flat, frameRoute]);
 
   // Limits follow the building; the 2D plan is locked straight down, north up: pan and zoom only.
   useEffect(() => {
@@ -301,8 +335,14 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     },
     [routeFloorsKey, model, floorY, camera, viewport, profile, invalidate],
   );
+  const stackRouteKey = useRef<string | null>(null);
   useEffect(() => {
     if (flat || walking || !routeFloorsKey || useTwin.getState().viewHandover) return;
+    // a new route frames itself (frameRoute above); this is for the stack coming back ("all floors" in the rail)
+    if (routeKey !== stackRouteKey.current) {
+      stackRouteKey.current = routeKey;
+      return;
+    }
     frameStack(!reducedMotion);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeFloorsKey, routeKey, flat, walking, camera]);
@@ -410,6 +450,8 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       fitBox(c, box, animate, 1.1);
       return;
     }
+    // A planned round asks for its start and stops: the drawn round is framed as a whole instead of one stop.
+    if (request.kind === "object" && (request.ids?.length ?? 0) >= 2 && useTwin.getState().state?.route?.ok && frameRoute(animate)) return;
     if (request.kind === "object" && request.ids?.length) {
       // Things on several floors of a stacked route (a round's stops): the stack framing shows them all, readably.
       const floorsAsked = new Set(request.ids.map((id) => model.spaceById.get(id)?.floor_id ?? model.assetById.get(id)?.floor_id).filter(Boolean));
@@ -538,7 +580,6 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
 
   // Double click on a room or the floor in 3D flies to that room (2D keeps the floor mesh's zoom-in handler).
   const scene = useThree((s) => s.scene);
-  const gl = useThree((s) => s.gl);
   const raycaster = useThree((s) => s.raycaster);
   const onDoubleClick = useCallback(
     (event: MouseEvent) => {
