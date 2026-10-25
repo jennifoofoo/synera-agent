@@ -199,3 +199,6 @@ Du warst offline, darum haben Leonies Sitzungen die Punkte aus unseren Notizen s
 - **`feat/round-per-device`** (läuft noch, Tests und Live-Suite): Prüfrunde mit einer Station **pro Gerät** (zwei Feuerlöscher in einer Halle = zwei Stationen), Etappen von Gerät zu Gerät mit `start_point`/`destination_point`, `leg_m` je Etappe ("how far" für Station und Runde); Prompt-Regel "nie über eigene Werkzeuge/IDs/Grenzen reden, sondern kurz nachfragen"; neues Werkzeug **Standort löschen**. Berührt `round_tools.py`, `agent.py`, `tools.py`, `web/api.py`, `round.ts`, `handsFree.ts`.
 Noch bei dir: Feuerlöscher im Urban Colab eintragen, Urban-Colab-Türen prüfen, `feat/twin-desktop-flow`. Neu gesehen: die 3D-Ansicht zeichnet dauerhaft ~60 fps auch ohne Bewegung (nicht von unseren Branches; vermutlich Studio-Look/Kamera), kostet am Handy Akku.
 Vorschlag für den Merge nach `main`: alles auf einmal (Basis + UI-Fixes + Runde pro Gerät), dann einmal volle Suite, Live-Suite, Benchmark-Vergleich.
+
+## Entschieden (Leonie, Sonntag ~07:45): Produktname
+**"Wanda – the building that talks back"** (so schon in `docs/submission/FORM_TECH_TEXT.md` und als Claim im Video). Bitte überall gleich verwenden: Video-Titel und Abspann, Formular, Pitch-Folie, ggf. Seitentitel.
