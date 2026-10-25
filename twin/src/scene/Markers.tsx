@@ -334,7 +334,9 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           if (!space || !shown(space.floor_id)) return null;
           return (
             <group name="route-destination-room" position-y={floorY(space.floor_id)}>
-              <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.signal} opacity={0.08} outline />
+              {/* with a route the destination is the answer: a saturated blue body (walls and floor), like a model
+                  with one painted room; without a route nothing is blue */}
+              <SpaceOverlay polygon={space.polygon} height={flat ? 0.12 : 1.25} colour={COLOURS.signal} opacity={flat ? 0.22 : 0.32} outline />
             </group>
           );
         })()}
