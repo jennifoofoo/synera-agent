@@ -92,12 +92,17 @@ button.x:hover { color: var(--text); background: transparent; }
   transition: opacity var(--t-fast);
 }
 .label-connector { background: var(--paper-2); }
-/* the tapped room (both views): ink pill, white text */
-.label.label-selected, .label.label-plan.label-selected { background: var(--ink); color: var(--surface); text-shadow: none; padding: 2px 9px; }
 /* 2D: rooms with a marker (route ends, "you are here") keep a pill so they stand out from the plain plan text */
 .label.label-plan.label-marked {
   background: var(--glass-strong); border-radius: var(--radius-pill); padding: 2px 8px; text-shadow: none;
   box-shadow: 0 1px 2px rgba(29, 36, 48, 0.14), 0 0 0 0.5px rgba(29, 36, 48, 0.05);
+}
+/* the tapped room (both views, marked or not): solid white pill, ink text (15:1), a thin selection-blue ring.
+   Higher specificity than every label state above and after it, so the ink text and the light pill never get split
+   (the white-on-white bug: an ink-pill rule lost its background to .label-marked but kept its white text). */
+.label.label-halo.label-selected, .label.label-halo.label-plan.label-selected {
+  background: var(--surface); color: var(--ink); text-shadow: none; padding: 2px 9px; border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1.5px var(--signal), 0 1px 3px rgba(29, 36, 48, 0.18);
 }
 /* 2D map: graphite text with a paper halo, no box */
 .label.label-plan {

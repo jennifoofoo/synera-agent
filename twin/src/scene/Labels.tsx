@@ -8,7 +8,7 @@ import { areasOf, type Area } from "./areas";
 import { prettyType } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
 import { closedConnectorStops } from "../model/closures";
-import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX } from "./markerLayout";
+import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
 import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
@@ -234,6 +234,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const route = state?.route ?? null;
   // The tapped room always carries its name (like a marked room), and no other name may sit on it (mobile session).
   const selectedId = useTwin((s) => (s.selection ? (s.selection.kind === "space" ? s.selection.id : s.selection.space_id) : undefined));
+  // Where the tap pin stands (HerePin.tsx TapPin): the tapped room's name moves above it like above the other markers.
+  const tapPoint = useTwin((s) => (s.selection?.point && s.selection.kind !== "asset" && s.selection.kind !== "opening" ? s.selection.point : null));
   const marks = useMemo(() => {
     const out = new Map<string, { point: Point; lift: number; height: number }>();
     const put = (spaceId: string | undefined | null, point: Point | null | undefined, lift: number, height = 0) => {
@@ -250,9 +252,14 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     const here = state?.position;
     if (here) put(here.space_id, here.point ?? model.spaceById.get(here.space_id)?.anchor, LABEL_LIFT.here);
-    if (selectedId) put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
+    if (selectedId) {
+      // The tap pin: 2D above its crosshair, 3D above the head of its stalk. A selection without a spot keeps the
+      // name on the room's anchor. A marker already in the room with a larger lift wins (put keeps the larger lift).
+      if (tapPoint) put(selectedId, tapPoint, flat ? LABEL_LIFT.tap : LABEL_LIFT.tapHead, flat ? 0 : TAP_STALK_M);
+      else put(selectedId, model.spaceById.get(selectedId)?.anchor, 0);
+    }
     return out;
-  }, [route, state?.position, model, floor.id, selectedId]);
+  }, [route, state?.position, model, floor.id, selectedId, tapPoint, flat]);
   const routeOnFloor = useMemo(
     () => (route?.ok && route.segments ? route.segments.filter((segment) => segment.floor_id === floor.id).map((segment) => segment.points) : []),
     [route, floor.id],
@@ -289,6 +296,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     const here = state?.position;
     const herePoint = here?.floor_id === floor.id ? (here.point ?? model.spaceById.get(here.space_id)?.anchor) : undefined;
     if (herePoint) kept.push(boxOf(herePoint, HERE_RIM_PX, HERE_RIM_PX));
+    // The tap pin with its small crosshair (2D; in 3D the stalk stands up and the layout is approximate anyway).
+    if (flat && tapPoint && selectedId && model.spaceById.get(selectedId)?.floor_id === floor.id) kept.push(boxOf(tapPoint, TAP_CROSS_PX, TAP_CROSS_PX));
     for (const points of routeOnFloor) {
       if (points.length < 2) continue;
       kept.push(boxOf(points[0], START_DOT_PX + 2, START_DOT_PX + 2));
@@ -450,7 +459,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       result.push(item);
     }
     return { shown: result, pins };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint]);
 
   return (
     <group position-y={y + 0.5}>
