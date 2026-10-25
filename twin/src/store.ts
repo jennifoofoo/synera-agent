@@ -109,6 +109,9 @@ interface TwinState {
   /** 2D: the plan was panned away from the floor (shows the recenter button). Set by the scene. */
   offCentre: boolean;
   floorMode: FloorMode;
+  /** 3D, a route over several floors: the route (floorVisibility.routeStackKey) for which the user picked one floor
+   * in the rail, so only that floor shows; null = the route's floors are stacked apart. A new route stacks again. */
+  routeStackOff: string | null;
   focusedFloorId: string | null;
   thingsMode: ThingsMode;
   cutaway: boolean;
@@ -193,6 +196,7 @@ interface TwinState {
   setRightInset: (px: number) => void;
   setTopInset: (px: number) => void;
   setFloorMode: (mode: FloorMode) => void;
+  setRouteStackOff: (key: string | null) => void;
   focusFloor: (floorId: string | null) => void;
   setThingsMode: (mode: ThingsMode) => void;
   toggleCutaway: () => void;
@@ -274,6 +278,7 @@ export const useTwin = create<TwinState>((set, get) => ({
   draft: false,
   offCentre: false,
   floorMode: "single", // only the chosen floor: a ghosted floor above read as a shadow copy
+  routeStackOff: null,
   focusedFloorId: null,
   thingsMode: "near",
   cutaway: true,
@@ -375,6 +380,9 @@ export const useTwin = create<TwinState>((set, get) => ({
   },
   setFloorMode(floorMode) {
     set({ floorMode });
+  },
+  setRouteStackOff(routeStackOff) {
+    set({ routeStackOff });
   },
   focusFloor(focusedFloorId) {
     set({ focusedFloorId });

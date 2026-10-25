@@ -3,7 +3,7 @@ import * as THREE from "three";
 import type { Route } from "../api/types";
 import { floorElevation, type BuildingModel, type FloorModel } from "../model/model";
 import { COLOURS } from "../model/palette";
-import type { FloorMode } from "../store";
+import { useTwin, type FloorMode } from "../store";
 
 /** How a floor is drawn in the scene: fully, as a thin footprint outline, or not at all. */
 export type FloorRole = "full" | "outline" | "hidden";
@@ -16,11 +16,30 @@ export function routeFloorIds(route: Route | null | undefined): string[] | null 
   return ids.length >= 2 ? ids : null;
 }
 
+/** Identifies a multi-floor route for the rail's "only this floor" choice ("" = no such route). */
+export function routeStackKey(route: Route | null | undefined): string {
+  const ids = routeFloorIds(route);
+  return ids && route?.ok ? `${ids.join("|")}>${route.destination ?? ""}` : "";
+}
+
+/** The floors the scene stacks for the shown route, joined by "|" ("" = none): a multi-floor route in 3D, unless the
+ * user picked a single floor in the rail for this route (store.routeStackOff). Guidance still moves the focused floor. */
+export function useRouteFloorsKey(): string {
+  return useTwin((s) => {
+    if (s.viewMode === "2d") return "";
+    const route = s.state?.route;
+    const key = routeStackKey(route);
+    if (!key || key === s.routeStackOff) return "";
+    return routeFloorIds(route)!.join("|");
+  });
+}
+
 /** The floor rule (3D):
  * - the active floor is drawn fully;
  * - floors above it are not drawn;
  * - floors below it are a thin footprint outline (the building visibly continues);
- * - a route over several floors shows only its floors, fully and stacked apart (the only case with two full floors);
+ * - a route over several floors shows only its floors, fully and stacked apart (the only case with two full floors),
+ *   until the user picks one floor in the rail (useRouteFloorsKey: then the usual rule applies to that floor);
  * - "all floors" (exploded) shows the active floor fully and the others as outlines.
  * The 2D plan shows only the active floor. */
 export function floorRoles(model: BuildingModel, focused: string | null, mode: FloorMode, flat: boolean, routeFloors: string[] | null): Map<string, FloorRole> {
