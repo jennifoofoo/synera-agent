@@ -4,6 +4,7 @@ import { spaceGroup } from "../model/palette";
 import { useNotes } from "../notes/notesStore";
 import { useRound } from "../round/round";
 import { useTwin } from "../store";
+import { WandaFairy } from "./WandaFairy";
 import "./Welcome.css";
 
 /** Name fallbacks for plans whose rooms carry no real type yet (a plan read from a drawing: "generic_room"). */
@@ -95,6 +96,9 @@ export function Welcome() {
   return (
     <div className={`welcome ${phase === "leaving" ? "leaving" : ""}`}>
       <div className="welcome-card" role="dialog" aria-label="Welcome" ref={card}>
+        <div className="welcome-fairy" aria-hidden>
+          <WandaFairy size={56} mic={false} state="idle" />
+        </div>
         <h1 className="welcome-title">Hi, I'm Wanda. Welcome to {name ?? "the building"}.</h1>
         <p className="welcome-sub">What can I help you find?</p>
         <div className="welcome-chips">
