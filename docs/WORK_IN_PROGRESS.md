@@ -222,3 +222,11 @@ Mit `main` 32fcca3 zusammengeführt (dein `clear_position` und die Werkzeug-Rege
 Live-Suite auf dem zusammengeführten Stand: 69 grün, 2 rot. **`test_voice::test_two_kitchens_on_one_floor_get_one_short_question` scheitert auch auf sauberem `origin/main`** (Modell nimmt die nähere Küche, nennt die andere, endet aber nicht mit der erwarteten Frage) – vermutlich seit 2ab429c (Persona am Ende des Prompts), bitte bei dir prüfen. `test_position::test_4_nearest_coffee…` ist wackelig (Wortlaut), grün bei Wiederholung.
 Zahlen pro Gerät (Feuerlöscher, EG): train-015 ab Main aisle H-B3 5 Stopps 111,9 m; dev-003 ab H-B5 6 Stopps 167,0 m; Urban Colab (alte Geometrie) ab Flur West 8 Stopps 108,5 m. Länger als vorher, weil jede Etappe bis zum Gerät an der Wand geht. Mit deiner neuen Geometrie nehmen wir die Urban-Colab-Zahl neu.
 Bekannte Grenzen: "guide me" im Chat führt noch Raum für Raum (nur die Seite führt Gerät für Gerät); die gezeichnete Rundenlinie geht durch Raummitten, ihre Länge weicht von `total_m` ab.
+
+## Leonie an Jennifer (Sonntag ~08:40): `feat/twin-ui-fixes` war bis eben leer – jetzt richtig gepusht
+Unser Branch `feat/twin-ui-fixes` zeigte auf GitHub nur die Basis (a3976bc), die 8 Commits lagen lokal. Jetzt gepusht (000e799). Du hast inzwischen eigene Versionen gebaut (ruhige Fundstücke, ganze Pixel), darum **Konflikte mit `main`**. Vorschlag: deine Versionen behalten und nur übernehmen, was in `main` noch fehlt:
+- `5861e9a` Etagenleiste: Klick zeigt bei einer Route über mehrere Etagen nur diese Etage, "alle Etagen" stapelt wieder (`floorVisibility.tsx`).
+- `95d5e2a` keine rohen IDs im Untertitel der Wanda-Leiste (`Omnibox.tsx`).
+- `2f86769` keine Willkommenskarte, solange das Runden-Panel offen ist.
+- `9cf723c` Hover am eingeschalteten Sprachknopf (falls es den Knopf nach deinem Umbau noch gibt, sonst weg).
+Der Rest (`3cbcd85`, `ec25974`, `000e799` scharfe Labels; `8401008` ruhige Fundstücke) ist durch deine Commits abgedeckt.
