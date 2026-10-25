@@ -246,17 +246,12 @@ function candidates(
       .map((area): Item => ({ kind: "area", id: area.id, point: area.point, area }));
     return inPriorityOrder([...pois, ...landmarkItems, ...areas], new Set(), roundStopId);
   }
-  // Every tier: the zones (largest rooms), whatever their size on screen. Mid and near add every room whose
-  // name (nearly) fits inside it at this scale. Tiers are cumulative, like a street map.
+  // Every tier: the zones (largest rooms), whatever their size on screen. Mid and near add every other room name,
+  // larger rooms first; which of them show is decided by priority, collision and the density cap (label-rules.md),
+  // not by whether the name fits inside its room. Tiers are cumulative, like a street map.
   rooms.sort((a, b) => b.area_m2 - a.area_m2 || a.id.localeCompare(b.id));
   const zones = rooms.slice(0, ZONE_COUNT);
-  const fitting =
-    tier === "far"
-      ? []
-      : rooms.slice(ZONE_COUNT).filter((space) => {
-          const [w, h] = spanOf(space.polygon);
-          return space.name.length * CHAR_PX * scale <= w * FIT_OVERFLOW && LABEL_H_PX * scale <= h;
-        });
+  const fitting = tier === "far" ? [] : rooms.slice(ZONE_COUNT);
   // The current round stop always tries to carry its name, like the zones.
   const stop = roundStopId ? rooms.find((space) => space.id === roundStopId) : undefined;
   const listed = [...zones, ...fitting].slice(0, limit);
