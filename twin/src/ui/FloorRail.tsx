@@ -1,5 +1,6 @@
 import { useKeyHelp } from "../scene/controlsTable";
 import { useTwin } from "../store";
+import { NotesToggle } from "./Facts";
 
 /** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
  * again = only this floor; the ⇕ toggle pulls the floors apart. Floors on the route carry a dot. */
@@ -32,6 +33,8 @@ export function FloorRail() {
       <button className="rail-toggle rail-view" onClick={() => setViewMode(flat ? "3d" : "2d")} title={flat ? "Show the building in 3D" : "Show the floor plan"} aria-pressed={flat}>
         {flat ? "3D" : "2D"}
       </button>
+      {/* "Notes & photos" layer (off by default): pins for notes and problems on the floor */}
+      <NotesToggle />
       {!flat && model.floors.length > 1 && (
         <button
           className={`rail-toggle ${floorMode === "exploded" ? "active" : ""}`}

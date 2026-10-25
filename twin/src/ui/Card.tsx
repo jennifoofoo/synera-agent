@@ -1,5 +1,5 @@
-// One card above the input, never two. Priority: directions (From/To panel at the top, summary + Guide me), the
-// tapped room/thing (Route / I'm here / close), then the guided step (Step k of n, back/next/stop), then the last reply
+// One card above the input, never two. Priority: directions (From/To panel at the top, summary + Guide me), a tapped
+// note/problem pin (ui/Facts.tsx), the tapped room/thing (Route / I'm here / close, "Note here"), then the guided step (Step k of n, back/next/stop), then the last reply
 // (2-3 lines, "more"; a reply that drew a route is the one-line route card), then the route card.
 // Owner: the Card/Position session, see ARCHITECTURE.md. Every fact comes from `state` (the API); the card only
 // shows it and sends the user's taps back as API calls or chat words ("next", "back", "stop").
@@ -19,6 +19,9 @@ import { readable } from "../walkInfo";
 import { AvoidsClosed } from "./AvoidsClosed";
 import { RouteChips } from "./RouteChips";
 import { TurnIcon, rideUp } from "./Walk";
+import { FactCard, GuideFactsLine, SavedChip } from "./Facts";
+import { useFacts } from "./factsStore";
+import { NoteHere } from "./NoteHere";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -30,10 +33,18 @@ export function Card() {
   const draft = useTwin((s) => s.draft);
   const campusRoute = useTwin((s) => s.campusRoute);
   const directions = useTwin((s) => s.directions);
+  const factPin = useFacts((s) => s.pin);
+  const closePin = useFacts((s) => s.openPin);
   if (!model || draft) return null; // a Level 4 draft has its own ids; Route/I'm here would hit the API with them
 
   let card: ReactNode = null;
   if (directions) card = <DirectionsCard model={model} />;
+  else if (factPin)
+    card = (
+      <Sheet key={factPin.id} className="card-fact" label="Note" onClose={() => closePin(null)}>
+        <FactCard model={model} />
+      </Sheet>
+    );
   else if (selection) card = <SelectionCard key={selection.id} model={model} />;
   else if (guide?.active) card = <GuideCard model={model} />;
   else if (busy) card = null; // the Omnibox shows "thinking" above the input
@@ -43,6 +54,7 @@ export function Card() {
   return (
     <>
       <HereChip />
+      <SavedChip />
       <TapWhereHint />
       {directions && <DirectionsPanel model={model} />}
       {card}
@@ -213,6 +225,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
           )}
         </div>
       )}
+      <NoteHere model={model} selection={selection} />
     </Sheet>
   );
 }
@@ -263,6 +276,7 @@ function GuideCard({ model }: { model: BuildingModel }) {
         </div>
       </div>
       {busy ? <div className="card-text card-muted">…</div> : <Clamped text={last ? withoutAnswerLine(last.text) : `Go to ${to}.`} />}
+      <GuideFactsLine spaceId={guide.leg.to_space_id} />
       <div className="card-actions">
         <button disabled={busy || guide.step_index === 0} onClick={() => void ask("back")}>
           Back

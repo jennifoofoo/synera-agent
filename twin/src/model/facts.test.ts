@@ -21,7 +21,7 @@ const model = {
   floorById: new Map(),
 } as unknown as BuildingModel;
 
-function fact(id: string, over: Partial<Fact> & { anchor?: Partial<Fact["anchor"]> } = {}): Fact {
+function fact(id: string, over: Partial<Omit<Fact, "anchor">> & { anchor?: Partial<Fact["anchor"]> } = {}): Fact {
   return {
     id,
     kind: "note",

@@ -193,8 +193,9 @@ interface TwinState {
   setClosed: (element: string, closed: boolean) => Promise<void>;
   addDoor: (first: string, second: string) => Promise<void>;
   reset: () => Promise<void>;
-  /** opts.here overrides the hereArmed/selection logic, e.g. { here: { clear: true } } from the "You are here" chip. */
-  ask: (message: string, voice?: boolean, opts?: { here?: ChatContext["here"] }) => Promise<ChatReply | null>;
+  /** opts.here overrides the hereArmed/selection logic, e.g. { here: { clear: true } } from the "You are here" chip.
+   * opts.context: the place the message is about when nothing is selected (e.g. "Resolved" on a note's card). */
+  ask: (message: string, voice?: boolean, opts?: { here?: ChatContext["here"]; context?: Omit<ChatContext, "here"> }) => Promise<ChatReply | null>;
 }
 
 /** The person muted "Hey Wanda" during guidance: remembered per browser, so the next guidance stays quiet too. */
@@ -212,6 +213,9 @@ export function setHandsFreeMuted(muted: boolean): void {
     /* private mode: not remembered */
   }
 }
+
+/** Called after every agent reply with the message that asked it (place knowledge: ui/Facts.tsx highlights facts). */
+export const replyHooks: ((reply: ChatReply, message: string) => void)[] = [];
 
 let messageId = 0;
 let cameraNonce = 0;
@@ -522,7 +526,7 @@ export const useTwin = create<TwinState>((set, get) => ({
       get().startWalk(); // the drawn route already has its steps; no agent call
       return null;
     }
-    const context: ChatContext = {};
+    const context: ChatContext = !selection && opts.context ? { ...opts.context } : {};
     if (opts.here) context.here = opts.here;
     else if (get().pendingHere) {
       const pending = get().pendingHere!;
@@ -581,6 +585,7 @@ export const useTwin = create<TwinState>((set, get) => ({
           set({ focusedFloorId: reply.state.position.floor_id });
         }
       }
+      for (const hook of replyHooks) hook(reply, message);
       if (reply.located?.length) {
         const ids = reply.located.map((entry) => entry.asset_id);
         get().setHighlight("found", { ids, colour: "#004fab" });

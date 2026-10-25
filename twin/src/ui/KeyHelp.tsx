@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { KEY_CONTROLS, MOUSE_CONTROLS, useKeyHelp } from "../scene/controlsTable";
 import { PoiBadge, POI_LEGEND } from "../scene/poiIcons";
 import { AllFloorsIcon, ResetViewIcon } from "./FloorRail";
+import { IssueGlyph, NoteGlyph } from "../scene/FactPins";
 import * as palette from "../model/palette";
 
 /** Room colours from palette.ts (LEGEND_GROUPS, added by the room-colours branch); none while it is not merged. */
@@ -67,6 +68,18 @@ export function KeyHelp() {
         <li data-legend="closed">
           <PoiBadge kind="lift" title="Closed" closed />
           <span>Closed (routes go around it; a closed door gets a red bar)</span>
+        </li>
+        <li data-legend="note">
+          <span className="fact-mark fact-note" aria-hidden>
+            <NoteGlyph />
+          </span>
+          <span>Note (switch on "Notes & photos" beside the floors; a blue corner: with photo)</span>
+        </li>
+        <li data-legend="issue">
+          <span className="fact-mark fact-issue" aria-hidden>
+            <IssueGlyph />
+          </span>
+          <span>Open problem (tap it: who, since when, "Resolved")</span>
         </li>
         <li>
           <span className="keyhelp-icon">

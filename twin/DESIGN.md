@@ -31,6 +31,7 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 | `--signal-dark` / `--signal-soft` | #002478 / #ebf1ff | hover and pressed, selected fills (dark text on soft) |
 | `--signal-ink` | #ffffff | text on signal |
 | `--ok` / `--danger` / `--warn` / `--info` | #2f7d5b / #b3382c / #4a5260 / #004fab | state only; info = "you are here" |
+| `--issue` | #a35f00 | open problem pins of place knowledge (amber, white "!" 5.0:1); notes are white pins with an ink speech bubble; never used for closures |
 | `--room-food` | #efe6d4 | kitchen, canteen (sand) |
 | `--room-sanitary` | #dce8ec | toilet, bathroom, locker room (pale aqua) |
 | `--room-vertical` | #dcd6e6 | stairs and lifts, also the 3D shafts (muted violet) |

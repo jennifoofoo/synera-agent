@@ -10,6 +10,7 @@ import { metresLeft, readable, walkMinutes } from "../walkInfo";
 import { honestLine, toggleWalkWithMe, useWalkMotion } from "../walkWithMe";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
+import { WalkFactsLine } from "./Facts";
 import "./Walk.css";
 
 export { walkMinutes };
@@ -117,6 +118,7 @@ export function Walk() {
           <TurnIcon line={steps[step]} up={rideUp(route.floor_changes, steps, step)} />
           <p aria-live="polite">{steps[step]}</p>
         </div>
+        <WalkFactsLine line={steps[step]} last={last} />
         <HandsFreeStatus />
         <div className="card-actions">
           <button disabled={step === 0} onClick={() => setWalkStep(step - 1)}>

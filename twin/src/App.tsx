@@ -15,6 +15,9 @@ import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
 import { Walk } from "./ui/Walk";
+import { installFacts, PhotoViewer } from "./ui/Facts";
+
+installFacts();
 
 /** One screen: the building, one input, one card. Everything else only when needed. */
 export function App() {
@@ -54,6 +57,7 @@ export function App() {
       </div>
       <NewBuilding />
       <KeyHelp />
+      <PhotoViewer />
       {loading && <div className="overlay">Loading {building?.name ?? "building"}…</div>}
       {error && <div className="overlay error">{error}</div>}
     </div>

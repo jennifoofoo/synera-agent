@@ -30,6 +30,7 @@
   --ok: #2f7d5b; /* step-free, added */
   --danger: #b3382c; /* closed, errors */
   --warn: #4a5260; /* stairs / caution text */
+  --issue: #a35f00; /* open problem pins (place knowledge), white on it 5.0:1; never for closures */
   --info: #004fab; /* "you are here" */
 
   /* room groups (scene, palette.ts GROUP_COLOURS): a very low-saturation tint only for places people look for, the
