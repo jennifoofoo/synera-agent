@@ -508,3 +508,48 @@ def test_the_page_note_comes_again_when_the_turn_failed(bm, tmp_path):
     agent.run_tools = lambda text: sent.append(text) or "ok"
     agent.ask("I'm here.")
     assert sent[0].startswith("(Page note") and sent[1].startswith("(Page note")
+
+
+# ---------- 'nearest X' draws the way at once (Jennifer's phone, 25.10.2026) ----------
+
+
+def test_nearest_draws_the_route_and_a_yes_starts_guiding(bm, state, tools):
+    """'Where is the nearest coffee machine?' with a known position: the reply named the room and offered to guide,
+    but no route was drawn (state.route stayed null) and the map did not fly. find_nearest now routes to the nearest
+    itself (map.last_route is what the page adopts as state.route) and leaves a walk overview, so a yes to the offer
+    starts guiding."""
+    from building_agent import walk as walking
+
+    coffee = {a["space_id"] for a in bm.assets.values() if a["type"] == "coffee_machine"}
+    floor = bm.spaces[kitchens_by_floor_ids(bm)[0]]["floor_id"]
+    start = next(  # a room on a kitchen floor without a coffee machine: the nearest is another room
+        sid
+        for sid, space in sorted(bm.spaces.items())
+        if space["floor_id"] == floor and sid not in coffee and space["room_type"] in ("office", "meeting_room")
+    )
+    state.position = make_position(bm, start, None, "click", 0)
+    bm.last_route = None
+    result = run(tools["find_nearest"], what="coffee machine")
+    assert not result["needs_choice"] and result["route_drawn"] is True
+    target = result["nearest"]["space_id"]
+    assert bm.last_route is not None and bm.last_route.destination_space_id == target
+    assert bm.last_route.start_space_id == start
+    assert math.isclose(bm.last_route.length_m, result["nearest"]["length_m"], abs_tol=0.01)
+    assert state.walk is not None and state.walk.destination == target
+    assert "different one" not in result["control_sentence"]  # the offer stays the only question
+    assert result.get("mode") == "overview" and result["offer"], result
+    said = walking.apply(bm, state, "Wanda yes guide me")
+    assert state.walk.mode == "guided" and said.get("step")
+    assert walking.guide_info(state.walk) is not None
+
+
+def test_nearest_never_replaces_a_route_being_guided(bm, state, tools):
+    from building_agent import walk as walking
+
+    ids = kitchens_by_floor_ids(bm)
+    state.position = make_position(bm, ids[0], None, "said", 0)
+    walking.remember_route(bm, state, routing.route(bm, ids[0], ids[-1]), mode="guided")
+    guided = bm.last_route
+    result = run(tools["find_nearest"], what="coffee machine")
+    if result["nearest"]["space_id"] != ids[-1]:
+        assert "route_drawn" not in result and bm.last_route is guided and state.walk.destination == ids[-1]
