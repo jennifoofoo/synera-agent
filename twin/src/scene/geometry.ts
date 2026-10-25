@@ -443,6 +443,7 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
   const { polygons, edgeOwners, gapsBySpace, allCuts } = wallLayout(floor, edits);
   const drawnEdges = new Set<string>();
   const industrial = isIndustrial(floor.spaces);
+  const lifts = overlapLifts(polygons);
   floor.spaces.forEach((space: Space, sid) => {
     const polygon = polygons[sid];
     if (polygon.length < 3) return;
@@ -450,7 +451,7 @@ export function buildFloorGeometry(floor: FloorModel, edits?: OpeningEdits): Flo
     const palette = GROUP_COLOURS[group];
     builder.currentGroup = GROUP_INDEX[group];
     const gaps = gapsBySpace.get(space.id) ?? [];
-    builder.slab(polygon, 0, colourFor(palette.slab), sid, gaps);
+    builder.slab(polygon, lifts[sid], colourFor(palette.slab), sid, gaps);
     const isOutdoor = space.type === "outdoor";
     const height = isOutdoor ? Math.min(wallHeight, 0.5) : wallHeight;
     for (let i = 0; i < polygon.length; i++) {
@@ -509,6 +510,45 @@ export function outlineGeometry(polygon: Point[], y: number): THREE.BufferGeomet
 }
 
 /** Even-odd point-in-polygon test in model metres. */
+/** Hand-made plans (uploaded floor plans) can draw a room inside another one (stairs or a store inside a corridor).
+ * Two slabs at one height then flicker (z-fighting). Each slab is lifted OVERLAP_LIFT_M per larger room it overlaps,
+ * so the smaller room is drawn on top; rooms that only share edges (all kit buildings) are not lifted. */
+const OVERLAP_LIFT_M = 0.01;
+
+function areaOf(polygon: Point[]): number {
+  let sum = 0;
+  for (let i = 0; i < polygon.length; i++) {
+    const [x0, y0] = polygon[i];
+    const [x1, y1] = polygon[(i + 1) % polygon.length];
+    sum += x0 * y1 - x1 * y0;
+  }
+  return Math.abs(sum) / 2;
+}
+
+/** Points just inside a polygon near its corners (10 % toward the vertex mean), so shared edges never count. */
+function probesOf(polygon: Point[]): Point[] {
+  const cx = polygon.reduce((acc, p) => acc + p[0], 0) / polygon.length;
+  const cy = polygon.reduce((acc, p) => acc + p[1], 0) / polygon.length;
+  const centre: Point = [cx, cy];
+  const near: Point[] = polygon.map(([x, y]): Point => [x + (cx - x) * 0.1, y + (cy - y) * 0.1]);
+  return [centre, ...near].filter((p) => insidePolygon(p, polygon));
+}
+
+export function overlapLifts(polygons: Point[][]): number[] {
+  const areas = polygons.map((polygon) => (polygon.length < 3 ? 0 : areaOf(polygon)));
+  const probes = polygons.map((polygon) => (polygon.length < 3 ? [] : probesOf(polygon)));
+  return polygons.map((polygon, i) => {
+    if (polygon.length < 3) return 0;
+    let larger = 0;
+    polygons.forEach((other, j) => {
+      if (j === i || other.length < 3 || areas[j] <= areas[i]) return;
+      const overlaps = probes[i].some((p) => insidePolygon(p, other)) || probes[j].some((p) => insidePolygon(p, polygon));
+      if (overlaps) larger++;
+    });
+    return larger * OVERLAP_LIFT_M;
+  });
+}
+
 export function insidePolygon([x, y]: Point, polygon: Point[]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {

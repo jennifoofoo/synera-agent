@@ -180,7 +180,8 @@ function AuthorSwitch() {
   const [name, setName] = useState(author === DEFAULT_AUTHOR ? "" : author);
   // Free name, remembered on this device; empty signs as "Technician".
   return (
-    <div className="note-author">
+    <label className="note-author">
+      <span>Signed</span>
       <input
         value={name}
         onChange={(event) => {
@@ -190,9 +191,9 @@ function AuthorSwitch() {
         placeholder={DEFAULT_AUTHOR}
         aria-label="Notes by (your name)"
         autoComplete="name"
-        size={12}
+        size={10}
       />
-    </div>
+    </label>
   );
 }
 

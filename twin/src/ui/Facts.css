@@ -38,7 +38,10 @@
 /* the sheet */
 .card-notes .card-head { align-items: flex-start; }
 .card-notes .card-title { flex: 1; }
-.note-author { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.note-author { display: inline-flex; align-items: baseline; gap: 4px; flex: none; font-size: 12px; color: var(--ink-3, var(--ink-2)); }
+/* the name reads as quiet text with a hint of an underline, not as a form box */
+.note-author input { border: 0; border-bottom: 1px dashed var(--line); border-radius: 0; background: transparent; padding: 1px 2px; font: inherit; font-size: 13px; color: var(--ink-2); width: 8.5em; outline: none; }
+.note-author input:focus { border-bottom-color: var(--signal); color: var(--ink); }
 .note-author button { min-height: 30px; padding: 2px 10px; border: 0; border-radius: 0; background: transparent; font-size: 13px; color: var(--ink-2); }
 .note-author button.on { background: var(--signal-soft); color: var(--signal-dark); font-weight: 600; }
 .note-author button + button { border-left: 1px solid var(--line); }
