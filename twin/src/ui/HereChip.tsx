@@ -78,3 +78,30 @@ export function HereChip() {
     </div>
   );
 }
+
+/** "Step-free" with × while step-free mode is on (state.step_free, docs/specs/step-free-mode.md). Same chip as
+ * "You are here", no own look. × turns the mode off for the chat and the route button. */
+export function StepFreeChip() {
+  const on = useTwin((s) => s.state?.step_free === true);
+  const setStepFree = useTwin((s) => s.setStepFree);
+  const [busy, setBusy] = useState(false);
+  if (!on) return null;
+  const off = async () => {
+    setBusy(true);
+    try {
+      await setStepFree(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="here-chip" role="status" data-testid="step-free-chip">
+      <span className="here-name">
+        <b>Step-free</b>
+      </span>
+      <button className="x" onClick={() => void off()} disabled={busy} aria-label="Turn step-free routes off">
+        ×
+      </button>
+    </div>
+  );
+}

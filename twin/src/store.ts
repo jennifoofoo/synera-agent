@@ -209,6 +209,7 @@ interface TwinState {
   clearRoute: () => Promise<void>;
   setClosed: (element: string, closed: boolean) => Promise<void>;
   addDoor: (first: string, second: string) => Promise<void>;
+  setStepFree: (enabled: boolean) => Promise<void>;
   reset: () => Promise<void>;
   /** opts.here overrides the hereArmed/selection logic, e.g. { here: { clear: true } } from the "You are here" chip. */
   ask: (message: string, voice?: boolean, opts?: { here?: ChatContext["here"] }) => Promise<ChatReply | null>;
@@ -527,6 +528,11 @@ export const useTwin = create<TwinState>((set, get) => ({
     const key = get().buildingKey;
     if (!key) return;
     set({ state: withPendingHere((await api.addDoor(key, first, second)).state) });
+  },
+  async setStepFree(enabled) {
+    const key = get().buildingKey;
+    if (!key) return;
+    set({ state: withPendingHere((await api.setStepFree(key, enabled)).state) });
   },
   async reset() {
     const key = get().buildingKey;

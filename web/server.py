@@ -9,6 +9,7 @@ API (all JSON; POST bodies carry "building": "<split>/<building_id>"):
   GET  /api/building?key=dev/...        floors, spaces, openings, connectors, assets, state
   POST /api/route    {start, destination, step_free, via: [], start_point?: {x, y, floor_id?}, destination_point?: {x, y}}
   POST /api/route/clear
+  POST /api/step_free {building, enabled}  step-free mode on/off (the page chip's ×); state.step_free, see docs/specs/step-free-mode.md
   POST /api/close    {element, closed: true|false}       lift/stairs/door/room id or name
   POST /api/door     {first, second, step_free}
   POST /api/reset                       reload the building from disk (drops closures, doors, route)
@@ -327,6 +328,7 @@ class App:
                 result = {**result, "here_note": here.note}
             session.position = chat.position_view()
             session.guide_info = chat.guide_info()
+            session.step_free = chat.step_free(session.step_free)
             saved_path = result.pop("saved_path", None)
             with self.lock:
                 current = self.session(key)
@@ -398,6 +400,10 @@ class App:
                 return 200, {"round": view, "state": api.state_view(session)}
             if path == "/api/route/clear":
                 return 200, api.clear_route(session)
+            if path == "/api/step_free":
+                enabled = body.get("enabled") is True
+                self.chat(key).set_step_free(enabled)
+                return 200, api.set_step_free(session, enabled)
             if path == "/api/close":
                 return 200, api.set_closed(session, str(body.get("element", "")), bool(body.get("closed", True)))
             if path == "/api/door":
