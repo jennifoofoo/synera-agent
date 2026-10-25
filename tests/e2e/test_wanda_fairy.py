@@ -210,12 +210,11 @@ def test_fairy_states(open_twin, profile):
         assert probe["mic"], (state, probe)  # still reads as "tap to talk"
         # The button never changes size and never moves under the finger.
         assert (probe["w"], probe["h"]) == (ORB_SIZE[profile], ORB_SIZE[profile]), (state, probe)
+        # Its horizontal place in the bar never changes; the bar itself may move up or down when a sheet row below it
+        # (the slim notes row, a card) comes or goes, which is layout, not the fairy.
         if first is None:
             first = probe
-        assert (round(probe["x"], 1), round(probe["y"], 1)) == (round(first["x"], 1), round(first["y"], 1)), (
-            state,
-            probe,
-        )
+        assert round(probe["x"], 1) == round(first["x"], 1), (state, probe)
         # Only inner parts animate, and only transform and opacity.
         for anim in page.evaluate(ANIMATIONS, ORB):
             if anim["name"] in ("box-shadow", "--wanda-level"):
