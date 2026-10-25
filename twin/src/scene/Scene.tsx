@@ -21,7 +21,7 @@ import { RouteLine } from "./RouteLine";
 import { RoundMarks } from "./RoundMarks";
 import { FloorOutline, floorLayout, floorRoles, useRouteFloorsKey } from "./floorVisibility";
 import { Things } from "./Things";
-import { Plinth, StudioLight, StudioShadows, useSoftwareGl } from "./Studio";
+import { Plinth, plinthTop, StudioLight, StudioShadows, useSoftwareGl } from "./Studio";
 import { openingEditsOf } from "./geometry";
 
 const NEAR_THINGS_LIMIT = 6000;
@@ -47,8 +47,8 @@ function Building({ model }: { model: BuildingModel }) {
   const routeFloorsKey = useRouteFloorsKey();
   const routeFloors = useMemo(() => (routeFloorsKey ? routeFloorsKey.split("|") : null), [routeFloorsKey]);
   const elevations = useMemo(
-    () => new Map(model.floors.map((floor) => [floor.id, floorLayout(floor, model, floorMode, routeFloors)])),
-    [model, floorMode, routeFloors],
+    () => new Map(model.floors.map((floor) => [floor.id, floorLayout(floor, model, floorMode, routeFloors, focused)])),
+    [model, floorMode, routeFloors, focused],
   );
   const floorY = useCallback((floorId: string) => elevations.get(floorId) ?? 0, [elevations]);
   const floorTop = useCallback((floorId: string) => (elevations.get(floorId) ?? 0) + (model.floorById.get(floorId)?.height_m ?? 3), [elevations, model]);
@@ -60,9 +60,14 @@ function Building({ model }: { model: BuildingModel }) {
   const bakeKey = `${model.building.key}:${focused}:${floorMode}:${thingsMode}:${routeFloorsKey}:${JSON.stringify(openingEditsOf(state))}`;
   const shadowFloor = routeFloors ? routeFloors.reduce((top, id) => (floorY(id) > floorY(top) ? id : top), routeFloors[0]) : focused;
   const guideSegments = state?.guide?.active ? state.guide.leg.segments : null;
+  // The plinth sits right under the drawn floors (the active one, or a route's floors), never under a basement far
+  // below; "all floors" has none, so the outlines of the floors below can show just under the active floor.
+  const plinthFloors = useMemo(() => [...visibleFloors], [visibleFloors]);
+  const showPlinth = !flat && plinthFloors.length > 0 && (floorMode !== "exploded" || routeFloors !== null);
 
   return (
     <group>
+      {showPlinth && <Plinth model={model} floorIds={plinthFloors} top={plinthTop(plinthFloors.map(floorY))} />}
       {model.floors.map((floor) => {
         const isFocused = floor.id === focused;
         const visible = visibleFloors.has(floor.id);
@@ -207,7 +212,6 @@ export function Scene() {
           <meshBasicMaterial color={COLOURS.plan} />
         </mesh>
       )}
-      {model && !flat && <Plinth model={model} />}
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
       {ao && !worker && !flat && (

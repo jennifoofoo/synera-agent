@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import type { Building } from "../api/types";
+import { buildModel } from "../model/model";
+import { OUTLINE_STEP_M, floorLayout, floorRoles } from "./floorVisibility";
+
+const square = (floor_id: string, id: string) => ({
+  id,
+  floor_id,
+  type: "room",
+  room_type: "living",
+  name: id,
+  ref: null,
+  polygon: [[0, 0], [10, 0], [10, 10], [0, 10]] as [number, number][],
+  anchor: [5, 5] as [number, number],
+  area_m2: 100,
+});
+
+const model = buildModel({
+  key: "t",
+  name: "t",
+  source: null,
+  floors: [
+    { id: "b", level: -1, name: "Basement", elevation_m: -3, height_m: 3 },
+    { id: "g", level: 0, name: "Ground", elevation_m: 0, height_m: 3 },
+    { id: "f1", level: 1, name: "Floor 1", elevation_m: 3, height_m: 3 },
+  ],
+  spaces: [square("b", "s1"), square("g", "s2"), square("f1", "s3")],
+  openings: [],
+  connectors: [],
+  assets: [],
+  state: {} as Building["state"],
+});
+const y = (id: string, mode: "single" | "exploded", focused = "g") => floorLayout(model.floorById.get(id)!, model, mode, null, focused);
+
+describe("floorLayout in 'all floors' (exploded)", () => {
+  it("keeps the active floor at its real height", () => {
+    expect(y("g", "exploded")).toBe(0);
+    expect(y("f1", "exploded", "f1")).toBe(3);
+  });
+
+  it("puts the floors below as outlines just under the active floor, not a storey lower", () => {
+    expect(y("b", "exploded")).toBeCloseTo(-OUTLINE_STEP_M);
+    expect(y("g", "exploded", "f1")).toBeCloseTo(3 - OUTLINE_STEP_M);
+    expect(y("b", "exploded", "f1")).toBeCloseTo(3 - 2 * OUTLINE_STEP_M);
+  });
+
+  it("pulls the floors above apart, above the active floor", () => {
+    expect(y("f1", "exploded")).toBeGreaterThan(3);
+  });
+
+  it("uses the real elevations outside 'all floors'", () => {
+    expect(y("b", "single")).toBe(-3);
+    expect(y("f1", "single")).toBe(3);
+  });
+});
+
+describe("floorRoles", () => {
+  it("draws only the active floor in single mode (the plinth sits under it)", () => {
+    const roles = floorRoles(model, "g", "single", false, null);
+    expect([...roles.values()]).toEqual(["hidden", "full", "hidden"]);
+  });
+
+  it("outlines the other floors in 'all floors'", () => {
+    const roles = floorRoles(model, "g", "exploded", false, null);
+    expect([...roles.values()]).toEqual(["outline", "full", "outline"]);
+  });
+});

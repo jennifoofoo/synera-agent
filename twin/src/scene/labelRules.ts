@@ -11,7 +11,8 @@
 /** Label classes, high to low. The spec's order (destination ... furniture) with three additions: the task markers
  * (route floor-change badges, closure chips, found dots: markers, not names) above every name, the names of found
  * things right after the tapped room (they answer the question just asked) and closed lifts and stairs before the
- * round stop (safety), and the second lines and door widths after everything (details). */
+ * round stop (safety), the symbols of the coloured rooms before the zone names (never colour without a symbol), and
+ * the second lines and door widths after everything (details). */
 export const LABEL_PRIORITY = [
   "marker",
   "destination",
@@ -21,6 +22,7 @@ export const LABEL_PRIORITY = [
   "closure",
   "roundStop",
   "landmark",
+  "roomSymbol",
   "zone",
   "poi",
   "room",
@@ -44,8 +46,9 @@ export function byPriority<T>(items: readonly T[], classOf: (item: T) => LabelCl
   return [...items].sort((a, b) => rankOfClass(classOf(a)) - rankOfClass(classOf(b)) || keyOf(a).localeCompare(keyOf(b)));
 }
 
-/** Classes the density cap never drops: what the current task names (they are few). */
-const UNCAPPED: ReadonlySet<LabelClass> = new Set(["marker", "destination", "here", "selected", "found", "closure", "roundStop", "landmark"]);
+/** Classes the density cap never drops: what the current task names (they are few), and the symbols of the coloured
+ * rooms (kitchen, bathroom, stairs, lift, meeting): they say what the colour means, never colour without a symbol. */
+const UNCAPPED: ReadonlySet<LabelClass> = new Set(["marker", "destination", "here", "selected", "found", "closure", "roundStop", "landmark", "roomSymbol"]);
 
 export function capped(name: LabelClass): boolean {
   return !UNCAPPED.has(name);
@@ -137,4 +140,11 @@ export function decide<T>(
     out.add(item);
   }
   return out;
+}
+
+/** A room's name as the map shows it: without a numbered suffix in brackets ("Kitchen 0.27 (apartment 6)" becomes
+ * "Kitchen 0.27"), which only crowds the map; the room card and the list keep the full name. A bracket without a
+ * number is part of the name and stays ("Café (Gastraum)"). */
+export function mapRoomName(name: string): string {
+  return name.replace(/\s*\([^()]*\d[^()]*\)\s*$/, "").trim() || name;
 }

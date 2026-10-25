@@ -56,6 +56,23 @@ export function distanceToOrthoZoom(distance: number, frameHeightPx: number, fov
   return frameHeightPx / (2 * distance * Math.tan((fovDeg * Math.PI) / 360));
 }
 
+/** Option/Alt + mouse drag (button held), the mouse twin of the two-finger swipe:
+ *  - on the plan, a drag mostly up (|dy| > 2 |dx|) by OPTION_DRAG_SWITCH_PX switches to 3D and keeps tilting;
+ *  - in 3D, a drag mostly down by as much that leaves the view nearly straight down goes back at the release;
+ *  - a drag that goes sideways first (OPTION_DRAG_SIDEWAYS_PX) rotates as before and never switches.
+ * `dx`, `dy`: the pointer's move since the press (screen px, y down). */
+export const OPTION_DRAG_SWITCH_PX = 40;
+export const OPTION_DRAG_SIDEWAYS_PX = 12;
+export type OptionDrag = "tilt-up" | "tilt-down" | "rotate" | "undecided";
+
+export function classifyOptionDrag(dx: number, dy: number): OptionDrag {
+  const vertical = Math.abs(dy) > 2 * Math.abs(dx);
+  if (vertical && -dy >= OPTION_DRAG_SWITCH_PX) return "tilt-up";
+  if (vertical && dy >= OPTION_DRAG_SWITCH_PX) return "tilt-down";
+  if (!vertical && Math.abs(dx) >= OPTION_DRAG_SIDEWAYS_PX) return "rotate";
+  return "undecided";
+}
+
 /** Polar angle while the fingers keep moving up after the switch to 3D (`upPx` > 0 is up), within the 3D limits. */
 export function tiltForSwipe(upPx: number, maxTilt: number): number {
   return Math.min(maxTilt, Math.max(HANDOVER_POLAR, HANDOVER_POLAR + upPx * TILT_RAD_PER_PX));
