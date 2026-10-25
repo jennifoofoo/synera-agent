@@ -1,21 +1,30 @@
-# Short technical explanation (for the Hack and More form)
+# Short technical explanation (paste into the form)
 
-Draft by Leonie's session, revised by Jennifer's session (Sunday about 03:30), switched to the real venue (Munich Urban Colab, `user/plan-89323a15`) on Sunday morning. Only claims what is on `main` or merged before the freeze; re-check every number before pasting. Items marked [ROUND] depend on `feat/demo-urban-colab-prep` (inspection round and notes) being merged; delete them if it is not. `[N stops]` / `[X m]` are placeholders until the Urban Colab has its fire extinguishers (`scripts/demo_seed.py` prints the numbers). Longer version: `docs/submission/TECHNICAL_EXPLANATION.md`.
-
----
-
-**Wanda: the building that talks back.** A voice agent for service technicians that knows a building as well as its facility manager, and keeps what technicians learn on site right where it happened.
-
-**Principle: facts from code, language from the model.** A deterministic core holds the building as a graph of rooms, doors, stairs, lifts and assets. Areas come from polygons, shared walls from outline distance, rooms above and below from floor overlap, door widths from the data, routes door to door on Synera's route model (stairs and lifts costed as in the scoring note). Claude only chooses tools, asks what is missing, shows what it understood and phrases the reply. All 145 test answers in `SUBMISSION/answers.json` are produced by code, so they are reproducible.
-
-**Knowledge that stays in the building.** Technicians attach what they learn to a room, a machine, a door or a lift, by voice: "remember here: the valve on press 2 drips", "lift 1 is out until tomorrow". Every fact has a valid-from and valid-to time, an author and its source sentence; "fixed" supersedes a fact instead of deleting it, so Wanda answers "what is wrong here now?" and "what broke this week?". A timed closure reroutes everyone until it expires and then reopens by itself. Together with the building this forms a time-aware knowledge graph, exported as JSON-LD with Brick Schema and RealEstateCore types and an Asset Administration Shell view for machines.
-
-**Interaction.** Every change (close a lift, add a door, move a machine, remember a fact) first shows a card with its effect and needs a clear "yes". Directions come in short steps with landmarks; tapping the map answers "where are you?". One Wanda voice bar at the bottom of the phone screen: tap the mic, or in hands-free mode just say "Hey Wanda"; it keeps listening briefly after each answer, and runs commands like "next" or "how far" instantly on the device; only real questions go to the agent. "Walk with me" counts steps and moves an estimated dot along the route, no GPS needed. [ROUND] Inspection rounds: "all fire extinguishers on the ground floor" becomes the shortest round ([N stops], about [X m] in the Urban Colab), guided stop by stop; at each stop Wanda reads what the last shift left there, and "finished" shows the job report (stops checked, metres walked, notes left and read).
-
-**Any building, even from a plan (Level 4).** A floor plan image plus its SVG becomes a building: scale, storey heights, floor alignment over stairs and lifts, door widths, and room types read from furniture symbols (each symbol is one asset). 83 % of our re-created Level 4 questions are answered correctly on buildings built from plans. Our demo runs in the real venue: the Munich Urban Colab was read from photos of its evacuation plans on the wall (two floors, 41 spaces, scale checked against the venue's published room sizes, e.g. Project Room 142 m² vs. 141 m²; doors added by hand, since evacuation plans draw no door widths), so the map in the video is the building we film in.
-
-**Stack.** Python 3.12+ (uv, shapely, networkx), Claude with tool use, a React + three.js twin (2D map with zoom levels and 3D model, Maps-style directions), Web Speech for voice in, ElevenLabs for voice out, browser motion sensors for step counting. Tests are the contract: one test per question kind against all labelled answers, a live conversation suite against the real model, browser end-to-end tests on desktop and phones.
+Copy everything between the two lines.
 
 ---
 
-Sources: `SUBMISSION/BENCHMARK.md`, `docs/specs/place-knowledge.md` (facts with time, graph export), `docs/WORK_IN_PROGRESS.md` (Level 4 83 %, live suite), `twin/src/motion/README.md` (Walk with me).
+**Wanda – the building that talks back.** A voice guide for service technicians that knows a building like its facility manager, and keeps what technicians learn on site where it happened.
+
+**Facts from code. Language from the model.** The building is a graph of rooms, doors, stairs, lifts and devices. Areas, walls, floors, door widths and routes are computed in Python on Synera's route model. Claude only picks a tool, asks what is missing and phrases the reply. All 145 benchmark answers in `SUBMISSION/answers.json` are produced by code, so they are reproducible. On the labelled dev set: 138 of 138.
+
+**The knowledge stays in the building.** A technician taps the Wanda orb and says "note: the bracket is loose". The note sticks to that device, room, door or lift, with author, time and photo. "Lift 1 is out until tomorrow" reroutes everyone until then, then reopens by itself. Events and room bookings live in the same store ("is the Project Room free at 10?"). On the laptop each room opens as a knowledge graph (Brick and RealEstateCore types, Asset Administration Shell export).
+
+**Guided work.** "All fire extinguishers on the ground floor" becomes the shortest round, one stop per device: in the Munich Urban Colab 8 stops and 98 m, against 234 m in name order. Wanda guides stop by stop, reads what the last shift left there, and "finished" shows a job report. Step-free mode avoids stairs. "Walk with me" counts steps and moves an estimated dot, no GPS.
+
+**Any building, even from a plan (Level 4).** A floor plan becomes a building: scale, storeys, doors, room types and equipment from furniture symbols. Our demo building is the venue itself, read from photos of its evacuation plans.
+
+**Safety.** Every change first shows a card with its effect and needs a clear yes.
+
+**Stack.** Python 3.12 (shapely, networkx), Claude with tool use (Sonnet for the live chat, Opus for the benchmark agent), React and three.js for the 2D/3D map on laptop and phone, browser speech in, ElevenLabs voice out. 5,072 offline tests pass, with one file per question kind against all labelled answers.
+
+---
+
+## Sources
+
+- 145 answers produced by code: all 145 questions of `data/test` match a sentence template of `building_agent/question_parser.py` and are answered by the kind functions without an API call (checked Sunday 25.10. on `main` 168f0b9); `building_agent.submission --check` says "ready to submit"; `SUBMISSION/answers.json` equals `answers/team_synera.csv` in all 145 replies.
+- 138 of 138 dev questions: full `benchmark.evaluate data/dev` run by the team this weekend (not re-run here, it calls the API).
+- Round: `plan_round` on `demo/buildings/plan-89323a15` (main), fire extinguishers on level 0, start Project Room (the start `scripts/demo_seed.py` uses): 8 stops, 98.4 m, exact order; name order 234.1 m. The video's floor-3 round is not on `main` yet, so it is not quoted here.
+- Sonnet for chat, Opus for answers: `building_agent/agent.py` (`CHAT_MODEL`), `starter_agent/agent.py` (`MODEL`).
+- Notes, end times, events, graph and AAS export: `building_agent/knowledge.py`, `knowledge_tools.py`, `knowledge_export.py`, `docs/specs/place-knowledge.md`, `docs/specs/events.md`.
+- Tests: `uv run pytest -q` on main 168f0b9: 5072 passed, 21 skipped, 0 failed, no API key (live and browser tests are excluded by default).
