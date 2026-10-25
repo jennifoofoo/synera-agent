@@ -1,6 +1,6 @@
 // Wheel classifier with recorded-like event sequences: run with `npm test` in twin/ (vitest).
 import { describe, expect, test } from "vitest";
-import { createTwist, createWheelClassifier, orbitDelta, wheelDevice, type WheelSample } from "./wheelInput";
+import { createOrbitSwitch, createTwist, createWheelClassifier, orbitDelta, wheelDevice, type WheelSample } from "./wheelInput";
 
 const ev = (over: Partial<WheelSample>): WheelSample => ({ deltaX: 0, deltaY: 0, deltaMode: 0, ctrlKey: false, altKey: false, timeStamp: 0, ...over });
 
@@ -96,5 +96,25 @@ describe("orbitDelta", () => {
   test("2D: no tilt, both axes rotate", () => {
     expect(orbitDelta(0, 100, true)[1]).toBe(0);
     expect(orbitDelta(0, 100, true)[0]).not.toBe(0);
+  });
+});
+
+describe("createOrbitSwitch (Option + swipe up on the plan)", () => {
+  test("a vertical swipe up switches once past the threshold", () => {
+    const sw = createOrbitSwitch(40);
+    expect([0, 1, 2, 3].map((i) => sw.step(0.5, 12, 1000 + i * 16))).toEqual(["tilting", "tilting", "tilting", "switch"]);
+  });
+  test("sideways, diagonal and downward swipes rotate and never switch", () => {
+    const sw = createOrbitSwitch(40);
+    for (let i = 0; i < 20; i++) {
+      expect(sw.step(12, 0, 1000 + i * 16)).toBe("rotate");
+      expect(sw.step(10, 12, 2000 + i * 16)).toBe("rotate");
+      expect(sw.step(0, -12, 3000 + i * 16)).toBe("rotate");
+    }
+  });
+  test("a pause starts a new gesture", () => {
+    const sw = createOrbitSwitch(40);
+    expect(sw.step(0, 30, 1000)).toBe("tilting");
+    expect(sw.step(0, 30, 1400)).toBe("tilting");
   });
 });
