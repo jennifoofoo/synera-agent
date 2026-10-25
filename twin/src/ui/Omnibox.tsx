@@ -543,19 +543,6 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
         </button>
         <button
           type="button"
-          ref={micRef}
-          className={`ob-mic mic ${listening ? "listening" : ""}`}
-          onPointerDown={(event) => event.preventDefault()}
-          onClick={toggleMic}
-          disabled={busy}
-          aria-label={listening ? "Stop and send" : "Speak"}
-          aria-pressed={listening}
-          title={listening ? "Tap to send" : "Tap and speak"}
-        >
-          <MicIcon />
-        </button>
-        <button
-          type="button"
           className="ob-icon ob-close"
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => {
@@ -579,7 +566,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
           <button
             type="button"
             ref={talkRef}
-            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""} ${walking && !handsFreeOn ? "muted" : ""}`}
+            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking && !(walking && !handsFreeOn) ? "speaking" : ""} ${walking && !handsFreeOn ? "muted" : ""}`}
             aria-label={orbLabel}
             aria-pressed={walking && !listening && !stops ? !handsFreeOn : listening}
             title={orbTitle}

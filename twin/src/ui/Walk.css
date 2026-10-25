@@ -42,3 +42,15 @@
   .card-walk .card-actions { margin-top: 6px; }
 }
 .card-walk .walk-end { background: transparent; border-color: transparent; color: var(--ink-2); }
+
+/* phone: the step sheet is solid (the plan must not show through the text), one filled button, nothing wraps */
+.worker .phone-sheet:has(.card-walk) { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.card-walk .walk-toggle, .card-walk .walk-end, .card-walk .walk-kicker { white-space: nowrap; }
+.card-walk .walk-foot .walk-toggle { flex: none; }
+.card-walk .walk-foot .walk-motion-switch { min-width: 0; }
+/* Done is the same blue as Next (it is the primary there too); only Back stays quiet */
+.card-walk .walk-next.primary { background: var(--walk-blue); color: var(--signal-ink); }
+/* "Turn on" is a hint, not the main action: a soft tint, so Next is the only filled button */
+.card-walk .walk-hint-actions button.primary { background: var(--signal-soft); color: var(--signal-dark); }
+.card-walk .walk-hint-actions button.primary:hover { background: color-mix(in srgb, var(--signal-soft) 80%, var(--signal)); }
+@media (max-height: 700px) { .worker .card-walk .walk-now p { font-size: 18px; } .worker .card-walk .walk-now { margin-top: 4px; } }
