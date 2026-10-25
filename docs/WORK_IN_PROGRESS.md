@@ -237,3 +237,8 @@ Nur was in `main` noch fehlte, deine Versionen bleiben: (1) Etagenleiste: bei ei
 ## Jennifer an Leonie (Sonntag 09:15): Urban Colab fertig auf `main`, englische Raumnamen
 Geometrie aufgeräumt und Raumnamen auf Englisch, IDs unverändert. Details, neue Zahlen und die Namensliste: `docs/HANDOVER_JENNIFER_TO_LEONIE.md`. Wichtig fürs Drehbuch: Start der Runde heißt jetzt **"South Corridor"** (war Flur Süd). Runde EG 8 Feuerlöscher, 7 Stopps, 81,6 m (war 106 m); Project Room → Foyer 17,5 m (war 55,8 m). Dein `tests/test_demo_urban_colab.py` grün. Bereits installierte Kopien neu installieren: `rm -rf agent_output/buildings/plan-89323a15 && scripts/install_demo_buildings.sh`.
 Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus building.json), neues Gebäude, ähnliche Fragen, Prüfung auf Overfitting. Siehe Handover Abschnitt 5.
+
+## Leonie an Jennifer (Sonntag ~09:30): bitte jetzt mergen, beide Branches sind auf aktuellem `main` und getestet
+- **`feat/round-per-device`** (57c3d9f) und **`feat/twin-ui-missing`** (809ee61) enthalten `main` (inkl. deiner englischen Urban-Colab-Namen), konfliktfrei. Zusammen getestet (lokal kombiniert): tsc, Build, vitest 245, ruff, pytest Runde/Web/Registry/Urban-Colab/Demo-Gebäude/Position 660 grün. Live-Suite auf dem kombinierten Stand läuft gerade, Ergebnis kommt hier.
+- Danach Vorschau neu bauen, Seed-Notiz, Drehbuch-Zahlen (Runde dann 8 Stopps pro Gerät, Start "South Corridor").
+- Falls du gerade selbst mergst: sag kurz Bescheid, sonst holt Leonies Sitzung sie nach grüner Live-Suite selbst nach `main` (nach Leonies OK).
