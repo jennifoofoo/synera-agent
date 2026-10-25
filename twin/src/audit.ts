@@ -113,7 +113,7 @@ export function drawnThings(): number {
   let total = 0;
   sceneRoot()?.traverse((o) => {
     const mesh = o as THREE.InstancedMesh;
-    if (!mesh.isInstancedMesh) return;
+    if (!mesh.isInstancedMesh || mesh.name === "thing-shadow") return; // a machine's soft shadow is not a second thing
     const material = mesh.material as THREE.Material;
     if (material.side === THREE.BackSide) return;
     total += mesh.count;

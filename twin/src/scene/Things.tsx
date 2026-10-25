@@ -199,7 +199,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       </instancedMesh>
       {!flat && (
         <>
-          <instancedMesh ref={shadows} args={[shadowPlane, undefined, capacity]} frustumCulled={false} raycast={() => null} renderOrder={1}>
+          <instancedMesh name="thing-shadow" ref={shadows} args={[shadowPlane, undefined, capacity]} frustumCulled={false} raycast={() => null} renderOrder={1}>
             <meshBasicMaterial color={COLOURS.shadow} transparent opacity={SHADOW_OPACITY} depthWrite={false} alphaMap={shadowMap ?? undefined} />
           </instancedMesh>
           <instancedMesh ref={bodies} args={[bodyBox, undefined, capacity]} onClick={onClick(split.body)} frustumCulled={false}>
