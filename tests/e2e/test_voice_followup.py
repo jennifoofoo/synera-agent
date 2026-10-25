@@ -257,13 +257,15 @@ START_WALK = """async () => {
 
 
 def test_hands_free_control_shown_once(twin):
-    """One hands-free button and at most one "Say Hey Wanda" line, in the bottom bar or (while walking) the sheet."""
+    """One voice entry point: the bottom bar has only the orb (no hands-free or stop button next to it), the step
+    sheet has the one hands-free button while walking, and at most one "Say Hey Wanda" line shows."""
     page, _ = twin
     page.evaluate("() => window.__twinStore.getState().setHandsFree(true)")
     page.wait_for_timeout(800)
-    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 0
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") <= 1
-    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .wb-stop") == 0
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .ob-talk") == 1
 
     assert page.evaluate(START_WALK), "no route found to walk"
     page.wait_for_function("() => !!document.querySelector('.card-walk')", timeout=15000)
@@ -272,6 +274,9 @@ def test_hands_free_control_shown_once(twin):
     assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
     assert page.evaluate(VISIBLE_COUNT, ".card-walk .hf-btn") == 1
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") <= 1
+    # While walking the bar's caption never repeats the step: only that Wanda listens or speaks, or nothing.
+    caption = page.evaluate("() => document.querySelector('.wb-text')?.textContent ?? ''")
+    assert caption in ("", "Listening…", "Speaking…"), caption
 
     # After something was said, the hint does not come back.
     assert page.evaluate("(t) => window.__say(t)", "hey wanda repeat")

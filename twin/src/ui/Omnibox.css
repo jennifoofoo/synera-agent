@@ -172,8 +172,6 @@
 @media (pointer: coarse) { .wb-ask { width: 44px; height: 44px; min-height: 44px; } }
 .wb-mic { background: var(--paper-2); }
 .wb-mic:hover { background: color-mix(in srgb, var(--text) 15%, transparent); }
-.wb-stop { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); animation: wb-in var(--t-base) both; }
-.wb-stop:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); }
 .ob-talk { position: relative; }
 /* spoken replies off: a muted-speaker badge on the Talk button */
 .ob-badge {
@@ -187,7 +185,7 @@
 .omnibox.expanded .omnibox-input { animation: wb-in var(--t-base) both; transform-origin: bottom center; }
 
 @media (prefers-reduced-motion: reduce) {
-  .wanda-bar, .wb-stop, .omnibox.expanded .omnibox-input { animation: none; }
+  .wanda-bar, .omnibox.expanded .omnibox-input { animation: none; }
   .wanda-orb, .wanda-orb.listening, .wanda-orb.speaking { animation: none; transform: none; transition: none; }
   .wanda-orb.listening, .wanda-orb.speaking { box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 30%, transparent); }
   .wanda-orb.thinking::after, .wanda-orb.wb-orb.idle { animation: none; }
