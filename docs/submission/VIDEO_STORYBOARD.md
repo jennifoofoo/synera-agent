@@ -22,6 +22,8 @@ The walk is on **floor 3** (team decision: no access to the ground floor). Floor
 | Night-shift note read aloud with photo when she is guided to that extinguisher | true on main (verified on the ground floor by demo-urban-colab-prep); seed on floor 3 by hand (§4) | `POST /api/facts` |
 | All 145 benchmark answers produced by code, reproducible | true | `SUBMISSION/answers.json`, `BENCHMARK.md` |
 | "By 2036, 12.9 million people in Germany reach retirement age" | sourced | Federal Statistical Office, via dbb magazin 9/2024 (show source in the caption) |
+| "42 % of institutional knowledge is unique to one individual"; "inefficient knowledge sharing costs a large US business about $47 million a year" (company of 17,700 employees); 5.3 hours a week lost per knowledge worker | sourced, **US, 2018** | Panopto Workplace Knowledge and Productivity Report, July 2018, survey by YouGov, 1,001 US workers ([HR Dive](https://www.hrdive.com/news/inefficient-knowledge-sharing-costs-large-us-businesses-47m-a-year/527892/)). Say "a large company", never "every company" or "in Germany" |
+| Unplanned downtime in Germany ≈ €147,000 per hour (ABB / Sapio Research 2023) | **not verified** (source page blocked), do not use in the video | industrial-production.de |
 
 **Rule for the cut:** never say a number aloud that is not on screen. Wanda's spoken numbers come from the LLM phrasing the tool result, so the caption shows the panel's number and the voiceover does not repeat it. Re-read the numbers from the panel on shoot day: floor 3 is new and may still change while `feat/mucl-all-floors` is finished.
 
@@ -41,9 +43,9 @@ Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recor
 | 0:00–0:03 | F | Close-up: Gisela's gloved hand on a fire extinguisher bracket in a corridor, dim. Cut to black on the last word. | VO: "Every building has one person who knows it by heart." | – | **Hook** (see §2) |
 | 0:03–0:06 | F | Black, white text appears. | VO: "Last spring, that person retired." | "Last spring, that person retired." | Turn the hook into a loss |
 | 0:06–0:13 | F | Slow push-in on Gisela on floor 3 at the Main Stairs, iPhone in hand, looking down a corridor full of doors. | VO: "By 2036, 12.9 million people in Germany reach retirement age." | "12.9 million people reach retirement age by 2036 (Destatis, via dbb magazin 9/2024)" | The one sourced number |
-| 0:13–0:20 | F | Gisela opens a paper folder: a printed plan, a handwritten list "Extinguishers, 3rd floor", crossed out, coffee stain. | VO: "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked." | – | Knowledge lives in heads |
-| 0:20–0:27 | F | Gisela walks into a closed door, turns back, scrolls an old photo gallery on her phone looking for "that bracket". Clock caption ticks up. | VO: "So the new shift searches. Asks around. Writes it up later, if at all." | "06:12 … 06:31" (ticking) | Time lost, handover lost |
-| 0:27–0:35 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Maintenance software knows what. Tracking knows roughly where. Nobody guides you hands-free, and nobody keeps what you learned." | "Knows what. Knows roughly where. Nobody guides you. Nobody remembers." | Positioning = the gap |
+| 0:13–0:19 | F | Gisela in front of extinguisher 3.02 in the Third Floor Corridor, reads the inspection tag, looks around: nobody to ask. | VO: "What they knew was never written down. Which extinguisher has the loose bracket." | – | Knowledge lives in heads |
+| 0:19–0:28 | F | Gisela at a closed door, turns back, scrolls an old photo gallery looking for "that bracket". Big numbers build over the picture: **42 %**, then **$47 M / year**. | VO: "Forty-two percent of a company's knowledge sits with one single person. Searching for it costs a large company millions every year." | "42 % of company knowledge is known by one person only · $47 M a year lost to poor knowledge sharing in a large company (Panopto / YouGov 2018, 1,001 US workers)" | **Business case**: lost knowledge is money |
+| 0:28–0:35 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Software knows what. Tracking knows roughly where. Nobody guides you, and nobody keeps what you learned." | "Knows what. Knows roughly where. Nobody guides you. Nobody remembers." | Positioning = the gap |
 | 0:35–0:38 | F | Logo card. | VO: "This is Wanda." | "Wanda – the building that talks back" | Product name |
 | 0:38–0:48 | F (laptop recording, slight zoom) | Laptop, 3D twin of the Urban Colab. Gisela clicks **Round**: fire extinguisher, Floor 3, taps the Main Stairs. Panel: "[N] stops · [X] m · about 2 min", stops in order, route drawn on floor 3. | VO: "Gisela plans her round on the laptop: the shortest order, computed on the building's own plans." | "Plan: [N] stops · [X] m" (copy from panel) | Laptop: planning |
 | 0:48–0:53 | L\|R | L: Gisela steps out of the Main Stairs, taps the Wanda orb, speaks. R: orb listening, then route + "Stop 1 of [N]". | Gisela: "Wanda, fire extinguisher round, third floor. I start at the main stairs. Guide me." Wanda answers (real app audio, keep or duck). | "She talks. Hands stay free." | Voice start |
@@ -54,7 +56,7 @@ Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recor
 | 1:13–1:16 | L\|R time-lapse | Stops 3 to [N]–1 (IT Room, Open Office West; per device also 3.04) at 8×, both sides in sync. | (music only) | "Stops 3–[N−1]" | Time-lapse |
 | 1:16–1:24 | L\|R | L: last stop, extinguisher 3.05 in the West Wing Corridor; cracked hose. She taps **Notes → Add photo**, the camera opens, she takes the photo, taps the text field's mic and **dictates**. R: photo preview, text appears, **Save note**, pin with photo on the map. | Gisela (dictating): "Hose is cracked, replace next week." | "Photo + note, pinned to this extinguisher" | **Photo**: she leaves knowledge |
 | 1:24–1:28 | L\|R | L: lowers the phone. R: job report: [N] of [N] stops, metres walked, 1 note with photo, "read during the round: Night shift". | Gisela (taps the orb): "Finished." Wanda: "Round finished: [N] of [N] stops checked. …" (real audio) | "Job report, written for her" | Documentation without typing |
-| 1:28–1:37 | F (laptop recording) | Laptop: click the West Wing Corridor → room card → **Knowledge**. Ego graph: room in the centre, extinguisher 3.05, Gisela's note with photo, her name as a person node. Drag the **time slider** back: the night shift's note on 3.02 (Third Floor Corridor graph) appears and disappears in time. | VO: "Every note lands in the building's knowledge graph: who, where, when, with a photo. The next shift hears it at the right spot." | "Knowledge graph: who · where · when" | **Knowledge graph** |
+| 1:28–1:37 | F (laptop recording) | Laptop: click the West Wing Corridor → room card → **Knowledge**. Ego graph: room in the centre, extinguisher 3.05, Gisela's note with photo, her name as a person node. Drag the **time slider** back: the night shift's note on 3.02 (Third Floor Corridor graph) appears and disappears in time. | VO: "Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays with the company, even when people retire." | "Knowledge graph: who · where · when. The know-how stays a company asset." | **Knowledge graph** |
 | 1:37–1:46 | F (diagram, `architecture.html`) | voice → Wanda (Claude picks a tool) → deterministic tools → building graph → facts back. | VO: "Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks." | "Facts from code. Language from the model." | Trust 1 |
 | 1:46–1:50 | F | 145 card. | VO: "All 145 benchmark answers are reproducible." | "145 benchmark answers, computed by code" | Trust 2 |
 | 1:50–1:56 | F | Floor-3 evacuation plan photo on the wall → crossfade → 2D map → 3D twin. | VO: "It works on any building, even from the evacuation plan on the wall." | "This building, read from its evacuation plans" | Trust 3: Level 4 |
@@ -66,7 +68,7 @@ Gisela talks to the phone **six times** (start, done, how many left, done, dicta
 
 | Block | Time | Length |
 |---|---|---|
-| Hook + problem | 0:00–0:35 | 35 s |
+| Hook + problem + business case | 0:00–0:35 | 35 s |
 | Product name | 0:35–0:38 | 3 s |
 | Laptop planning | 0:38–0:48 | 10 s |
 | Split-screen round (voice, night-shift note with photo, her photo note, report) | 0:48–1:28 | 40 s |
@@ -74,7 +76,7 @@ Gisela talks to the phone **six times** (start, done, how many left, done, dicta
 | Why you can trust it | 1:37–1:56 | 19 s |
 | Close | 1:56–2:00 | 4 s |
 
-VO-first: the real lengths come from `make_vo.py` (§6); if a line runs over, shorten it there and here. Cut order if the cut runs long: (1) "How many stops left?" beat, (2) time slider drag in the knowledge-graph beat, (3) closed-door shot to 4 s. Never cut the night-shift note, her photo note, the knowledge graph, the sourced number or the last line.
+VO-first: the real lengths come from `make_vo.py` (§6); if a line runs over, shorten it there and here. Cut order if the cut runs long: (1) "How many stops left?" beat, (2) time slider drag in the knowledge-graph beat, (3) closed-door shot to 4 s. Never cut the night-shift note, her photo note, the knowledge graph, the sourced numbers (12.9 M, 42 %, $47 M) or the last line.
 
 ### Features we have and how they fit the story
 
@@ -123,7 +125,7 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
 |---|---|---|---|---|
 | S1 | Close-up gloved hand on bracket (hook) | any extinguisher, ideally 3.02 Third Floor Corridor | Camera B, handheld, low light | 5 s, two takes |
 | S2 | Gisela at the Main Stairs, push-in | floor 3, Main Stairs door | Camera B, gimbal | 8 s |
-| S3 | Paper folder, crossed-out list, printed plan | table in the floor-3 Kitchen | Camera B, top-down | prop: print the evacuation plan + handwritten list |
+| S3 | Gisela in front of extinguisher 3.02, reads the tag, looks around, nobody to ask | Third Floor Corridor | Camera B, medium shot | no props needed |
 | S4 | Dead end: closed door, turn back | any closed door | Camera B | no app visible on her phone |
 | S5 | Laptop planning (round panel, Floor 3, start Main Stairs) | anywhere | Laptop screen recording | record 3 takes, keep the cleanest; mouse slow |
 | S5b | **Knowledge graph after the round**: West Wing Corridor → room card → Knowledge (Gisela's note with photo, her name), then Third Floor Corridor → Knowledge, drag the time slider | anywhere, **after** S6/S7 so her note exists | Laptop screen recording | the Knowledge button shows only on the laptop and only for rooms with notes |
@@ -270,12 +272,12 @@ Source of truth: `docs/submission/video/vo_lines.json` (the test keeps it equal 
 | S01 | 0:00–0:03 | 3 s | Every building has one person who knows it by heart. |
 | S02 | 0:03–0:06 | 3 s | Last spring, that person retired. |
 | S03 | 0:06–0:13 | 7 s | By 2036, 12.9 million people in Germany reach retirement age. |
-| S04 | 0:13–0:20 | 7 s | What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked. |
-| S05 | 0:20–0:27 | 7 s | So the new shift searches. Asks around. Writes it up later, if at all. |
-| S06 | 0:27–0:35 | 8 s | Maintenance software knows what. Tracking knows roughly where. Nobody guides you hands-free, and nobody keeps what you learned. |
+| S04 | 0:13–0:19 | 6 s | What they knew was never written down. Which extinguisher has the loose bracket. |
+| S05 | 0:19–0:28 | 9 s | Forty-two percent of a company's knowledge sits with one single person. Searching for it costs a large company millions every year. |
+| S06 | 0:28–0:35 | 7 s | Software knows what. Tracking knows roughly where. Nobody guides you, and nobody keeps what you learned. |
 | S07 | 0:35–0:38 | 3 s | This is Wanda. |
 | S08 | 0:38–0:48 | 10 s | Gisela plans her round on the laptop: the shortest order, computed on the building's own plans. |
-| S09 | 1:28–1:37 | 9 s | Every note lands in the building's knowledge graph: who, where, when, with a photo. The next shift hears it at the right spot. |
+| S09 | 1:28–1:37 | 9 s | Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays with the company, even when people retire. |
 | S10 | 1:37–1:46 | 9 s | Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks. |
 | S11 | 1:46–1:50 | 4 s | All 145 benchmark answers are reproducible. |
 | S12 | 1:50–1:56 | 6 s | It works on any building, even from the evacuation plan on the wall. |
@@ -303,9 +305,9 @@ Needs: the page running locally with the floor-3 building (`feat/mucl-all-floors
 |---|---|---|---|
 | F1 | 0:00–0:03 | Close-up gloved hand on the extinguisher bracket (ideally 3.02) | Camera B |
 | F2 | 0:06–0:13 | Gisela at the Main Stairs on floor 3, slow push-in | Camera B, gimbal |
-| F3 | 0:13–0:20 | Paper folder: printed plan, crossed-out list "Extinguishers, 3rd floor" | Camera B, top-down |
-| F4 | 0:20–0:27 | Closed door, she turns back, scrolls an old photo gallery | Camera B |
-| F5 | 0:27–0:35 | Still of Gisela in the corridor (text goes on top in the edit) | Camera B |
+| F3 | 0:13–0:19 | Gisela in front of extinguisher 3.02, reads the tag, looks around, nobody to ask | Camera B |
+| F4 | 0:19–0:28 | Closed door, she turns back, scrolls an old photo gallery | Camera B |
+| F5 | 0:28–0:35 | Still of Gisela in the corridor (text goes on top in the edit) | Camera B |
 | F6 | 0:48–1:28 | **The round, camera side**: whole walk from the Main Stairs to 3.05, her six lines spoken live | Camera B, 2–3 m behind |
 | F7 | 0:48–1:28 | **The round, phone side**: iPhone screen recording **with microphone on** (map, Wanda's voice, her voice, her photo note) | iPhone A |
 | F8 | 1:16–1:24 | Her photo of the cracked hose: happens inside F7 (Notes → Add photo) | iPhone A |
