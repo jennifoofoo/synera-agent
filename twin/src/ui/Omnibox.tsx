@@ -671,7 +671,8 @@ function WandaFairy() {
         <g className="wf-core-g">
           <circle className="wf-glow" cx="24" cy="24" r="19" fill={`url(#${id}-soft)`} />
           <circle className="wf-core" cx="24" cy="24" r="15" fill={`url(#${id}-core)`} />
-          <circle className="wf-shine" cx="19" cy="18" r="5.5" />
+          {/* a thin light edge along the top-left rim, well clear of the mic */}
+          <path className="wf-shine" d="M10.6 21.6A13.6 13.6 0 0 1 21.6 10.6" />
           <path className="wf-mic" d={MIC_PATH} transform="translate(24 24.4) scale(0.8) translate(-12 -11.5)" />
         </g>
         <g className="wf-sparks">

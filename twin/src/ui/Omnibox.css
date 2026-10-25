@@ -110,17 +110,13 @@
   flex: none; position: relative; width: 40px; height: 40px; border-radius: 50%;
 }
 .worker .wanda-orb { width: 44px; height: 44px; }
-/* the voice level shows as the soft glow round the orb, as before (set from audioLevel.ts, not an animation) */
-.wanda-orb.listening, .wanda-orb.speaking {
-  box-shadow: 0 0 calc(6px + var(--wanda-level, 0) * 26px) calc(var(--wanda-level, 0) * 6px) color-mix(in srgb, var(--signal) 45%, transparent);
-  transition: box-shadow 80ms linear;
-}
 .wb-orb {
   display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; cursor: pointer;
   color: var(--signal-ink); --ob-active: var(--signal); background: transparent;
 }
-/* listening: the ring round the orb (from .ob-talk.listening), the fairy stays visible inside it */
-.wanda-orb.wb-orb.listening { background: transparent; }
+/* listening and speaking: one soft ring, the halo inside the SVG (it follows --wanda-level, set from audioLevel.ts);
+   no box-shadow ring on the button on top of it (.ob-talk.listening has one for the plain mic) */
+.wanda-orb.wb-orb.listening, .wanda-orb.wb-orb.speaking { background: transparent; box-shadow: none; }
 .wb-orb:hover { background: transparent; }
 .wb-orb:disabled { opacity: 1; cursor: progress; }
 .wb-orb:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
@@ -128,7 +124,7 @@
 .wb-orb .ob-badge svg { width: 14px; height: 14px; }
 
 .wf { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.wf-body, .wf-wings, .wf-core-g, .wf-sparks { transform-box: view-box; transform-origin: 50% 50%; }
+.wf-halo, .wf-body, .wf-wings, .wf-core-g, .wf-sparks { transform-box: view-box; transform-origin: 50% 50%; }
 .wf-stop-signal { stop-color: var(--signal); }
 .wf-stop-dark { stop-color: var(--signal-dark); }
 .wf-stop-clear { stop-opacity: 0; }
@@ -139,7 +135,7 @@
 }
 .wf-wing-down { fill: color-mix(in srgb, var(--signal) 26%, transparent); }
 .wf-glow { opacity: 0.35; }
-.wf-shine { fill: var(--signal-ink); opacity: 0.16; }
+.wf-shine { fill: none; stroke: var(--signal-ink); stroke-width: 1.3; stroke-linecap: round; opacity: 0.4; }
 .wf-mic { fill: var(--signal-ink); }
 .wf-spark { fill: var(--signal); stroke: var(--signal-ink); stroke-width: 0.7; }
 .wf-sparks { display: none; }
@@ -153,7 +149,10 @@
 .wanda-orb.reply .wf-glow { animation: wf-glow-flash 0.7s ease-out; }
 /* listening: fast wings, the halo up */
 .wanda-orb.listening .wf-wings { animation: wf-flap 0.35s ease-in-out infinite; }
-.wanda-orb.listening .wf-halo { opacity: 0.32; }
+.wanda-orb.listening .wf-halo, .wanda-orb.speaking .wf-halo {
+  opacity: calc(0.3 + var(--wanda-level, 0) * 0.5); transform: scale(calc(1 + var(--wanda-level, 0) * 0.3));
+  transition: opacity 80ms linear, transform 80ms linear;
+}
 /* thinking: wings still, three sparks circle the core */
 .wanda-orb.thinking .wf-sparks { display: inline; animation: wf-spin 1.4s linear infinite; }
 .wanda-orb.thinking .wf-wings { animation: none; }
@@ -213,7 +212,7 @@
   .wanda-orb.listening, .wanda-orb.speaking { box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 30%, transparent); }
   /* the fairy stands still: wings open, sparks shown but not circling; the states show by halo and glow only */
   .wanda-orb .wf *, .wanda-orb .wf { animation: none !important; transition: none !important; }
-  .wanda-orb .wf-core-g { transform: none !important; }
+  .wanda-orb .wf-core-g, .wanda-orb .wf-halo { transform: none !important; }
   .wanda-orb.speaking .wf-glow { opacity: 0.6; }
 }
 .omnibox.collapsed .ob-status { align-self: flex-end; }
