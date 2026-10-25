@@ -26,7 +26,7 @@ STORY = [
     (4, 9, "Fire alarm call point 0.04", "issue", "Cover cracked, still works.", "Marta", None, None),
     (3, 22, "Fire extinguisher 0.05", "issue", "Bracket is loose, always check it first.", "Night shift", None, None),
     (3, 11, "Café", "note", "Coffee machine descaled, takes 10 minutes to heat up.", "Ali", None, None),
-    (2, 14, "Lift", "issue", "Lift door closes slowly, technician booked.", "Jonas", 1, None),
+    (2, 14, "Lift", "issue", "Lift out of order until tomorrow, technician booked. Use the Main Stairs.", "Jonas", 1, None),
     (1, 8, "Project Room", "note", "Beamer remote is in the drawer under the window.", "Ali", None, None),
     (1, 17, "Defibrillator 0.01", "note", "Pads replaced, expiry 2028.", "Marta", None, None),
     (0, 7, "Kitchenette", "issue", "Dishwasher leaks a little, towel under it.", "Night shift", 2, None),
