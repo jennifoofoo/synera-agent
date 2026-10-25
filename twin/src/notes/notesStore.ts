@@ -167,8 +167,6 @@ export function currentPlace(): NotePlace | null {
   return null;
 }
 
-/** Notes and issues valid now in a room (including those on its machines and doors), newest first. Closures show on
- * the map's closure marks, not as notes. */
 /** Only what matters to the walker, no noise: in an inspection round, notes on the round's own devices (shown at that
  * stop); on a normal route, notes at the destination. Everything else on the way stays quiet. */
 export function relevantNotes(notes: Note[]): Note[] {
@@ -182,6 +180,8 @@ export function relevantNotes(notes: Note[]): Note[] {
   return notes.filter((note) => note.anchor.space_id === destination);
 }
 
+/** Notes and issues valid now in a room (including those on its machines and doors), newest first. Closures show on
+ * the map's closure marks, not as notes. */
 export function notesIn(spaceIds: Iterable<string>): Note[] {
   const ids = new Set(spaceIds);
   const now = Date.now();
