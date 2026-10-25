@@ -6,6 +6,7 @@ from building_agent.directions import (
     LANDMARK_RADIUS_M,
     DirectionsSession,
     chunk_steps,
+    metres,
     turn_directions,
     turn_plan,
     turn_word,
@@ -119,30 +120,57 @@ def test_turn_word_thresholds():
     assert turn_word((1, 0), (0.1, 0)) is None
 
 
-def test_left_turn_with_landmark_exact_words():
+WALK_LINE = re.compile(r"^(Leave .+ through the door|Walk (\d+ m|a few metres|on|straight on for (\d+ m|a few metres)))\b")
+METRES = re.compile(r"\b\d+ m\b|a few metres")
+
+
+def test_turn_first_exact_words():
+    """Turn-first like a navigation app: action and metres first, the turn at the door, rooms only when they help.
+
+    The first step cannot know where the person faces, so it leaves the room and turns after its door (the walk
+    from the room's anchor to the door gives the direction)."""
     bm = synthetic_building()
     steps = turn_directions(bm, route(bm, "A", "D"))
-    assert steps[0] == "Leave Room A and go into Corridor 0.01."
-    assert steps[1] == "Turn left at the coffee machine into Room C."
-    assert steps[2] == "Go straight on into Room D."
+    assert steps[0] == "Leave Room A through the door (5 m), then turn left."
+    assert steps[1] == "Walk 7 m, then turn left at the coffee machine."
+    assert steps[2] == "Walk 10 m to Room D straight ahead."
     assert steps[3].startswith("You have arrived at Room D")
 
 
-def test_right_turn_exact_words():
+def test_destination_side_and_landmark_on_first_step():
     bm = synthetic_building()
     steps = turn_directions(bm, route(bm, "C", "A"))
-    assert steps[0].startswith("Leave Room C by")
-    assert steps[0] == "Leave Room C by the coffee machine and go into Corridor 0.01."
-    assert steps[1] == "Turn right into Room A."
+    assert steps[0] == "Leave Room C through the door by the coffee machine (5 m), then turn right."
+    assert steps[1] == "Walk 7 m to Room A on your right."
 
 
 def test_straight_and_merged_run():
     bm = synthetic_building()
     steps = turn_directions(bm, route(bm, "A", "E"))
-    assert steps[1] == "Go straight on into Room E."
-    steps = turn_directions(bm, route(bm, "A", "F"))
-    assert steps[1] == "Go straight on through Room E, then Room F."
-    assert len(steps) == 3
+    assert steps[0] == "Leave Room A through the door (5 m) and go straight on."
+    assert steps[1] == "Walk 10 m to Room E straight ahead."
+    plan = turn_plan(bm, route(bm, "A", "F"))
+    assert plan[1].text == "Walk 20 m to Room F straight ahead."
+    assert plan[1].rooms == ["E", "F"]
+    assert len(plan) == 3
+
+
+def test_metres_rounding():
+    assert metres(None) is None
+    assert metres(2.9) == "a few metres"
+    assert metres(3.4) == "3 m"
+    assert metres(12.6) == "13 m"
+    assert metres(23) == "25 m"
+    assert metres(27.4) == "25 m"
+
+
+def test_room_names_only_when_they_help():
+    bm = synthetic_building()
+    plan = turn_plan(bm, route(bm, "A", "D"))
+    assert "Corridor 0.01" not in " ".join(step.text for step in plan)
+    bm.spaces["B"]["room_type"] = "lobby"
+    plan = turn_plan(bm, route(bm, "A", "D"))
+    assert plan[0].text == "Leave Room A through the door (5 m), then turn left (towards Corridor 0.01)."
 
 
 def test_landmark_filters_boring_and_far():
@@ -153,7 +181,7 @@ def test_landmark_filters_boring_and_far():
     assert "chair" not in text and "cnc" not in text
 
 
-def test_lift_and_stairs_get_no_turn_words():
+def test_lift_and_stairs_keep_their_wording():
     bm = synthetic_building()
     plan = turn_plan(bm, route(bm, "A", "U2"))
     texts = [step.text for step in plan]
@@ -162,7 +190,7 @@ def test_lift_and_stairs_get_no_turn_words():
         if "Lift" in step.text:
             assert step.turn is None
     after_lift = texts[next(i for i, t in enumerate(texts) if "Lift" in t) + 1]
-    assert not re.search(r"Turn|straight", after_lift)
+    assert after_lift == "Walk 5 m to Upper room straight ahead."
     bm.connectors["V1"]["kind"] = "stairs"
     bm.connectors["V1"]["name"] = "Stairs 1"
     texts = turn_directions(bm, route(bm, "A", "U2"))
@@ -232,9 +260,14 @@ def test_sweep_over_buildings():
             assert [step.text for step in plan] == turn_directions(bm, result)
             for step in plan:
                 assert step.text.strip()
-                for room in step.rooms:
-                    if room in bm.spaces and "Take" not in step.text:
-                        assert bm.spaces[room]["name"] in step.text
+                is_walk = step.rooms and not step.text.startswith(("Take ", "Go through the entrance", "Leave the"))
+                if is_walk:  # turn-first: the action leads, metres follow, a turn word only where geometry gives one
+                    assert WALK_LINE.match(step.text), step.text
+                    assert METRES.search(step.text) or step.text.startswith("Walk on"), step.text
+                    if step.turn in ("left", "right"):
+                        assert f"turn {step.turn}" in step.text or f"on your {step.turn}" in step.text, step.text
+                if not step.rooms:
+                    assert step.text.startswith(("You have arrived at", "You are already at")), step.text
                 if "Take" in step.text:
                     assert step.turn is None and not re.search(r"Turn|straight", step.text)
                 if step.turn in ("left", "right", "around"):
