@@ -6,7 +6,7 @@ import { clockLabel, durationLabel, type Note } from "../notes/notes";
 import { closeReport, placeName, useNotes, type Job } from "../notes/notesStore";
 import type { BuildingModel } from "../model/model";
 import { useTwin } from "../store";
-import { NoteThumb } from "./Notes";
+import { NoteThumb } from "./Facts";
 import { PhoneSheet } from "./PhoneSheet";
 
 function notesWith(ids: string[], notes: Note[]): Note[] {
@@ -22,7 +22,7 @@ function walkedLine(job: Job): string | null {
 
 /** The report as plain text (Copy, Share). */
 export function reportText(job: Job, notes: Note[], seen: Note[], model: BuildingModel | null, building: string | null): string {
-  const where = (note: Note) => (model ? placeName(model, note.spaceId, note.assetId) : note.spaceId);
+  const where = (note: Note) => (model ? placeName(model, note.anchor.space_id, note.anchor.asset_id) : note.anchor.space_id);
   const lines = [`Job report${building ? ` · ${building}` : ""}`];
   if (job.title) lines.push(`${job.title.startsWith("Round") ? "Round" : "Destination"}: ${job.title}${job.arrived ? " (arrived)" : job.lengthM !== null ? " (ended early)" : ""}`);
   const end = job.endedAt ?? Date.now();
@@ -32,7 +32,7 @@ export function reportText(job: Job, notes: Note[], seen: Note[], model: Buildin
   lines.push(`Closures: ${job.closures.length ? job.closures.join(", ") : "none on the way"}`);
   if (notes.length) {
     lines.push(`Notes (${notes.length}):`);
-    for (const note of notes) lines.push(`- ${clockLabel(note.createdAt)} ${note.author} at ${where(note)}: ${note.text || "(photo)"}${note.photo && note.text ? " (photo)" : ""}`);
+    for (const note of notes) lines.push(`- ${clockLabel(note.created_at)} ${note.author} at ${where(note)}: ${note.text || "(photo)"}${note.photo && note.text ? " (photo)" : ""}`);
   } else lines.push("Notes: none");
   if (seen.length) {
     lines.push(`Notes read on the way (${seen.length}):`);
@@ -64,9 +64,9 @@ export function Report() {
     }
   };
   const share = async () => {
-    const files = notes
-      .filter((note) => note.photo)
-      .map((note, index) => new File([note.photo as Blob], `note-${index + 1}.jpg`, { type: "image/jpeg" }));
+    const photos = notes.filter((note) => note.photo).map((note) => note.photo as string);
+    const blobs = await Promise.all(photos.map((url) => fetch(url).then((r) => r.blob()).catch(() => null)));
+    const files = blobs.flatMap((blob, index) => (blob ? [new File([blob], `note-${index + 1}.jpg`, { type: "image/jpeg" })] : []));
     const withFiles = files.length && navigator.canShare?.({ files }) ? { files } : {};
     try {
       await navigator.share({ title: "Job report", text, ...withFiles });
@@ -126,7 +126,7 @@ export function Report() {
                 <NoteThumb photo={note.photo} size={48} />
                 <div className="note-row-body">
                   <div className="note-meta">
-                    <strong>{model ? placeName(model, note.spaceId, note.assetId) : note.spaceId}</strong> · {clockLabel(note.createdAt)} · {note.author}
+                    <strong>{model ? placeName(model, note.anchor.space_id, note.anchor.asset_id) : note.anchor.space_id}</strong> · {clockLabel(note.created_at)} · {note.author}
                   </div>
                   {note.text && <p className="note-text">{note.text}</p>}
                 </div>
@@ -136,7 +136,7 @@ export function Report() {
         )}
         {seen.length > 0 && (
           <p className="card-line report-seen">
-            Read on the way: {[...new Set(seen.map((note) => `${note.author} at ${model ? placeName(model, note.spaceId, note.assetId) : note.spaceId}`))].join(", ")}
+            Read on the way: {[...new Set(seen.map((note) => `${note.author} at ${model ? placeName(model, note.anchor.space_id, note.anchor.asset_id) : note.anchor.space_id}`))].join(", ")}
           </p>
         )}
         <div className="card-actions">

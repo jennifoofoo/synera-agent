@@ -1,8 +1,8 @@
-/* ===== Place notes and job report (owner: notes session). Base tokens from styles/tokens.css. ===== */
+/* ===== Place knowledge (notes, problems) and job report (owner: notes session). Base tokens from styles/tokens.css. ===== */
 
 /* the Notes button: bottom left, level with the Ask/Talk row (desktop) */
+.notes-fab-row { position: absolute; left: 14px; bottom: 18px; z-index: 4; display: flex; gap: 6px; }
 .notes-fab {
-  position: absolute; left: 14px; bottom: 18px; z-index: 4;
   display: inline-flex; align-items: center; gap: 6px; height: 44px; min-height: 44px; padding: 0 14px 0 12px;
   border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float);
   font-weight: 600; font-size: 14px; color: var(--ink);
@@ -13,11 +13,17 @@
   font-size: 12px; line-height: 20px; text-align: center; font-variant-numeric: tabular-nums;
 }
 /* phone: just above the dock on the left, mirroring the recenter button on the right (the dock grows with its sheets) */
-.app.worker .notes-fab { left: calc(var(--safe-l, 0px) + 8px); bottom: calc(var(--dock-h, 90px) + var(--safe-b, 0px) + 12px); }
-@media (orientation: landscape) and (max-height: 500px) { .app.worker .notes-fab { bottom: calc(var(--safe-b, 0px) + 8px); } }
+/* the layer switch "Notes & photos" (spec: off by default) */
+.notes-layer {
+  width: 44px; height: 44px; min-height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float); color: var(--ink-2);
+}
+.notes-layer.on { background: var(--signal-soft); border-color: var(--signal); color: var(--signal-dark); }
+.app.worker .notes-fab-row { left: calc(var(--safe-l, 0px) + 8px); bottom: calc(var(--dock-h, 90px) + var(--safe-b, 0px) + 12px); }
+@media (orientation: landscape) and (max-height: 500px) { .app.worker .notes-fab-row { bottom: calc(var(--safe-b, 0px) + 8px); } }
 /* never on top of the keyboard input */
-.app:has(.omnibox.expanded) .notes-fab { display: none; }
-@media (max-width: 760px) { .app.planner:has(.dock .card) .notes-fab { display: none; } }
+.app:has(.omnibox.expanded) .notes-fab-row { display: none; }
+@media (max-width: 760px) { .app.planner:has(.dock .card) .notes-fab-row { display: none; } }
 
 /* the small blue note badge (sheet title, guide card) */
 .note-badge {
@@ -43,8 +49,15 @@
 .note-meta { font-size: 13px; color: var(--ink-2); }
 .note-meta strong { color: var(--ink); font-weight: 600; }
 .note-text { margin: 2px 0 0; font-size: 15px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
-.note-remove { flex: none; min-height: 28px; padding: 2px 4px; border: 0; background: transparent; font-size: 12.5px; color: var(--ink-2); }
-.note-remove.armed { color: var(--danger); font-weight: 600; }
+.note-action { flex: none; min-height: 28px; padding: 2px 4px; border: 0; background: transparent; font-size: 13px; }
+.note-kind {
+  display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 3px; font-size: 11px; font-weight: 700; line-height: 17px;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.note-row.past { opacity: 0.72; }
+.note-row.past .note-text { font-size: 14px; }
+.note-history-toggle { margin-top: 8px; padding: 0; min-height: 28px; font-size: 13px; }
+.note-history { margin-top: 4px; max-height: 24vh; }
 .note-thumb {
   flex: none; padding: 0; min-height: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--paper-2);
 }
@@ -69,11 +82,15 @@
 .note-photo-preview { position: relative; display: inline-block; }
 .note-photo-preview img { display: block; height: 64px; max-width: 120px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .note-photo-preview .x { position: absolute; right: -10px; top: -10px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
-.note-storage { margin-left: auto; font-size: 12px; color: var(--ink-2); text-align: right; }
+.note-issue { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.note-issue input { width: 18px; height: 18px; margin: 0; accent-color: var(--danger); }
+.note-storage { margin: 6px 0 0; font-size: 12px; color: var(--ink-2); text-align: center; }
 .note-problem { margin: 6px 0 0; font-size: 13px; color: var(--danger); }
 
 /* the note during guidance: one compact card above the step sheet */
 .card-guide-note { display: flex; gap: 10px; align-items: flex-start; padding: 10px 10px 10px 12px; border-left: 3px solid var(--signal); }
+.card-guide-note.issue { border-left-color: var(--danger); }
+.card-guide-note.issue .note-badge { background: var(--danger); }
 .card-guide-note .x { flex: none; margin: -4px -4px 0 0; }
 .card-guide-note .note-text { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .note-more { margin-top: 4px; padding: 0; min-height: 0; font-size: 13px; }
@@ -111,6 +128,8 @@
   border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--signal);
 }
 .note-pin:hover { background: var(--signal-dark); }
+.note-pin.issue { background: var(--danger); }
+.note-pin.issue::after { border-top-color: var(--danger); }
 .note-pin.corner { transform: none; }
 .note-pin.corner::after { display: none; }
 .note-pin.corner .note-pin-pop { bottom: 28px; left: auto; right: -8px; }

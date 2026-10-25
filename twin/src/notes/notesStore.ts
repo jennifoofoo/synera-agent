@@ -1,6 +1,7 @@
-// Place notes and the job report (owner: notes session). Deterministic, no agent: notes are kept through
-// notes.ts (NotesStorage), the job is the guidance in progress (store.walkStep and state.route), the report is built
-// from what was recorded. Voice hooks for the integrator: addNoteHere(text), notesHere(), finishJob() (see the end).
+// Place knowledge and the job report (owner: notes session). Deterministic, no agent: facts (notes, issues) are kept
+// through notes.ts (FactsStorage: the server's /api/facts when it answers, else IndexedDB), the job is the guidance in
+// progress (store.walkStep and state.route), the report is built from what was recorded. Voice hooks for the
+// integrator: notesCommand(text), or addNoteHere(text), notesHere(), finishJob() (see the end).
 
 import { create } from "zustand";
 import type { Point, Route } from "../api/types";
@@ -10,7 +11,7 @@ import { useTwin, walkSteps } from "../store";
 import { isSpeaking, speak, speechPending } from "../voice";
 import { metresLeft, readable } from "../walkInfo";
 import { normalizeSpeech } from "../wake";
-import { newNoteId, notesStorage, whenLabel, type Note } from "./notes";
+import { isCurrent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
 
 export const AUTHORS = ["Klaus", "Tom"] as const;
 const AUTHOR_PREF = "twin.noteAuthor";
@@ -22,6 +23,8 @@ export interface NotePlace {
   spaceId: string;
   floorId: string;
   assetId: string | null;
+  /** A door, lift or stairs the note is about (anchor.element_id). */
+  elementId: string | null;
   point: Point | null;
   /** "Press 3 · Production zone H-A1" or "Office 0.25". */
   name: string;
@@ -47,9 +50,13 @@ export interface Job {
 
 interface NotesState {
   buildingKey: string | null;
+  /** Every fact of the building, current and past (history); notesIn() gives the current ones. */
   notes: Note[];
   loaded: boolean;
+  storage: FactsStorage | null;
   storageLabel: string;
+  /** Map layer "Notes & photos" (spec: off by default). During guidance the route's notes show anyway. */
+  layer: boolean;
   author: string;
   error: string | null;
   /** The notes sheet: closed, the list for a place ("What's here?"), or the add form. */
@@ -66,6 +73,25 @@ interface NotesState {
   dismissed: string[];
 }
 
+const LAYER_PREF = "twin.notesLayer";
+
+function loadLayer(): boolean {
+  try {
+    return localStorage.getItem(LAYER_PREF) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setLayer(layer: boolean): void {
+  useNotes.setState({ layer });
+  try {
+    localStorage.setItem(LAYER_PREF, layer ? "1" : "0");
+  } catch {
+    /* private mode: this tab only */
+  }
+}
+
 function loadAuthor(): string {
   try {
     return localStorage.getItem(AUTHOR_PREF) || AUTHORS[0];
@@ -78,7 +104,9 @@ export const useNotes = create<NotesState>(() => ({
   buildingKey: null,
   notes: [],
   loaded: false,
-  storageLabel: notesStorage().label,
+  storage: null,
+  storageLabel: "",
+  layer: loadLayer(),
   author: loadAuthor(),
   error: null,
   sheet: "closed",
@@ -115,30 +143,48 @@ export function currentPlace(): NotePlace | null {
   if (selection) {
     if (selection.kind === "asset") {
       const asset = model.assetById.get(selection.id);
-      if (asset) return { spaceId: asset.space_id, floorId: asset.floor_id, assetId: asset.id, point: asset.position, name: placeName(model, asset.space_id, asset.id) };
+      if (asset) return { spaceId: asset.space_id, floorId: asset.floor_id, assetId: asset.id, elementId: null, point: asset.position, name: placeName(model, asset.space_id, asset.id) };
     }
-    const spaceId = selection.kind === "space" ? selection.id : selection.space_id;
+    const element = selection.kind === "opening" || selection.kind === "connector" ? selection.id : null;
+    const opening = selection.kind === "opening" ? model.openingById.get(selection.id) : undefined;
+    const connector = selection.kind === "connector" ? model.connectorById.get(selection.id) : undefined;
+    const spaceId = selection.kind === "space" ? selection.id : (selection.space_id ?? opening?.space_ids[0] ?? connector?.space_ids.find((id) => model.spaceById.get(id)?.floor_id === selection.floor_id));
     const space = spaceId ? model.spaceById.get(spaceId) : undefined;
-    if (space) return { spaceId: space.id, floorId: space.floor_id, assetId: null, point: selection.point ?? space.anchor, name: placeName(model, space.id) };
+    if (space) {
+      const name = connector?.name ? `${connector.name} · ${space.name}` : placeName(model, space.id);
+      return { spaceId: space.id, floorId: space.floor_id, assetId: null, elementId: element, point: selection.point ?? opening?.position ?? space.anchor, name };
+    }
   }
   // Guiding: the place the walker reached with the current step ("You are here" still shows the start).
   const walkStep = useTwin.getState().walkStep;
   const atStep = walkStep !== null ? spacesAtStep(walkStep).at(-1) : undefined;
   const reached = atStep ? model.spaceById.get(atStep) : undefined;
-  if (reached) return { spaceId: reached.id, floorId: reached.floor_id, assetId: null, point: reached.anchor, name: placeName(model, reached.id) };
+  if (reached) return { spaceId: reached.id, floorId: reached.floor_id, assetId: null, elementId: null, point: reached.anchor, name: placeName(model, reached.id) };
   const position = state?.position;
   const space = position ? model.spaceById.get(position.space_id) : undefined;
-  if (position && space) return { spaceId: space.id, floorId: space.floor_id, assetId: null, point: position.point ?? space.anchor, name: placeName(model, space.id) };
+  if (position && space) return { spaceId: space.id, floorId: space.floor_id, assetId: null, elementId: null, point: position.point ?? space.anchor, name: placeName(model, space.id) };
   return null;
 }
 
-/** Notes in a room (including notes on its assets), newest first. */
+/** Notes and issues valid now in a room (including those on its machines and doors), newest first. Closures show on
+ * the map's closure marks, not as notes. */
 export function notesIn(spaceIds: Iterable<string>): Note[] {
   const ids = new Set(spaceIds);
+  const now = Date.now();
   return useNotes
     .getState()
-    .notes.filter((note) => ids.has(note.spaceId))
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .notes.filter((note) => note.kind !== "closure" && ids.has(note.anchor.space_id) && isCurrent(note, now))
+    .sort(newestFirst);
+}
+
+/** Resolved and expired notes in a room (the history), newest first. */
+export function historyIn(spaceIds: Iterable<string>): Note[] {
+  const ids = new Set(spaceIds);
+  const now = Date.now();
+  return useNotes
+    .getState()
+    .notes.filter((note) => note.kind !== "closure" && ids.has(note.anchor.space_id) && !isCurrent(note, now) && Date.parse(note.valid_from) <= now)
+    .sort(newestFirst);
 }
 
 // ---- loading and saving ----
@@ -146,49 +192,78 @@ export function notesIn(spaceIds: Iterable<string>): Note[] {
 let loadRun = 0;
 export async function loadNotes(buildingKey: string | null): Promise<void> {
   const run = ++loadRun;
-  useNotes.setState({ buildingKey, notes: [], loaded: false, guide: null, storageLabel: notesStorage().label });
+  useNotes.setState({ buildingKey, notes: [], loaded: false, guide: null });
   if (!buildingKey) return;
+  const storage = await pickFactsStorage(buildingKey);
+  if (run !== loadRun) return;
+  useNotes.setState({ storage, storageLabel: storage.label });
   try {
-    const notes = await notesStorage().list(buildingKey);
-    if (run === loadRun) useNotes.setState({ notes, loaded: true, error: null });
+    const notes = await storage.list(buildingKey);
+    if (run === loadRun) useNotes.setState({ notes: mergeStateFacts(notes), loaded: true, error: null });
   } catch {
-    if (run === loadRun) useNotes.setState({ loaded: true, error: "Notes could not be loaded on this device." });
+    if (run === loadRun) useNotes.setState({ loaded: true, error: "Notes could not be loaded." });
   }
 }
 
-export async function addNote(input: { text: string; photo?: Blob | null; place?: NotePlace | null }): Promise<Note | null> {
-  const { buildingKey, author } = useNotes.getState();
+/** state.facts (the server's current facts in every reply) wins over what was listed before. */
+function mergeStateFacts(notes: Note[]): Note[] {
+  const live = (useTwin.getState().state as { facts?: Note[] } | null)?.facts;
+  if (!Array.isArray(live) || !live.length) return notes;
+  const byId = new Map(notes.map((note) => [note.id, note]));
+  for (const fact of live) byId.set(fact.id, fact);
+  return [...byId.values()].sort(newestFirst);
+}
+
+export async function addNote(input: { text: string; photo?: Blob | null; place?: NotePlace | null; kind?: FactKind; source?: "text" | "voice" | "tap" }): Promise<Note | null> {
+  const { buildingKey, author, storage } = useNotes.getState();
   const place = input.place ?? currentPlace();
   const text = input.text.trim();
-  if (!buildingKey || !place || (!text && !input.photo)) return null;
-  const note: Note = {
-    id: newNoteId(),
-    buildingKey,
-    spaceId: place.spaceId,
-    floorId: place.floorId,
-    assetId: place.assetId,
-    point: place.point,
-    text,
-    author,
-    createdAt: Date.now(),
-    photo: input.photo ?? null,
-  };
+  if (!buildingKey || !storage || !place || (!text && !input.photo)) return null;
+  let note: Note;
   try {
-    await notesStorage().add(note);
+    note = await storage.add(buildingKey, {
+      kind: input.kind === "issue" ? "issue" : "note",
+      anchor: { space_id: place.spaceId, asset_id: place.assetId, element_id: place.elementId, point: place.point, floor_id: place.floorId },
+      text,
+      author,
+      photo: input.photo ?? null,
+      source: input.source ?? "tap",
+    });
   } catch {
-    useNotes.setState({ error: "This device could not save the note (storage full?)." });
+    useNotes.setState({ error: storage.kind === "server" ? "The server could not save the note." : "This device could not save the note (storage full?)." });
     return null;
   }
   const job = useNotes.getState().job ?? newJob(null);
-  useNotes.setState((s) => ({ notes: [...s.notes, note], error: null, job: { ...job, noteIds: [...job.noteIds, note.id] } }));
+  // A new note shows on the map at once, even with the layer off until now.
+  useNotes.setState((s) => ({ notes: [note, ...s.notes.filter((n) => n.id !== note.id)], error: null, job: { ...job, noteIds: [...job.noteIds, note.id] } }));
+  if (!useNotes.getState().layer) setLayer(true);
   return note;
 }
 
-export async function removeNote(id: string): Promise<void> {
-  const { buildingKey } = useNotes.getState();
-  if (!buildingKey) return;
-  await notesStorage().remove(buildingKey, id);
-  useNotes.setState((s) => ({ notes: s.notes.filter((note) => note.id !== id) }));
+/** Undo is only for a note just made (typos); later a note is resolved, never deleted (spec). */
+export const UNDO_MS = 2 * 60_000;
+
+export function canUndo(note: Note): boolean {
+  const { storage } = useNotes.getState();
+  return !!storage?.undo && Date.now() - Date.parse(note.created_at) < UNDO_MS;
+}
+
+export function canResolve(note: Note): boolean {
+  return !!useNotes.getState().storage?.resolve && isCurrent(note);
+}
+
+export async function undoNote(id: string): Promise<void> {
+  const { buildingKey, storage } = useNotes.getState();
+  if (!buildingKey || !storage?.undo) return;
+  await storage.undo(buildingKey, id);
+  useNotes.setState((s) => ({ notes: s.notes.filter((note) => note.id !== id), job: s.job ? { ...s.job, noteIds: s.job.noteIds.filter((n) => n !== id) } : s.job }));
+}
+
+export async function resolveNote(id: string): Promise<void> {
+  const { buildingKey, storage, author } = useNotes.getState();
+  if (!buildingKey || !storage?.resolve) return;
+  const next = await storage.resolve(buildingKey, id, author);
+  useNotes.setState((s) => ({ notes: s.notes.map((note) => (note.id === id ? next : note)) }));
 }
 
 // ---- the sheet ----
@@ -335,13 +410,19 @@ export function dismissGuide(): void {
   if (guide) useNotes.setState((s) => ({ guide: null, dismissed: [...s.dismissed, guide.stepKey] }));
 }
 
-/** "Klaus left a note here, yesterday 14:12: always release the left lever first." */
+/** Who and what, for the card title: "Klaus left a note here" / "Klaus reported a problem here". */
+export function noteHeadline(note: Note): string {
+  const who = note.author || "Someone";
+  return note.kind === "issue" ? `${who} reported a problem here` : `${who} left a note here`;
+}
+
+/** "Klaus left a note here, yesterday 14:12: always release the left lever first." (age and author, spec) */
 export function noteSpeech(notes: Note[]): string {
   const [first] = notes;
   if (!first) return "";
   const text = first.text ? `: ${first.text}` : ", with a photo.";
   const more = notes.length > 1 ? ` And ${notes.length - 1} more note${notes.length > 2 ? "s" : ""} here.` : "";
-  return `${first.author} left a note here, ${whenLabel(first.createdAt)}${text}${/[.!?]$/.test(text) ? "" : "."}${more}`;
+  return `${noteHeadline(first)}, ${whenLabel(first.valid_from)}${text}${/[.!?]$/.test(text) ? "" : "."}${more}`;
 }
 
 /** Speak after the step line the Walk sheet is reading (speak() would cut it off), only with voice on. */
@@ -375,12 +456,22 @@ export function installNotes(): () => void {
       updateGuide(now.walkStep);
     }
   });
+  // The server sends the facts valid now with every state (state.facts): take them, and re-read the history when
+  // they change (a fact resolved through the chat leaves state.facts).
+  const unsubscribeFacts = useTwin.subscribe((now, before) => {
+    const live = (now.state as { facts?: Note[] } | null)?.facts;
+    if (live === (before.state as { facts?: Note[] } | null)?.facts || !Array.isArray(live)) return;
+    useNotes.setState((s) => ({ notes: mergeStateFacts(s.notes) }));
+    const { storage, buildingKey } = useNotes.getState();
+    if (storage?.kind === "server" && buildingKey) void storage.list(buildingKey).then((notes) => useNotes.setState({ notes: mergeStateFacts(notes) }), () => {});
+  });
   const unsubscribeNotes = useNotes.subscribe((now, before) => {
     if (now.notes !== before.notes) updateGuide(useTwin.getState().walkStep);
   });
   return () => {
     installed = false;
     unsubscribe();
+    unsubscribeFacts();
     unsubscribeNotes();
   };
 }
@@ -389,12 +480,12 @@ export function installNotes(): () => void {
 
 /** "Hey Wanda, note: …" — save a note at the current place (tapped room/asset, else "You are here").
  * Returns the sentence to speak. */
-export async function addNoteHere(text: string): Promise<string> {
+export async function addNoteHere(text: string, kind: "note" | "issue" = "note"): Promise<string> {
   const place = currentPlace();
   if (!place) return "Tell me where you are first, then I can leave the note there.";
-  const note = await addNote({ text, place });
+  const note = await addNote({ text, place, kind, source: "voice" });
   if (!note) return useNotes.getState().error ?? "I could not save that note.";
-  return `Noted at ${place.name}.`;
+  return kind === "issue" ? `Problem noted at ${place.name}.` : `Noted at ${place.name}.`;
 }
 
 /** "Hey Wanda, what's here?" — opens the list for the current place and returns the sentence to speak. */
@@ -436,6 +527,7 @@ function reportSpeech(job: Job): string {
   return parts.join(" ");
 }
 
+const ISSUE_SAID = /^\s*(?:problem|issue|report a problem|störung|stoerung|defekt)\b\s*(?:here|hier)?\s*[:,.-]?\s*(.+)$/i;
 const NOTE_SAID = /^\s*(?:note|take a note|make a note|merk dir|merke dir|merk|notiz|notiere)\b\s*(?:that|this|here|hier|dass|das)?\s*[:,.-]?\s*(.+)$/i;
 const HERE_SAID = /^(?:what'?s here|what is here|any notes(?: here)?|notes here|was gibt'?s hier|was gibt es hier|gibt es hier notizen)$/;
 const FINISH_SAID = /^(?:finished|i'?m finished|i am finished|job done|finish(?: the)? job|end(?: the)? job|fertig|ich bin fertig|feierabend|auftrag fertig)$/;
@@ -444,6 +536,8 @@ const FINISH_SAID = /^(?:finished|i'?m finished|i am finished|job done|finish(?:
  * returns the sentence to speak; anything else returns null. While walking, "finished"/"fertig" before the last step
  * is left to the walking commands ("fertig" = next station). */
 export function notesCommand(text: string): Promise<string> | null {
+  const issue = ISSUE_SAID.exec(text);
+  if (issue && issue[1].trim().length > 1) return addNoteHere(issue[1].trim(), "issue");
   const note = NOTE_SAID.exec(text);
   if (note && note[1].trim().length > 1) return addNoteHere(note[1].trim());
   const said = normalizeSpeech(text).replace(/^(?:please|bitte) /, "").replace(/ (?:please|bitte)$/, "");

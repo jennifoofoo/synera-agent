@@ -9,7 +9,7 @@ import { ChangesPill } from "./ui/ChangesPill";
 import { FloorRail } from "./ui/FloorRail";
 import { KeyHelp } from "./ui/KeyHelp";
 import { NewBuilding } from "./ui/NewBuilding";
-import { NotesButton, NotesDock } from "./ui/Notes";
+import { NotesButton, NotesDock } from "./ui/Facts";
 import { Omnibox } from "./ui/Omnibox";
 import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";

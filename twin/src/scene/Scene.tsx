@@ -12,7 +12,7 @@ import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
-import { NotePins } from "./NotePins";
+import { FactPins } from "./FactPins";
 import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
 import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
@@ -81,7 +81,7 @@ function Building({ model }: { model: BuildingModel }) {
         flat={flat}
       />
       <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
-      <NotePins model={model} floorY={floorY} visibleFloors={visibleFloors} />
+      <FactPins model={model} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
     </group>
   );

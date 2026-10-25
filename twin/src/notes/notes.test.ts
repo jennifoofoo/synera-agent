@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
-import { durationLabel, whenLabel } from "./notes";
+import { durationLabel, isCurrent, MemoryFacts, pickFactsStorage, sinceLabel, whenLabel, type Fact } from "./notes";
 import { notesCommand, spacesNamed } from "./notesStore";
 
 const model = {
@@ -50,5 +50,57 @@ describe("notesCommand", () => {
     for (const said of ["note: always release the left lever first", "Merk dir: Halterung locker", "what's here?", "Was gibt's hier", "finished", "Fertig"]) {
       expect(notesCommand(said)).not.toBeNull();
     }
+  });
+});
+
+describe("facts", () => {
+  const base: Fact = {
+    id: "f-1",
+    kind: "issue",
+    anchor: { space_id: "S25", asset_id: null, element_id: null, point: null, floor_id: "F0" },
+    text: "Valve drips",
+    valid_from: new Date(2026, 9, 25, 8, 10).toISOString(),
+    valid_to: null,
+    status: "open",
+    author: "Klaus",
+    photo: null,
+    created_at: new Date(2026, 9, 25, 8, 10).toISOString(),
+  };
+  const now = new Date(2026, 9, 25, 10, 0).getTime();
+
+  it("is current while open and inside its time", () => {
+    expect(isCurrent(base, now)).toBe(true);
+    expect(isCurrent({ ...base, status: "resolved" }, now)).toBe(false);
+    expect(isCurrent({ ...base, valid_to: new Date(2026, 9, 25, 9, 0).toISOString() }, now)).toBe(false);
+    expect(isCurrent({ ...base, valid_to: new Date(2026, 9, 25, 10, 0).toISOString() }, now)).toBe(false); // exactly valid_to
+    expect(isCurrent({ ...base, valid_from: new Date(2026, 9, 25, 11, 0).toISOString() }, now)).toBe(false);
+  });
+
+  it("names age and author", () => {
+    expect(sinceLabel(base, true, now)).toBe("since today 08:10, by Klaus");
+    expect(sinceLabel({ ...base, valid_to: new Date(2026, 9, 26, 18, 0).toISOString() }, false, now)).toBe("since today 08:10 · until tomorrow 18:00");
+  });
+
+  it("uses the server when GET /api/facts answers with a list, else this device", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify({ facts: [] }), { status: 200 })) as typeof fetch;
+    expect((await pickFactsStorage("b")).kind).toBe("server");
+    globalThis.fetch = (async () => new Response("nope", { status: 404 })) as typeof fetch;
+    expect((await pickFactsStorage("b")).kind).toBe("local");
+    globalThis.fetch = original;
+  });
+
+  it("keeps undo and resolve local; history stays", async () => {
+    const local = new MemoryFacts();
+    const fact = await local.add("b", { kind: "note", anchor: base.anchor, text: "Lever left first", author: "Klaus" });
+    const resolved = await local.resolve("b", fact.id);
+    expect(resolved.status).toBe("resolved");
+    expect(resolved.valid_to).not.toBeNull();
+    expect((await local.list("b")).length).toBe(1);
+  });
+
+  it("takes a spoken problem as an issue", () => {
+    expect(notesCommand("problem: valve drips")).not.toBeNull();
+    expect(notesCommand("Störung hier: Ventil tropft")).not.toBeNull();
   });
 });

@@ -1,30 +1,37 @@
-// Place notes on screen (owner: notes session): the Notes button, the sheet ("What's here?" list and the add form),
-// the note card during guidance and the photo viewer. State and rules live in notes/notesStore.ts.
+// Place knowledge on screen (owner: notes session; spec docs/specs/place-knowledge.md "Seite"): the Notes button and
+// the map layer switch "Notes & photos", the sheet ("What's here?" with history, and the add form), the note card
+// during guidance and the photo viewer. State and rules live in notes/notesStore.ts, storage in notes/notes.ts.
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { downscalePhoto, whenLabel, type Note } from "../notes/notes";
+import { downscalePhoto, endedLabel, sinceLabel, type Note } from "../notes/notes";
 import {
   AUTHORS,
   addNote,
+  canResolve,
+  canUndo,
   closeNotes,
   dismissGuide,
   finishJob,
+  historyIn,
   installNotes,
+  noteHeadline,
   notesIn,
   openNotes,
-  removeNote,
+  resolveNote,
   setAuthor,
+  setLayer,
+  undoNote,
   useNotes,
 } from "../notes/notesStore";
 import { useTwin } from "../store";
 import { listenOnce, speechInputAvailable } from "../voice";
 import { PhoneSheet } from "./PhoneSheet";
 import { Report } from "./Report";
-import "./Notes.css";
+import "./Facts.css";
 
-/** An object URL for a stored photo, revoked when the component goes away. */
-export function usePhotoUrl(photo: Blob | null): string | null {
+/** An object URL for a local photo blob (the add form's preview), revoked when the component goes away. */
+export function useBlobUrl(photo: Blob | null): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!photo) return setUrl(null);
@@ -38,6 +45,11 @@ export function usePhotoUrl(photo: Blob | null): string | null {
 // ---- photo viewer ----
 
 let showPhoto: (url: string | null) => void = () => {};
+
+/** Open a fact's photo full screen (also for voice: "show me the photo"). */
+export function openPhoto(url: string): void {
+  showPhoto(url);
+}
 
 function PhotoViewer() {
   const [url, setUrl] = useState<string | null>(null);
@@ -61,69 +73,102 @@ function PhotoViewer() {
   );
 }
 
-export function NoteThumb({ photo, size = 56 }: { photo: Blob | null; size?: number }) {
-  const url = usePhotoUrl(photo);
-  if (!url) return null;
+export function NoteThumb({ photo, size = 56 }: { photo: string | null; size?: number }) {
+  if (!photo) return null;
   return (
-    <button className="note-thumb" style={{ width: size, height: size }} onClick={() => showPhoto(url)} aria-label="Show photo">
-      <img src={url} alt="" />
+    <button className="note-thumb" style={{ width: size, height: size }} onClick={() => openPhoto(photo)} aria-label="Show photo">
+      <img src={photo} alt="" />
     </button>
   );
 }
 
-function NoteGlyph({ size = 18 }: { size?: number }) {
+export function NoteGlyph({ size = 18, issue = false }: { size?: number; issue?: boolean }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M5 4h14v11l-5 5H5z" />
-      <path d="M14 20v-5h5M8.5 9h7M8.5 12.5h4" />
+      {issue ? (
+        <>
+          <path d="M12 4 21 20H3z" />
+          <path d="M12 10v4.5M12 17.5v.01" />
+        </>
+      ) : (
+        <>
+          <path d="M5 4h14v11l-5 5H5z" />
+          <path d="M14 20v-5h5M8.5 9h7M8.5 12.5h4" />
+        </>
+      )}
     </svg>
   );
 }
 
-function NoteRow({ note, onRemove }: { note: Note; onRemove?: () => void }) {
+function NoteRow({ note, past = false }: { note: Note; past?: boolean }) {
   const model = useTwin((s) => s.model);
-  const asset = note.assetId ? model?.assetById.get(note.assetId)?.name : null;
-  const [confirm, setConfirm] = useState(false);
+  const asset = note.anchor.asset_id ? model?.assetById.get(note.anchor.asset_id)?.name : null;
+  const undo = !past && canUndo(note);
+  const resolve = !past && !undo && canResolve(note);
   return (
-    <li className="note-row">
+    <li className={`note-row ${past ? "past" : ""}`}>
       <NoteThumb photo={note.photo} />
       <div className="note-row-body">
         <div className="note-meta">
-          <strong>{note.author}</strong> · {whenLabel(note.createdAt)}
+          {note.kind === "issue" && <span className="note-kind">Problem</span>}
+          <strong>{note.author || "Someone"}</strong> · {sinceLabel(note, false)}
+          {past ? ` · ${endedLabel(note)}` : ""}
           {asset && <span> · {asset}</span>}
         </div>
         {note.text && <p className="note-text">{note.text}</p>}
       </div>
-      {onRemove && (
-        // Two taps: a note is someone's knowledge, it should not go with a stray tap.
-        <button className={`link note-remove ${confirm ? "armed" : ""}`} onClick={() => (confirm ? onRemove() : setConfirm(true))} onBlur={() => setConfirm(false)}>
-          {confirm ? "Delete?" : "Delete"}
+      {undo && (
+        // Undo only right after creating (typos): a note is someone's knowledge, later it is resolved, not deleted.
+        <button className="link note-action" onClick={() => void undoNote(note.id)}>
+          Undo
+        </button>
+      )}
+      {resolve && (
+        <button className="link note-action" onClick={() => void resolveNote(note.id)} title={note.kind === "issue" ? "Mark as fixed" : "No longer true"}>
+          {note.kind === "issue" ? "Fixed" : "Done"}
         </button>
       )}
     </li>
   );
 }
 
-// ---- the button ----
+// ---- the button and the layer switch ----
 
-/** Bottom left: "Notes" (opens "What's here?" for the tapped room or "You are here"); installs the notes store. */
+/** Bottom left: "Notes" (opens "What's here?" for the tapped room, the guidance step's room or "You are here") and
+ * the map layer "Notes & photos" (spec: off by default). Installs the notes store. */
 export function NotesButton() {
   const sheet = useNotes((s) => s.sheet);
   const notes = useNotes((s) => s.notes);
+  const layer = useNotes((s) => s.layer);
   const model = useTwin((s) => s.model);
   const draft = useTwin((s) => s.draft);
   const selection = useTwin((s) => s.selection);
   const position = useTwin((s) => s.state?.position ?? null);
   useEffect(installNotes, []);
   if (!model || draft || sheet !== "closed") return null;
+  void notes; // re-render on changes
   const spaceId = selection?.kind === "asset" ? model.assetById.get(selection.id)?.space_id : selection?.kind === "space" ? selection.id : (selection?.space_id ?? position?.space_id);
-  const here = spaceId ? notes.filter((note) => note.spaceId === spaceId).length : 0;
+  const here = spaceId ? notesIn([spaceId]).length : 0;
   return (
-    <button className="notes-fab" onClick={() => openNotes("here")} aria-label={here ? `Notes, ${here} here` : "Notes"}>
-      <NoteGlyph />
-      <span>Notes</span>
-      {here > 0 && <span className="notes-count">{here}</span>}
-    </button>
+    <div className="notes-fab-row">
+      <button className="notes-fab" onClick={() => openNotes("here")} aria-label={here ? `Notes, ${here} here` : "Notes"}>
+        <NoteGlyph />
+        <span>Notes</span>
+        {here > 0 && <span className="notes-count">{here}</span>}
+      </button>
+      <button
+        className={`notes-layer ${layer ? "on" : ""}`}
+        onClick={() => setLayer(!layer)}
+        aria-pressed={layer}
+        aria-label="Notes and photos on the map"
+        title={layer ? "Hide notes & photos on the map" : "Show notes & photos on the map"}
+      >
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+          <path d="M12 3 21 8l-9 5-9-5z" />
+          <path d="m3 12.5 9 5 9-5M3 16.5l9 5 9-5" />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -147,13 +192,14 @@ function AddForm() {
   const draft = useNotes((s) => s.draft);
   const storageLabel = useNotes((s) => s.storageLabel);
   const [text, setText] = useState(draft);
+  const [issue, setIssue] = useState(false);
   const [photo, setPhoto] = useState<Blob | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const stopListening = useRef<(() => void) | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  const photoUrl = usePhotoUrl(photo);
+  const photoUrl = useBlobUrl(photo);
   useEffect(() => () => stopListening.current?.(), []);
 
   const pick = async (input: File | undefined) => {
@@ -185,7 +231,7 @@ function AddForm() {
   };
   const save = async () => {
     setBusy(true);
-    const note = await addNote({ text, photo, place });
+    const note = await addNote({ text, photo, place, kind: issue ? "issue" : "note", source: "tap" });
     setBusy(false);
     if (note) openNotes("here");
     else setProblem(useNotes.getState().error ?? "Write something or add a photo.");
@@ -197,9 +243,9 @@ function AddForm() {
         <textarea
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder="What should the next person know here?"
+          placeholder={issue ? "What is wrong here?" : "What should the next person know here?"}
           rows={3}
-          maxLength={600}
+          maxLength={500}
           aria-label="Note"
           autoFocus={!draft}
         />
@@ -230,7 +276,10 @@ function AddForm() {
           </button>
         )}
         <input ref={file} type="file" accept="image/*" capture="environment" hidden onChange={(event) => void pick(event.target.files?.[0])} />
-        <span className="note-storage">{storageLabel}</span>
+        <label className="note-issue">
+          <input type="checkbox" checked={issue} onChange={() => setIssue(!issue)} />
+          It's a problem
+        </label>
       </div>
       {problem && <p className="note-problem">{problem}</p>}
       <div className="card-actions">
@@ -239,6 +288,7 @@ function AddForm() {
           Save note
         </button>
       </div>
+      <p className="note-storage">{storageLabel}</p>
     </div>
   );
 }
@@ -248,8 +298,10 @@ function HereList() {
   const all = useNotes((s) => s.notes);
   const job = useNotes((s) => s.job);
   const walking = useTwin((s) => s.walkStep !== null);
+  const [history, setHistory] = useState(false);
   void all; // re-render on changes
   const notes = place ? notesIn([place.spaceId]) : [];
+  const past = place ? historyIn([place.spaceId]) : [];
   return (
     <>
       {!place ? (
@@ -257,11 +309,25 @@ function HereList() {
       ) : notes.length ? (
         <ul className="note-list">
           {notes.map((note) => (
-            <NoteRow key={note.id} note={note} onRemove={() => void removeNote(note.id)} />
+            <NoteRow key={note.id} note={note} />
           ))}
         </ul>
       ) : (
-        <p className="note-empty">No notes here yet. Leave one for the next shift.</p>
+        <p className="note-empty">No notes here right now. Leave one for the next shift.</p>
+      )}
+      {past.length > 0 && (
+        <>
+          <button className="link note-history-toggle" onClick={() => setHistory(!history)} aria-expanded={history}>
+            {history ? "Hide history" : `History (${past.length})`}
+          </button>
+          {history && (
+            <ul className="note-list note-history">
+              {past.map((note) => (
+                <NoteRow key={note.id} note={note} past />
+              ))}
+            </ul>
+          )}
+        </>
       )}
       <div className="card-actions">
         {job && !walking && job.noteIds.length > 0 && <button onClick={() => (closeNotes(), finishJob())}>Finish job</button>}
@@ -303,20 +369,20 @@ export function NotesSheet() {
 
 // ---- during guidance ----
 
-/** "Klaus left a note here · yesterday 14:12" with the text and photo, above the step sheet. */
+/** "Klaus left a note here · since yesterday 14:12" with the text and photo, above the step sheet. */
 export function GuideNote() {
   const guide = useNotes((s) => s.guide);
   if (!guide) return null;
   const [note, ...more] = guide.notes;
   return (
-    <section className="card card-guide-note" role="status" aria-live="polite" aria-label="Note here">
+    <section className={`card card-guide-note ${note.kind === "issue" ? "issue" : ""}`} role="status" aria-live="polite" aria-label="Note here">
       <NoteThumb photo={note.photo} size={64} />
       <div className="note-row-body">
         <div className="note-meta">
           <span className="note-badge small">
-            <NoteGlyph size={13} />
+            <NoteGlyph size={13} issue={note.kind === "issue"} />
           </span>
-          <strong>{note.author} left a note here</strong> · <span className="nowrap">{whenLabel(note.createdAt)}</span>
+          <strong>{noteHeadline(note)}</strong> · <span className="nowrap">{sinceLabel(note, false)}</span>
         </div>
         {note.text && <p className="note-text">{note.text}</p>}
         {more.length > 0 && (
