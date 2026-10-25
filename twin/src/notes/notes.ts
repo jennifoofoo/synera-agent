@@ -27,9 +27,18 @@ export interface Fact {
   status: FactStatus;
   resolved_by?: string | null;
   author: string | null;
+  /** Normalised author ("klaus"), set by the server. */
+  person_id?: string | null;
+  related?: string[];
   photo: string | null;
   created_at: string;
   source?: string;
+}
+
+/** What a save or undo returns: the fact and, from the server, the building state after it (`{fact, state}`). */
+export interface Saved {
+  fact: Fact;
+  state?: unknown;
 }
 
 /** Older name kept for the notes UI. */
@@ -52,11 +61,11 @@ export interface FactsStorage {
   readonly label: string;
   /** Every fact of the building, current and past (history), newest first. */
   list(buildingKey: string): Promise<Fact[]>;
-  add(buildingKey: string, input: NewFact): Promise<Fact>;
+  add(buildingKey: string, input: NewFact): Promise<Saved>;
   /** Mark done: the fact gets valid_to = now and status resolved (local only; the server resolves through the chat). */
   resolve?(buildingKey: string, id: string, author: string | null): Promise<Fact>;
-  /** Undo right after creating (typos); the only real delete. */
-  undo?(buildingKey: string, id: string): Promise<void>;
+  /** Undo right after creating (typos); the only real delete. Returns the new state from the server, if any. */
+  undo?(buildingKey: string, id: string): Promise<{ state?: unknown } | void>;
 }
 
 /** Valid now: started, not ended, not resolved (spec "jetzt gültig"). */
@@ -130,7 +139,7 @@ export class LocalFacts implements FactsStorage {
     return stored.map((s) => this.toFact(s)).sort(newestFirst);
   }
 
-  async add(buildingKey: string, input: NewFact): Promise<Fact> {
+  async add(buildingKey: string, input: NewFact): Promise<Saved> {
     const now = new Date().toISOString();
     const stored: StoredFact = {
       id: newFactId(),
@@ -148,7 +157,7 @@ export class LocalFacts implements FactsStorage {
       photoBlob: input.photo ?? null,
     };
     await this.put(stored);
-    return this.toFact(stored);
+    return { fact: this.toFact(stored) };
   }
 
   async resolve(_buildingKey: string, id: string): Promise<Fact> {
@@ -176,7 +185,7 @@ export class MemoryFacts implements FactsStorage {
   async list(buildingKey: string): Promise<Fact[]> {
     return [...(this.facts.get(buildingKey) ?? [])].sort(newestFirst);
   }
-  async add(buildingKey: string, input: NewFact): Promise<Fact> {
+  async add(buildingKey: string, input: NewFact): Promise<Saved> {
     const now = new Date().toISOString();
     const fact: Fact = {
       id: newFactId(),
@@ -192,7 +201,7 @@ export class MemoryFacts implements FactsStorage {
       source: input.source ?? "text",
     };
     this.facts.set(buildingKey, [...(this.facts.get(buildingKey) ?? []), fact]);
-    return fact;
+    return { fact };
   }
   async resolve(buildingKey: string, id: string): Promise<Fact> {
     const list = this.facts.get(buildingKey) ?? [];
@@ -229,7 +238,7 @@ export class ServerFacts implements FactsStorage {
     return (body.facts ?? []).sort(newestFirst);
   }
 
-  async add(buildingKey: string, input: NewFact): Promise<Fact> {
+  async add(buildingKey: string, input: NewFact): Promise<Saved> {
     const body = {
       key: buildingKey,
       kind: input.kind,
@@ -240,11 +249,25 @@ export class ServerFacts implements FactsStorage {
       ...(input.photo ? { photo_base64: await blobToBase64(input.photo) } : {}),
       source: input.source ?? "text",
     };
-    const response = await fetch("/api/facts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!response.ok) throw new Error(`facts ${response.status}`);
-    const reply = (await response.json()) as Fact | { fact: Fact };
-    return "fact" in reply ? reply.fact : reply;
+    const reply = await postJson("/api/facts", body);
+    return "fact" in reply ? { fact: reply.fact as Fact, state: reply.state } : { fact: reply as unknown as Fact };
   }
+
+  /** POST /api/facts/undo removes the building's newest fact if it is younger than 2 minutes; refuse when that is
+   * not this note (someone saved after it, or it is too old), so undo never removes another person's note. */
+  async undo(buildingKey: string, id: string): Promise<{ state?: unknown }> {
+    const newest = (await this.list(buildingKey))[0];
+    if (newest?.id !== id) throw new Error("Only the newest note can be undone.");
+    const reply = await postJson("/api/facts/undo", { key: buildingKey });
+    if (!reply.undone) throw new Error("Too late to undo.");
+    return { state: reply.state };
+  }
+}
+
+async function postJson(url: string, body: unknown): Promise<Record<string, unknown>> {
+  const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!response.ok) throw new Error(`facts ${response.status}`);
+  return (await response.json()) as Record<string, unknown>;
 }
 
 /** The server when GET /api/facts answers 200 with a facts list, else IndexedDB (or memory). */

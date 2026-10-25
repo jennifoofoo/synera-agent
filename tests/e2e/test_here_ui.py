@@ -29,6 +29,20 @@ pytestmark = pytest.mark.e2e
 
 VIEWPORTS = {"desktop": {"width": 1100, "height": 720}, "phone": {"width": 390, "height": 844}}
 
+# No ambient occlusion pass in these tests (also after a reload): headless Chromium renders WebGL in software
+# (SwiftShader), where the planner's N8AO pass costs about one second per frame (measured 0.7 fps with AO, 60 fps
+# without, same page). With frameloop "always" every Playwright call then queues behind those frames, so on a busy
+# machine waits ran past their timeouts (test_tap_answers_where flaked on the visible hint) and HTML labels lagged a
+# frame behind the camera. These tests check markers, labels and taps, not shading; test_twin_ghost.py covers AO.
+NO_AO = """(() => {
+  let store;
+  Object.defineProperty(window, "__twinStore", {
+    configurable: true,
+    get: () => store,
+    set: (value) => { store = value; try { value.setState({ ao: false }); } catch (e) {} },
+  });
+})();"""
+
 # Screen position (client px) of a named object in the three.js scene, via the camera that CameraRig exposes.
 SCREEN_OF = """(name) => {
   const scene = window.__twinScene, controls = window.__twinControls && window.__twinControls.current;
@@ -42,6 +56,18 @@ SCREEN_OF = """(name) => {
   const v = new obj.position.constructor(e[12], e[13], e[14]).project(camera);
   const rect = document.querySelector('canvas').getBoundingClientRect();
   return { x: rect.left + (v.x + 1) / 2 * rect.width, y: rect.top + (1 - v.y) / 2 * rect.height, wx: e[12], wy: -e[14] };
+}"""
+
+# WCAG contrast of an element's text colour against its own (opaque enough) background colour.
+LABEL_CONTRAST = """(selector) => {
+  const el = document.querySelector(selector), cs = getComputedStyle(el);
+  const parse = (c) => c.match(/[\\d.]+/g).map(Number);
+  const lum = ([r, g, b]) => [r, g, b].map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+    .reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const bg = parse(cs.backgroundColor);
+  if (bg.length > 3 && bg[3] < 0.5) return 0; // a pill needs its own background
+  const a = lum(parse(cs.color)), b = lum(bg);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }"""
 
 
@@ -114,6 +140,7 @@ def page(request, server, playwright_instance):
     context = browser.new_context(
         viewport=VIEWPORTS[kind], has_touch=kind == "phone", is_mobile=kind == "phone", device_scale_factor=2
     )
+    context.add_init_script(NO_AO)
     page = context.new_page()
     page.kind = kind
     page.errors = []
@@ -190,6 +217,12 @@ def test_tap_pin_then_here_then_drag(page, server):
     assert pin, "no pin in the scene after the tap"
     assert abs(pin["wx"] - float(match[1])) <= 0.06 and abs(pin["wy"] - float(match[2])) <= 0.06
     assert page.evaluate(SCREEN_OF, "here-dot") is None
+    # The tapped room's name sits above the pin and its crosshair (never on them), dark ink on a light pill.
+    label = page.locator(".label-selected")
+    label.wait_for(state="visible", timeout=5000)
+    box = label.bounding_box()
+    assert box["y"] + box["height"] <= pin["y"] - 16, f"the room name {box} sits on the tap pin at {pin}"
+    assert page.evaluate(LABEL_CONTRAST, ".label-selected") >= 4.5
     shot(page, "after-tap")
 
     # 2. "I'm here": the pin becomes the dot, never both

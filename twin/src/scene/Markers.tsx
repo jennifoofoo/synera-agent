@@ -326,6 +326,21 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
         }),
       )}
 
+      {/* focus mode: the destination room of a shown route gets a signal edge and a light tint */}
+      {state?.route?.ok &&
+        state.route.destination &&
+        (() => {
+          const space = model.spaceById.get(state.route.destination);
+          if (!space || !shown(space.floor_id)) return null;
+          return (
+            <group name="route-destination-room" position-y={floorY(space.floor_id)}>
+              {/* with a route the destination is the answer: a saturated blue body (walls and floor), like a model
+                  with one painted room; without a route nothing is blue */}
+              <SpaceOverlay polygon={space.polygon} height={flat ? 0.12 : 1.25} colour={COLOURS.signal} opacity={flat ? 0.22 : 0.32} outline />
+            </group>
+          );
+        })()}
+
       {/* selection */}
       {selection &&
         shown(selection.floor_id) &&

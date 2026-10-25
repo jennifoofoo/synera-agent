@@ -34,15 +34,16 @@ const fragment = /* glsl */ `
 
   void main() {
     float d = distance(vXZ, uCentre);
-    vec3 colour = mix(uInner, uOuter, smoothstep(0.0, uRadius, d));
+    vec3 colour = mix(uInner, uOuter, smoothstep(0.0, uRadius * 0.55, d));
     float shadow = (1.0 - smoothstep(uShadow0, uShadow1, d)) * 0.07;
     colour *= 1.0 - shadow;
     vec2 r = vXZ / uCell;
     vec2 cell = fract(r) - 0.5;
-    float fw = max(fwidth(r.x), 1e-5);
+    vec2 fwv = fwidth(r);
+    float fw = max(max(fwv.x, fwv.y), 1e-5);
     float px = length(cell) / fw;
-    float dot = (1.0 - smoothstep(1.2, 2.0, px)) * (1.0 - smoothstep(0.25, 0.45, fw)) * (1.0 - smoothstep(uRadius * 0.3, uRadius * 0.8, d));
-    colour = mix(colour, uDot, dot * 0.35);
+    float dot = (1.0 - smoothstep(1.2, 2.0, px)) * (1.0 - smoothstep(0.12, 0.3, fw)) * (1.0 - smoothstep(uRadius * 0.2, uRadius * 0.5, d));
+    colour = mix(colour, uDot, dot * 0.28);
     gl_FragColor = vec4(colour, 1.0);
   }
 `;

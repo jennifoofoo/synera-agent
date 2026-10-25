@@ -10,11 +10,11 @@
 
 import { create } from "zustand";
 import { api } from "../api/client";
-import type { Building, BuildingState, Space } from "../api/types";
+import type { AgentRound, Building, BuildingState, Route, Space } from "../api/types";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { walkMinutes } from "../walkInfo";
-import { entranceRoom, inArea, normType, orderRound, straightLine, typeMatches } from "./order";
+import { areaOptions, entranceRoom, inArea, normType, orderRound, straightLine, typeMatches } from "./order";
 
 /** Up to this many route calls the matrix is measured on real routes; above it, straight lines. */
 const MAX_ROUTE_PAIRS = 231; // 21 stops + start
@@ -270,7 +270,9 @@ async function goToStop(index: number): Promise<void> {
       useTwin.getState().startWalk();
     } else {
       // Already in the room (two stops in one place) or no route: show the stop, the step sheet stays closed.
+      const listening = useTwin.getState().handsFree;
       useTwin.getState().stopWalk();
+      if (listening) useTwin.getState().setHandsFree(true); // "Hey Wanda, done" still checks this stop
       if (useTwin.getState().state?.route) await useTwin.getState().clearRoute();
       useRound.setState({ index, guiding: true });
       useTwin.getState().flyTo(plan.stops[index].assetIds[0] ?? to);
@@ -359,6 +361,58 @@ export function summary(plan: RoundPlan): string {
   return `${stops} · ${Math.round(plan.lengthM)} m · ~${walkMinutes(plan.lengthM)} min`;
 }
 
+// ---------- a round the chat agent planned ----------
+
+let adoptedKey = "";
+
+function agentRoundKey(building: string, round: AgentRound): string {
+  return JSON.stringify([building, round.start, round.stops.map((stop) => stop.space_id), round.return_to_start]);
+}
+
+/** Take over a round the chat agent planned (plan_round, state.route.round): the same stops in the same order, so
+ * Start, "guide me" and "done" go stop by stop. The agent's drawn route stays on the map. */
+export function adoptRound(round: AgentRound, lengthM: number | null): RoundPlan | null {
+  const { buildingKey, building, model } = useTwin.getState();
+  if (!buildingKey || !building || !model) return null;
+  const stops: RoundStop[] = [];
+  for (const stop of round.stops) {
+    const space = model.spaceById.get(stop.space_id);
+    if (!space) return null;
+    stops.push({ spaceId: space.id, floorId: space.floor_id, name: space.name, assetIds: [...stop.asset_ids] });
+  }
+  if (!stops.length) return null;
+  adoptedKey = agentRoundKey(buildingKey, round);
+  if (useRound.getState().guiding) endRound();
+  // The area the panel shows: the floor when all stops are on one floor (so "plan again" keeps it), else everything.
+  const floors = [...new Set(stops.map((stop) => stop.floorId))];
+  const floor = floors.length === 1 ? model.floorById.get(floors[0]) : undefined;
+  const floorName = floor ? floor.name || `Level ${floor.level}` : "";
+  const area = floorName && areaOptions(building.floors, building.spaces).includes(floorName) ? floorName : "Whole building";
+  const type = building.assets.find((asset) => typeMatches(asset, round.device_type))?.type ?? round.device_type;
+  const plan: RoundPlan = {
+    building: buildingKey,
+    type,
+    area,
+    startId: round.start,
+    startName: model.spaceById.get(round.start)?.name ?? round.start,
+    stops,
+    lengthM: lengthM ?? 0,
+    measured: "route",
+    unreachable: [],
+  };
+  useRound.setState({ open: true, type, area, startId: round.start, plan, guiding: false, index: 0, checked: [], finished: false, whatIf: null, picking: null, error: null, busy: null });
+  showStops(plan, null);
+  return plan;
+}
+
+/** Is this drawn route the whole round (the agent's, or the one planRound drew), not one leg of it? */
+function isWholeRound(route: Route | null | undefined, plan: RoundPlan): boolean {
+  if (!route?.ok) return false;
+  if (route.round) return true;
+  const ids = plan.stops.map((stop) => stop.spaceId);
+  return route.start === plan.startId && route.destination === ids[ids.length - 1] && JSON.stringify(route.via ?? []) === JSON.stringify(ids.slice(0, -1));
+}
+
 // ---------- what if: a new door ----------
 
 /** Add a door between two neighbouring rooms, plan the same round again and compare. */
@@ -432,9 +486,24 @@ if (typeof window !== "undefined") {
   });
   // Another building: the round belongs to the old one.
   useTwin.subscribe((now, before) => {
+    if (now.buildingKey !== before.buildingKey) adoptedKey = "";
     if (now.buildingKey !== before.buildingKey && useRound.getState().plan) {
       useRound.setState({ plan: null, whatIf: null, guiding: false, checked: [], index: 0, picking: null });
     }
+  });
+  // The chat agent planned a round (state.route.round): open it here once, with its stops in its order.
+  useTwin.subscribe((now, before) => {
+    const route = now.state?.route;
+    if (route === before.state?.route || !route?.ok || !route.round || !now.buildingKey) return;
+    if (agentRoundKey(now.buildingKey, route.round) === adoptedKey) return;
+    adoptRound(route.round, typeof route.length_m === "number" ? route.length_m : null);
+  });
+  // "Guide me" (card, chat or voice) on the whole round: guide it stop by stop instead.
+  useTwin.subscribe((now, before) => {
+    if (switching || before.walkStep !== null || now.walkStep === null) return;
+    const { plan, guiding, busy: working } = useRound.getState();
+    if (!plan || guiding || working || plan.building !== now.buildingKey || !isWholeRound(now.state?.route, plan)) return;
+    void startRound();
   });
   // Picking rooms for the what-if door: each tapped room (or a point in a room) counts.
   useTwin.subscribe((now, before) => {
@@ -450,5 +519,5 @@ if (typeof window !== "undefined") {
       void roundWhatIfDoor(first, spaceId);
     }
   });
-  (window as unknown as { __round: unknown }).__round = { useRound, openRound, planRound, startRound, roundDone, roundStatus, roundWhatIfDoor, roundUndoDoor, endRound, pickDoorRooms, closeRound };
+  (window as unknown as { __round: unknown }).__round = { useRound, adoptRound, openRound, planRound, startRound, roundDone, roundStatus, roundWhatIfDoor, roundUndoDoor, endRound, pickDoorRooms, closeRound };
 }

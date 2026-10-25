@@ -145,6 +145,13 @@ export async function handleUtterance(text: string): Promise<void> {
     return;
   }
   const command = parseCommand(text);
+  if (command === "next" && inRound() && !walkNow()) {
+    // At a round stop without a step sheet (the stop is in the room you are in): "done" checks it and goes on.
+    setStatus("listening");
+    say(await roundDone());
+    followUpAfterSpeech();
+    return;
+  }
   if (command && (walkNow() || command === "stop")) {
     setStatus("listening");
     runLocal(command);
@@ -461,4 +468,9 @@ export function installHandsFree(): void {
     if (document.visibilityState === "hidden") halt();
     else start();
   });
+}
+
+if (typeof window !== "undefined") {
+  // For browser tests without a microphone: run a spoken sentence as if it was heard.
+  (window as unknown as { __handsFree: unknown }).__handsFree = { handleUtterance };
 }

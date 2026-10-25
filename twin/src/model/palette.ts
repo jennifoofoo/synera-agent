@@ -110,7 +110,9 @@ export const COLOURS = {
   gold: "#004fab",
   stairs: GROUP_COLOURS.vertical.wall, // stairs shafts, the vertical group colour
   accentBlue: GROUP_COLOURS.vertical.wall, // lift shafts, the vertical group colour (the name is historic)
-  thing: "#e4e3df", // furniture: the floor's own tone, shape comes from the light
+  thing: "#e4e3df", // landmark furniture bodies: the floor's own tone, shape comes from the light
+  footprint: "#dcdad5", // furniture footprints on the floor: one step darker than the slab
+  shadow: "#1d2430", // the soft contact shadow under machines (ink, at low opacity)
   machine: "#d4d6d8", // machines: a touch darker, still neutral
   thingEdge: "#c3c6c9", // furniture outline, faint
   ok: "#2f7d5b", // token --ok
