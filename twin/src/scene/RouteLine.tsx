@@ -20,9 +20,9 @@ const DISSOLVE_S = 0.3;
 /** Route line width on screen (px), 2D and 3D, and its white casing on each side. */
 const LINE_PX = 6;
 const LINE_PX_3D = 5.5;
-const CASING_PX = 2;
+const CASING_PX = 1.5;
 /** A soft halo of the signal colour under the casing (px each side) and its opacity. */
-const HALO_PX = 7;
+const HALO_PX = 8;
 const HALO_OPACITY = 0.16;
 /** The travelling flow on the line: thin white dashes (px wide, metres long) that move at walking pace. */
 const FLOW_PX = 2.2;

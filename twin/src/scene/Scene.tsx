@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { NoToneMapping } from "three";
-import { GizmoHelper, GizmoViewcube, OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
+import { OrthographicCamera, PerformanceMonitor, PerspectiveCamera } from "@react-three/drei";
 
 // Postprocessing (N8AO etc.) is planner-only and loaded on demand, so phones never download it.
 const Effects = lazy(() => import("./Effects"));
@@ -13,7 +13,6 @@ import { FollowCam } from "./FollowCam";
 import { Declutter } from "./Declutter";
 import { FloorRise } from "./FloorRise";
 import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
-import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { FactPins } from "./FactPins";
@@ -22,6 +21,8 @@ import { RouteLine } from "./RouteLine";
 import { RoundMarks } from "./RoundMarks";
 import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
 import { Things } from "./Things";
+import { Plinth, StudioLight, StudioShadows, useSoftwareGl } from "./Studio";
+import { openingEditsOf } from "./geometry";
 
 const NEAR_THINGS_LIMIT = 6000;
 const ALL_THINGS_LIMIT = 4000;
@@ -38,6 +39,7 @@ function Building({ model }: { model: BuildingModel }) {
   const viewMode = useTwin((s) => s.viewMode);
   const worker = profile === "worker";
   const flat = viewMode === "2d";
+  const software = useSoftwareGl();
 
   const focused = focusedFloorId ?? model.floors[0]?.id ?? null;
   // Floor rule (floorVisibility.tsx): active floor full, floors below as outlines, floors above hidden; a route over
@@ -54,6 +56,9 @@ function Building({ model }: { model: BuildingModel }) {
   const roles = useMemo(() => floorRoles(model, focused, floorMode, flat, routeFloors), [model, focused, floorMode, flat, routeFloors]);
   const visibleFloors = useMemo(() => new Set(model.floors.filter((floor) => roles.get(floor.id) === "full").map((floor) => floor.id)), [model, roles]);
   const route = state?.route ?? null;
+  // The soft shadow is baked again only when what casts it changes (floor, floor mode, route floors, things, doors).
+  const bakeKey = `${model.building.key}:${focused}:${floorMode}:${thingsMode}:${routeFloorsKey}:${JSON.stringify(openingEditsOf(state))}`;
+  const shadowFloor = routeFloors ? routeFloors.reduce((top, id) => (floorY(id) > floorY(top) ? id : top), routeFloors[0]) : focused;
   const guideSegments = state?.guide?.active ? state.guide.leg.segments : null;
 
   return (
@@ -71,6 +76,8 @@ function Building({ model }: { model: BuildingModel }) {
           </FloorRise>
         );
       })}
+      {/* the shadow lies on the top full floor: a floor stacked above would throw its slab over the one below */}
+      {!flat && !worker && !software && shadowFloor && <StudioShadows model={model} y={floorY(shadowFloor)} bakeKey={bakeKey} />}
       {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
       <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} worker={worker} />
       <Markers
@@ -92,6 +99,21 @@ function Building({ model }: { model: BuildingModel }) {
       <FollowCam model={model} floorY={floorY} />
       <Declutter />
     </group>
+  );
+}
+
+/** Planner (3D): studio light from an environment map plus a low sky dome as a safety net. Phone, 2D and software
+ * WebGL: the cheap lights (a bright sky dome, a steep key light, a cool fill). */
+function Lights({ studio, centre, size }: { studio: boolean; centre: [number, number, number]; size: number }) {
+  const software = useSoftwareGl();
+  const full = studio && !software;
+  return (
+    <>
+      {full && <StudioLight />}
+      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, full ? 0.6 : 2.1]} />
+      {!full && <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={0.9} color={COLOURS.sky} />}
+      {!full && <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.6} color={COLOURS.fill} />}
+    </>
   );
 }
 
@@ -150,40 +172,35 @@ export function Scene() {
     <Canvas
       dpr={dpr}
       frameloop={worker ? "demand" : "always"}
-      gl={{ antialias: !ao || worker, powerPreference: "high-performance", logarithmicDepthBuffer: false, toneMapping: NoToneMapping }}
+      // 3D: transparent over the CSS studio backdrop (styles.css, .app.solid); 2D keeps its solid plan colour.
+      gl={{ alpha: true, antialias: !ao || worker, powerPreference: "high-performance", logarithmicDepthBuffer: false, toneMapping: NoToneMapping }}
       onPointerMissed={() => select(null)}
-      shadows={false}
+      shadows={!worker}
       style={{ position: "absolute", inset: 0, touchAction: "none" }}
     >
       {flat ? (
         <OrthographicCamera makeDefault position={[centre[0], size * 2, centre[2]]} near={0.1} far={size * 12} zoom={4} />
       ) : (
-        <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
+        <PerspectiveCamera makeDefault fov={32} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
-      <color attach="background" args={[flat ? COLOURS.plan : COLOURS.groundOuter]} />
-      {!flat && <fog attach="fog" args={[COLOURS.groundOuter, size * 2.5, size * 9]} />}
-      {/* soft daylight: a bright sky dome, one steep key light for the wall tops, a cool fill from the other side */}
-      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, 2.1]} />
-      <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={0.9} color={COLOURS.sky} />
-      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.6} color={COLOURS.fill} />
+      {flat && <color attach="background" args={[COLOURS.plan]} />}
+      {!flat && <fog attach="fog" args={[COLOURS.studioBottom, size * 3, size * 10]} />}
+      <Lights studio={!flat && !worker} centre={centre} size={size} />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}
         onDecline={() => setQuality((q) => Math.max(0, q - 1))}
         onIncline={() => setQuality((q) => Math.min(2, q + 1))}
       />
-      <mesh rotation-x={-Math.PI / 2} position={[centre[0], groundY, centre[2]]} renderOrder={-1}>
-        <planeGeometry args={[size * 60, size * 60]} />
-        <meshBasicMaterial color={flat ? COLOURS.plan : COLOURS.groundOuter} />
-      </mesh>
-      {!flat && <GroundGrid centre={centre} radius={size * 2.2} />}
+      {flat && (
+        <mesh rotation-x={-Math.PI / 2} position={[centre[0], groundY, centre[2]]} renderOrder={-1}>
+          <planeGeometry args={[size * 60, size * 60]} />
+          <meshBasicMaterial color={COLOURS.plan} />
+        </mesh>
+      )}
+      {model && !flat && <Plinth model={model} />}
       <Stats />
       <Suspense fallback={null}>{model && <Building model={model} />}</Suspense>
-      {!worker && !flat && (
-        <GizmoHelper alignment="bottom-right" margin={[64, 64]} renderPriority={2}>
-          <GizmoViewcube color={COLOURS.gizmoFace} hoverColor={COLOURS.gizmoHover} textColor="#1d2430" strokeColor={COLOURS.gizmoStroke} opacity={0.95} faces={["E", "W", "Top", "Bottom", "N", "S"]} />
-        </GizmoHelper>
-      )}
       {ao && !worker && !flat && (
         <Suspense fallback={null}>
           <Effects quality={quality} />
