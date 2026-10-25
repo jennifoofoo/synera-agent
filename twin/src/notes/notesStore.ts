@@ -4,7 +4,7 @@
 // integrator: notesCommand(text), or addNoteHere(text), notesHere(), finishJob() (see the end).
 
 import { create } from "zustand";
-import type { Point, Route } from "../api/types";
+import type { BuildingState, Point, Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { closedOnRoute } from "../model/closures";
 import { useTwin, walkSteps } from "../store";
@@ -220,24 +220,32 @@ export async function addNote(input: { text: string; photo?: Blob | null; place?
   const text = input.text.trim();
   if (!buildingKey || !storage || !place || (!text && !input.photo)) return null;
   let note: Note;
+  let state: unknown;
   try {
-    note = await storage.add(buildingKey, {
+    ({ fact: note, state } = await storage.add(buildingKey, {
       kind: input.kind === "issue" ? "issue" : "note",
       anchor: { space_id: place.spaceId, asset_id: place.assetId, element_id: place.elementId, point: place.point, floor_id: place.floorId },
       text,
       author,
       photo: input.photo ?? null,
       source: input.source ?? "tap",
-    });
+    }));
   } catch {
     useNotes.setState({ error: storage.kind === "server" ? "The server could not save the note." : "This device could not save the note (storage full?)." });
     return null;
   }
+  applyServerState(state);
   const job = useNotes.getState().job ?? newJob(null);
   // A new note shows on the map at once, even with the layer off until now.
   useNotes.setState((s) => ({ notes: [note, ...s.notes.filter((n) => n.id !== note.id)], error: null, job: { ...job, noteIds: [...job.noteIds, note.id] } }));
   if (!useNotes.getState().layer) setLayer(true);
   return note;
+}
+
+/** The server's state after a save or undo (`{fact, state}`), so the map, state.facts and closures stay in step. */
+function applyServerState(state: unknown): void {
+  const twin = useTwin.getState();
+  if (state && typeof state === "object" && "closed" in state && twin.state) twin.applyState(state as unknown as BuildingState);
 }
 
 /** Undo is only for a note just made (typos); later a note is resolved, never deleted (spec). */
@@ -255,7 +263,13 @@ export function canResolve(note: Note): boolean {
 export async function undoNote(id: string): Promise<void> {
   const { buildingKey, storage } = useNotes.getState();
   if (!buildingKey || !storage?.undo) return;
-  await storage.undo(buildingKey, id);
+  try {
+    const reply = await storage.undo(buildingKey, id);
+    if (reply) applyServerState(reply.state);
+  } catch (error) {
+    useNotes.setState({ error: error instanceof Error && storage.kind === "server" ? `${error.message}` : "Could not undo that note." });
+    return;
+  }
   useNotes.setState((s) => ({ notes: s.notes.filter((note) => note.id !== id), job: s.job ? { ...s.job, noteIds: s.job.noteIds.filter((n) => n !== id) } : s.job }));
 }
 

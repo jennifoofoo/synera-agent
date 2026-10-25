@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
-import { durationLabel, isCurrent, MemoryFacts, pickFactsStorage, sinceLabel, whenLabel, type Fact } from "./notes";
+import { durationLabel, isCurrent, MemoryFacts, pickFactsStorage, ServerFacts, sinceLabel, whenLabel, type Fact } from "./notes";
 import { notesCommand, spacesNamed } from "./notesStore";
 
 const model = {
@@ -92,11 +92,32 @@ describe("facts", () => {
 
   it("keeps undo and resolve local; history stays", async () => {
     const local = new MemoryFacts();
-    const fact = await local.add("b", { kind: "note", anchor: base.anchor, text: "Lever left first", author: "Klaus" });
+    const { fact } = await local.add("b", { kind: "note", anchor: base.anchor, text: "Lever left first", author: "Klaus" });
     const resolved = await local.resolve("b", fact.id);
     expect(resolved.status).toBe("resolved");
     expect(resolved.valid_to).not.toBeNull();
     expect((await local.list("b")).length).toBe(1);
+  });
+
+  it("saves on the server with {fact, state} and undoes only the newest note", async () => {
+    const original = globalThis.fetch;
+    const saved = { ...base, id: "f-1", photo: "/api/facts/photo?key=b&id=f-1", author: "Klaus", person_id: "klaus" };
+    const calls: string[] = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url === "/api/facts") return new Response(JSON.stringify({ fact: saved, state: { facts: [saved] } }));
+      if (url === "/api/facts/undo") return new Response(JSON.stringify({ undone: saved, state: { facts: [] } }));
+      return new Response(JSON.stringify({ facts: [saved], persons: [] }));
+    }) as typeof fetch;
+    const server = new ServerFacts();
+    const reply = await server.add("b", { kind: "note", anchor: base.anchor, text: "Lever", author: "Klaus" });
+    expect(reply.fact.photo).toBe("/api/facts/photo?key=b&id=f-1");
+    expect(reply.state).toEqual({ facts: [saved] });
+    expect(await server.undo("b", "f-1")).toEqual({ state: { facts: [] } });
+    await expect(server.undo("b", "f-other")).rejects.toThrow();
+    expect(calls.filter((c) => c.startsWith("POST"))).toEqual(["POST /api/facts", "POST /api/facts/undo"]);
+    expect("resolve" in server).toBe(false);
+    globalThis.fetch = original;
   });
 
   it("takes a spoken problem as an issue", () => {
