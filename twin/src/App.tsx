@@ -18,6 +18,7 @@ import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
 import { Round } from "./ui/Round";
+import { SIDEBAR_MIN_WIDTH, Sidebar, SidebarExpand, useMinWidth, useSidebar } from "./ui/Sidebar";
 import { Walk } from "./ui/Walk";
 import { Welcome } from "./ui/Welcome";
 
@@ -34,32 +35,52 @@ export function App() {
   const rightInset = useTwin((s) => s.rightInset);
   const directionsOpen = useTwin((s) => s.directions !== null);
   const walking = useTwin((s) => s.walkStep !== null);
+  // Laptop: the chat is a column on the left (ui/Sidebar.tsx); phones and narrow windows keep the floating dock.
+  const wide = useMinWidth(SIDEBAR_MIN_WIDTH);
+  const collapsed = useSidebar((s) => s.collapsed);
+  const sidebar = profile === "planner" && wide;
+  const docked = sidebar && !collapsed;
   useEffect(() => {
     void loadBuildings();
   }, [loadBuildings]);
   useEffect(installHandsFree, []);
   return (
     <div
-      className={`app ${profile} ${flat ? "flat" : "solid"} ${directionsOpen ? "directions-open" : ""} ${walking ? "walking" : ""}`}
+      className={`app ${profile} ${flat ? "flat" : "solid"} ${directionsOpen ? "directions-open" : ""} ${walking ? "walking" : ""}${docked ? " with-sidebar" : sidebar ? " sb-collapsed" : ""}`}
       style={{ "--top-inset": `${topInset}px`, "--bottom-inset": `${bottomInset}px`, "--right-inset": `${rightInset}px` } as React.CSSProperties}
     >
+      {docked && (
+        <Sidebar
+          walking={walking}
+          dock={
+            <>
+              <CampusCard />
+              <NotesDock />
+              {walking ? <Walk /> : <Card />}
+            </>
+          }
+        />
+      )}
       <Scene />
       <Welcome />
       <CampusSite />
-      <TopBar />
+      {!docked && <TopBar />}
       <FloorRail />
       <Recenter />
       <ChangesPill />
       <Planner />
       <Round />
       <Phone />
-      <div className="dock">
-        <CampusCard />
-        <NotesDock />
-        {/* While walking: the step sheet and only the Talk button (say "next" while walking). */}
-        {walking ? <Walk /> : <Card />}
-        <Omnibox walking={walking} />
-      </div>
+      {!docked && (
+        <div className="dock">
+          <CampusCard />
+          <NotesDock />
+          {/* While walking: the step sheet and only the Talk button (say "next" while walking). */}
+          {walking ? <Walk /> : <Card />}
+          <Omnibox walking={walking} />
+        </div>
+      )}
+      {sidebar && collapsed && <SidebarExpand />}
       <NotesButton />
       <KnowledgeGraph />
       <NewBuilding />
