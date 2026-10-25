@@ -4,16 +4,17 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import type { ThreeEvent } from "@react-three/fiber";
 import type { Asset, BuildingState } from "../api/types";
 import type { FloorModel } from "../model/model";
-import { COLOURS } from "../model/palette";
+import { assetHeight, isFloorMarking } from "../model/assetHeights";
+import { COLOURS, GROUP_COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { tapMap } from "../tapAnswer";
 import { useLandmarks } from "./landmarks";
 import { MIN_SHAPE_PX, useMapZoom } from "./mapZoom";
 
-// Two kinds of things, like an architectural model: furniture is a flat footprint on the floor (it gives scale and
-// reads as "a desk here", nothing more), machines and the landmarks of the directions are bodies (rounded, a darker
-// top, a soft shadow) because they are what people steer by. Equipment (printers, extinguishers) is a footprint too:
-// its icon on the map is the recognisable part.
+// Two kinds of things, like an architectural model: machines and the landmarks of the directions are full bodies
+// (rounded, a darker top, a soft shadow) because they are what people steer by; everything else is a low body at its
+// default height by type (model/assetHeights.ts: a desk at table height, a pallet a hand high, else 0.3 m), one
+// instanced mesh for all of them. Floor markings stay flat in that mesh, tinted like the walkway floor marking.
 
 /** Bodies: a rounded box standing on the floor, vertex colour darkens the top face a step (instance colour on top). */
 const bodyBox = new RoundedBoxGeometry(1, 1, 1, 3, 0.06);
@@ -65,14 +66,14 @@ const PLAN_THING_FAINT = COLOURS.planThingFaint;
 const PLAN_LANDMARK = COLOURS.planLandmark;
 /** 2D: things are thin slabs, so they never cover the route, pins or labels drawn above the floor. */
 const PLAN_HEIGHT = 0.06;
-/** 3D: furniture footprints are this high (m), bodies keep their category height. */
-const FOOTPRINT_HEIGHT = 0.08;
+/** 3D: floor markings, flat and in the walkway marking tone, so they never read as an object. */
+const MARKING = GROUP_COLOURS.walkway.slab;
 const SHADOW_PAD_M = 0.45;
 const SHADOW_OPACITY = 0.1;
 
 export function assetSize(asset: Asset): [number, number, number] {
   const category = asset.category ?? "furniture";
-  const height = category === "machine" ? 1.9 : category === "equipment" ? 1.3 : category === "fixture" ? 0.9 : 0.75;
+  const height = assetHeight(asset);
   const width = asset.footprint?.width_m ?? (category === "machine" ? 2 : 0.8);
   const depth = asset.footprint?.depth_m ?? (category === "machine" ? 1.5 : 0.8);
   return [Math.max(0.25, width), height, Math.max(0.25, depth)];
@@ -91,8 +92,8 @@ interface Props {
   flat?: boolean;
 }
 
-/** All things of one floor: machines and landmarks as rounded bodies with a soft shadow, everything else as a flat
- * footprint; one instanced mesh per kind (true size from the footprint). */
+/** All things of one floor: machines and landmarks as rounded bodies with a soft shadow, everything else as a low
+ * body at its type's height (floor markings flat); one instanced mesh per kind (true size from the footprint). */
 export function Things({ floor, y, state, limit, flat = false }: Props) {
   const select = tapMap; // a map tap selects, or answers Wanda's "where are you?" (tapAnswer.ts)
   const bodies = useRef<THREE.InstancedMesh>(null);
@@ -121,7 +122,8 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
         : all,
     [all, flat, scale, landmarks],
   );
-  // 3D: bodies are machines and the landmarks of the directions; the rest lies flat. 2D: everything is a flat slab.
+  // 3D: bodies are machines and the landmarks of the directions; the rest are low bodies (markings flat) in the slab
+  // mesh. 2D: everything is a flat slab.
   const split = useMemo(() => {
     const body: Asset[] = [];
     const slab: Asset[] = [];
@@ -151,9 +153,9 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       return colour;
     };
     split.slab.forEach((asset, index) => {
-      place(asset, flat ? PLAN_HEIGHT : FOOTPRINT_HEIGHT);
+      place(asset, flat ? PLAN_HEIGHT : assetSize(asset)[1]);
       slab.setMatrixAt(index, temp.matrix);
-      colour.set(flat ? planColour(asset) : COLOURS.footprint);
+      colour.set(flat ? planColour(asset) : isFloorMarking(asset) ? MARKING : COLOURS.footprint);
       slab.setColorAt(index, focus(asset));
     });
     slab.count = split.slab.length;

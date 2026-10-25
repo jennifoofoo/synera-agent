@@ -2,7 +2,7 @@
 // count), added / moved / removed things, highlights (finds) and the selection. Never colour alone: each
 // marker also has a shape (ring, "!" badge, box, dashed ghost) and, unless reduced motion, movement.
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Html, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
@@ -11,7 +11,8 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { closedConnectorStops } from "../model/closures";
 import type { Highlight, Selection } from "../store";
-import { outlineGeometry, polygonGeometry } from "./geometry";
+import { openingEditsOf, outlineGeometry, polygonGeometry, wallTopOutline, withCutaway } from "./geometry";
+import { cutawayUniforms } from "./FloorMesh";
 import { HereDot, TapPin } from "./HerePin";
 import { ClosedGlyph } from "./Labels";
 import { Pulse } from "./markerLayout";
@@ -146,6 +147,32 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
           <lineBasicMaterial color={colour} depthTest={false} />
         </lineSegments>
       )}
+    </group>
+  );
+}
+
+/** The selected room in 3D: its wall tops painted in the selection colour (the band follows the dollhouse cutaway
+ * and runs over the floor across door gaps, geometry.ts wallTopOutline) over a light tint of its floor. */
+function WallTopSelection({ model, spaceId, state }: { model: BuildingModel; spaceId: string; state: BuildingState | null }) {
+  const space = model.spaceById.get(spaceId);
+  const floor = space ? model.floorById.get(space.floor_id) : undefined;
+  const editsKey = JSON.stringify(openingEditsOf(state));
+  const band = useMemo(() => (floor ? wallTopOutline(floor, spaceId, JSON.parse(editsKey)) : null), [floor, spaceId, editsKey]);
+  const material = useMemo(
+    () =>
+      withCutaway(
+        new THREE.MeshBasicMaterial({ color: COLOURS.selection, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }),
+        cutawayUniforms,
+      ),
+    [],
+  );
+  useEffect(() => () => band?.dispose(), [band]);
+  useEffect(() => () => material.dispose(), [material]);
+  if (!space || !band) return null;
+  return (
+    <group name="selection-room">
+      <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.12} outline={false} />
+      <mesh name="selection-walls" geometry={band} material={material} renderOrder={13} />
     </group>
   );
 }
@@ -350,7 +377,11 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
             if (!space) return null;
             return (
               <group position-y={floorY(space.floor_id)}>
-                <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.12} outline />
+                {flat ? (
+                  <SpaceOverlay polygon={space.polygon} height={0.12} colour={COLOURS.selection} opacity={0.12} outline />
+                ) : (
+                  <WallTopSelection model={model} spaceId={space.id} state={state} />
+                )}
               </group>
             );
           }
