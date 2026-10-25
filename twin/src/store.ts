@@ -5,6 +5,7 @@ import { api } from "./api/client";
 import type { Building, BuildingListEntry, BuildingState, ChatContext, ChatReply, Located, Point, Route } from "./api/types";
 import { buildModel, type BuildingModel } from "./model/model";
 import { waitsForPlace } from "./asksWhere";
+import { acceptsGuiding } from "./guideYes";
 
 export type FloorMode = "stacked" | "exploded" | "single";
 export type Profile = "planner" | "worker";
@@ -577,7 +578,8 @@ export const useTwin = create<TwinState>((set, get) => ({
         return null;
       }
     }
-    if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
+    const lastReply = [...get().chat].reverse().find((entry) => entry.role === "agent")?.text;
+    if (get().state?.route?.ok && acceptsGuiding(message, lastReply)) {
       get().startWalk(); // the drawn route already has its steps; no agent call
       return null;
     }
