@@ -444,7 +444,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         const box = { x0: cx + dx - halfW - GAP_PX / 2, y0: cy + dy - halfH - GAP_PX / 2, x1: cx + dx + halfW + GAP_PX / 2, y1: cy + dy + halfH + GAP_PX / 2 };
         if (!free(box, `name-${dot.pin.id}`)) continue;
         kept.push(box);
-        pins.push({ kind: "name", id: dot.pin.id, point: dot.pin.point, text, dx, dy });
+        pins.push({ kind: "name", id: dot.pin.id, point: dot.pin.point, text, dx: Math.round(dx), dy: Math.round(dy) }); // whole pixels: sharp text
         classes.set(`name-${dot.pin.id}`, "found");
         break;
       }
