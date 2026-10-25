@@ -257,8 +257,8 @@ START_WALK = """async () => {
 
 
 def test_hands_free_control_shown_once(twin):
-    """One voice entry point: the bottom bar has only the orb (no hands-free or stop button next to it), the step
-    sheet has the one hands-free button while walking, and at most one "Say Hey Wanda" line shows."""
+    """One voice entry point: the bottom bar has only the orb (no hands-free or stop button next to it), at most one
+    "Say Hey Wanda" line shows, and while walking the orb itself mutes and unmutes hands-free."""
     page, _ = twin
     page.evaluate("() => window.__twinStore.getState().setHandsFree(true)")
     page.wait_for_timeout(800)
@@ -271,8 +271,9 @@ def test_hands_free_control_shown_once(twin):
     page.wait_for_function("() => !!document.querySelector('.card-walk')", timeout=15000)
     page.wait_for_function("() => window.__twinStore.getState().handsFree", timeout=15000)
     page.wait_for_timeout(800)
-    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
-    assert page.evaluate(VISIBLE_COUNT, ".card-walk .hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .hf-btn") == 0
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .ob-talk") == 1
+    assert page.get_attribute(".ob-fabs .ob-talk", "aria-label") == "Mute Wanda"
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") <= 1
     # While walking the bar's caption never repeats the step: only that Wanda listens or speaks, or nothing.
     caption = page.evaluate("() => document.querySelector('.wb-text')?.textContent ?? ''")
@@ -285,4 +286,13 @@ def test_hands_free_control_shown_once(twin):
     assert page.evaluate("(t) => window.__say(t)", "hey wanda repeat")
     page.wait_for_timeout(1500)
     assert page.evaluate(VISIBLE_COUNT, ".hf-status") == 0 or "Hey Wanda" not in page.inner_text(".hf-status")
-    assert page.evaluate(VISIBLE_COUNT, ".hf-btn") == 1
+    assert page.evaluate(VISIBLE_COUNT, ".ob-fabs .hf-btn") == 0
+
+    # The orb mutes hands-free while walking, and a second tap brings it back.
+    page.wait_for_function("() => document.querySelector('.ob-fabs .ob-talk')?.getAttribute('aria-label') === 'Mute Wanda'", timeout=10000)
+    page.click(".ob-fabs .ob-talk")
+    page.wait_for_function("() => !window.__twinStore.getState().handsFree", timeout=5000)
+    assert page.get_attribute(".ob-fabs .ob-talk", "aria-label") == "Unmute Wanda"
+    page.click(".ob-fabs .ob-talk")
+    page.wait_for_function("() => window.__twinStore.getState().handsFree", timeout=5000)
+    assert page.get_attribute(".ob-fabs .ob-talk", "aria-label") == "Mute Wanda"

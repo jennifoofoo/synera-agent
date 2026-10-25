@@ -2,12 +2,13 @@
 // accepting it flies there and selects it. Enter on a sentence asks the building (the reply shows in the Card).
 // Voice in via the mic (push-to-talk), replies to spoken questions are spoken back (mute toggle).
 // By default one bottom bar shows: the Wanda orb, which is the Talk button (push-to-talk), a one-line caption (what
-// Wanda hears, thinks or says) and Ask (opens the input); while listening or speaking the orb itself stops. The input stays mounted but invisible, so the
+// Wanda hears, thinks or says) and Ask (opens the input). The orb is the one voice control: Stop while Wanda speaks,
+// Mute / Unmute Wanda (hands-free) while walking, Talk otherwise. The input stays mounted but invisible, so the
 // header search, Cmd/Ctrl+K, the caption and Ask just focus it; focus opens it, an empty blur or Escape closes it.
 // Owner: chat/search session, see ARCHITECTURE.md.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTwin } from "../store";
+import { setHandsFreeMuted, useTwin } from "../store";
 import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
 import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
@@ -313,9 +314,19 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
     const fired = longPress.current?.fired;
     longPress.current = null;
     if (fired) return;
-    // One voice button: speaking or the follow-up listen, the orb stops; listening, it sends; otherwise it listens.
-    if (!listenerRef.current && (speaking || (followUpOpen && !handsFreeOn))) stopAll();
-    else toggleMic();
+    // One voice control: while Wanda speaks it stops her; while walking it mutes or unmutes hands-free ("Hey Wanda"
+    // is on by itself during a walk, and nothing else offers a mute); otherwise it is Talk (tap again to send).
+    if (!listenerRef.current && speaking) {
+      stopAll();
+      return;
+    }
+    if (walking && !listenerRef.current) {
+      setHandsFreeMuted(handsFreeOn); // remembered for the rest of the walk
+      useTwin.getState().setHandsFree(!handsFreeOn);
+      return;
+    }
+    if (followUpOpen && !handsFreeOn) cancelFollowUp(); // one recognition at a time
+    toggleMic();
   };
 
   const toggleSound = () => {
@@ -379,7 +390,9 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   } else {
     caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Say “Wanda” or tap the mic";
   }
-  const stops = listening || followUpListening || speaking;
+  const stops = speaking && !listening;
+  const orbLabel = listening ? "Stop and send" : stops ? "Stop" : walking ? (handsFreeOn ? "Mute Wanda" : "Unmute Wanda") : voiceOut ? "Talk" : "Talk (spoken replies off)";
+  const orbTitle = listening ? "Tap to send" : stops ? "Tap to stop" : walking ? (handsFreeOn ? "Tap to mute “Hey Wanda”" : "Tap so Wanda listens again") : "Tap and speak (hold: spoken replies on/off)";
   // While walking the bar only says that Wanda listens or speaks, never the step or the reply (the sheet has them).
   if (walking) caption = mode === "listening" ? "Listening…" : mode === "speaking" ? "Speaking…" : "";
 
@@ -564,10 +577,10 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
           <button
             type="button"
             ref={talkRef}
-            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""}`}
-            aria-label={listening ? "Stop and send" : stops ? "Stop" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
-            aria-pressed={listening}
-            title={listening ? "Tap to send" : stops ? "Tap to stop" : "Tap and speak (hold: spoken replies on/off)"}
+            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""} ${walking && !handsFreeOn ? "muted" : ""}`}
+            aria-label={orbLabel}
+            aria-pressed={walking && !listening && !stops ? !handsFreeOn : listening}
+            title={orbTitle}
             disabled={busy}
             onPointerDown={talkDown}
             onPointerUp={talkUp}
@@ -577,7 +590,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
             onClick={talkClick}
           >
             <MicIcon />
-            {!voiceOut && !listening && (
+            {(!voiceOut || (walking && !handsFreeOn)) && !listening && (
               <span className="ob-badge" aria-hidden>
                 <MutedIcon />
               </span>
