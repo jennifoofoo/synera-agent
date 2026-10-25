@@ -258,3 +258,57 @@ Slide C (1:50–1:56), Magic Move: the evacuation-plan photo (`demo/plans/urban-
 - [ ] No secrets, tunnel URLs, terminal with `.env`, personal tabs, notifications, battery warnings, email addresses.
 - [ ] Watched once muted (the story still works) and once with eyes closed (the VO still works).
 - [ ] Link plays in a private window; link pasted into the submission form.
+
+## 7. Who makes what (three lists)
+
+### A. ElevenLabs: narrator lines (render with `make_vo.py`, never by hand in the dashboard)
+
+Source of truth: `docs/submission/video/vo_lines.json` (the test keeps it equal to §1). One MP3 per line, narrator voice ≠ Wanda.
+
+| ID | Slot | Seconds | Text (exact) |
+|---|---|---|---|
+| S01 | 0:00–0:03 | 3 s | Every building has one person who knows it by heart. |
+| S02 | 0:03–0:06 | 3 s | Last spring, that person retired. |
+| S03 | 0:06–0:13 | 7 s | By 2036, 12.9 million people in Germany reach retirement age. |
+| S04 | 0:13–0:20 | 7 s | What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked. |
+| S05 | 0:20–0:27 | 7 s | So the new shift searches. Asks around. Writes it up later, if at all. |
+| S06 | 0:27–0:35 | 8 s | Maintenance software knows what. Tracking knows roughly where. Nobody guides you hands-free, and nobody keeps what you learned. |
+| S07 | 0:35–0:38 | 3 s | This is Wanda. |
+| S08 | 0:38–0:48 | 10 s | Gisela plans her round on the laptop: the shortest order, computed on the building's own plans. |
+| S09 | 1:28–1:37 | 9 s | Every note lands in the building's knowledge graph: who, where, when, with a photo. The next shift hears it at the right spot. |
+| S10 | 1:37–1:46 | 9 s | Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks. |
+| S11 | 1:46–1:50 | 4 s | All 145 benchmark answers are reproducible. |
+| S12 | 1:50–1:56 | 6 s | It works on any building, even from the evacuation plan on the wall. |
+| S13 | 1:56–2:00 | 4 s | The knowledge stays in the building. |
+
+Not for ElevenLabs by hand: **Wanda's lines** (real app audio from the iPhone recording; only if a take is too noisy, the identical sentence again through our own `/api/speak`) and **Gisela's lines** (spoken live).
+
+### B. Recorded by Claude with Playwright (no camera, 1920×1080 laptop view, no audio)
+
+Needs: the page running locally with the floor-3 building (`feat/mucl-all-floors`), the night-shift note seeded (§4). Playwright exists in the project (`uv sync --group e2e`, `tests/e2e/`).
+
+| # | Slot | What is recorded | Note |
+|---|---|---|---|
+| P1 | 0:38–0:48 | Laptop planning: 3D twin → **Round** → fire extinguisher, Floor 3, tap Main Stairs → panel "[N] stops · [X] m", route drawn | slow scripted mouse moves |
+| P2 | 1:28–1:37 | **Knowledge graph**: West Wing Corridor → room card → Knowledge (Gisela's note with photo), Third Floor Corridor → Knowledge, drag the time slider | record **after** the shoot, so her real note and photo are there |
+| P3 | 1:37–1:50 | `docs/submission/video/architecture.html`: diagram + 145 card | already built; Playwright presses Space and records |
+| P4 | 1:50–1:56 | Floor-3 2D map, then the 3D twin, same angle | the plan photo itself is a file (`demo/plans/urban-colab/photos/OG3-04_floor3_east.jpeg`); crossfade in CapCut |
+| P5 | 1:56–2:00 | End shot: map with the "Notes & photos" layer on, pins with photo thumbnails | after the shoot |
+| P6 | 0:35–0:38 and end card | Logo card "Wanda – the building that talks back" | a static HTML card or CapCut text, no recording |
+| P7 | fallback only | Phone view (390×844) of the round, driven by injected commands (`window.__handsFree.handleUtterance`) | only if the iPhone recording fails; it has no sound and is not "real hands" |
+
+### C. You film yourselves (camera + the real iPhone)
+
+| # | Slot | What | Device |
+|---|---|---|---|
+| F1 | 0:00–0:03 | Close-up gloved hand on the extinguisher bracket (ideally 3.02) | Camera B |
+| F2 | 0:06–0:13 | Gisela at the Main Stairs on floor 3, slow push-in | Camera B, gimbal |
+| F3 | 0:13–0:20 | Paper folder: printed plan, crossed-out list "Extinguishers, 3rd floor" | Camera B, top-down |
+| F4 | 0:20–0:27 | Closed door, she turns back, scrolls an old photo gallery | Camera B |
+| F5 | 0:27–0:35 | Still of Gisela in the corridor (text goes on top in the edit) | Camera B |
+| F6 | 0:48–1:28 | **The round, camera side**: whole walk from the Main Stairs to 3.05, her six lines spoken live | Camera B, 2–3 m behind |
+| F7 | 0:48–1:28 | **The round, phone side**: iPhone screen recording **with microphone on** (map, Wanda's voice, her voice, her photo note) | iPhone A |
+| F8 | 1:16–1:24 | Her photo of the cracked hose: happens inside F7 (Notes → Add photo) | iPhone A |
+| F9 | 1:50 (optional) | The real evacuation plan on the floor-3 wall, straight on | Camera B (else the photo file) |
+
+F6 and F7 run at the same time; sync with the clap + orb tap (§3).
