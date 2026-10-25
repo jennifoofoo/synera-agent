@@ -16,19 +16,19 @@ export type SpaceGroup =
   | "outdoor";
 
 // Hue only for sought-after groups: the four places people look for (food and break, sanitary, stairs and lifts,
-// meeting) plus the industrial walkways (pale lemon like a floor marking) get a very pale hue; everything else stays a
+// meeting) plus the industrial walkways (pale lemon like a floor marking) get a soft, calm hue (clearly visible next to the grey offices, still far lighter than the route blue); everything else stays a
 // neutral grey that differs by lightness only. Colour is never alone: every hue group also has an icon and a legend
 // entry (LEGEND_GROUPS). The signal blue stays reserved for route, selection and primary buttons, and no room is ever
 // filled red or green (those are safety and state colours). The hue groups also differ in lightness, so they stay
 // apart under red-green colour blindness. Walls are off-white (half way from the slab to white), so the building
 // reads as an architectural white model; the light and a thin edge line give them their shape, not a dark colour.
-// Ink labels (#1d2430) on every slab are at least 10:1 (technical, the darkest grey); WCAG AA needs 4.5:1.
+// Ink labels (#1d2430) on every slab are at least 9.5:1 (stairs and lifts, the darkest hue); WCAG AA needs 4.5:1.
 export const GROUP_COLOURS: Record<SpaceGroup, { slab: string; wall: string; label: string }> = {
-  food: { slab: "#efe6d4", wall: "#f7f2e9", label: "Food and break" }, // token --room-food
-  sanitary: { slab: "#dce8ec", wall: "#edf3f5", label: "Toilets" }, // token --room-sanitary
-  vertical: { slab: "#dcd6e6", wall: "#edebf2", label: "Stairs and lifts" }, // token --room-vertical
-  meeting: { slab: "#dbe3d5", wall: "#edf1ea", label: "Meeting" }, // token --room-meeting
-  walkway: { slab: "#f2edd3", wall: "#f8f6e9", label: "Walkways" }, // token --room-walkway
+  food: { slab: "#f2dbaa", wall: "#f8edd4", label: "Food and break" }, // token --room-food
+  sanitary: { slab: "#bde1ea", wall: "#def0f4", label: "Toilets" }, // token --room-sanitary
+  vertical: { slab: "#d0c6ea", wall: "#e8e2f4", label: "Stairs and lifts" }, // token --room-vertical
+  meeting: { slab: "#d1e4c5", wall: "#e8f1e2", label: "Meeting" }, // token --room-meeting
+  walkway: { slab: "#f1ecc3", wall: "#f8f6e1", label: "Walkways" }, // token --room-walkway
   circulation: { slab: "#f5f4f1", wall: "#faf9f8", label: "Corridors" },
   work: { slab: "#ecebe7", wall: "#f5f5f3", label: "Work and living" },
   production: { slab: "#e3e5e7", wall: "#f1f2f3", label: "Production" },
