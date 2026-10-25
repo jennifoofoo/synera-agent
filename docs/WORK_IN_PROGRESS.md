@@ -270,3 +270,9 @@ Aus einem UI-Check mit Screenshots (Vorschau 8815, Laptop und iPhone, Urban Cola
 - **Notizenliste nur kurz zeigen.** Viele Einträge sind von "Someone", das wirkt wie Testdaten.
 - **Bei hervorgehobenen Zielen nicht ganz reinzoomen.** Die Füllfarbe wirkt aus der Nähe matt.
 - Handy-Sheet: bei Rückfragen erscheint manchmal ein Meta-Satz wie "I'll ask which one." Wenn er im Bild ist, die Szene neu aufnehmen.
+
+### Leonie an Jennifer (So ~11:15)
+- `feat/mucl-all-floors` ist in main (96040c0): Urban Colab jetzt mit Untergeschoss, EG West, OG2, OG3, OG4. Treppe V02 heißt "Main Stairs". Preflight 25 OK / 5 WARN / 0 FAIL. Nach dem Pull: `rm -rf agent_output/buildings/plan-89323a15 && scripts/install_demo_buildings.sh`.
+- Wir drehen im 3. OG: Feuerlöscher-Runde ab Main Stairs = 6 Stopps, 114 m.
+- Noch NICHT in main, kommen als Nächstes: `fix/round-route-legs` (gezeichnete Linie geht Gerät für Gerät, vorher bis 10 m daneben) und `fix/twin-multi-floor-route` (Stockwerke getrennt + Marker "↓ from Ground floor, Lift"). Kombiniert getestet auf `test/sunday-combined`.
+- Hinweis: `scripts/demo_knowledge_seed.py` (dein Commit b0f4ae6) ist nicht ruff-formatiert, check.sh ist deshalb rot.
