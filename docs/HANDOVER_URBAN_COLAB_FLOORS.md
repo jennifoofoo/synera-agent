@@ -23,7 +23,7 @@ Alle Fotos liegen jetzt im Repo: `demo/plans/urban-colab/photos/` (Originale), `
 | `U02_basement` | U.02 | Untergeschoss: Tiefgarage, Treppenkern, Aufzug, Serverräume, BMA, BOS Funk, 3 Lager, NSHV | **offen** |
 | `wayfinding_sign_not_a_plan` | - | Wegweiser-Schild, kein Grundriss | nicht nötig |
 
-**Kein Foto vom 2. OG.** Nicht erfinden; Etage 2 fehlt einfach (Aufzug und Treppe verbinden 1 mit 3, die Höhe kommt aus `elevation_m`).
+**2. OG:** Foto kam später dazu (`photos/OG2-04_floor2.jpeg`, Crop `crops/OG2-04_floor2.jpg`), gebaut mit `tools/add_floor2.py`. Alle Etagen B1 bis F4 sind auf `feat/mucl-all-floors`.
 
 ## 2. Ziel
 In `building.json` zusätzlich: Etage `B1` (level -1, "Basement"), F0 um den Westteil aus E.06 ergänzt, `F3` (level 3, "Floor 3", aus beiden OG3-Hälften), `F4` (level 4, "Floor 4"). Jede neue Etage mit Räumen, Türen, Aufzug und Haupttreppe in den bestehenden `vertical_connectors` (V01 Lift, V02 Treppe), Feuerlöschern und Druckknopfmeldern als Assets. Alles auf Englisch benannt. Danach Tests und Preflight grün, Merge nach `main`.

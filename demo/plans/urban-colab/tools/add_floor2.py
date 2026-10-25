@@ -50,7 +50,7 @@ corridor = unary_union(
 )
 add("corr", "Second Floor Corridor", "corridor", "corridor", corridor)
 add("lobby", "Lift Lobby", "corridor", "corridor", box(12.9, 11.9, 14.5, 23.4))
-add("terr", "Terrace", "outdoor", "balcony", box(24.9, 18.1, E, NORTH))
+add("terr", "Terrace East", "outdoor", "balcony", box(24.9, 18.1, E, NORTH))
 add("tt1", "Think Tank 2.01", "room", "office", box(21.3, 11.9, 23.4, 16.0))
 open_area = unary_union([box(14.5, 11.9, E, 18.1), box(14.5, 18.1, 24.9, 23.4), box(18.4, 23.4, 24.9, NORTH)])
 add("open", "Open Office", "room", "office", open_area.difference(rooms["tt1"][3]))
