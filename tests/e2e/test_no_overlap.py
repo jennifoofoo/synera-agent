@@ -288,6 +288,10 @@ def _audit(page, where: str, findings: list[str]) -> None:
     ui = page.evaluate(UI_BOXES)
     found = [("map", o) for o in shown["overlaps"]] + [("ui", o) for o in ui]
     for scope, o in found:
+        # The "You are here" dot and the tap pin are both placed by the user; a pin standing on the dot (a tap next
+        # to yourself, seen from far away) is normal map behaviour, nothing can yield.
+        if {o["a"], o["b"]} == {"marker here-dot", "marker tap-pin"}:
+            continue
         findings.append(f"{where} [{scope}, tier {shown['tier']}]: {o['a']} / {o['b']} ({o['dx']}x{o['dy']} px)")
     if os.environ.get("OVERLAP_DEBUG"):
         print(where, shown["tier"], shown["count"], shown.get("names"), len(found))
