@@ -400,6 +400,11 @@ export const useTwin = create<TwinState>((set, get) => ({
       hereArmed: false,
       focusedFloorId: here.floor_id,
     }));
+    // A route on screen starts where the person is: re-plan it from the new place (not during guidance or a round).
+    const route = get().state?.route;
+    if (route?.ok && !route.round && route.destination && get().walkStep === null && route.start !== here.space_id) {
+      void get().route(here.space_id, route.destination);
+    }
   },
 
   dismissAwaitingPlace() {

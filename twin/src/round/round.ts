@@ -1,7 +1,6 @@
 // Inspection round (owner: round session): "all fire extinguishers on the ground floor", walked in a short order.
-// Deterministic, no agent: the assets come from the building model, the distances from /api/route (cached per
-// building and door/closure state), the order from order.ts (nearest neighbour + 2-opt), the drawn route and its
-// length from one /api/route call with the stops as via. Guidance goes leg by leg: each stop is its own route, so
+// Deterministic, no agent: POST /api/round plans it with the same plan_round the chat agent uses (exact order up to
+// 8 stops), so panel and chat give the same stops, order and metres; the server draws it as state.route.round. Guidance goes leg by leg: each stop is its own route, so
 // the step sheet (ui/Walk.tsx) shows only the way to the next stop; "Done" checks the stop and loads the next leg.
 //
 // Voice hooks for the integrator: roundDone() ("Hey Wanda, done"), roundStatus().text ("how many left").
@@ -10,14 +9,12 @@
 
 import { create } from "zustand";
 import { api } from "../api/client";
-import type { AgentRound, Building, BuildingState, Route, Space } from "../api/types";
+import type { AgentRound, Building, BuildingState, PlannedRound, Route } from "../api/types";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { walkMinutes } from "../walkInfo";
-import { areaOptions, entranceRoom, inArea, orderRound, straightLine, typeMatches } from "./order";
+import { areaOptions, entranceRoom, typeMatches } from "./choices";
 
-/** Up to this many route calls the matrix is measured on real routes; above it, straight lines. */
-const MAX_ROUTE_PAIRS = 231; // 21 stops + start
 export const ROUND_BLUE = "#004fab";
 
 export interface RoundStop {
@@ -35,13 +32,11 @@ export interface RoundPlan {
   startName: string;
   stops: RoundStop[];
   lengthM: number;
-  /** "route": distances from /api/route; "straight": straight-line stand-in (too many stops). */
-  measured: "route" | "straight";
   unreachable: string[];
   /** The round ends back at the start: after the last stop, "Done" guides the way back as a final leg. */
   returnToStart: boolean;
-  /** Metres of each leg: legsM[i] from the stop before (or the start) to stop i; one more for the way back. Filled
-   * after planning (route lengths, cached); null until then. */
+  /** Metres of each leg: legsM[i] from the stop before (or the start) to stop i; one more for the way back. From
+   * plan_round's legs (POST /api/round); null when not known (a round taken over from the chat). */
   legsM?: number[] | null;
 }
 
@@ -104,56 +99,51 @@ export const useRound = create<RoundState>(() => ({
   pendingDoor: null,
 }));
 
-// ---------- distances ----------
-
-const cache = new Map<string, number>();
-
-/** Doors and closures change routes: they are part of the cache key. */
-function graphKey(state: BuildingState | null): string {
-  if (!state) return "";
-  return JSON.stringify([
-    [...state.closed].sort(),
-    state.added_doors.map((door) => door.id).sort(),
-    [...(state.removed_openings ?? [])].sort(),
-    state.widened_openings ?? {},
-  ]);
-}
-
-async function routeLength(building: string, graph: string, a: string, b: string, stepFree: boolean): Promise<number> {
-  if (a === b) return 0;
-  const [x, y] = a < b ? [a, b] : [b, a];
-  const key = `${building}|${graph}|${stepFree}|${x}|${y}`;
-  const known = cache.get(key);
-  if (known !== undefined) return known;
-  const { route } = await api.route(building, x, y, stepFree);
-  const length = route.ok && typeof route.length_m === "number" ? route.length_m : Infinity;
-  cache.set(key, length);
-  return length;
-}
-
 // ---------- planning ----------
 
-function stopsFor(building: Building, type: string, area: string): RoundStop[] {
-  const spaces = new Map(building.spaces.map((space) => [space.id, space]));
-  const floors = new Map(building.floors.map((floor) => [floor.id, floor]));
-  const bySpace = new Map<string, string[]>();
-  for (const asset of building.assets) {
-    if (!typeMatches(asset, type)) continue;
-    const space = spaces.get(asset.space_id);
-    if (!space || !inArea(space, floors.get(space.floor_id), area)) continue;
-    bySpace.set(space.id, [...(bySpace.get(space.id) ?? []), asset.id]);
-  }
-  return [...bySpace.keys()].sort().map((spaceId) => {
-    const space = spaces.get(spaceId)!;
-    return { spaceId, floorId: space.floor_id, name: space.name, assetIds: bySpace.get(spaceId)!.sort() };
-  });
-}
+/** The round last drawn by this page or taken over from the chat, so the watcher below opens each round once. */
+let adoptedKey = "";
 
 function startRoom(building: Building, chosen: string | null): string | null {
   return chosen ?? useTwin.getState().state?.position?.space_id ?? entranceRoom(building.openings);
 }
 
-/** Plan the round for the current choices: stops, order, drawn route. Draws it on the map. */
+/** The stops of a planned round, in its order; null when the building does not have one of its rooms. */
+function roundStops(round: AgentRound): RoundStop[] | null {
+  const model = useTwin.getState().model;
+  if (!model) return null;
+  const stops: RoundStop[] = [];
+  for (const stop of round.stops) {
+    const space = model.spaceById.get(stop.space_id);
+    if (!space) return null;
+    stops.push({ spaceId: space.id, floorId: space.floor_id, name: space.name, assetIds: [...stop.asset_ids] });
+  }
+  return stops.length ? stops : null;
+}
+
+/** The plan from a server round: plan_round's stops in its order, its total and its legs. */
+function plannedFrom(building: string, type: string, area: string, planned: Extract<PlannedRound, { ok: true }>): RoundPlan | null {
+  const stops = roundStops(planned.info);
+  if (!stops) return null;
+  const legs = planned.stops.map((stop) => stop.leg_m);
+  if (planned.info.return_to_start) legs.push(planned.back_to_start_m ?? 0);
+  return {
+    building,
+    type,
+    area,
+    startId: planned.info.start,
+    startName: useTwin.getState().model?.spaceById.get(planned.info.start)?.name ?? planned.start,
+    stops,
+    lengthM: planned.total_m,
+    // plan_round ends the list with "(left out of the round)"; the panel says that itself.
+    unreachable: (planned.unreachable ?? []).filter((name) => !name.startsWith("(")),
+    returnToStart: !!planned.info.return_to_start,
+    legsM: legs.length === stops.length + (planned.info.return_to_start ? 1 : 0) ? legs : null,
+  };
+}
+
+/** Plan the round for the current choices on the server (POST /api/round) and draw it on the map. A refusal (no such
+ * device here, too many rooms, ...) shows the server's words in the panel. */
 export async function planRound(): Promise<RoundPlan | null> {
   const { buildingKey, building, model } = useTwin.getState();
   const { type, area, startId, returnToStart } = useRound.getState();
@@ -162,63 +152,28 @@ export async function planRound(): Promise<RoundPlan | null> {
     useRound.setState({ plan: null, error: null });
     return null;
   }
-  const stops = stopsFor(building, type, area);
   const start = startRoom(building, startId);
-  if (!stops.length || !start) {
-    useRound.setState({ plan: null, error: stops.length ? "No start room: tap “I'm here” first." : `No ${prettyType(type).toLowerCase()} found in ${area}.` });
+  if (!start) {
+    useRound.setState({ plan: null, error: "No start room: tap “I'm here” first." });
     return null;
   }
-  const nodes = [start, ...stops.map((stop) => stop.spaceId)];
-  const n = nodes.length;
-  const pairs = (n * (n - 1)) / 2;
-  const measured: RoundPlan["measured"] = pairs <= MAX_ROUTE_PAIRS ? "route" : "straight";
-  const distance = nodes.map(() => nodes.map(() => 0));
-  const graph = graphKey(useTwin.getState().state);
-  const levelOf = (floorId: string) => model.floorById.get(floorId)?.level ?? 0;
-  let done = 0;
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d =
-        measured === "route"
-          ? await routeLength(buildingKey, graph, nodes[i], nodes[j], false)
-          : straightLine(model.spaceById.get(nodes[i]) as Space, model.spaceById.get(nodes[j]) as Space, levelOf);
-      distance[i][j] = distance[j][i] = d;
-      if (++done % 10 === 0) useRound.setState({ busy: `Measuring routes ${done} of ${pairs}…` });
-    }
-  }
-  // Stops that no route reaches (closed off) are left out and named.
-  const unreachable = stops.filter((_, i) => !isFinite(distance[0][i + 1])).map((stop) => stop.name);
-  const reachable = nodes.map((_, i) => i).filter((i) => i === 0 || isFinite(distance[0][i]));
-  const sub = reachable.map((i) => reachable.map((j) => distance[i][j]));
-  const order = orderRound(sub).map((k) => stops[reachable[k] - 1]);
-  if (!order.length) {
-    useRound.setState({ plan: null, error: "No stop can be reached from the start." });
+  const reply = await api.round(buildingKey, type, { area, start, returnToStart });
+  const planned = reply.round;
+  // The drawn round carries its stops (state.route.round): it is ours, the chat watcher below must not take it over.
+  if (planned.ok) adoptedKey = agentRoundKey(buildingKey, planned.info);
+  useTwin.getState().applyState(reply.state);
+  if (!planned.ok) {
+    useRound.setState({ plan: null, error: planned.error ?? planned.question ?? "No round for this choice." });
     return null;
   }
-  const last = order[order.length - 1];
-  const ids = order.map((stop) => stop.spaceId);
-  const result = returnToStart ? await api.route(buildingKey, start, start, false, ids) : await api.route(buildingKey, start, last.spaceId, false, ids.slice(0, -1));
-  if (!result.route.ok || typeof result.route.length_m !== "number") {
-    useRound.setState({ plan: null, error: result.route.message ?? result.route.error ?? "No route for this round." });
+  const plan = plannedFrom(buildingKey, type, area, planned);
+  if (!plan) {
+    useRound.setState({ plan: null, error: "The planned round names a room this map does not have." });
     return null;
   }
-  useTwin.getState().applyState(result.state);
-  const plan: RoundPlan = {
-    building: buildingKey,
-    type,
-    area,
-    startId: start,
-    startName: model.spaceById.get(start)?.name ?? start,
-    stops: order,
-    lengthM: result.route.length_m,
-    measured,
-    unreachable,
-    returnToStart,
-  };
   useRound.setState({ plan, error: null });
-  void measureLegs(plan);
   showStops(plan, null);
-  useTwin.getState().requestCamera({ kind: "object", ids: [start, ...order.map((stop) => stop.spaceId)] });
+  useTwin.getState().requestCamera({ kind: "object", ids: [plan.startId, ...plan.stops.map((stop) => stop.spaceId)] });
   return plan;
 }
 
@@ -398,19 +353,6 @@ export function endRound(): void {
     .finally(() => switching--);
 }
 
-/** The legs' lengths, for "how far" (route lengths through the same cache as planning). */
-async function measureLegs(plan: RoundPlan): Promise<void> {
-  const graph = graphKey(useTwin.getState().state);
-  const points = [plan.startId, ...plan.stops.map((stop) => stop.spaceId), ...(plan.returnToStart ? [plan.startId] : [])];
-  try {
-    const legs: number[] = [];
-    for (let i = 1; i < points.length; i++) legs.push(await routeLength(plan.building, graph, points[i - 1], points[i], false));
-    if (useRound.getState().plan === plan) plan.legsM = legs.map((m) => (isFinite(m) ? m : 0));
-  } catch {
-    /* no "left in the round" then */
-  }
-}
-
 /** "How far" in a round: to the next stop and for the whole rest of the round. legLeftM: metres left on the leg
  * being walked (null: not known, e.g. the stop is in the room you are in). */
 export function roundHowFar(legLeftM: number | null): string {
@@ -470,8 +412,6 @@ export function summary(plan: RoundPlan): string {
 
 // ---------- a round the chat agent planned ----------
 
-let adoptedKey = "";
-
 function agentRoundKey(building: string, round: AgentRound): string {
   return JSON.stringify([building, round.start, round.stops.map((stop) => stop.space_id), round.return_to_start]);
 }
@@ -481,13 +421,8 @@ function agentRoundKey(building: string, round: AgentRound): string {
 export function adoptRound(round: AgentRound, lengthM: number | null): RoundPlan | null {
   const { buildingKey, building, model } = useTwin.getState();
   if (!buildingKey || !building || !model) return null;
-  const stops: RoundStop[] = [];
-  for (const stop of round.stops) {
-    const space = model.spaceById.get(stop.space_id);
-    if (!space) return null;
-    stops.push({ spaceId: space.id, floorId: space.floor_id, name: space.name, assetIds: [...stop.asset_ids] });
-  }
-  if (!stops.length) return null;
+  const stops = roundStops(round);
+  if (!stops) return null;
   adoptedKey = agentRoundKey(buildingKey, round);
   if (useRound.getState().guiding) endRound();
   // The area the panel shows: the floor when all stops are on one floor (so "plan again" keeps it), else everything.
@@ -504,11 +439,10 @@ export function adoptRound(round: AgentRound, lengthM: number | null): RoundPlan
     startName: model.spaceById.get(round.start)?.name ?? round.start,
     stops,
     lengthM: lengthM ?? 0,
-    measured: "route",
     unreachable: [],
     returnToStart: !!round.return_to_start,
+    legsM: null,
   };
-  void measureLegs(plan);
   useRound.setState({ open: true, type, area, startId: round.start, returnToStart: plan.returnToStart, plan, guiding: false, returning: false, index: 0, checked: [], finished: false, whatIf: null, picking: null, error: null, busy: null });
   showStops(plan, null);
   return plan;
@@ -525,7 +459,7 @@ function isWholeRound(route: Route | null | undefined, plan: RoundPlan): boolean
 
 // ---------- what if: a new door ----------
 
-/** Add a door between two neighbouring rooms, plan the same round again and compare. */
+/** Add a door between two neighbouring rooms, plan the same round again on the server and compare the two totals. */
 export async function roundWhatIfDoor(first: string, second: string): Promise<WhatIf | null> {
   const before = useRound.getState().plan;
   const { buildingKey: key, model } = useTwin.getState();
