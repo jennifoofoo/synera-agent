@@ -204,24 +204,29 @@ def leg_search(
     return length, nodes, graph
 
 
+def stop_points(stops: list[str], start_point, via_points, destination_point) -> list:
+    """One exact point (or None: the room's anchor) per stop: start, each via stop, destination."""
+    middle = list(via_points or [])
+    middle += [None] * (len(stops) - 2 - len(middle))
+    return [start_point, *middle[: len(stops) - 2], destination_point]
+
+
 def leg_portals(
-    bm: BuildingMap, step_free: bool, stops: list[str], start_point=None, destination_point=None
+    bm: BuildingMap,
+    step_free: bool,
+    stops: list[str],
+    start_point=None,
+    destination_point=None,
+    via_points: list | None = None,
 ) -> list[list[tuple]] | None:
     """For drawing: per leg the doors crossed as ("o", opening id, space) pairs (from and into) and the stair or lift
     rides as ("c", connector id, space) pairs, in walking order. Same graph and search as `route`, including exact
-    start and destination points (already checked); None if no route."""
+    start, via and destination points (already checked); None if no route."""
     rg = routing_graph(bm, step_free)
     legs: list[list[tuple]] = []
-    last_index = len(stops) - 2
+    points = stop_points(stops, start_point, via_points, destination_point)
     for index, (leg_start, leg_end) in enumerate(itertools.pairwise(stops)):
-        found = leg_search(
-            bm,
-            rg,
-            leg_start,
-            leg_end,
-            start_point if index == 0 else None,
-            destination_point if index == last_index else None,
-        )
+        found = leg_search(bm, rg, leg_start, leg_end, points[index], points[index + 1])
         if found is None:
             return None
         graph = found[2]
@@ -258,8 +263,13 @@ def route(
     start_point=None,
     start_floor: str | None = None,
     destination_point=None,
+    via_points: list | None = None,
 ) -> RouteResult:
     """Shortest walk start -> via... -> destination, one leg per pair of stops. Sets bm.last_route.
+
+    via_points (one per via stop, None for the room's anchor) make a leg end and the next one start at that exact
+    point, e.g. the devices of an inspection round: each leg is then the same walk as a route from point to point,
+    and the length is the sum of those legs.
 
     start_point / destination_point (model metres) make the in-room leg run from the exact point (to the exact
     point) instead of the room's anchor: same visibility graph, 15 cm wall clearance and door landing as the kit's
@@ -273,50 +283,58 @@ def route(
         start_point = check_point(bm, stops[0], start_point, start_floor)
     if destination_point is not None:
         destination_point = check_point(bm, stops[-1], destination_point)
+    via_points = [
+        None if point is None else check_point(bm, stop, point)
+        for stop, point in zip(stops[1:-1], stop_points(stops, None, via_points, None)[1:-1], strict=True)
+    ]
+    points_at = stop_points(stops, start_point, via_points, destination_point)
     rg = routing_graph(bm, step_free)
     nodes: list[str] = []
+    junctions: list[int] = [0]  # index in nodes where each stop is reached
     length = 0.0
     graph = rg.graph  # the graph that holds the exact points, if any: the direction text reads its edge lengths
-    last_index = len(stops) - 2
     for index, (leg_start, leg_end) in enumerate(itertools.pairwise(stops)):
-        found = leg_search(
-            bm,
-            rg,
-            leg_start,
-            leg_end,
-            start_point if index == 0 else None,
-            destination_point if index == last_index else None,
-        )
+        found = leg_search(bm, rg, leg_start, leg_end, points_at[index], points_at[index + 1])
         if found is None:
             bm.last_route = None
             bm.last_route_points = []
             raise unreachable(bm, leg_start, leg_end, step_free)
         length += found[0]
-        nodes += found[1] if not nodes else found[1][1:]
+        if len(found[1]) == 1 and points_at[index] != points_at[index + 1]:
+            nodes += found[1] if nodes else found[1] * 2  # two points in one room: each keeps its own vertex
+        else:
+            nodes += found[1] if not nodes else found[1][1:]
+        junctions.append(len(nodes) - 1)
         if found[2] is not rg.graph and graph is rg.graph:
             graph = found[2]
-    same_room = len(nodes) == 1
+    same_room = len(set(nodes)) == 1
     result = RouteResult(
         start_space_id=stops[0],
         destination_space_id=stops[-1],
         length_m=round(length, 2),
-        space_path=bm.spaces_passed(graph, nodes),
-        steps=same_room_steps(bm, nodes[0], length) if same_room and length else bm.directions(graph, nodes),
+        space_path=bm.spaces_passed(graph, deduplicated(nodes)),
+        steps=same_room_steps(bm, nodes[0], length)
+        if same_room and length
+        else bm.directions(graph, deduplicated(nodes)),
         step_free=step_free,
         closed=sorted(bm.closed),
     )
     bm.last_route = result
     points = [bm.node_point(node) for node in nodes]
-    if same_room and (start_point or destination_point):
+    if len(nodes) == 1 and (start_point or destination_point):
         floor_id, anchor = points[0]
         points = [(floor_id, start_point or anchor), (floor_id, destination_point or anchor)]
     else:
-        if start_point is not None:
-            points[0] = (points[0][0], start_point)
-        if destination_point is not None:
-            points[-1] = (points[-1][0], destination_point)
+        for position, point in zip(junctions, points_at, strict=True):
+            if point is not None:
+                points[position] = (points[position][0], point)
     bm.last_route_points = points
     return result
+
+
+def deduplicated(nodes: list[str]) -> list[str]:
+    """The node path without a room repeated back to back (two exact points in one room)."""
+    return [node for index, node in enumerate(nodes) if index == 0 or node != nodes[index - 1]]
 
 
 def same_room_steps(bm: BuildingMap, space_id: str, length: float) -> list[str]:

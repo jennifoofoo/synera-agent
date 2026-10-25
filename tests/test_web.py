@@ -548,3 +548,24 @@ def test_tunnel_origin_is_allowed_only_when_switched_on_and_same_origin(monkeypa
     assert not server.tunnel_origin("https://a-b.trycloudflare.com", "evil.example.com")
     assert not server.tunnel_origin("http://a-b.trycloudflare.com", "a-b.trycloudflare.com")
     assert not server.tunnel_origin("https://evil.example.com", "evil.example.com")
+
+
+def test_round_line_runs_through_every_device_and_is_as_long_as_the_round(app):
+    """The drawn round is the legs device to device (via stops with via_points): every device lies on the line,
+    route.length_m equals total_m, and a two-floor round still has its floor change."""
+    from shapely.geometry import LineString, Point
+
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    for area in ("Ground floor", ""):
+        _, reply = app.post("/api/round", {"building": key, "type": "fire extinguisher", "area": area, "start": start})
+        planned, route = reply["round"], reply["state"]["route"]
+        assert route["length_m"] == pytest.approx(planned["total_m"], abs=0.1)
+        for stop in planned["info"]["stops"]:
+            floor_id = bm.assets[stop["asset_id"]]["floor_id"]
+            lines = [s["points"] for s in route["segments"] if s["floor_id"] == floor_id and len(s["points"]) > 1]
+            gap = min(LineString(points).distance(Point(stop["position"])) for points in lines)
+            assert gap < 0.3, (stop["name"], gap)
+    assert {stop["floor"] for stop in planned["stops"]} == {"Ground floor", "Floor 1"}
+    assert route["floor_changes"]

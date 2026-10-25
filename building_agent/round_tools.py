@@ -5,8 +5,9 @@ measures every device-to-device walk on the door-to-door route model (`routing`,
 as find_route with start_point / destination_point: from the device through its room's doors to the next device)
 and orders the stops: exact over all orders for up to EXACT_MAX_STOPS stops, else nearest neighbour from the start
 followed by 2-opt until nothing improves. Ties go to the smaller asset id, so the same question always gives the
-same round. The round is drawn once with `routing.route` through the stops' rooms, ending at the last device, and
-remembered like find_route, so the plan shows it and "guide me" can start. The model only picks the arguments and
+same round. The round is drawn once with `routing.route` through every device (via stops with via_points), so the
+drawn line touches each device and its length is total_m; it is remembered like find_route, so the plan shows it
+and "guide me" can start. The model only picks the arguments and
 phrases the result."""
 
 import itertools
@@ -224,8 +225,8 @@ def plan_round(
     start_point=None,
 ) -> dict:
     """The shortest round from `start` (a space id or name; `start_point` an exact [x, y] in it, e.g. the person's
-    dot) to every matching device, one stop per device. Sets bm.last_route (routing.route through the stops' rooms,
-    ending at the last device) and bm.located_asset_ids (the devices, for highlighting)."""
+    dot) to every matching device, one stop per device. Sets bm.last_route (routing.route through every device, the
+    same legs as the stops' leg_m) and bm.located_asset_ids (the devices, for highlighting)."""
     assets, asset_type, tied = resolve_assets(bm, what)
     if tied:
         return {
@@ -268,13 +269,14 @@ def plan_round(
     naive = sorted(reachable, key=lambda i: (natural_key(by_id[i]["name"]), i))
     total = path_length(matrix, START, tuple(order), return_to_start)
     naive_total = path_length(matrix, START, tuple(naive), return_to_start)
+    # The drawn round is the legs themselves: start -> device 1 -> ... (-> start), every via stop at its device.
     rooms = [by_id[i]["space_id"] for i in order]
-    rooms = [room for index, room in enumerate(rooms) if index == 0 or room != rooms[index - 1]]
+    at = [points[i] for i in order]
     if return_to_start:
-        via, destination, end_point = rooms, start_id, start_point
+        via, via_points, destination, end_point = rooms, at, start_id, start_point
     else:
-        via, destination, end_point = rooms[:-1], rooms[-1], points[order[-1]]
-    route = routing.route(bm, start_id, destination, step_free, via, start_point, None, end_point)
+        via, via_points, destination, end_point = rooms[:-1], at[:-1], rooms[-1], at[-1]
+    route = routing.route(bm, start_id, destination, step_free, via, start_point, None, end_point, via_points)
     bm.located_asset_ids = list(order)
     legs, here = [], START
     for asset_id in order:
@@ -289,6 +291,7 @@ def plan_round(
     bm.planned_round = {
         "route": route,
         "via": via,
+        "via_points": [list(point) if point is not None else None for point in via_points],
         "destination_point": list(end_point) if end_point is not None else None,
         "info": {
             "device_type": asset_type or what,

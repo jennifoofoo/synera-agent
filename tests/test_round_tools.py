@@ -1,5 +1,6 @@
 import itertools
 import json
+import math
 import random
 from pathlib import Path
 
@@ -206,7 +207,7 @@ def test_tool_starts_here_and_remembers_the_round_for_guiding(bm):
     round_tool, _ = tool(bm, guide)
     result = call(round_tool, what="Feuerlöscher", start="here", floor_level=0)
     assert "Main aisle H-B5" in result["start_assumed"]
-    assert guide.walk is not None and guide.walk.length_m == pytest.approx(bm.last_route.length_m, abs=0.06)
+    assert guide.walk is not None and guide.walk.length_m == pytest.approx(result["total_m"], abs=0.1)
     assert guide.walk.destination == result["stops"][-1]["space_id"]
     assert guide.walk.via == bm.planned_round["via"]
 
@@ -253,3 +254,18 @@ def test_demo_round_from_the_entrance_matches_the_spec():
 def test_unknown_start_still_fails_after_the_entrance_words_are_dropped(bm):
     with pytest.raises(MapError):
         plan_round(bm, "fire extinguisher", "entrance in Nowhere room 9.99", floor_level=0)
+
+
+def test_route_with_via_points_is_the_sum_of_the_point_to_point_legs(bm):
+    """The via contract: via_points[i] belongs to via[i] (None = the room's anchor); each leg runs point to point
+    like a route with start_point/destination_point, and last_route_points pass through every point."""
+    result = plan_round(bm, "fire extinguisher", "Main aisle H-B5", floor_level=0)
+    start_id = bm.resolve_space("Main aisle H-B5")
+    rooms = [stop["space_id"] for stop in result["stops"]]
+    points = [stop["position"] for stop in result["stops"]]
+    route = routing.route(bm, start_id, rooms[-1], False, rooms[:-1], None, None, points[-1], points[:-1])
+    assert route.length_m == pytest.approx(result["total_m"], abs=0.1)
+    drawn = [tuple(point) for _, point in bm.last_route_points]
+    assert all(any(math.dist(point, p) < 1e-6 for p in drawn) for point in points)
+    plain = routing.route(bm, start_id, rooms[-1], False, rooms[:-1], None, None, None, [None] * (len(rooms) - 1))
+    assert plain.length_m == routing.route(bm, start_id, rooms[-1], False, rooms[:-1]).length_m
