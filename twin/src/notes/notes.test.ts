@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
-import { durationLabel, isCurrent, MemoryFacts, pickFactsStorage, ServerFacts, sinceLabel, whenLabel, type Fact } from "./notes";
+import { durationLabel, eventLabel, isCurrent, isUpcomingEvent, MemoryFacts, pickFactsStorage, ServerFacts, sinceLabel, whenLabel, type Fact } from "./notes";
 import { notesCommand, spacesNamed } from "./notesStore";
 
 const model = {
@@ -79,6 +79,16 @@ describe("facts", () => {
     expect(isCurrent({ ...base, valid_to: new Date(2026, 9, 25, 9, 0).toISOString() }, now)).toBe(false);
     expect(isCurrent({ ...base, valid_to: new Date(2026, 9, 25, 10, 0).toISOString() }, now)).toBe(false); // exactly valid_to
     expect(isCurrent({ ...base, valid_from: new Date(2026, 9, 25, 11, 0).toISOString() }, now)).toBe(false);
+  });
+
+  it("labels events by start and end and keeps them until they end (docs/specs/events.md)", () => {
+    const pitches: Fact = { ...base, kind: "event", text: "Pitches", status: "future", valid_from: new Date(2026, 9, 25, 14, 0).toISOString(), valid_to: new Date(2026, 9, 25, 16, 0).toISOString() };
+    expect(eventLabel(pitches, now)).toBe("today 14:00 to 16:00");
+    expect(eventLabel({ ...pitches, valid_from: new Date(2026, 9, 24, 9, 0).toISOString() }, now)).toBe("yesterday 09:00 to today 16:00");
+    expect(isCurrent(pitches, now)).toBe(false);
+    expect(isUpcomingEvent(pitches, now)).toBe(true);
+    expect(isUpcomingEvent(pitches, new Date(2026, 9, 25, 16, 0).getTime())).toBe(false);
+    expect(isUpcomingEvent(base, now)).toBe(false); // an issue is never an event
   });
 
   it("names age and author", () => {
