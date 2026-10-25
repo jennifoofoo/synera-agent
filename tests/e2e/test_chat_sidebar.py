@@ -23,8 +23,12 @@ REPLIES = [
     "Reply one. "
     + "The nearest toilet is on this floor, past the kitchen on the left, about 25 m from the entrance. " * 4
     + "End of one.",
-    "Reply two. " + "The kitchen next to the open office has a coffee machine, second door on the right. " * 4 + "End of two.",
-    "Reply three. " + "The nearest way out is the main entrance, straight ahead and then left at the reception. " * 4 + "End of three.",
+    "Reply two. "
+    + "The kitchen next to the open office has a coffee machine, second door on the right. " * 4
+    + "End of two.",
+    "Reply three. "
+    + "The nearest way out is the main entrance, straight ahead and then left at the reception. " * 4
+    + "End of three.",
 ]
 
 BOX = "(sel) => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; }"
