@@ -639,7 +639,7 @@ export const useTwin = create<TwinState>((set, get) => ({
         return reply;
       }
       if (reply.state) {
-        set({ state: reply.state });
+        set({ state: withPendingHere(reply.state) }); // a tap during the turn stays on screen
         if (reply.state.route?.ok && reply.state.route.floors?.length && !reply.state.guide) {
           set({ focusedFloorId: reply.state.route.floors[0] });
         }

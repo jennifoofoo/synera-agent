@@ -45,6 +45,20 @@ describe("ask shows the rooms a reply names", () => {
     expect(s.camera).toMatchObject({ kind: "object", ids: ["S2"] });
   });
 
+  it("keeps an 'I'm here' tapped while the reply was on its way, and sends it with the next message", async () => {
+    setup();
+    let finish: (value: ChatReply) => void = () => {};
+    const chat = vi.spyOn(api, "chat").mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+    const first = useTwin.getState().ask("Where is the nearest toilet?");
+    useTwin.getState().setHere({ space_id: "S1", floor_id: "F0" });
+    finish(reply({ reply: "Where are you?" }));
+    await first;
+    expect(useTwin.getState().state?.position?.space_id).toBe("S1");
+    chat.mockResolvedValueOnce(reply({}));
+    await useTwin.getState().ask("Where is the nearest toilet?");
+    expect(chat.mock.calls[1][2]?.here).toEqual({ space_id: "S1", floor_id: "F0" });
+  });
+
   it("ignores rooms the model does not know and a reply without rooms", async () => {
     setup();
     vi.spyOn(api, "chat").mockResolvedValue(
