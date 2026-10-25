@@ -1,13 +1,13 @@
 // Label rules (docs/specs/label-rules.md): run with `npm test` in twin/ (vitest).
 import { describe, expect, test } from "vitest";
-import { LABEL_PRIORITY, blocked, byPriority, capped, decide, densityBudget, densityCap, overlapPx, rankOfClass, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
+import { LABEL_PRIORITY, blocked, byPriority, capped, decide, densityBudget, densityCap, mapRoomName, overlapPx, rankOfClass, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
 
 const box = (x: number, y: number, w = 40, h = 16): Box => ({ x0: x, y0: y, x1: x + w, y1: y + h });
 const H = { hold: 2, reveal: 3 };
 
 describe("priority", () => {
   test("the spec's order, destination first, furniture last of the names", () => {
-    const spec: LabelClass[] = ["destination", "here", "selected", "roundStop", "landmark", "zone", "poi", "room", "machine", "furniture"];
+    const spec: LabelClass[] = ["destination", "here", "selected", "roundStop", "landmark", "roomSymbol", "zone", "poi", "room", "machine", "furniture"];
     const ranks = spec.map(rankOfClass);
     expect([...ranks].sort((a, b) => a - b)).toEqual(ranks);
     expect(rankOfClass("marker")).toBeLessThan(rankOfClass("destination"));
@@ -27,7 +27,7 @@ describe("priority", () => {
   });
 
   test("the cap never drops what the task names", () => {
-    for (const c of ["destination", "here", "selected", "roundStop", "landmark", "found", "closure", "marker"] as const) expect(capped(c)).toBe(false);
+    for (const c of ["destination", "here", "selected", "roundStop", "landmark", "found", "closure", "marker", "roomSymbol"] as const) expect(capped(c)).toBe(false);
     for (const c of ["zone", "poi", "room", "machine", "furniture", "detail"] as const) expect(capped(c)).toBe(true);
   });
 });
@@ -106,5 +106,18 @@ describe("decide", () => {
     const items = [item("a", 0), item("b", 30), item("c", 60), item("d", 90)];
     const once = [...decide(items, { hysteresis: H })];
     expect([...decide(items, { hysteresis: H })]).toEqual(once);
+  });
+});
+
+describe("mapRoomName", () => {
+  test("drops a numbered suffix in brackets", () => {
+    expect(mapRoomName("Kitchen 0.27 (apartment 6)")).toBe("Kitchen 0.27");
+    expect(mapRoomName("Living room 0.01 (apartment 3)")).toBe("Living room 0.01");
+  });
+
+  test("keeps names without such a suffix", () => {
+    expect(mapRoomName("Café (Gastraum)")).toBe("Café (Gastraum)");
+    expect(mapRoomName("Office 0.22")).toBe("Office 0.22");
+    expect(mapRoomName("(apartment 6)")).toBe("(apartment 6)");
   });
 });

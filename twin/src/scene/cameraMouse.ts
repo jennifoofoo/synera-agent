@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
 import { useTwin, type ViewHandover } from "../store";
-import { classifyTwoFinger, distanceToOrthoZoom, FLAT_ENOUGH_POLAR, type FingerPair, HANDOVER_POLAR, type TwoFingerGesture, tiltForSwipe } from "./twoFinger";
+import { classifyOptionDrag, classifyTwoFinger, distanceToOrthoZoom, FLAT_ENOUGH_POLAR, type FingerPair, HANDOVER_POLAR, type OptionDrag, type TwoFingerGesture, tiltForSwipe } from "./twoFinger";
 import { createOrbitSwitch, createTwist, createWheelClassifier, orbitDelta } from "./wheelInput";
 
 // Input model (like a map):
@@ -16,6 +16,8 @@ import { createOrbitSwitch, createTwist, createWheelClassifier, orbitDelta } fro
 //  - 2D <-> 3D like Google Maps (docs/specs/swipe-tilt.md): two fingers pushed up together on the plan (twoFinger.ts
 //    decides, a pinch never tilts) or Option/Alt + swipe up switch to 3D at the same spot and scale and keep tilting.
 //    In 3D, two fingers down (or Option/Alt + swipe down, then a 300 ms pause) to nearly straight down go back to 2D.
+//    The mouse does the same with Option/Alt + drag (button held): up on the plan switches and keeps tilting, down in
+//    3D to nearly straight down goes back at the release, sideways rotates as before (twoFinger.ts classifyOptionDrag).
 // camera-controls does rotate, touch and the animated moves; panning, the wheel and gestures are done here.
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
@@ -57,6 +59,21 @@ interface TiltSession {
   y0: number;
 }
 
+/** Option/Alt + mouse drag that switched the plan to 3D: it keeps tilting the new view until the button is released
+ * (a ref, like TiltSession: the switch sets this hook's listeners up again in the middle of the drag). */
+interface MouseTilt {
+  pointerId: number;
+  y0: number;
+}
+
+/** An Option/Alt + left mouse drag in progress (see classifyOptionDrag); "rotate" sticks once decided. */
+interface OptionDragState {
+  pointerId: number;
+  start: [number, number];
+  flat: boolean;
+  state: OptionDrag;
+}
+
 /** Two fingers in 3D: at the release, a swipe down that left the view nearly straight down goes back to the plan. */
 interface TiltBack {
   ids: [number, number];
@@ -89,6 +106,7 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
   const tiltSession = useRef<TiltSession | null>(null);
+  const mouseTilt = useRef<MouseTilt | null>(null);
 
   useEffect(() => {
     const el = gl.domElement;
@@ -107,6 +125,7 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
     let restoreLeft: CameraControlsImpl["mouseButtons"]["left"] | null = null;
     let down: [number, number] = [0, 0];
     let back: TiltBack | null = null;
+    let optionDrag: OptionDragState | null = null;
     let backTimer: ReturnType<typeof setTimeout> | undefined;
     const orbitSwitch = createOrbitSwitch();
     const usable = () => !(active && !active());
@@ -284,6 +303,8 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (mouse && event.button === 0 && (event.ctrlKey || event.altKey)) {
         restoreLeft = c.mouseButtons.left;
         c.mouseButtons.left = CameraControlsImpl.ACTION.ROTATE; // Ctrl or Alt + left drag rotates
+        mouseTilt.current = null;
+        optionDrag = event.altKey ? { pointerId: event.pointerId, start: [event.clientX, event.clientY], flat: isFlat(c), state: "undecided" } : null;
         return;
       }
       const wantsPan = (mouse && (event.button === 0 || event.button === 1)) || (!mouse && touches === 1);
@@ -305,6 +326,32 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
     const onPointerMove = (event: PointerEvent) => {
       lastX = event.clientX;
       lastY = event.clientY;
+      const mt = mouseTilt.current;
+      if (mt && mt.pointerId === event.pointerId) {
+        // The Option/Alt drag that switched to 3D keeps tilting it (the new controls never saw the press).
+        const c = controls.current;
+        if (c && !isFlat(c)) {
+          void c.rotatePolarTo(tiltForSwipe(mt.y0 - event.clientY, c.maxPolarAngle), false);
+          invalidate();
+        }
+        return;
+      }
+      if (optionDrag && optionDrag.pointerId === event.pointerId && optionDrag.state !== "rotate") {
+        const step = classifyOptionDrag(event.clientX - optionDrag.start[0], event.clientY - optionDrag.start[1]);
+        const c = controls.current;
+        if (step === "tilt-up" && optionDrag.flat && c && isFlat(c) && useTwin.getState().viewMode === "2d" && usable()) {
+          // Option/Alt + drag up on the plan: switch to 3D at the same spot and scale, then keep tilting.
+          mouseTilt.current = { pointerId: event.pointerId, y0: event.clientY };
+          optionDrag = null;
+          if (restoreLeft !== null) {
+            c.mouseButtons.left = restoreLeft;
+            restoreLeft = null;
+          }
+          useTwin.getState().tiltTo3d(handoverFrom(c));
+          return;
+        }
+        if (step !== "undecided") optionDrag.state = step;
+      }
       const session = tiltSession.current;
       if (session?.pos.has(event.pointerId)) {
         // The fingers that switched to 3D keep tilting it (the new controls never saw them go down).
@@ -358,6 +405,15 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       if (pan && event.pointerId === pan.pointerId) stopPan();
       const c = controls.current;
       if (tiltSession.current?.pos.has(event.pointerId)) tiltSession.current = null; // a finger lifted: tilting ends
+      if (mouseTilt.current?.pointerId === event.pointerId) mouseTilt.current = null; // the button released
+      if (optionDrag && optionDrag.pointerId === event.pointerId) {
+        // Option/Alt + drag down in 3D that left the view nearly straight down: back to the plan at the release.
+        const step = classifyOptionDrag(event.clientX - optionDrag.start[0], event.clientY - optionDrag.start[1]);
+        const turned = optionDrag.state === "rotate";
+        const from3d = !optionDrag.flat;
+        optionDrag = null;
+        if (from3d && !turned && step === "tilt-down" && c && !isFlat(c) && c.polarAngle < FLAT_ENOUGH_POLAR && usable()) useTwin.getState().tiltTo2d(handoverFrom(c));
+      }
       if (back?.ids.includes(event.pointerId)) {
         // Released after two fingers in 3D: a swipe down (not a pinch) that left the view nearly straight down.
         const last = pairOf(back.ids, fingers);

@@ -106,3 +106,62 @@ export function assetHeight(asset: Pick<Asset, "type" | "category">): number {
   if (asset.category === "machine") return MACHINE_HEIGHT;
   return HEIGHTS[asset.type] ?? DEFAULT_HEIGHT;
 }
+
+/** Furniture height grows with zoom (3D): far out every piece of furniture is a low block at most this high, so a
+ * flat full of beds, sofas and wardrobes reads as rooms, not as a field of white boxes. */
+export const FAR_FURNITURE_CAP = 0.15;
+/** Metres per screen pixel where furniture starts to grow (the mid tier's outer edge, scene/mapZoom.ts MID_MAX) and
+ * where it reaches its full type height (the near tier, mapZoom.ts NEAR_MAX). */
+export const GROW_FROM_MPP = 0.3;
+export const FULL_AT_MPP = 0.09;
+
+/** Work furniture of factories and labs: keeps its full height at every zoom, like the machines. */
+const INDUSTRIAL = new Set([
+  "pallet_rack",
+  "workbench",
+  "assembly_station",
+  "packing_station",
+  "inspection_bench",
+  "tool_cabinet",
+  "chemical_cabinet",
+  "lab_bench",
+  "server_rack",
+]);
+
+/** Whether a thing's height grows with zoom: furniture and fixtures of flats and offices. Machines, equipment and the
+ * work furniture of factories (INDUSTRIAL) keep their bodies at every zoom; floor markings are flat anyway. */
+export function growsWithZoom(asset: Pick<Asset, "type" | "category">): boolean {
+  const category = asset.category ?? "furniture";
+  if (category !== "furniture" && category !== "fixture") return false;
+  return !INDUSTRIAL.has(asset.type) && !FLOOR_MARKINGS.has(asset.type);
+}
+
+/** A small floor is near-tier sized already when it fits the screen (a flat at its overview is ~0.05 m/px), so the
+ * overview is also told by how many screens wide the floor is: furniture starts to grow once the floor is wider than
+ * GROW_FROM_SCREENS screens and stands at full height from FULL_AT_SCREENS (zoomed into a few rooms). */
+export const GROW_FROM_SCREENS = 1.3;
+export const FULL_AT_SCREENS = 3;
+
+const smooth = (t: number) => {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+};
+
+/** Share (0 to 1) of the way from the far cap to the full height: grows with the scale (`metresPerPixel`, the map
+ * tiers, smooth in log scale) and with how many screens wide the floor is drawn (`floorScreens`); the smaller wins,
+ * so both a whole flat and a whole factory floor in view count as the overview. */
+export function growth(metresPerPixel: number, floorScreens = Infinity): number {
+  const byScale = smooth(Math.log(GROW_FROM_MPP / Math.max(1e-6, metresPerPixel)) / Math.log(GROW_FROM_MPP / FULL_AT_MPP));
+  const byFloor = smooth(Math.log(Math.max(1e-6, floorScreens) / GROW_FROM_SCREENS) / Math.log(FULL_AT_SCREENS / GROW_FROM_SCREENS));
+  return Math.min(byScale, byFloor);
+}
+
+/** Height in metres of a thing's body in 3D at a zoom (see growth): furniture (growsWithZoom) rises from a low block
+ * (FAR_FURNITURE_CAP) far out to its full type height near; `keep` (route landmarks, found or selected things) and
+ * everything else always stand at full height. */
+export function zoomedHeight(asset: Pick<Asset, "type" | "category">, metresPerPixel: number, floorScreens = Infinity, keep = false): number {
+  const full = assetHeight(asset);
+  if (keep || !growsWithZoom(asset)) return full;
+  const low = Math.min(full, FAR_FURNITURE_CAP);
+  return low + (full - low) * growth(metresPerPixel, floorScreens);
+}
