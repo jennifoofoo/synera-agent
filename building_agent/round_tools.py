@@ -1,15 +1,18 @@
 """Inspection rounds: visit every device of one type in an area in the shortest order, all in Python.
 
-`plan_round` finds the matching devices, makes one stop per room (several devices in one room are one stop),
-measures every stop-to-stop walk on the door-to-door route model (`routing`, the same graph as find_route) and
-orders the stops: exact over all orders for up to EXACT_MAX_STOPS stops, else nearest neighbour from the start
-followed by 2-opt until nothing improves. Ties go to the smaller space id, so the same question always gives the
-same round. The final round is routed once with `routing.route` and remembered like find_route, so the plan
-shows it and "guide me" can start. The model only picks the arguments and phrases the result."""
+`plan_round` finds the matching devices, makes one stop per DEVICE (two devices in one room are two stops),
+measures every device-to-device walk on the door-to-door route model (`routing`, the same graph and in-room walks
+as find_route with start_point / destination_point: from the device through its room's doors to the next device)
+and orders the stops: exact over all orders for up to EXACT_MAX_STOPS stops, else nearest neighbour from the start
+followed by 2-opt until nothing improves. Ties go to the smaller asset id, so the same question always gives the
+same round. The round is drawn once with `routing.route` through the stops' rooms, ending at the last device, and
+remembered like find_route, so the plan shows it and "guide me" can start. The model only picks the arguments and
+phrases the result."""
 
 import itertools
 import re
 
+import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
@@ -19,11 +22,12 @@ from building_agent.guide_tools import GuideState, building_signature
 from building_agent.position import no_position_error, position_note
 from building_agent.task_tools import fold, types_for_task
 from building_agent.walk import WALK_M_PER_S, remember_route
-from starter_agent.building_map import BuildingMap, MapError
+from starter_agent.building_map import LENGTH_DECIMALS, BuildingMap, MapError
 from starter_agent.tools import as_json
 
 EXACT_MAX_STOPS = 8
 MAX_STOPS = 60
+START = "@start"  # the start's key in the distance matrix (asset ids are the other keys)
 MAX_ENTRANCES = 6
 EPSILON_M = 1e-6  # a new order must be shorter by more than this to replace the one found first
 HERE_WORDS = {"here", "hier", "me", "my position", "current position", "where i am"}
@@ -138,8 +142,63 @@ def best_order(matrix: dict, start: str, stops: list[str], back: bool) -> tuple[
 
 
 def distance_matrix(bm: BuildingMap, nodes: list[str], step_free: bool) -> dict:
+    """Room-to-room (anchor to anchor) route lengths, as routing.route measures them without points."""
     rg = routing.routing_graph(bm, step_free)
     return {node: routing.distances_from(bm, rg, node, nodes) for node in nodes}
+
+
+def device_point(bm: BuildingMap, asset: dict) -> tuple[float, float] | None:
+    """The device's position as a route end inside its room (routing.check_point), None (the room's anchor) when
+    the position is too far outside the room to be a route end."""
+    try:
+        return routing.check_point(bm, asset["space_id"], asset["position"][:2])
+    except MapError:
+        return None
+
+
+def add_point_node(bm: BuildingMap, rg: routing.RoutingGraph, graph, node: str, space_id: str, point) -> None:
+    """On a copy of the graph: an extra node for an exact point in a room, wired like routing.rewire_room wires the
+    room node (walks to the room's doors, stair and lift edges plus the walk to the anchor), so a search from or to
+    it measures what routing.route measures with start_point / destination_point. The room node stays as it is."""
+    walks = routing.room_walks(bm, rg, space_id, point)
+    for neighbour in list(graph.neighbors(space_id)):
+        for edge in list(graph[space_id][neighbour].values()):
+            if "via" in edge:
+                graph.add_edge(
+                    node, neighbour, **{**edge, "weight": round(edge["weight"] + walks["anchor"], LENGTH_DECIMALS)}
+                )
+            elif neighbour not in walks["doors"]:
+                graph.add_edge(node, neighbour, **edge)
+    for door, length in walks["doors"].items():
+        graph.add_edge(node, door, weight=round(length, LENGTH_DECIMALS), space=space_id)
+
+
+def point_matrix(bm: BuildingMap, ends: dict[str, tuple[str, tuple | None]], step_free: bool) -> dict:
+    """{key: {key: metres}} between exact points: ends maps a key to (space id, point or None for the anchor).
+    Two ends in one room walk inside the room (routing.same_room_walk), like routing.route does."""
+    rg = routing.routing_graph(bm, step_free)
+    graph = rg.graph.copy()
+    nodes: dict[str, str] = {}
+    for key, (space_id, point) in ends.items():
+        if space_id not in graph:
+            continue
+        if point is None:
+            nodes[key] = space_id
+        else:
+            nodes[key] = f"point:{key}"
+            add_point_node(bm, rg, graph, nodes[key], space_id, point)
+    matrix: dict[str, dict[str, float]] = {}
+    for key, node in nodes.items():
+        reached = nx.single_source_dijkstra_path_length(graph, node, weight="weight")
+        row = {}
+        for other, other_node in nodes.items():
+            space, other_space = ends[key][0], ends[other][0]
+            if space == other_space:
+                row[other] = routing.same_room_walk(bm, space, ends[key][1], ends[other][1])
+            elif other_node in reached:
+                row[other] = reached[other_node]
+        matrix[key] = row
+    return matrix
 
 
 # ---------- the round ----------
@@ -162,9 +221,11 @@ def plan_round(
     area: str | None = None,
     return_to_start: bool = False,
     step_free: bool = False,
+    start_point=None,
 ) -> dict:
-    """The shortest round from `start` (a space id or name) to every room holding a matching device. Sets bm.last_route
-    (routing.route of the final round) and bm.located_asset_ids (the devices, for highlighting)."""
+    """The shortest round from `start` (a space id or name; `start_point` an exact [x, y] in it, e.g. the person's
+    dot) to every matching device, one stop per device. Sets bm.last_route (routing.route through the stops' rooms,
+    ending at the last device) and bm.located_asset_ids (the devices, for highlighting)."""
     assets, asset_type, tied = resolve_assets(bm, what)
     if tied:
         return {
@@ -188,64 +249,100 @@ def plan_round(
             )
         assets = in_area
     start_id = start_space(bm, start)
-    by_room: dict[str, list[dict]] = {}
-    for asset in sorted(assets, key=lambda a: (natural_key(a["name"]), a["id"])):
-        by_room.setdefault(asset["space_id"], []).append(asset)
-    if len(by_room) > MAX_STOPS:
-        raise MapError(f"{len(by_room)} rooms is too many for one round. Narrow it to a floor or an area.")
-    rooms = sorted(by_room)
-    matrix = distance_matrix(bm, sorted({start_id, *rooms}), step_free)
-    reachable = [room for room in rooms if room in matrix[start_id]]
-    unreachable = [room for room in rooms if room not in reachable]
+    if start_point is not None:
+        try:
+            start_point = routing.check_point(bm, start_id, start_point)
+        except MapError:
+            start_point = None  # a dot too far outside its room: start at the room instead
+    if len(assets) > MAX_STOPS:
+        raise MapError(f"{len(assets)} devices is too many for one round. Narrow it to a floor or an area.")
+    by_id = {asset["id"]: asset for asset in assets}
+    points = {asset_id: device_point(bm, asset) for asset_id, asset in by_id.items()}
+    ends = {START: (start_id, start_point), **{i: (by_id[i]["space_id"], points[i]) for i in sorted(by_id)}}
+    matrix = point_matrix(bm, ends, step_free)
+    reachable = [asset_id for asset_id in sorted(by_id) if asset_id in matrix.get(START, {})]
+    unreachable = sorted({by_id[i]["space_id"] for i in by_id if i not in reachable})
     if not reachable:
-        raise MapError(f"None of these rooms can be reached from {bm.describe_space(start_id)}.")
-    order, method = best_order(matrix, start_id, reachable, return_to_start)
-    naive = sorted(reachable, key=lambda room: (natural_key(bm.spaces[room]["name"]), room))
-    total = path_length(matrix, start_id, tuple(order), return_to_start)
-    naive_total = path_length(matrix, start_id, tuple(naive), return_to_start)
-    via, destination = (order, start_id) if return_to_start else (order[:-1], order[-1])
-    route = routing.route(bm, start_id, destination, step_free, via)
-    bm.located_asset_ids = [a["id"] for room in order for a in by_room[room]]
-    # For the page (web/api.py adopt_agent_route): this route is a round, so the page can guide it stop by stop.
+        raise MapError(f"None of these devices can be reached from {bm.describe_space(start_id)}.")
+    order, method = best_order(matrix, START, reachable, return_to_start)
+    naive = sorted(reachable, key=lambda i: (natural_key(by_id[i]["name"]), i))
+    total = path_length(matrix, START, tuple(order), return_to_start)
+    naive_total = path_length(matrix, START, tuple(naive), return_to_start)
+    rooms = [by_id[i]["space_id"] for i in order]
+    rooms = [room for index, room in enumerate(rooms) if index == 0 or room != rooms[index - 1]]
+    if return_to_start:
+        via, destination, end_point = rooms, start_id, start_point
+    else:
+        via, destination, end_point = rooms[:-1], rooms[-1], points[order[-1]]
+    route = routing.route(bm, start_id, destination, step_free, via, start_point, None, end_point)
+    bm.located_asset_ids = list(order)
+    legs, here = [], START
+    for asset_id in order:
+        legs.append(round(matrix[here][asset_id], 1))
+        here = asset_id
+
+    def where(asset_id: str) -> list[float] | None:
+        point = points[asset_id]
+        return None if point is None else [round(point[0], 3), round(point[1], 3)]
+
+    # For the page (web/api.py adopt_agent_route): this route is a round, so the page can guide it device by device.
     bm.planned_round = {
         "route": route,
+        "via": via,
+        "destination_point": list(end_point) if end_point is not None else None,
         "info": {
             "device_type": asset_type or what,
             "start": start_id,
-            "stops": [{"space_id": room, "asset_ids": [a["id"] for a in by_room[room]]} for room in order],
+            "start_point": list(start_point) if start_point is not None else None,
+            "stops": [
+                {
+                    "asset_id": asset_id,
+                    "asset_ids": [asset_id],
+                    "name": by_id[asset_id]["name"],
+                    "space_id": by_id[asset_id]["space_id"],
+                    "position": where(asset_id),
+                    "leg_m": leg,
+                }
+                for asset_id, leg in zip(order, legs, strict=True)
+            ],
             "return_to_start": return_to_start,
+            **({"back_to_start_m": round(matrix[order[-1]][START], 1)} if return_to_start else {}),
+            "total_m": round(total, 1),
             "step_free": step_free,
         },
     }
-    stops, here = [], start_id
-    for number, room in enumerate(order, start=1):
+    stops = []
+    for number, (asset_id, leg) in enumerate(zip(order, legs, strict=True), start=1):
+        room = by_id[asset_id]["space_id"]
         stops.append(
             {
                 "n": number,
+                "asset_id": asset_id,
+                "device": by_id[asset_id]["name"],
                 "room": bm.spaces[room]["name"],
                 "space_id": room,
                 "floor": bm.floor_name(bm.spaces[room]["floor_id"]),
-                "devices": [a["name"] for a in by_room[room]],
-                "leg_m": round(matrix[here][room], 1),
+                "position": where(asset_id),
+                "devices": [by_id[asset_id]["name"]],
+                "leg_m": leg,
             }
         )
-        here = room
     saved = round(naive_total - total, 1)
     return {
         "device_type": (asset_type or what).replace("_", " "),
-        "devices": sum(len(by_room[room]) for room in order),
+        "devices": len(order),
         "start": bm.spaces[start_id]["name"],
         "stops": stops,
-        **({"back_to_start_m": round(matrix[order[-1]][start_id], 1)} if return_to_start else {}),
+        **({"back_to_start_m": round(matrix[order[-1]][START], 1)} if return_to_start else {}),
         "total_m": round(total, 1),
         "about_minutes": max(1, round(total / WALK_M_PER_S / 60)),
         "step_free": step_free,
         "order": method,
         "compare_hint": {
-            "naive_order": "rooms in name order",
+            "naive_order": "devices in name order",
             "naive_total_m": round(naive_total, 1),
             "saved_m": saved,
-            "say": f"{saved:.0f} m shorter than going through the rooms in name order."
+            "say": f"{saved:.0f} m shorter than going to the devices in name order."
             if saved >= 1
             else "Name order happens to be as short here.",
         },
@@ -254,7 +351,7 @@ def plan_round(
             if unreachable
             else {}
         ),
-        "route": {"length_m": route.length_m, "drawn": True, "guide": "Say 'guide me' to be led stop by stop."},
+        "route": {"drawn": True, "guide": "Say 'guide me' to be led device by device."},
     }
 
 
@@ -270,8 +367,8 @@ def make_round_tools(bm: BuildingMap, guide: GuideState) -> list:
         replace_guide: bool = False,
     ) -> str:
         """Inspection round: the SHORTEST order to visit every device of one type ('check all fire extinguishers
-        on the ground floor'), computed here (exact for up to 8 rooms). Devices in one room are one stop. Returns
-        the stops in order with metres per leg, total metres, minutes and compare_hint (how much shorter than
+        on the ground floor'), computed here (exact for up to 8 devices). One stop per device, walked device to
+        device. Returns the stops in order with metres per leg, total metres, minutes and compare_hint (how much shorter than
         name order); the round is drawn on the plan and can be guided. Never order stops yourself.
 
         Args:
@@ -307,10 +404,10 @@ def make_round_tools(bm: BuildingMap, guide: GuideState) -> list:
                         "question": f"I am guiding you to {destination}. Do you want to start the round instead?",
                     }
                 )
-            result = plan_round(bm, what, start_id, floor_level, area, return_to_start, step_free)
+            point = guide.position.point if start is None else None
+            result = plan_round(bm, what, start_id, floor_level, area, return_to_start, step_free, point)
             if bm.last_route is not None and "stops" in result:
-                via = [stop["space_id"] for stop in result["stops"]]
-                remember_route(bm, guide, bm.last_route, via if return_to_start else via[:-1])
+                remember_route(bm, guide, bm.last_route, bm.planned_round["via"])
                 guide.signature = building_signature(bm)
         except MapError as error:
             raise ToolError(str(error)) from error

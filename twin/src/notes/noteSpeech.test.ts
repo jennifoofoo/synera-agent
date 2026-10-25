@@ -34,9 +34,10 @@ const plan: RoundPlan = {
   area: "Ground floor",
   startId: "S0",
   startName: "Entrance",
+  startPoint: null,
   stops: [
-    { spaceId: "S1", floorId: "F0", name: "Project Room", assetIds: ["A1"] },
-    { spaceId: "S2", floorId: "F0", name: "Foyer", assetIds: ["A2"] },
+    { key: "S1", spaceId: "S1", floorId: "F0", name: "Project Room", device: "", assetIds: ["A1"], position: null },
+    { key: "S2", spaceId: "S2", floorId: "F0", name: "Foyer", device: "", assetIds: ["A2"], position: null },
   ],
   lengthM: 60,
   unreachable: [],

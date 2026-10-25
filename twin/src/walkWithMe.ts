@@ -435,11 +435,17 @@ function confirmStep(step: number): void {
   const route = state?.route;
   if (!route?.ok) return;
   const at = stepStart(walkSteps().map(readable), route, step);
-  const space = at ? spaceAt(at.floorId, at.point) : null;
-  if (!at || !space) return;
-  const point: Point = [Math.round(at.point[0] * 100) / 100, Math.round(at.point[1] * 100) / 100];
-  const here = { space_id: space, floor_id: at.floorId, point };
-  confirmedKey = `${at.floorId}|${space}|${point.join(",")}`;
+  if (!at) return;
+  // Arrival: the dot is in the destination room, not in whatever room the last route point happens to touch.
+  const total = walkSteps().length;
+  const destination = step >= total - 1 && route.destination ? useTwin.getState().model?.spaceById.get(route.destination) : undefined;
+  const space = destination ? destination.id : spaceAt(at.floorId, at.point);
+  if (!space) return;
+  const floorId = destination?.floor_id ?? at.floorId;
+  const inside = destination ? inPolygon(at.point, destination.polygon) : true;
+  const point: Point | null = inside ? [Math.round(at.point[0] * 100) / 100, Math.round(at.point[1] * 100) / 100] : null;
+  const here = { space_id: space, floor_id: floorId, point };
+  confirmedKey = `${floorId}|${space}|${point?.join(",") ?? ""}`;
   if (running) running.position = confirmedKey; // ours, not a correction: the estimate is reset by onUserStep
   useTwin.getState().setHere(here);
 }

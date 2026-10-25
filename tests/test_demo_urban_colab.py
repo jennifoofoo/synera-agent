@@ -1,5 +1,6 @@
 """The demo round on the Munich Urban Colab (demo/buildings/plan-89323a15): fire extinguishers on the ground floor
-from the main entrance room, planned by POST /api/round, must be as long as POST /api/route over the same stops.
+from the main entrance room, planned by POST /api/round, must be as long as POST /api/route over the same legs
+(device to device).
 
 The demo link (docs/submission/VIDEO_2MIN.md):
     http://localhost:8798/?building=user/plan-89323a15#round=fire_extinguisher&area=Ground%20floor
@@ -45,9 +46,20 @@ def assert_round_matches_route(app: App, building: dict) -> None:
     stops = [stop["space_id"] for stop in planned["info"]["stops"]]
     assert len(stops) > 0
     assert planned["devices"] == len(ground_floor_extinguishers(building))
-    _, routed = app.post("/api/route", {"building": KEY, "start": start, "destination": stops[-1], "via": stops[:-1]})
-    assert routed["route"]["ok"], routed["route"]
-    assert abs(routed["route"]["length_m"] - planned["total_m"]) <= 1.0
+    # One stop per device: the page walks leg by leg from device to device (start_point / destination_point), so
+    # the legs routed like that add up to the planned total.
+    walked, here = 0.0, (start, None)
+    for stop in planned["info"]["stops"]:
+        body = {"building": KEY, "start": here[0], "destination": stop["space_id"]}
+        if here[1]:
+            body["start_point"] = {"x": here[1][0], "y": here[1][1]}
+        if stop["position"]:
+            body["destination_point"] = {"x": stop["position"][0], "y": stop["position"][1]}
+        _, routed = app.post("/api/route", body)
+        assert routed["route"]["ok"], routed["route"]
+        walked += routed["route"]["length_m"]
+        here = (stop["space_id"], stop["position"])
+    assert abs(walked - planned["total_m"]) <= 1.0
 
 
 def test_demo_round_on_the_urban_colab(tmp_path):

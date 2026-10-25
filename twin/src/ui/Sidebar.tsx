@@ -6,6 +6,7 @@
 // The map gets the rest: App makes .app a grid and every other child sits in the map column (Sidebar.css).
 // Phone (worker) and windows under 1024 px never render this.
 
+import { speakIfOn } from "../voice";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "zustand";
 import { floorLabel } from "../model/model";
@@ -174,7 +175,7 @@ function ColumnWelcome() {
       {chips.length > 0 && (
         <div className="welcome-chips">
           {chips.map((text) => (
-            <button key={text} type="button" className="welcome-chip" onClick={() => void useTwin.getState().ask(text)}>
+            <button key={text} type="button" className="welcome-chip" onClick={() => void useTwin.getState().ask(text).then((reply) => speakIfOn(reply, useTwin.getState().voiceOut, useTwin.getState().speechAvailable))}>
               {text}
             </button>
           ))}

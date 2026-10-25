@@ -138,3 +138,40 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 :root .app.worker .directions {
   padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 12px) 10px calc(var(--safe-l) + 14px);
 }
+
+/* ===== Fix round: phone layout ===== */
+/* One thing at a time at the bottom: while a card, route, round or step sheet is open, the floating Notes / On map
+   chips go (the lower map stays clear); they come back when the sheet closes. */
+.app.worker:has(.dock .phone-sheet) .notes-fab-row,
+.app.worker.directions-open .notes-fab-row,
+.app.worker.walking .notes-fab-row { display: none; }
+/* Round open: the round sheet is the only sheet (the route card waits behind it) */
+.worker .dock:has(.round-panel) > .phone-sheet:not(:has(.round-panel)) { display: none; }
+.worker .dock:has(.round-panel) > .card { display: none; }
+
+/* Walking: the dock is just the orb (a compact glass circle, no empty pill); muted looks muted */
+.app.worker.walking .wanda-bar { align-self: flex-start; width: 56px; height: 56px; padding: 0; justify-content: center; gap: 0; }
+.app.worker.walking .wanda-bar .wb-caption { display: none; }
+.wanda-orb.muted .wf-core-g, .wanda-orb.muted .wf-glow, .wanda-orb.muted .wf-wings { animation: none; transform: none; }
+.wanda-orb.muted { filter: grayscale(0.85); opacity: 0.7; }
+
+/* Walking: the floors rail stops above the recenter button (it sits right above the dock) */
+:root .app.worker.walking:has(.recenter) .floorrail {
+  max-height: calc(var(--vvh, 100dvh) - var(--rail-top, calc(var(--head-y) + 56px)) - var(--dock-h, 90px) - 16px - 56px);
+}
+/* ... and the note on the route is a slim banner, not a card that covers the dot */
+.app.worker .card-guide-note { padding: 6px 4px 6px 10px; gap: 8px; align-items: center; font-size: 13px; }
+.app.worker .card-guide-note .note-thumb { width: 36px !important; height: 36px !important; }
+.app.worker .card-guide-note .note-text { -webkit-line-clamp: 2; font-size: 13px; margin: 0; }
+.app.worker .card-guide-note .note-meta { font-size: 12px; }
+
+/* Landscape phone: the directions sheet is a corner panel, the suggestion chips stay out of the way */
+@media (orientation: landscape) and (max-height: 520px) {
+  .worker .directions {
+    right: auto; width: min(420px, 48vw); max-height: 62vh; overflow-y: auto;
+    border-radius: 0 0 var(--radius-lg) 0; padding-left: calc(var(--safe-l) + 14px);
+  }
+  .worker .directions .dir-field { min-height: 40px; }
+  .worker .dock .ob-chips { display: none; }
+  .worker .dock > .phone-sheet { max-height: calc(var(--vvh, 100dvh) * 0.6); }
+}

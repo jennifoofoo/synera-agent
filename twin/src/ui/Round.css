@@ -146,3 +146,12 @@
 .worker .round-panel button.link { min-height: 32px; font-size: 13.5px; }
 .worker .round-stops { display: none; }
 .worker .round-go { min-height: 48px; font-size: 16px; }
+
+/* many types: the head stays in view, the rest scrolls; "More" is a quiet chip; a disabled Start is neutral, not a broken primary */
+.round-panel { max-height: calc(100dvh - 140px); overflow-y: auto; overscroll-behavior: contain; }
+.round-head { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-bottom: 4px; }
+.phone-sheet .round-panel { max-height: none; overflow: visible; }
+.phone-sheet .round-head { background: var(--glass-strong); }
+.round-chip.round-more { padding: 4px 14px; color: var(--accent); background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-strong); }
+.round-panel button.primary.round-go:disabled { opacity: 1; background: var(--paper-2); border-color: transparent; color: var(--ink-2); }
+.worker .round-go:disabled { display: block; }

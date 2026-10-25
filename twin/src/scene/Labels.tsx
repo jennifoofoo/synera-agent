@@ -73,7 +73,7 @@ interface Box {
 }
 
 type Item =
-  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean; room?: boolean }
+  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean; room?: boolean; named?: string }
   | { kind: "tag"; id: string; point: Point; dx: number }
   | { kind: "room"; id: string; point: Point; space: Space }
   | { kind: "area"; id: string; point: Point; area: Area }
@@ -525,7 +525,20 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       for (const shift of shifts) {
         const point: Point = shift ? [item.point[0], item.point[1] - shift * scale] : item.point;
         if (item.kind === "area" && shift && !item.area.polygons.some((polygon) => insidePolygon(point, polygon))) continue;
-        const box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
+        let box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
+        let flatNamed = "";
+        if (flat && item.kind === "poi" && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title && (tier === "mid" || tier === "near")) {
+          // 2D: like 3D, the symbol of a room keeps its name beside it when that is free (else the symbol alone).
+          const name = mapRoomName(item.title);
+          const extra = POI_TEXT_GAP_PX + name.length * CHAR_PX; // the symbol and its name are centred together
+          const wide = { ...box, x0: box.x0 - extra / 2, x1: box.x1 + extra / 2 };
+          const room = model.spaceById.get(item.id);
+          const fits = !room || (POI_PX + extra) * scale <= spanOf(room.polygon)[0] * 1.05; // never across the walls
+          if (fits && free(wide, `poi-${item.id}`) && !onRoute(wide)) {
+            box = wide;
+            flatNamed = name;
+          }
+        }
         if (poi3d && !badgeOnly) {
           // the badge sits on the point, its name to the right: shift the box so it covers both and nothing else
           box.x0 += poi3d.shift;
@@ -534,11 +547,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         const key = `${item.kind}-${item.id}`;
         const cls = candidateClasses.get(item) ?? "room";
         if (!free(box, key)) continue;
+        // 2D: a name wider than its room would run across the walls: it waits for a closer zoom (selected rooms keep theirs).
+        if (flat && item.kind === "room" && item.id !== selectedId && text.length * CHAR_PX * scale > spanOf(item.space.polygon)[0] * 1.1) continue;
         if ((item.kind === "room" || item.kind === "area") && selectedPx && boxOnPolygon(box, selectedPx)) continue;
         if ((item.kind === "room" || item.kind === "area" || (item.kind === "thing" && !item.landmark)) && onRoute(box)) continue; // landmarks keep their name on the route
         if (capped(cls) && !budget.take(box)) continue; // the density cap drops the lowest ranked first
         kept.push(box);
-        result.push(shift ? { ...item, point } : item);
+        result.push(shift ? { ...item, point } : flatNamed && item.kind === "poi" ? { ...item, named: flatNamed } : item);
         classes.set(key, cls);
         if (item.kind === "room") roomBoxes.set(item.id, box);
         if (item.kind === "poi" && item.closed) closedPlaced.push(item);
@@ -569,6 +584,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     for (const item of all) {
       if (item.kind !== "door") continue;
+      // Clear widths are a detail of the selected room (its doors), never debug text on every wide door.
+      if (!selectedId || !model.openingById.get(item.id)?.space_ids.includes(selectedId)) continue;
       const box = boxOf(item.point, (item.text.length * DOOR_CHAR_PX) / 2, DOOR_H_PX / 2);
       if (!free(box, `door-${item.id}`) || !budget.take(box)) continue;
       kept.push(box);
@@ -635,8 +652,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             {flat ? (
-              <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-label-class={classes.get(`poi-${item.id}`) ?? "poi"} data-poi-space={item.id}>
+              <div className="zoom-fade poi-flat" style={item.named ? { transform: `translateX(${-(POI_TEXT_GAP_PX + item.named.length * CHAR_PX) / 2}px)` } : undefined} data-zoom-kind={`poi-${item.poi}`} data-label-class={classes.get(`poi-${item.id}`) ?? "poi"} data-poi-space={item.id}>
                 <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
+                {item.named && (
+                  <span className="label label-halo label-plan poi-pin-name">
+                    <NameWithNumber name={item.named} />
+                  </span>
+                )}
               </div>
             ) : (
               <PoiPin item={item} tier={tier} labelClass={classes.get(`poi-${item.id}`) ?? "poi"} />

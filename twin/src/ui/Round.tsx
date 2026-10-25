@@ -45,6 +45,9 @@ export function Round() {
   );
 }
 
+/** Chips shown before "More": the most common types (the list is sorted by count). */
+const TOP_TYPES = 8;
+
 /** "Fire extinguishers", "Defibrillator": the chip names. */
 function plural(name: string, count: number): string {
   if (count === 1) return name;
@@ -63,6 +66,7 @@ export function RoundCard() {
   const hereId = useTwin((s) => s.state?.position?.space_id ?? null);
   const round = useRound();
   const [pickStart, setPickStart] = useState(false);
+  const [moreTypes, setMoreTypes] = useState(false);
 
   const types = useMemo(() => {
     if (!model) return [];
@@ -112,7 +116,7 @@ export function RoundCard() {
       <PhoneSheet open onClose={endRound} label="Inspection round">
         <section className="card round-panel round-panel-here" aria-label="Inspection round">
           <RoundBar />
-          <p className="round-note">You are in {stop.name}. Check it, then tap Done.</p>
+          <p className="round-note">{stop.device ? `${stop.device} is here in ${stop.name}.` : `You are in ${stop.name}.`} Check it, then tap Done.</p>
         </section>
       </PhoneSheet>
     );
@@ -120,7 +124,7 @@ export function RoundCard() {
   if (!round.open) return null;
 
   const { plan, whatIf, picking, busy, error, checked, finished, suggestion, pendingDoor } = round;
-  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings);
+  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings, model.building.spaces);
   const startKind = round.startId ? null : hereId ? "Here" : "Entrance";
   const hintType = round.type || types[0]?.[0] || "fire_extinguisher";
   const hintArea = round.area && round.area !== "Whole building" ? ` on the ${round.area.toLowerCase()}` : "";
@@ -142,7 +146,7 @@ export function RoundCard() {
             What
           </span>
           <div className="round-chips" role="group" aria-labelledby="round-what">
-            {types.map(([type, count]) => (
+            {(moreTypes ? types : types.filter(([type], index) => index < TOP_TYPES || type === round.type)).map(([type, count]) => (
               <button
                 key={type}
                 type="button"
@@ -153,6 +157,11 @@ export function RoundCard() {
                 {plural(prettyType(type), count)} <span className="round-count">{count}</span>
               </button>
             ))}
+            {types.length > TOP_TYPES && (
+              <button type="button" className="round-chip round-more" aria-expanded={moreTypes} onClick={() => setMoreTypes(!moreTypes)}>
+                {moreTypes ? "Fewer" : `More (${types.length - TOP_TYPES})`}
+              </button>
+            )}
           </div>
         </div>
 
@@ -268,13 +277,13 @@ export function RoundCard() {
                 <span>Start: {plan.startName}</span>
               </li>
               {plan.stops.map((stop, index) => {
-                const done = checked.includes(stop.spaceId);
+                const done = checked.includes(stop.key);
                 return (
-                  <li key={stop.spaceId} className={done ? "done" : ""}>
+                  <li key={stop.key} className={done ? "done" : ""}>
                     <button className="round-stop" onClick={() => useTwin.getState().flyTo(stop.assetIds[0] ?? stop.spaceId)}>
                       <span className="round-num">{done ? "✓" : index + 1}</span>
-                      <span className="round-stop-name">{stop.name}</span>
-                      <span className="round-muted">{assetLabel(plan.type, stop.assetIds.length)}</span>
+                      <span className="round-stop-name">{stop.device || stop.name}</span>
+                      <span className="round-muted">{stop.device ? stop.name : assetLabel(plan.type, stop.assetIds.length)}</span>
                     </button>
                   </li>
                 );
@@ -290,7 +299,7 @@ export function RoundCard() {
         )}
 
         <button className="primary round-go" onClick={() => void startRound()} disabled={!plan || !!busy}>
-          {resume && plan ? `Resume (${checked.length} of ${plan.stops.length} done)` : "Start round"}
+          {resume && plan ? `Resume (${checked.length} of ${plan.stops.length} done)` : !plan && !busy && !round.type ? "Pick what to check" : "Start round"}
         </button>
 
         {plan && picking && (

@@ -12,12 +12,15 @@ from building_agent.impact import copy_map
 from building_agent.kinds.what_if_door import shared_wall_midpoint
 from building_agent.position import make_position
 from building_agent.round_tools import (
+    START,
     best_order,
+    device_point,
     distance_matrix,
     make_round_tools,
     nearest_neighbour,
     path_length,
     plan_round,
+    point_matrix,
 )
 from starter_agent.building_map import MapError
 
@@ -42,30 +45,88 @@ def stop_rooms(result: dict) -> list[str]:
     return [stop["room"] for stop in result["stops"]]
 
 
-def test_ground_floor_extinguishers_one_stop_per_room_and_total_matches_the_drawn_route(bm):
+def device_matrix(bm, start_id: str, asset_ids: list[str], start_point=None) -> dict:
+    ends = {START: (start_id, start_point)}
+    ends.update({i: (bm.assets[i]["space_id"], device_point(bm, bm.assets[i])) for i in asset_ids})
+    return point_matrix(bm, ends, False)
+
+
+def test_ground_floor_extinguishers_one_stop_per_device_and_legs_sum_to_the_total(bm):
     result = plan_round(bm, "fire extinguisher", "Main aisle H-B5", floor_level=0)
     assert result["devices"] == 6 and len(result["stops"]) == 6
-    assert result["stops"][0]["room"] == "Main aisle H-B5" and result["stops"][0]["leg_m"] == 0
+    assert len({stop["asset_id"] for stop in result["stops"]}) == 6
+    assert all(stop["position"] and stop["device"] for stop in result["stops"])
+    assert result["stops"][0]["room"] == "Main aisle H-B5" and result["stops"][0]["leg_m"] > 0  # walk to the device
     assert all(stop["floor"] == "Ground floor" for stop in result["stops"])
     assert result["order"].startswith("exact")
     assert result["total_m"] == pytest.approx(sum(stop["leg_m"] for stop in result["stops"]), abs=0.3)
-    assert bm.last_route.length_m == pytest.approx(result["total_m"], abs=0.06)
     assert result["compare_hint"]["naive_total_m"] >= result["total_m"]
-    assert len(bm.located_asset_ids) == 6
+    assert bm.located_asset_ids == [stop["asset_id"] for stop in result["stops"]]
+    # The drawn route ends at the last device.
+    assert bm.last_route.destination_space_id == result["stops"][-1]["space_id"]
+    assert bm.last_route_points[-1][1] == pytest.approx(result["stops"][-1]["position"], abs=0.01)
+
+
+def test_each_leg_is_the_point_to_point_route_the_page_asks_for(bm):
+    """Leg i is routing.route from device i-1 (start_point) to device i (destination_point): what round.ts sends."""
+    result = plan_round(bm, "fire extinguisher", "Main aisle H-B5", floor_level=0)
+    start_id = bm.resolve_space("Main aisle H-B5")
+    previous = (start_id, None)
+    for stop in result["stops"]:
+        leg = routing.route(bm, previous[0], stop["space_id"], False, None, previous[1], None, stop["position"])
+        assert leg.length_m == pytest.approx(stop["leg_m"], abs=0.06)
+        previous = (stop["space_id"], stop["position"])
+
+
+def test_two_devices_in_one_room_are_two_stops(bm):
+    room = bm.resolve_space("Main aisle H-B5")
+    first = next(a for a in bm.assets.values() if a["type"] == "fire_extinguisher" and a["space_id"] == room)
+    x, y = first["position"][:2]
+    bm.assets["extra-extinguisher"] = {
+        **first,
+        "id": "extra-extinguisher",
+        "name": "Fire extinguisher H-B5 b",
+        "position": [x + 1.0, y],
+    }
+    result = plan_round(bm, "fire extinguisher", "Main aisle H-B5", floor_level=0)
+    assert len(result["stops"]) == 7
+    in_room = [stop for stop in result["stops"] if stop["space_id"] == room]
+    assert {stop["asset_id"] for stop in in_room} == {first["id"], "extra-extinguisher"}
+    order = [stop["asset_id"] for stop in result["stops"]]
+    assert abs(order.index(first["id"]) - order.index("extra-extinguisher")) == 1  # next to each other: 1 m apart
+    second = max(order.index(first["id"]), order.index("extra-extinguisher"))
+    inside = routing.same_room_walk(
+        bm, room, device_point(bm, first), device_point(bm, bm.assets["extra-extinguisher"])
+    )
+    assert 0 < result["stops"][second]["leg_m"] == pytest.approx(inside, abs=0.06)  # the walk inside the room
 
 
 @pytest.mark.parametrize("start", ["Main aisle H-B5", "Server room 0.43"])
 def test_small_rounds_are_optimal_by_brute_force(bm, start):
     result = plan_round(bm, "fire extinguisher", start, floor_level=0)
     start_id = bm.resolve_space(start)
-    rooms = [stop["space_id"] for stop in result["stops"]]
-    matrix = distance_matrix(bm, sorted({start_id, *rooms}), False)
-    best = min(path_length(matrix, start_id, order, False) for order in itertools.permutations(rooms))
+    devices = [stop["asset_id"] for stop in result["stops"]]
+    matrix = device_matrix(bm, start_id, devices)
+    best = min(path_length(matrix, START, order, False) for order in itertools.permutations(devices))
     assert result["total_m"] == pytest.approx(best, abs=0.06)
     back = plan_round(bm, "fire extinguisher", start, floor_level=0, return_to_start=True)
-    best_back = min(path_length(matrix, start_id, order, True) for order in itertools.permutations(rooms))
+    best_back = min(path_length(matrix, START, order, True) for order in itertools.permutations(devices))
     assert back["total_m"] == pytest.approx(best_back, abs=0.06)
+    assert back["total_m"] == pytest.approx(sum(s["leg_m"] for s in back["stops"]) + back["back_to_start_m"], abs=0.3)
     assert bm.last_route.destination_space_id == start_id
+
+
+def test_start_point_is_used_for_the_first_leg(bm):
+    start_id = bm.resolve_space("Main aisle H-B5")
+    anchor = bm.anchor(start_id)
+    plain = plan_round(bm, "fire extinguisher", start_id, floor_level=0)
+    first = plain["stops"][0]
+    point = first["position"]  # standing right at the first device
+    at_device = plan_round(bm, "fire extinguisher", start_id, floor_level=0, start_point=point)
+    assert at_device["stops"][0]["asset_id"] == first["asset_id"]
+    assert at_device["stops"][0]["leg_m"] == pytest.approx(0, abs=0.3)
+    assert bm.planned_round["info"]["start_point"] == pytest.approx(point, abs=0.01)
+    assert anchor != tuple(point)
 
 
 def test_order_is_deterministic_whatever_the_asset_order(bm):
@@ -74,20 +135,21 @@ def test_order_is_deterministic_whatever_the_asset_order(bm):
     random.Random(7).shuffle(items)
     bm.assets = dict(items)
     second = plan_round(bm, "fire extinguisher", "Server room 0.43")
-    assert stop_rooms(first) == stop_rooms(second) and first["total_m"] == second["total_m"]
+    assert [s["asset_id"] for s in first["stops"]] == [s["asset_id"] for s in second["stops"]]
+    assert first["total_m"] == second["total_m"]
 
 
 def test_multi_floor_round_uses_the_heuristic_and_beats_nearest_neighbour(bm):
     result = plan_round(bm, "extinguishers", "Main aisle H-B5")
-    assert result["devices"] == 10
+    assert result["devices"] == 10 and len(result["stops"]) == 10
     assert {stop["floor"] for stop in result["stops"]} == {"Ground floor", "Floor 1"}
     assert result["order"] == "nearest neighbour + 2-opt"
     start_id = bm.resolve_space("Main aisle H-B5")
-    rooms = [stop["space_id"] for stop in result["stops"]]
-    matrix = distance_matrix(bm, sorted({start_id, *rooms}), False)
-    greedy = path_length(matrix, start_id, tuple(nearest_neighbour(matrix, start_id, rooms)), False)
+    devices = [stop["asset_id"] for stop in result["stops"]]
+    matrix = device_matrix(bm, start_id, devices)
+    greedy = path_length(matrix, START, tuple(nearest_neighbour(matrix, START, devices)), False)
     assert result["total_m"] <= greedy + 0.06
-    assert bm.last_route.length_m == pytest.approx(result["total_m"], abs=0.06)
+    assert result["total_m"] == pytest.approx(sum(stop["leg_m"] for stop in result["stops"]), abs=0.5)
 
 
 def test_heuristic_matches_brute_force_on_random_small_sets(bm):
@@ -144,9 +206,9 @@ def test_tool_starts_here_and_remembers_the_round_for_guiding(bm):
     round_tool, _ = tool(bm, guide)
     result = call(round_tool, what="Feuerlöscher", start="here", floor_level=0)
     assert "Main aisle H-B5" in result["start_assumed"]
-    assert guide.walk is not None and guide.walk.length_m == pytest.approx(result["total_m"], abs=0.06)
+    assert guide.walk is not None and guide.walk.length_m == pytest.approx(bm.last_route.length_m, abs=0.06)
     assert guide.walk.destination == result["stops"][-1]["space_id"]
-    assert guide.walk.via == [stop["space_id"] for stop in result["stops"][:-1]]
+    assert guide.walk.via == bm.planned_round["via"]
 
 
 def test_tool_reports_unknown_device_as_tool_error(bm):
@@ -167,14 +229,19 @@ DEMO = Path("data/train/proc-factory-train-015")
 
 @pytest.mark.skipif(not DEMO.exists(), reason="data/train is missing")
 def test_demo_round_from_the_entrance_matches_the_spec():
-    """Spec acceptance (docs/specs/inspection-round.md): 5 stops from "entrance in Main aisle H-B3", length equal to
-    the route through the same stops (±1 m), and a door between H-A2 and Server room 0.16 makes it shorter."""
+    """Spec acceptance (docs/specs/inspection-round.md): 5 stops (one per device) from "entrance in Main aisle H-B3",
+    length equal to the device-to-device legs walked one by one (±1 m), and a door between H-A2 and Server room
+    0.16 makes it shorter."""
     demo = copy_map(routing.load_map(DEMO))
     result = plan_round(demo, "fire extinguisher", "entrance in Main aisle H-B3", floor_level=0)
     assert len(result["stops"]) == 5 and result["start"] == "Main aisle H-B3"
-    via = [stop["space_id"] for stop in result["stops"]]
-    same_order = routing.route(demo, demo.resolve_space("Main aisle H-B3"), via[-1], False, via[:-1])
-    assert same_order.length_m == pytest.approx(result["total_m"], abs=1)
+    previous, walked = (demo.resolve_space("Main aisle H-B3"), None), 0.0
+    for stop in result["stops"]:
+        walked += routing.route(
+            demo, previous[0], stop["space_id"], False, None, previous[1], None, stop["position"]
+        ).length_m
+        previous = (stop["space_id"], stop["position"])
+    assert walked == pytest.approx(result["total_m"], abs=1)
     first, second = demo.resolve_space("Production zone H-A2"), demo.resolve_space("Server room 0.16")
     with_door = copy_map(demo)
     with_door.add_door(first, second, position=shared_wall_midpoint(demo, first, second))

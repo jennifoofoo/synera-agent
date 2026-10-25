@@ -65,7 +65,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
   const [now] = useState(() => Date.now());
   const [graph, setGraph] = useState<LdNode[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [at, setAt] = useState(now);
+  const at = now; // the panel shows now; "Show ended" brings back what has ended (no time slider: too much for a demo)
   const [showEnded, setShowEnded] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -92,7 +92,6 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
   }, []);
 
   const ego = useMemo(() => (graph ? egoGraph(graph, roomId, { at, showEnded, width }) : null), [graph, roomId, at, showEnded, width]);
-  const range = timeRange(ego?.oldest ?? null, now);
   const room = ego?.nodes[0];
   const facts = ego?.nodes.filter((node) => node.ring === 2) ?? [];
   const focused = ego?.nodes.find((node) => node.id === focus) ?? null;
@@ -153,33 +152,8 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
           )
         )}
       </div>
-      <div className="kg-time">
-        <div className="kg-time-row">
-          <span className="tiny-label">Time</span>
-          <strong data-testid="knowledge-time">{momentLabel(at, now)}</strong>
-          {Math.abs(at - now) >= HOUR_MS && (
-            <button type="button" className="link kg-link" onClick={() => setAt(now)}>
-              Back to now
-            </button>
-          )}
-        </div>
-        <input
-          type="range"
-          aria-label="Time"
-          data-testid="knowledge-slider"
-          min={range.min}
-          max={range.max}
-          step={HOUR_MS}
-          value={Math.min(Math.max(at, range.min), range.max)}
-          onChange={(event) => setAt(Number(event.target.value))}
-        />
-        <div className="kg-time-ends kg-muted">
-          <span>{momentLabel(range.min, now)}</span>
-          <span>+{Math.round((range.max - now) / DAY_MS)} days</span>
-        </div>
-      </div>
       <ol className="kg-facts" data-testid="knowledge-facts">
-        {facts.length === 0 && <li className="kg-muted">No notes here at this time.</li>}
+        {facts.length === 0 && <li className="kg-muted">No notes here right now.</li>}
         {facts.map((fact) => (
           <li key={fact.id} className={fact.state === "ended" ? "ended" : ""} data-kind={fact.role}>
             <span className={`kg-num ${fact.role}`}>{fact.number}</span>

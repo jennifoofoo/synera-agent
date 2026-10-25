@@ -4,7 +4,7 @@
 // route show theirs anyway. Tap: the newest note with age, author and photo; tap that: the list. Closures are not
 // pinned here (they keep their own closure marks).
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
 import type { Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
@@ -19,8 +19,19 @@ interface Props {
 }
 
 function Pop({ note, count, onOpen }: { note: Note; count: number; onOpen: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Near a screen edge the preview slides back inside the viewport (8 px margin).
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    element.style.translate = "0px";
+    const box = element.getBoundingClientRect();
+    const margin = 8;
+    const shift = box.left < margin ? margin - box.left : box.right > window.innerWidth - margin ? window.innerWidth - margin - box.right : 0;
+    if (shift) element.style.translate = `${Math.round(shift)}px`;
+  });
   return (
-    <div className="note-pin-pop" role="button" tabIndex={0} onClick={(event) => (event.stopPropagation(), onOpen())}>
+    <div ref={ref} className="note-pin-pop" role="button" tabIndex={0} onClick={(event) => (event.stopPropagation(), onOpen())}>
       {note.photo && <img src={note.photo} alt="" />}
       <div className="note-meta">
         {note.kind === "issue" && <span className="note-kind">Problem</span>}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Building } from "../api/types";
 import { buildModel } from "../model/model";
-import { OUTLINE_STEP_M, floorLayout, floorRoles } from "./floorVisibility";
+import { floorLayout, floorRoles } from "./floorVisibility";
 
 const square = (floor_id: string, id: string) => ({
   id,
@@ -33,19 +33,11 @@ const model = buildModel({
 const y = (id: string, mode: "single" | "exploded", focused = "g") => floorLayout(model.floorById.get(id)!, model, mode, null, focused);
 
 describe("floorLayout in 'all floors' (exploded)", () => {
-  it("keeps the active floor at its real height", () => {
-    expect(y("g", "exploded")).toBe(0);
-    expect(y("f1", "exploded", "f1")).toBe(3);
-  });
-
-  it("puts the floors below as outlines just under the active floor, not a storey lower", () => {
-    expect(y("b", "exploded")).toBeCloseTo(-OUTLINE_STEP_M);
-    expect(y("g", "exploded", "f1")).toBeCloseTo(3 - OUTLINE_STEP_M);
-    expect(y("b", "exploded", "f1")).toBeCloseTo(3 - 2 * OUTLINE_STEP_M);
-  });
-
-  it("pulls the floors above apart, above the active floor", () => {
-    expect(y("f1", "exploded")).toBeGreaterThan(3);
+  it("pulls every floor apart in floor order, whichever floor is active", () => {
+    expect(y("b", "exploded")).toBeLessThan(y("g", "exploded"));
+    expect(y("g", "exploded")).toBeLessThan(y("f1", "exploded"));
+    expect(y("f1", "exploded") - y("g", "exploded")).toBeGreaterThan(3);
+    expect(y("g", "exploded", "f1")).toBe(y("g", "exploded", "g"));
   });
 
   it("uses the real elevations outside 'all floors'", () => {
@@ -60,8 +52,8 @@ describe("floorRoles", () => {
     expect([...roles.values()]).toEqual(["hidden", "full", "hidden"]);
   });
 
-  it("outlines the other floors in 'all floors'", () => {
+  it("draws every floor fully in 'all floors' (a hairline outline of a bigger floor below read as a stray frame)", () => {
     const roles = floorRoles(model, "g", "exploded", false, null);
-    expect([...roles.values()]).toEqual(["outline", "full", "outline"]);
+    expect([...roles.values()]).toEqual(["full", "full", "full"]);
   });
 });
