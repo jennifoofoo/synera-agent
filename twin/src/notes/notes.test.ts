@@ -46,6 +46,11 @@ describe("notesCommand", () => {
     expect(notesCommand("next")).toBeNull();
     expect(notesCommand("notebook on the desk?")).toBeNull();
   });
+  it("hands notes with an end time to the agent, which reads it (card, then yes)", () => {
+    for (const said of ["note: valve drips until Friday", "Merk dir: Ventil tropft bis morgen", "problem: lift out for two hours", "Notiz: Tür klemmt für 3 Tage"]) {
+      expect(notesCommand(said)).toBeNull();
+    }
+  });
   it("takes note, what's here and finished (English and German)", () => {
     for (const said of ["note: always release the left lever first", "Merk dir: Halterung locker", "what's here?", "Was gibt's hier", "finished", "Fertig"]) {
       expect(notesCommand(said)).not.toBeNull();

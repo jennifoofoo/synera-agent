@@ -1,7 +1,7 @@
 // Point-of-interest pictograms for the 2D map: a white glyph in a small round grey badge, like a street map.
 import "./poiIcons.css";
 
-export type PoiKind = "stairs" | "lift" | "toilet" | "entrance" | "step" | "coffee" | "printer" | "extinguisher" | "firstaid";
+export type PoiKind = "stairs" | "lift" | "toilet" | "meeting" | "entrance" | "step" | "coffee" | "printer" | "extinguisher" | "firstaid";
 
 /** What each symbol means, for the legend in the help card (ui/KeyHelp.tsx) and twin/CONTROLS.md. */
 export const POI_LEGEND: { kind: PoiKind; label: string }[] = [
@@ -9,6 +9,7 @@ export const POI_LEGEND: { kind: PoiKind; label: string }[] = [
   { kind: "lift", label: "Lift" },
   { kind: "stairs", label: "Stairs" },
   { kind: "toilet", label: "Toilets" },
+  { kind: "meeting", label: "Meeting room" },
   { kind: "step", label: "Not step-free (a step or threshold)" },
   { kind: "coffee", label: "Coffee machine" },
   { kind: "printer", label: "Printer" },
@@ -51,6 +52,16 @@ const GLYPHS: Record<PoiKind, JSX.Element> = {
       <path className="stroke thin" d="M12 3v18" />
       <circle cx="17.5" cy="5" r="2" />
       <path d="M15.6 8.5h3.8l2.4 7.5h-2.4v4.5h-3.8V16h-2.4z" />
+    </svg>
+  ),
+  // a meeting: three people round a table
+  meeting: (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="5" r="2.1" />
+      <circle cx="5.5" cy="9" r="2" />
+      <circle cx="18.5" cy="9" r="2" />
+      <path d="M3 14.5h18v3H3z" />
+      <path className="stroke thin" d="M7 17.5v3M17 17.5v3" />
     </svg>
   ),
   // not step-free: a single step (a threshold) on the floor line
