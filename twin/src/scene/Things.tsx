@@ -5,6 +5,7 @@ import type { Asset, BuildingState } from "../api/types";
 import type { FloorModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
+import { tapMap } from "../tapAnswer";
 import { useLandmarks } from "./landmarks";
 import { MIN_SHAPE_PX, useMapZoom } from "./mapZoom";
 
@@ -43,7 +44,7 @@ interface Props {
 
 /** All things of one floor as one instanced mesh (true size from the footprint) plus an inverted-hull outline (3D). */
 export function Things({ floor, y, state, limit, flat = false }: Props) {
-  const select = useTwin((s) => s.select);
+  const select = tapMap; // a map tap selects, or answers Wanda's "where are you?" (tapAnswer.ts)
   const mesh = useRef<THREE.InstancedMesh>(null);
   const outline = useRef<THREE.InstancedMesh>(null);
   const removed = useMemo(() => new Set(state?.removed_assets ?? []), [state?.removed_assets]);

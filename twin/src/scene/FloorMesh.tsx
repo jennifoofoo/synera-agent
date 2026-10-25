@@ -4,6 +4,7 @@ import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
+import { tapMap } from "../tapAnswer";
 import { buildFloorGeometry, openingEditsOf, withCutaway } from "./geometry";
 
 interface Props {
@@ -21,7 +22,7 @@ export const cutawayUniforms = { uCamDir: { value: new THREE.Vector2(0, 1) }, uC
 export const controlsRef: { current: import("camera-controls").default | null } = { current: null };
 
 export function FloorMesh({ floor, model, y, ghost, visible }: Props) {
-  const select = useTwin((s) => s.select);
+  const select = tapMap; // a map tap selects, or answers Wanda's "where are you?" (tapAnswer.ts)
   const flat = useTwin((s) => s.viewMode === "2d");
   const reducedMotion = useTwin((s) => s.reducedMotion);
   // Doors added, removed or widened in this session change the walls; the key keeps route updates from rebuilding.

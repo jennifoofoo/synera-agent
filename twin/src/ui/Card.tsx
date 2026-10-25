@@ -41,9 +41,28 @@ export function Card() {
   return (
     <>
       <HereChip />
+      <TapWhereHint />
       {directions && <DirectionsPanel model={model} />}
       {card}
     </>
+  );
+}
+
+/** Wanda asked "Where are you?": one calm line, the next tap on the map answers it (tapAnswer.ts). × keeps taps normal. */
+function TapWhereHint() {
+  const awaiting = useTwin((s) => !!s.awaitingPlace && !s.directions);
+  const dismiss = useTwin((s) => s.dismissAwaitingPlace);
+  if (!awaiting) return null;
+  return (
+    <div className="here-chip tap-where" role="status" data-testid="tap-where">
+      <span className="here-name">
+        <span className="here-dot" aria-hidden />
+        <span>Tap where you are</span>
+      </span>
+      <button className="x" onClick={dismiss} aria-label="Not now">
+        ×
+      </button>
+    </div>
   );
 }
 
