@@ -9,6 +9,7 @@ import { floorLabel, type BuildingModel } from "../model/model";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { withoutAnswerLine } from "../voice";
+import { useNewBuilding } from "./newBuildingStore";
 import "./Planner.css";
 
 const IMPACT = "impact";
@@ -54,6 +55,17 @@ export function Planner() {
   if (!enabled) return null;
   return (
     <>
+      <button
+        type="button"
+        className="planner-add"
+        aria-label="New building"
+        title="New building (upload floor plans)"
+        onClick={() => useNewBuilding.getState().open()}
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
       <button
         className={`planner-toggle ${open ? "active" : ""}`}
         onClick={() => setOpen(!open)}

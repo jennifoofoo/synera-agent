@@ -3,8 +3,13 @@
   position: absolute; right: 14px; top: 14px; z-index: 3; min-height: 36px; padding: 4px 14px;
   border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float); font-size: 13px; color: var(--muted);
 }
-/* the changes pill sits left of the List button */
-.app.planner .pill { right: 76px; }
+.planner-add {
+  position: absolute; right: 76px; top: 14px; z-index: 3; width: 36px; height: 36px; min-height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float); color: var(--text);
+}
+.planner-add:hover { background: var(--surface); }
+/* the changes pill sits left of the + and List buttons */
+.app.planner .pill { right: 122px; }
 
 .planner-sheet {
   position: absolute; right: 14px; top: 54px; bottom: 150px; width: 300px; z-index: 4;
