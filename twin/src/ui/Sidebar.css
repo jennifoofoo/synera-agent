@@ -88,6 +88,14 @@
   align-self: flex-start; max-width: 100%; padding: 10px 14px; border-radius: 4px var(--radius) var(--radius) var(--radius);
   background: var(--surface); box-shadow: var(--shadow-soft); color: var(--ink);
 }
+/* replies: paragraphs and lists from chatMarkdown.ts (the bubble itself keeps pre-wrap off for them) */
+.sb-text { white-space: normal; }
+.sb-text p, .sb-text ul, .sb-text ol { margin: 0; }
+.sb-text > * + * { margin-top: 8px; }
+.sb-text ul, .sb-text ol { padding-left: 20px; }
+.sb-text li + li { margin-top: 3px; }
+.sb-text li::marker { color: var(--ink-2); }
+.sb-text strong { font-weight: 600; }
 .sb-note { margin-top: 6px; color: var(--warn); font-size: 12.5px; }
 .sb-thinking { padding: 12px 14px; }
 @keyframes sb-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
@@ -95,8 +103,6 @@
 /* empty: Wanda's welcome, the same words and chips as the welcome card on the map, set in the column */
 .sb-log-empty { justify-content: center; }
 .sb-welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 0 0 8vh; animation: sb-in var(--t-base) both; }
-.sb-welcome-art:empty { display: none; }
-.sb-welcome-art { margin-bottom: 12px; }
 .sb-welcome .welcome-title { font-size: var(--fs-28); text-wrap: balance; }
 .sb-welcome .welcome-sub { margin: 6px 0 18px; font-size: var(--fs-16); }
 .sb-welcome .welcome-chips { justify-content: flex-start; gap: 8px; }

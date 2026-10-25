@@ -11,6 +11,7 @@ import { create } from "zustand";
 import { floorLabel } from "../model/model";
 import { useTwin } from "../store";
 import { withoutAnswerLine } from "../voice";
+import { parseChatMarkdown, type Inline } from "../chatMarkdown";
 import { NotesButton } from "./Facts";
 import { Omnibox } from "./Omnibox";
 import { Round } from "./Round";
@@ -141,7 +142,7 @@ function ChatLog() {
         ) : (
           <li key={message.id} className="sb-msg sb-agent">
             <div className="sb-text">
-              {/^The (agent|request) failed/.test(message.text) ? "Something went wrong, please ask again." : withoutAnswerLine(message.text)}
+              {/^The (agent|request) failed/.test(message.text) ? "Something went wrong, please ask again." : <Markdown text={withoutAnswerLine(message.text)} />}
             </div>
             {message.note && <div className="sb-note">{message.note}</div>}
           </li>
@@ -166,8 +167,6 @@ function ColumnWelcome() {
   const chips = useWelcomeChips();
   return (
     <li className="sb-welcome" aria-label="Welcome">
-      {/* Slot for Wanda's picture (the fairy, docs/specs/wanda-fairy.md); empty until that lands. */}
-      <div className="sb-welcome-art" aria-hidden />
       <h2 className="welcome-title">Hi, I'm Wanda.</h2>
       <p className="welcome-sub">What can I help you find in {name ?? "this building"}?</p>
       {chips.length > 0 && (
@@ -180,6 +179,53 @@ function ColumnWelcome() {
         </div>
       )}
     </li>
+  );
+}
+
+/** Wanda's reply with its little markdown (bold, italic, lists, line breaks) as React nodes, never as HTML. */
+function Markdown({ text }: { text: string }) {
+  return (
+    <>
+      {parseChatMarkdown(text).map((block, index) =>
+        block.kind === "p" ? (
+          <p key={index}>
+            {block.lines.map((line, i) => (
+              <span key={i}>
+                {i > 0 && <br />}
+                <Runs runs={line} />
+              </span>
+            ))}
+          </p>
+        ) : block.kind === "ul" ? (
+          <ul key={index}>
+            {block.items.map((item, i) => (
+              <li key={i}>
+                <Runs runs={item} />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ol key={index} start={block.start}>
+            {block.items.map((item, i) => (
+              <li key={i}>
+                <Runs runs={item} />
+              </li>
+            ))}
+          </ol>
+        ),
+      )}
+    </>
+  );
+}
+
+function Runs({ runs }: { runs: Inline[] }) {
+  return (
+    <>
+      {runs.map((run, i) => {
+        const text = run.italic ? <em>{run.text}</em> : run.text;
+        return run.bold ? <strong key={i}>{text}</strong> : <span key={i}>{text}</span>;
+      })}
+    </>
   );
 }
 
