@@ -169,7 +169,9 @@ class App:
         with self.lock:
             session = self.session(key)
             if key not in self.chats:
-                self.chats[key] = ChatAdapter(session.directory, session.map, self.level4, self.campus.synced_holder)
+                self.chats[key] = ChatAdapter(
+                    session.directory, session.map, self.level4, self.campus.synced_holder, self.knowledge
+                )
             return self.chats[key]
 
     def open_saved(self, chat: ChatAdapter, saved_path: str) -> str | None:
@@ -341,7 +343,14 @@ class App:
                         "level4": level4,
                     }
                 located = [] if result.get("error") else located_entries(session.map, result.get("reply", ""))
-                return 200, {**result, "located": located, "state": api.state_view(session), "level4": level4}
+                knowledge = knowledge_api.chat_fields(session.map, key)
+                return 200, {
+                    **result,
+                    "located": located,
+                    **knowledge,
+                    "state": api.state_view(session),
+                    "level4": level4,
+                }
         with self.lock:
             session = self.session(key)
             if path == "/api/route":

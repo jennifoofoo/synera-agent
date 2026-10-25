@@ -18,6 +18,7 @@ from building_agent.find_tools import make_find_tools
 from building_agent.guide_tools import GuideState, building_signature, make_guide_tools
 from building_agent.impact import make_impact_tools
 from building_agent.judge_route import judge_route
+from building_agent.knowledge_tools import facts_lookup, make_knowledge_tools
 from building_agent.level4.tools import BMHolder, make_level4_tools
 from building_agent.position import EXACT_POSITION_NOTE, exact_start_point, no_position_error, position_note
 from building_agent.position_tools import distance_annotator, make_position_tools
@@ -201,6 +202,10 @@ def make_tools(
         if tool.name not in REPLACED_BY_GUIDE | REPLACED_STARTER_TOOLS
     ]
     guide_tools = make_guide_tools(bm, output_directory, guide)
+    knowledge_tools = []
+    if guide.knowledge is not None:  # place knowledge only in a page session, never in the benchmark
+        guide.facts_lookup = facts_lookup(bm, guide)
+        knowledge_tools = make_knowledge_tools(bm, guide)
     level4_tools = make_level4_tools(BMHolder(bm), output_directory, guide, on_saved)
     return [
         *starter,
@@ -214,6 +219,7 @@ def make_tools(
         *make_round_tools(bm, guide),
         *make_impact_tools(bm),
         *guide_tools,
+        *knowledge_tools,
         *make_selection_tools(bm, guide),
         *level4_tools,
         *(make_campus_tools(campus, output_directory, guide) if campus else []),

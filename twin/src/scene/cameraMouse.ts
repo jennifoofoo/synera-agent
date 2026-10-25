@@ -2,12 +2,15 @@ import { useEffect, type RefObject } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
 import CameraControlsImpl from "camera-controls";
+import { createTwist, createWheelClassifier, orbitDelta } from "./wheelInput";
 
 // Input model (like a map):
 //  - left button or one finger: grab the map and pan (the point under the pointer stays under the pointer, no damping)
 //  - right button, or Ctrl/Alt + left: rotate (3D: also tilt). Two fingers: pinch zoom + rotate + tilt in 3D;
 //    on the 2D plan pinch zoom around the midpoint and move with it, no rotation
-//  - middle button: pan. Wheel and pinch: zoom to the pointer. Two-finger trackpad scroll: pan.
+//  - middle button: pan. Mouse wheel and pinch: zoom to the pointer. Two-finger trackpad swipe: pan.
+//  - Option/Alt + wheel or swipe: horizontal rotates, vertical tilts (3D). Safari two-finger twist: rotate.
+//    Which wheel event is which: wheelInput.ts.
 // camera-controls does rotate, touch and the animated moves; panning, the wheel and gestures are done here.
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
@@ -26,21 +29,6 @@ export function wheelUnits(event: Pick<WheelEvent, "deltaY" | "deltaMode" | "ctr
   if (event.ctrlKey) return Math.max(-PINCH_CLAMP, Math.min(PINCH_CLAMP, event.deltaY * PINCH_TO_UNITS));
   const px = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
   return Math.max(-NOTCH_CLAMP_PX, Math.min(NOTCH_CLAMP_PX, px)) * PX_TO_UNITS;
-}
-
-/** A mouse wheel notch (zoom) or a trackpad scroll (pan)? Line-mode steps and whole 120 steps (Chrome and Firefox
- * with a mouse) are notches. A trackpad sends a stream of small steps, often sideways or fractional, so an event
- * that follows another within 80 ms, or comes sideways or fractional, is a scroll. An isolated whole step is a
- * notch (Safari reports a mouse notch and a trackpad step alike, so the first step of a scroll zooms a hair). */
-let lastWheel = 0;
-export function isTrackpadScroll(event: WheelEvent): boolean {
-  const now = performance.now();
-  const streaming = now - lastWheel < 80;
-  lastWheel = now;
-  if (event.deltaMode !== 0) return false;
-  const legacy = (event as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY ?? 0;
-  if (Math.abs(event.deltaY) >= 50 && Math.abs(legacy) % 120 === 0 && event.deltaX === 0) return false;
-  return event.deltaX !== 0 || !Number.isInteger(event.deltaY) || streaming;
 }
 
 /** Two fingers on the 2D plan: zoom by the finger spread around their midpoint, and move with the midpoint. */
@@ -122,32 +110,56 @@ export function useCameraMouse({ controls, onDoubleClick, active }: Options) {
       invalidate();
     };
 
+    const classify = createWheelClassifier();
+    const isFlat = (c: CameraControlsImpl) => !!(c.camera as THREE.OrthographicCamera).isOrthographicCamera;
     const onWheel = (event: WheelEvent) => {
       if ((event as unknown as Record<string, unknown>)[RIG_FLAG]) return; // our own, let it reach the controls
       event.preventDefault(); // never scroll or zoom the page over the canvas
       event.stopPropagation();
       const c = controls.current;
       if (!c || !usable()) return;
-      if (!event.ctrlKey && !event.altKey && isTrackpadScroll(event)) {
-        scrollPan(c, event.deltaX, event.deltaY);
+      const action = classify({
+        deltaX: event.deltaX,
+        deltaY: event.deltaY,
+        deltaMode: event.deltaMode,
+        ctrlKey: event.ctrlKey,
+        altKey: event.altKey,
+        timeStamp: event.timeStamp,
+        wheelDeltaY: (event as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY,
+      });
+      if (action === "pan") return scrollPan(c, event.deltaX, event.deltaY);
+      if (action === "orbit") {
+        const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+        const [azimuth, polar] = orbitDelta(event.deltaX * scale, event.deltaY * scale, isFlat(c));
+        void c.rotate(azimuth, polar, false);
+        invalidate();
         return;
       }
       zoomBy(wheelUnits(event), event.clientX, event.clientY);
     };
 
     // Safari (Mac) reports a trackpad pinch as gesture events and would zoom the whole page.
+    // A two-finger twist on the trackpad (gesturechange rotation) turns the map, like Apple Maps.
     let lastScale = 1;
+    const twist = createTwist();
     const onGestureStart = (event: Event) => {
       event.preventDefault();
       lastScale = 1;
+      twist.reset();
     };
     const onGestureChange = (event: Event) => {
       event.preventDefault();
-      const gesture = event as Event & { scale: number; clientX?: number; clientY?: number };
+      const gesture = event as Event & { scale: number; rotation?: number; clientX?: number; clientY?: number };
       const factor = gesture.scale / lastScale;
       lastScale = gesture.scale;
       if (touches > 0 || !(factor > 0) || !usable()) return; // a touch pinch is handled by the controls
       zoomBy(-Math.log(factor) / UNIT, gesture.clientX ?? lastX, gesture.clientY ?? lastY);
+      const turn = twist.step(gesture.rotation ?? 0);
+      const c = controls.current;
+      if (turn && c) {
+        void c.rotate(turn, 0, false);
+        invalidate();
+      }
     };
     const onGestureEnd = (event: Event) => event.preventDefault();
 

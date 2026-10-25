@@ -7,7 +7,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTwin } from "../store";
-import { keepAwake, listen, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
 import { parseWake } from "../wake";
 import { Autocomplete, type PlaceHit } from "./Autocomplete";
@@ -59,6 +60,58 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const listenerRef = useRef<Listener | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const talkRef = useRef<HTMLButtonElement>(null);
+  const micRef = useRef<HTMLButtonElement>(null);
+  const [speaking, setSpeaking] = useState(false);
+
+  const setLevel = useCallback((level: number) => {
+    const value = level.toFixed(3);
+    talkRef.current?.style.setProperty("--wanda-level", value);
+    micRef.current?.style.setProperty("--wanda-level", value);
+  }, []);
+
+  // Listening: the ring follows the microphone. Not on iOS, where a second mic stream can cut the recognition.
+  useEffect(() => {
+    if (!listening) return;
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const stop = ios ? () => {} : startMicLevel(setLevel);
+    return () => {
+      stop();
+      setLevel(0);
+    };
+  }, [listening, setLevel]);
+
+  // Speaking: watch the voice (shared audio element or browser voice); 100 ms is plenty for a state flag.
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = !listening && isSpeaking();
+      setSpeaking((was) => (was === now ? was : now));
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [listening]);
+
+  // While spoken: the ring follows the audio, or a gentle sine breathing (1.6 s) when it cannot be measured.
+  useEffect(() => {
+    if (!speaking) return;
+    let measured = false;
+    const audio = sharedAudio();
+    const stopAudio = audio.paused
+      ? () => {}
+      : startAudioElementLevel(audio, (level) => {
+          measured = true;
+          setLevel(level);
+        });
+    const started = performance.now();
+    const breathe = window.setInterval(() => {
+      if (measured) return;
+      setLevel(0.25 + 0.25 * Math.sin(((performance.now() - started) / 1600) * 2 * Math.PI));
+    }, 50);
+    return () => {
+      stopAudio();
+      window.clearInterval(breathe);
+      setLevel(0);
+    };
+  }, [speaking, setLevel]);
 
   // Sound on by default; remembered per device.
   useEffect(() => {
@@ -405,6 +458,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
         </button>
         <button
           type="button"
+          ref={micRef}
           className={`ob-mic mic ${listening ? "listening" : ""}`}
           onPointerDown={(event) => event.preventDefault()}
           onClick={toggleMic}
@@ -431,14 +485,15 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
               onClick={() => inputRef.current?.focus()}
             >
               <ChatIcon />
-              <span className="ob-fab-label">Ask</span>
+              <span className="ob-fab-label">Ask Wanda</span>
             </button>
           )}
           {/* "Hey Wanda" is switched on in the step sheet; here only while it is on, to see and mute it */}
           {handsFreeOn && !walking && <HandsFreeButton className="ob-fab" />}
           <button
             type="button"
-            className={`ob-fab ob-talk ob-labelled mic ${listening ? "listening" : ""}`}
+            ref={talkRef}
+            className={`ob-fab ob-talk ob-labelled mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""}`}
             aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
             aria-pressed={listening}
             title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}

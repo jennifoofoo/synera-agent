@@ -1,5 +1,6 @@
 import { useKeyHelp } from "../scene/controlsTable";
 import { useTwin } from "../store";
+import { Compass } from "./Compass";
 
 /** Left edge: one small number per floor. Tap = focus that floor (others become glass); tap the active one
  * again = only this floor; the ⇕ toggle pulls the floors apart. Floors on the route carry a dot. */
@@ -76,6 +77,7 @@ export function FloorRail() {
           ?
         </button>
       )}
+      <Compass />
     </div>
   );
 }

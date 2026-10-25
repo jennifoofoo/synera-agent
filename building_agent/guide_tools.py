@@ -10,7 +10,7 @@ import networkx as nx
 from anthropic import beta_tool
 from anthropic.lib.tools import ToolError
 
-from building_agent import edit_ops, routing
+from building_agent import edit_ops, knowledge_tools, routing
 from building_agent import walk as walking
 from building_agent.directions import DirectionsSession
 from building_agent.impact import analyse
@@ -20,7 +20,24 @@ from building_agent.walk import Walk
 from starter_agent.building_map import BuildingMap, MapError
 from starter_agent.tools import as_json
 
-ACTIONS = ("close", "reopen", "add_door", "remove_door", "widen_door", "move_asset", "add_asset", "undo")
+TIMED_REPLY = {
+    "closed": False,
+    "note": "This closure has an end time. Call propose_change(action='close', element, until=<their time words>) "
+    "and show the card; nothing is closed until the person's yes.",
+}
+ACTIONS = (
+    "close",
+    "reopen",
+    "add_door",
+    "remove_door",
+    "widen_door",
+    "move_asset",
+    "add_asset",
+    "undo",
+    "remember",
+    "resolve",
+)
+KNOWLEDGE_ACTIONS = ("remember", "resolve")  # cards made by remember_here and resolve_here (knowledge_tools)
 UNDO_DEPTH = 20
 YES = re.compile(r"\b(ja|yes|yep|jep|genau|passt|do it|go ahead|mach das|bitte ja)\b", re.IGNORECASE)
 NO = re.compile(r"\b(nein|no|nicht|stop|abbrechen|cancel|lieber|whatever|egal|aber|but|ja ja)\b", re.IGNORECASE)
@@ -39,6 +56,7 @@ class Pending:
     to_space: str | None = None
     asset_type: str | None = None
     hint: dict | None = None
+    extra: dict | None = None  # remember/resolve: the fact to store; close: until and reason
 
 
 @dataclass
@@ -54,6 +72,10 @@ class GuideState:
     position: Position | None = None  # where the person stands; only the server sets it, one per conversation
     last_user_text: str = ""  # the person's latest message, set by the agent: guards read it, not the model
     walk: Walk | None = None  # the route handed out last: room sequence, mode (overview, guided), current step
+    knowledge: object | None = None  # KnowledgeStore (place knowledge) in a page session; None in the benchmark
+    author: str | None = None  # who is talking, as typed on the page ('Technician A'); facts record it
+    last_fact: dict | None = None  # the fact stored last in this conversation (for undo)
+    facts_lookup: object | None = None  # rooms -> short lines of facts valid now; walk.py reads it while guiding
 
     def begin_turn(self) -> None:
         """A card can only be answered in the very next message; later it is stale and dropped."""
@@ -409,6 +431,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             element: Name or id of the lift, staircase, door or room that is closed.
         """
         if names_a_time(state.last_user_text):  # a closure for later cannot be scheduled: never close it now
+            if state.knowledge is not None and knowledge_tools.parse_until(state.last_user_text, knowledge_tools.now()):
+                return as_json(TIMED_REPLY)
             return as_json(SCHEDULED_REPLY)
         try:
             target = bm.find_element(element)
@@ -434,6 +458,8 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         asset_type: str | None = None,
         hint: dict | None = None,
         when: str | None = None,
+        until: str | None = None,
+        reason: str | None = None,
     ) -> str:
         """Prepare a change to the building and return an understanding card. Changes nothing yet.
         Show the card to the person, wait for their explicit yes in their NEXT message, then call confirm_change.
@@ -457,12 +483,26 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 (metres, inside the room), plus optional {"rotation_deg": n}.
             when: Any time the person named for the change ("tomorrow", "from Monday", "next week", "morgen", "ab
                 Montag"). Scheduling does not exist: pass it and nothing is changed or proposed. Not for now, today, jetzt or heute.
+            until: close only: the end the person named for a closure that starts now ('until tomorrow', 'bis 14
+                Uhr', 'for two hours'). The closure then ends by itself; the card says until when.
+            reason: close only: why, in a few words ('broken', 'maintenance').
         """
-        if when_is_later(when) or names_a_time(state.last_user_text):  # decided on the person's own words too
+        timed = None
+        if action == "close" and state.knowledge is not None:  # place knowledge: 'out until tomorrow' is allowed
+            timed = knowledge_tools.closure_time(state.last_user_text, until, when, knowledge_tools.now())
+            if timed.scheduled:
+                state.pending = None
+                return as_json(SCHEDULED_REPLY)
+            if timed.unclear:
+                state.pending = None
+                return as_json({"needs_time": True, "question": knowledge_tools.ASK_UNTIL, "changed": False})
+        elif when_is_later(when) or names_a_time(state.last_user_text):  # decided on the person's own words too
             state.pending = None
             return as_json(SCHEDULED_REPLY)
         if action not in ACTIONS:
             raise ToolError(f"action must be one of {ACTIONS}.")
+        if action in KNOWLEDGE_ACTIONS:
+            raise ToolError("Call remember_here or resolve_here for this; they make the card.")
         if state.pending is not None and state.pending.turn == state.turn:
             raise ToolError("One proposal per message. Show the card you already made and wait for the answer.")
         state.pending = None
@@ -490,6 +530,13 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             card["effect on the whole building"] = removal_sentences(bm, element, other)
         elif action in ("widen_door", "move_asset", "add_asset"):
             card["effect on the whole building"] = edit_sentences(bm, preview.last_edit)
+        extra = None
+        if timed is not None and timed.at is not None:
+            until_text = knowledge_tools.until_words(timed.at, knowledge_tools.now())
+            card["I understood"] = f"{what.rstrip('.')} {until_text}" + (f" ({reason.strip()})." if reason else ".")
+            card["until"] = until_text
+            card["after that"] = "It opens again by itself."
+            extra = {"until": timed.at, "reason": reason}
         state.pending = Pending(
             action,
             element,
@@ -502,6 +549,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             to_space,
             asset_type,
             hint,
+            extra,
         )
         return as_json(card)
 
@@ -519,6 +567,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             raise ToolError("There is nothing to undo.")
         snapshot = state.undo[-1]
         check_undo_is_safe(snapshot)
+        knowledge_tools.undo_fact(bm, state, snapshot)  # a stored note only within two minutes
         preview = copy.deepcopy(bm)
         edit_ops.restore_snapshot(preview, snapshot)
         card = {
@@ -551,6 +600,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
         if pending.signature != building_signature(bm):
             raise ToolError("The building changed since this card was made. Call propose_change again.")
         left_before = walking.left_now(bm, state)
+        closure_until = None
         if confirmed and (not YES.search(user_reply) or NO.search(user_reply)):
             raise ToolError("That reply is not a clear yes. Ask the person again, then call propose_change anew.")
         if not confirmed:
@@ -559,11 +609,23 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             if not state.undo:
                 raise ToolError("There is nothing to undo.")
             check_undo_is_safe(state.undo[-1])
+            knowledge_tools.undo_fact(bm, state, state.undo[-1])
             snapshot = state.undo.pop()
             edit_ops.restore_snapshot(bm, snapshot)
+            knowledge_tools.undo_fact_apply(bm, state, snapshot)
             state.session = None
             state.signature = building_signature(bm)
             what = f"Undone: {snapshot.label}."
+        elif pending.action in KNOWLEDGE_ACTIONS:
+            snapshot = edit_ops.take_snapshot(bm)
+            stored = knowledge_tools.apply_pending(bm, state, pending)
+            if pending.action == "remember" and state.last_fact:  # 'undo that' takes the note back (2 minutes)
+                snapshot.label = f"remove the note '{pending.extra['text']}'"
+                snapshot.fact_at = state.last_fact["at"]
+                snapshot.after_signature = building_signature(bm)
+                state.undo.append(snapshot)
+            state.log.append({"turn": state.turn, "fact": pending.action})
+            return as_json({"applied": True, **stored})
         else:
             snapshot = edit_ops.take_snapshot(bm)
             try:
@@ -584,6 +646,15 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
             snapshot.label = undo_label(bm, pending.action, what, edit)
             snapshot.after_signature = building_signature(bm)
             state.undo.append(snapshot)
+            timed = (pending.extra or {}).get("until") if pending.action == "close" else None
+            if timed is not None:  # the closure ends by itself: stored as a closure fact with valid_to
+                target = bm.find_element(pending.element)
+                fact = knowledge_tools.store_closure(bm, state, target, timed, pending.extra.get("reason"))
+                snapshot.fact_at = state.last_fact["at"] if state.last_fact else None
+                what = f"{what.rstrip('.')} {knowledge_tools.until_words(timed, knowledge_tools.now())}."
+                closure_until = fact.get("valid_to")
+            if pending.action == "reopen":
+                knowledge_tools.end_closures(bm, state, bm.find_element(pending.element))
         output_directory.mkdir(parents=True, exist_ok=True)
         bm.save(output_directory / "building_edited.json")
         state.log.append({"turn": state.turn, "change": what})
@@ -597,6 +668,7 @@ def make_guide_tools(bm: BuildingMap, output_directory: Path, state: GuideState)
                 "effect": pending.card["effect on your last route"],
                 "all_closed": sorted(bm.closed),
                 **({"walk_update": update} if update else {}),
+                **({"closed_until": str(closure_until)} if closure_until else {}),
             }
         )
 

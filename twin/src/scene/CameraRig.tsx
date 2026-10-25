@@ -18,6 +18,9 @@ interface Props {
 
 const HOME_AZIMUTH = -Math.PI / 4;
 const PLAN_TILT = 0.004;
+/** The flattest 3D view: about 57 degrees from straight down. Flatter, walls hide each other and far labels pile
+ * up; this holds for every input (drag, Option + swipe, keys, the tilt buttons). */
+export const MAX_TILT = 1.0;
 
 /** camera-controls' fitToBox snaps the rotation to 90° steps; fitting the bounding sphere keeps the view angle. */
 function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 1.08, minRadius = 3) {
@@ -132,7 +135,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.maxZoom = Math.max(60, fit * 12);
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
-    c.maxPolarAngle = flat ? PLAN_TILT : Math.PI / 2 - 0.12;
+    c.maxPolarAngle = flat ? PLAN_TILT : MAX_TILT;
     // The plan may be rotated (right drag, two fingers) but never tilted; Home turns it back north up.
     c.minAzimuthAngle = -Infinity;
     c.maxAzimuthAngle = Infinity;

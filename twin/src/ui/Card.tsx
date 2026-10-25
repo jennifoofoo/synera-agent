@@ -403,18 +403,29 @@ function RouteCard({ model, route, details, note }: { model: BuildingModel; rout
   useEscape(end);
   const facts = routeFacts(model, route);
   const steps = walkLines(route.steps).map(readable);
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const toggleText = details ? "Details" : `${steps.length} ${steps.length === 1 ? "step" : "steps"}`;
+  const hasList = details ? true : steps.length > 0;
   return (
     <Sheet className="card-route" label={`Route to ${facts.destination}`} onClose={end}>
       <div className="route-head">
         <span className="route-dot" aria-hidden />
         <strong className="route-dest">{facts.destination}</strong>
       </div>
-      <RouteChips length={facts.length} lengthM={route.length_m} floors={facts.floors} stepFree={facts.stepFree} />
+      <div className="route-summary-row">
+        <RouteChips length={facts.length} lengthM={route.length_m} floors={facts.floors} stepFree={facts.stepFree} />
+        {hasList && (
+          <button type="button" className="link route-steps-toggle" aria-expanded={stepsOpen} onClick={() => setStepsOpen((v) => !v)}>
+            {toggleText}
+          </button>
+        )}
+      </div>
       <AvoidsClosed model={model} route={route} />
       {note && <div className="card-note">{note}</div>}
       {details ? (
-        <div className="card-text open route-details">{details}</div>
+        stepsOpen && <div className="card-text open route-details">{details}</div>
       ) : (
+        stepsOpen &&
         steps.length > 0 && (
           <ol className="route-steps">
             {steps.map((line, index) => (

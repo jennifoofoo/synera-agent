@@ -72,7 +72,7 @@ def open_page(context, url: str, errors: list[str]):
     page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
     page.on("console", lambda m: m.type == "error" and errors.append(f"console: {m.text}"))
     page.goto(f"{url}?building=dev/{BUILDING}")
-    page.wait_for_function(WAIT_MODEL, timeout=30000)
+    page.wait_for_function(WAIT_MODEL, timeout=90000)
     page.wait_for_timeout(1200)
     return page
 
@@ -83,7 +83,7 @@ def store(page, call: str) -> None:
 
 def set_route(page) -> None:
     store(page, f"route('{START}', '{DESTINATION}')")
-    page.wait_for_function(WAIT_ROUTE, timeout=15000)
+    page.wait_for_function(WAIT_ROUTE, timeout=60000)
 
 
 def settle(page, ms: int = 2600) -> None:

@@ -9,6 +9,7 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
+import { FloorRise } from "./FloorRise";
 import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
@@ -60,12 +61,12 @@ function Building({ model }: { model: BuildingModel }) {
         const visible = visibleFloors.has(floor.id);
         const showThings = visible && thingsMode !== "off" && (thingsMode === "all" || isFocused);
         return (
-          <group key={floor.id}>
+          <FloorRise key={floor.id} active={visible} y={floorY(floor.id)}>
             <FloorMesh floor={floor} model={model} y={floorY(floor.id)} ghost={false} visible={visible} />
             {roles.get(floor.id) === "outline" && <FloorOutline floor={floor} y={floorY(floor.id)} />}
             {showThings && <Things floor={floor} y={floorY(floor.id)} state={state} limit={thingsMode === "all" ? ALL_THINGS_LIMIT : NEAR_THINGS_LIMIT} flat={flat} />}
             {isFocused && visible && <Labels floor={floor} model={model} y={floorY(floor.id)} limit={flat ? (worker ? 30 : 80) : worker ? 14 : 36} flat={flat} />}
-          </group>
+          </FloorRise>
         );
       })}
       {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
@@ -155,12 +156,12 @@ export function Scene() {
       ) : (
         <PerspectiveCamera makeDefault fov={38} near={0.5} far={size * 12} position={[centre[0] + size, size * 0.9, centre[2] + size]} />
       )}
-      <color attach="background" args={[flat ? COLOURS.plan : COLOURS.background]} />
+      <color attach="background" args={[flat ? COLOURS.plan : COLOURS.groundOuter]} />
       {!flat && <fog attach="fog" args={[COLOURS.groundOuter, size * 2.5, size * 9]} />}
       {/* soft daylight: a bright sky dome, one steep key light for the wall tops, a cool fill from the other side */}
-      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, 1.6]} />
-      <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={1.3} color={COLOURS.sky} />
-      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.5} color={COLOURS.fill} />
+      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, 2.1]} />
+      <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={0.9} color={COLOURS.sky} />
+      <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.6} color={COLOURS.fill} />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}
