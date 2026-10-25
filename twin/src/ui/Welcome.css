@@ -26,6 +26,8 @@
 }
 .worker .welcome-title { font-size: var(--fs-20); }
 .worker .welcome-chip { min-height: 44px; font-size: 15px; }
+/* phone portrait: three chips, so the card does not cover most of the plan */
+@media (orientation: portrait) { .worker .welcome-chip:nth-child(n + 4) { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .welcome-card { animation: none; transition: opacity var(--t-base); }
