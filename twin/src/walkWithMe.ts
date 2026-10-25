@@ -5,7 +5,7 @@
 // as "estimated" with an uncertainty ring, and is never written to state.position or sent to the server as `here`.
 
 import { create } from "zustand";
-import type { BuildingState, Route } from "./api/types";
+import type { BuildingState, Point, Route } from "./api/types";
 import { createWalkWithMe, legsFromRoute, requestMotionPermission, type MotionStatus, type WalkPosition, type WalkWithMe } from "./motion";
 import { useTwin, walkSteps } from "./store";
 import { speak } from "./voice";
@@ -158,6 +158,54 @@ export function buildPlan(lines: string[], route: Pick<Route, "segments" | "floo
   return { steps, legGroup, rideStep };
 }
 
+// ---------- where the person is once a step is done (Next/Back without motion) ----------
+
+export interface StepPoint {
+  point: [number, number];
+  floorId: string;
+}
+
+function pointAlong(points: [number, number][], metres: number): [number, number] {
+  let left = Math.max(0, metres);
+  for (let i = 1; i < points.length; i++) {
+    const [ax, ay] = points[i - 1];
+    const [bx, by] = points[i];
+    const length = Math.hypot(bx - ax, by - ay);
+    if (left <= length && length > 0) return [ax + ((bx - ax) * left) / length, ay + ((by - ay) * left) / length];
+    left -= length;
+  }
+  const last = points[points.length - 1];
+  return [last[0], last[1]];
+}
+
+/** The route point at the start of step `step` (= the end of the step before it), on the same metres the plan uses
+ * for Walk with me: a ride step sits at the stairs/lift on the floor it leaves, the step after it at the start of
+ * the next floor's leg, the last step at the destination. Null without a route line. */
+export function stepStart(lines: string[], route: Pick<Route, "segments" | "floor_changes">, step: number): StepPoint | null {
+  const legs = legsFromRoute(route).filter((leg) => leg.points.length > 0);
+  if (!legs.length || !lines.length) return null;
+  const plan = buildPlan(lines, route);
+  const index = Math.max(0, Math.min(step, plan.steps.length - 1));
+  const at = (legIndex: number, metres: number): StepPoint => ({ point: pointAlong(legs[legIndex].points, metres), floorId: legs[legIndex].floorId });
+  const last = legs.length - 1;
+  if (index === plan.steps.length - 1 && index > 0) return at(last, Infinity); // arrival: the destination
+  const target = plan.steps[index];
+  if (index === 0 || target.kind === "start") return at(0, 0);
+  let offset = 0;
+  const inGroup: { legIndex: number; offset: number; length: number }[] = [];
+  legs.forEach((leg, legIndex) => {
+    const length = legLength(leg.points);
+    if (plan.legGroup[legIndex] === target.group) inGroup.push({ legIndex, offset, length });
+    offset += length;
+  });
+  if (!inGroup.length) return at(last, Infinity);
+  const end = inGroup[inGroup.length - 1];
+  if (target.kind === "ride") return at(end.legIndex, Infinity); // waiting at the stairs/lift, still on this floor
+  // A walk step starts on the first leg of its stretch that still lies ahead (after a ride: the new floor).
+  const leg = inGroup.find((entry) => entry.length > 1e-6 && entry.offset + entry.length > target.startM + 1e-6) ?? end;
+  return at(leg.legIndex, target.startM - leg.offset);
+}
+
 /** The step the estimate is in: the ride while waiting at stairs/lift, the last step on arrival. */
 export function stepFor(plan: Plan, p: WalkPosition): number | null {
   if (!plan.steps.length) return null;
@@ -296,18 +344,103 @@ function onUserStep(step: number): void {
   const p = walk.position();
   const plan = running.plan;
   const ride = p ? plan.rideStep[plan.legGroup[p.legIndex] ?? 0] : undefined;
-  if (p?.atConnector && ride !== undefined && step > ride) {
+  if (p?.atConnector && ride !== undefined && step === ride + 1) {
     walk.next(); // through the stairs/lift: Next button, "next" by voice or "Hey Wanda, next"
     return;
   }
-  const target = plan.steps[step];
-  if (target && target.kind !== "start") correct(() => walk?.resetTo({ distanceAlong: target.startM }));
+  // Same point as the confirmed dot (stepStart), so the estimate and the dot agree, also after a floor change.
+  const route = useTwin.getState().state?.route;
+  const at = route ? stepStart(walkSteps().map(readable), route, step) : null;
+  if (at) correct(() => walk?.resetTo({ point: at.point, floorId: at.floorId }));
+}
+
+// ---------- the confirmed dot: Next/Back say "I did this step" ----------
+// Pressing Next (button, list, "next" by voice) moves the "You are here" dot to the end of the step just done, Back
+// moves it back. It is set like "I'm here" (setHere: on screen at once, the server learns it as context.here with
+// the next chat message, never a call of its own). Steps driven by the Walk with me estimate do not move it.
+
+type Here = { space_id: string; floor_id: string; point?: Point | null };
+let beforeGuide: { position: BuildingState["position"]; pendingHere: Here | null } | null = null;
+let confirmedKey = "";
+
+function inPolygon(point: Point, polygon: Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function edgeDistance(point: Point, polygon: Point[]): number {
+  let best = Infinity;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [a, b] = [polygon[j], polygon[i]];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / l2)) : 0;
+    best = Math.min(best, Math.hypot(a[0] + t * dx - point[0], a[1] + t * dy - point[1]));
+  }
+  return best;
+}
+
+/** The room a route point lies in (a point on a door line: the nearest room). */
+function spaceAt(floorId: string, point: Point): string | null {
+  const spaces = useTwin.getState().model?.floorById.get(floorId)?.spaces ?? [];
+  const inside = spaces.filter((space) => inPolygon(point, space.polygon));
+  const pick = inside.find((space) => space.type !== "outdoor") ?? inside[0];
+  if (pick) return pick.id;
+  let best: { id: string; d: number } | null = null;
+  for (const space of spaces) {
+    const d = edgeDistance(point, space.polygon);
+    if (!best || d < best.d) best = { id: space.id, d };
+  }
+  return best?.id ?? null;
+}
+
+function confirmStep(step: number): void {
+  const { state } = useTwin.getState();
+  const route = state?.route;
+  if (!route?.ok) return;
+  const at = stepStart(walkSteps().map(readable), route, step);
+  const space = at ? spaceAt(at.floorId, at.point) : null;
+  if (!at || !space) return;
+  const point: Point = [Math.round(at.point[0] * 100) / 100, Math.round(at.point[1] * 100) / 100];
+  const here = { space_id: space, floor_id: at.floorId, point };
+  confirmedKey = `${at.floorId}|${space}|${point.join(",")}`;
+  if (running) running.position = confirmedKey; // ours, not a correction: the estimate is reset by onUserStep
+  useTwin.getState().setHere(here);
+}
+
+/** End of the guide: Done (on the last step) leaves the dot at the destination; End route midway puts back the
+ * position from before the guide, unless the person set one herself meanwhile. */
+function endGuide(lastStep: number): void {
+  const before = beforeGuide;
+  beforeGuide = null;
+  const total = walkSteps().length;
+  if (total && lastStep >= total - 1) {
+    confirmStep(total - 1);
+    return;
+  }
+  const state = useTwin.getState().state;
+  if (!before || !confirmedKey || positionKey(state) !== confirmedKey) return;
+  useTwin.setState({ state: state ? { ...state, position: before.position } : state, pendingHere: before.pendingHere });
 }
 
 if (typeof window !== "undefined") {
   useTwin.subscribe((state, prev) => {
-    if (state.walkStep !== prev.walkStep && state.walkStep !== null && prev.walkStep !== null && !driving && running) {
-      onUserStep(state.walkStep);
+    if (state.walkStep !== null && prev.walkStep === null) {
+      beforeGuide = { position: state.state?.position ?? null, pendingHere: state.pendingHere };
+      confirmedKey = "";
+    } else if (state.walkStep === null && prev.walkStep !== null) {
+      if (state.loading) beforeGuide = null; // another building opens: nothing to keep or put back
+      else endGuide(prev.walkStep);
+    }
+    if (state.walkStep !== prev.walkStep && state.walkStep !== null && prev.walkStep !== null && !driving) {
+      confirmStep(state.walkStep);
+      if (running) onUserStep(state.walkStep);
     }
     if (state.walkStep !== prev.walkStep || state.state !== prev.state || state.buildingKey !== prev.buildingKey) sync();
   });
@@ -321,4 +454,9 @@ if (typeof window !== "undefined") {
     instance().simulate(stepsPerSecond);
   };
   (window as unknown as { __walkMotion: typeof useWalkMotion }).__walkMotion = useWalkMotion;
+  // e2e: the confirmed dot's point for a step of the drawn route (stepStart on the guide's lines).
+  (window as unknown as { __walkStepStart: (step: number) => StepPoint | null }).__walkStepStart = (step) => {
+    const route = useTwin.getState().state?.route;
+    return route?.ok ? stepStart(walkSteps().map(readable), route, step) : null;
+  };
 }
