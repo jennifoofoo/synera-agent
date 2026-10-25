@@ -46,6 +46,7 @@ function fitHome(
   view: { width: number; height: number },
   animate: boolean,
   points?: THREE.Vector3[],
+  planner = false,
 ) {
   if (!(camera as THREE.PerspectiveCamera).isPerspectiveCamera || view.width < 1 || view.height < 1) {
     void c.rotateTo(azimuth, polar, animate);
@@ -53,7 +54,9 @@ function fitHome(
     return;
   }
   const probe = (camera as THREE.PerspectiveCamera).clone();
-  const chrome = view.width < 700 ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
+  // Phone chrome only on the phone profile: on the laptop a narrow map (next to the chat column) still has the
+  // floor rail on the right and the buttons on top.
+  const chrome = view.width < 700 && !planner ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
   const lo = new THREE.Vector2(-1 + (2 * chrome.left) / view.width, -1 + (2 * chrome.bottom) / view.height);
   const hi = new THREE.Vector2(1 - (2 * chrome.right) / view.width, 1 - (2 * chrome.top) / view.height);
   const direction = new THREE.Vector3().setFromSpherical(new THREE.Spherical(1, polar, azimuth));
@@ -316,7 +319,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       }
       for (const point of points) box.expandByPoint(point);
       if (box.isEmpty()) box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
-      fitHome(c, camera, box, HOME_AZIMUTH, polar, viewport, animate, points);
+      fitHome(c, camera, box, HOME_AZIMUTH, polar, viewport, animate, points, profile === "planner");
       return;
     }
     if (request.kind === "floor" && request.floorId) {
