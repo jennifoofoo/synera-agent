@@ -328,15 +328,17 @@ class App:
                 result = {**result, "here_ignored": here.reason}
             elif here.note:
                 result = {**result, "here_note": here.note}
-            session.position = chat.position_view()
-            session.guide_info = chat.guide_info()
-            session.step_free = chat.step_free(session.step_free)
             saved_path = result.pop("saved_path", None)
             with self.lock:
                 current = self.session(key)
                 level4 = self.level4.chat_info()
-                if current is not session:  # the building was reset while the agent was thinking
+                # The building was reset, or a fresh page load replaced the conversation, while the agent was
+                # thinking: this turn's position, guide and step-free belong to the old one and are not written back.
+                if current is not session or self.chats.get(key) is not chat:
                     return 200, {**result, "stale": True, "state": api.state_view(current), "level4": level4}
+                session.position = chat.position_view()
+                session.guide_info = chat.guide_info()
+                session.step_free = chat.step_free(session.step_free)
                 session.adopt_agent_route(previous_route, version)
                 opened = self.open_saved(chat, saved_path) if saved_path else None
                 if opened:  # the page switches to the new building and fetches it from /api/building
@@ -416,6 +418,7 @@ class App:
                 return 200, api.clear_route(session)
             if path == "/api/fresh":  # a fresh page load: nothing from an earlier load or another tab carries over
                 self.chats.pop(key, None)  # new conversation: no old position, walk or 'Where are you?' history
+                self.chat(key).set_step_free(session.step_free)  # step-free stays on (the chip still shows it)
                 session.position = session.guide_info = None
                 return 200, api.clear_route(session)
             if path == "/api/here/clear":  # the "You are here" chip's x: forget the position, no chat turn

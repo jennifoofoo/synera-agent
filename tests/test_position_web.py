@@ -116,3 +116,32 @@ def test_a_fresh_page_load_starts_without_position_route_or_conversation(monkeyp
     assert app.chat(key) is not old_chat
     _, building = app.get("/api/building", {"key": [key]})
     assert building["state"]["position"] is None and building["state"]["route"] is None
+
+
+def test_fresh_keeps_step_free_for_the_new_conversation(monkeypatch):
+    """Review: /api/fresh dropped the conversation but not session.step_free; the new one started with False and
+    the next turn wrote False back, so the chip said step-free while the agent routed over stairs."""
+    app, key = App(DATA), multi_floor_building_with_lift()
+    app.post("/api/step_free", {"building": key, "enabled": True})
+    app.post("/api/fresh", {"building": key})
+    assert app.chat(key).step_free_start is True
+    assert app.session(key).step_free is True
+
+
+def test_a_turn_in_flight_during_fresh_writes_nothing_back(monkeypatch):
+    """Review: a chat turn that was running when /api/fresh replaced the conversation wrote its old position back."""
+    app, key = App(DATA), multi_floor_building_with_lift()
+    monkeypatch.setattr("web.server.chat_available", lambda: True)
+    monkeypatch.setattr("web.chat.chat_available", lambda: True)
+    room = next(s for s in app.session(key).map.spaces.values() if s["type"] == "room")
+
+    def ask(adapter, text: str, selection=None, here=None) -> dict:
+        adapter.session = SimpleNamespace(guide=GuideState(), map=adapter.map)
+        adapter.apply_here(here)
+        app.post("/api/fresh", {"building": key})  # another tab loads while the agent is thinking
+        return {"reply": "ok", "backend": "fake"}
+
+    monkeypatch.setattr("web.chat.ChatAdapter.ask", ask)
+    _, reply = app.post("/api/chat", {"building": key, "message": "hi", "context": {"here": {"space_id": room["id"]}}})
+    assert reply["stale"] is True and reply["state"]["position"] is None
+    assert app.session(key).position is None

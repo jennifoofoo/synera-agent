@@ -183,8 +183,12 @@ interface TwinState {
   followUpOpen: boolean;
   followUpHeard: string;
 
-  loadBuildings: () => Promise<void>;
-  openBuilding: (key: string) => Promise<void>;
+  /** fresh: the real page load only (App's first call), see openBuilding. */
+  loadBuildings: (opts?: { fresh?: boolean }) => Promise<void>;
+  /** fresh: before loading, the server forgets the position, route and conversation an earlier load or another tab
+   * left (POST /api/fresh). Only the page load passes it: a building opened mid-session (Level 4 save, campus leg,
+   * the building menu) keeps its chat and route. */
+  openBuilding: (key: string, opts?: { fresh?: boolean }) => Promise<void>;
   applyState: (state: BuildingState) => void;
   setProfile: (profile: Profile | null) => void;
   setViewMode: (mode: ViewMode) => void;
@@ -236,8 +240,6 @@ export function setHandsFreeMuted(muted: boolean): void {
 }
 
 let messageId = 0;
-/** Buildings opened since this page loaded (see openBuilding: the first open starts fresh on the server). */
-const freshKeys = new Set<string>();
 let cameraNonce = 0;
 
 const prefersReducedMotion =
@@ -320,32 +322,30 @@ export const useTwin = create<TwinState>((set, get) => ({
   followUpOpen: false,
   followUpHeard: "",
 
-  async loadBuildings() {
+  async loadBuildings(opts = {}) {
     try {
       const [buildings, status] = await Promise.all([api.buildings(), api.status()]);
       set({ buildings, chatAvailable: status.chat_available, speechAvailable: status.speech_available });
       const wanted = new URLSearchParams(location.search).get("building") ?? localStorage.getItem("twin.building");
       const first = buildings.find((b) => b.key === wanted) ?? buildings.find((b) => b.key.includes("factory")) ?? buildings[0];
-      if (first && !get().buildingKey) await get().openBuilding(first.key);
+      if (first && !get().buildingKey) await get().openBuilding(first.key, opts);
     } catch (error) {
       set({ error: `Cannot reach the API: ${(error as Error).message}` });
     }
   },
 
-  async openBuilding(key) {
+  async openBuilding(key, opts = {}) {
     set({ loading: true, error: null, selection: null, popover: null, highlights: {}, chat: [], directions: null, walkStep: null, awaitingPlace: null });
     try {
-      const building = await api.building(key);
-      if (!freshKeys.has(key)) {
-        // First open in this page load: the server forgets the position, route and conversation that an earlier
-        // load or another tab left (the demo never starts with "You are here: Toilets" from before).
-        freshKeys.add(key);
+      if (opts.fresh) {
+        // The page load: the demo never starts with "You are here: Toilets" or a route from before.
         try {
-          building.state = (await api.fresh(key)).state;
+          await api.fresh(key);
         } catch {
           /* an older server without /api/fresh: keep its state */
         }
       }
+      const building = await api.building(key);
       const model = buildModel(building);
       localStorage.setItem("twin.building", key);
       set({

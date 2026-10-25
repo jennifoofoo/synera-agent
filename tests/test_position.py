@@ -471,3 +471,40 @@ def test_equally_near_rooms_with_the_same_name_route_to_the_nearer(bm, monkeypat
     result = nearest(bm, start, "kitchen")
     assert result["needs_choice"] is False and result["nearest"]["space_id"] == ids[1]
     assert "control_sentence" in result
+
+
+def test_a_mixed_tie_lists_each_name_once(bm, monkeypatch):
+    """Review: two equally near rooms with one name plus a third made 'Toilets or Toilets or Kitchenette'."""
+    ids = kitchens_by_floor_ids(bm)[:3]
+    if len(ids) < 3:
+        pytest.skip("needs three kitchens")
+    twin = {**bm.spaces[ids[1]], "name": bm.spaces[ids[0]]["name"], "floor_id": bm.spaces[ids[0]]["floor_id"]}
+    monkeypatch.setitem(bm.spaces, ids[1], twin)
+    other = {**bm.spaces[ids[2]], "name": "Zz other kitchen", "floor_id": bm.spaces[ids[0]]["floor_id"]}
+    monkeypatch.setitem(bm.spaces, ids[2], other)
+    lengths = {ids[0]: 20.3, ids[1]: 20.0, ids[2]: 20.6}
+    monkeypatch.setattr(position_module, "lengths_from", lambda *args, **kwargs: lengths)
+    start = make_position(bm, kitchens_by_floor_ids(bm)[-1], None, "said", 0)
+    result = nearest(bm, start, "kitchen")
+    assert result["needs_choice"] is True
+    assert [entry["space_id"] for entry in result["tied"]] == [ids[1], ids[2]]
+    assert result["question"].count(bm.spaces[ids[0]]["name"]) == 1
+
+
+def test_the_page_note_comes_again_when_the_turn_failed(bm, tmp_path):
+    """Review: a failed API call removed the note from the history but kept told_position, so it never came again."""
+    room = next(s for s in bm.spaces.values() if s["type"] == "room" and s["name"])
+    agent = Agent(bm, tmp_path, client=object())
+    sent: list[str] = []
+
+    def fail(text):
+        sent.append(text)
+        raise RuntimeError("api down")
+
+    agent.run_tools = fail
+    agent.guide.position = make_position(bm, room["id"], None, "click", agent.guide.turn + 1)
+    with pytest.raises(RuntimeError):
+        agent.ask("I'm here.")
+    agent.run_tools = lambda text: sent.append(text) or "ok"
+    agent.ask("I'm here.")
+    assert sent[0].startswith("(Page note") and sent[1].startswith("(Page note")

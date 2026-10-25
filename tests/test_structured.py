@@ -79,7 +79,7 @@ def test_several_numbers_on_the_answer_line_are_flagged():
     assert "warnings" not in structured_entry("q", "count", bm, "Answer: 13")
 
 
-def test_located_spaces_longest_name_first_and_own_room_excluded():
+def test_located_spaces_names_only_clear_destinations():
     from types import SimpleNamespace
 
     from building_agent.structured import located_spaces
@@ -92,6 +92,8 @@ def test_located_spaces_longest_name_first_and_own_room_excluded():
         "t1": {"id": "t1", "name": "Toilets", "floor_id": "F1"},
         "t0": {"id": "t0", "name": "Toilets", "floor_id": "F0"},
         "k": {"id": "k", "name": "Kitchenette", "floor_id": "F1"},
+        "s": {"id": "s", "name": "South Corridor", "floor_id": "F0", "type": "corridor"},
+        "l": {"id": "l", "name": "Lift A", "floor_id": "F0", "type": "lift"},
     }
     bm = SimpleNamespace(spaces=spaces, floors=floors)
 
@@ -99,6 +101,9 @@ def test_located_spaces_longest_name_first_and_own_room_excluded():
         return [entry["space_id"] for entry in located_spaces(bm, reply, exclude)]
 
     assert ids("Project Room West is on the Ground floor, next to the Foyer.", "c") == ["a"]
-    assert ids("Go via the Project Room to the toilets.") == ["b", "t0", "t1"]
+    assert ids("Go via the Project Room to the toilets.") == ["b"]  # 'Toilets' is shared: no guess
+    assert ids("Take Lift A through the South Corridor to the Kitchenette.") == ["k"]  # ways are not places
+    assert ids("Project Room West is free. Want directions from the Foyer?") == ["a"]
+    assert ids("Do you mean the Kitchenette or Project Room?") == []  # options in a question
     assert ids("The Kitchenettes are closed. Kitchenette on Floor 1.") == ["k"]
     assert ids("Nothing here.") == []

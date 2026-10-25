@@ -50,18 +50,25 @@ def located_entries(bm: BuildingMap, reply: str = "") -> list[dict]:
 MAX_LOCATED_SPACES = 6
 
 
+GENERIC_SPACE_TYPES = {"corridor", "stair", "lift", "outdoor"}  # 'take the stairs' is a way, not a destination
+
+
 def located_spaces(bm: BuildingMap, reply: str, exclude: str | None = None) -> list[dict]:
-    """Rooms the reply names, in the order it names them, for the page (highlight and camera; no facts change).
+    """Rooms the reply names as statements, in its order, for the page (highlight and camera; no facts change).
 
     'Where is Project Room West?', an event's room or 'the Kitchenette on Floor 1' only exist as text: the page had
-    nothing to show. Longest names win ('Project Room West' is not also 'Project Room'); a name several rooms share
-    gives all of them. `exclude` is the person's own room (a reply says 'from the Foyer')."""
+    nothing to show. Longest names win ('Project Room West' is not also 'Project Room'). Left out, so the camera never
+    flies somewhere wrong: rooms named only in a question ('the Café or the Foyer?', 'directions from the Foyer?'),
+    names several spaces share ('Toilets'), corridors, stairs, lifts and outdoor areas, and `exclude` (the person's
+    own room)."""
     text = reply.casefold()
-    names = sorted(
-        {space["name"].strip() for space in bm.spaces.values() if len(str(space.get("name") or "").strip()) >= 3},
-        key=len,
-        reverse=True,
-    )
+    for question in re.finditer(r"[^.!?\n]*\?", text):  # a question names options, not the answer
+        text = text[: question.start()] + " " * (question.end() - question.start()) + text[question.end() :]
+    count: dict[str, int] = {}
+    for space in bm.spaces.values():
+        name = str(space.get("name") or "").strip()
+        count[name] = count.get(name, 0) + 1
+    names = sorted((name for name in count if len(name) >= 3), key=len, reverse=True)
     taken = [False] * len(text)
     hits: list[tuple[int, str]] = []
     for name in names:
@@ -72,20 +79,20 @@ def located_spaces(bm: BuildingMap, reply: str, exclude: str | None = None) -> l
             hits.append((match.start(), name))
     entries: list[dict] = []
     for _, name in sorted(hits):
-        rooms = sorted(
-            (s for s in bm.spaces.values() if str(s.get("name") or "").strip() == name and s["id"] != exclude),
-            key=lambda s: (bm.floors[s["floor_id"]]["level"], s["id"]),
-        )
-        for space in rooms:
-            if len(entries) < MAX_LOCATED_SPACES and all(e["space_id"] != space["id"] for e in entries):
-                entries.append(
-                    {
-                        "space_id": space["id"],
-                        "space_name": space["name"],
-                        "floor_id": space["floor_id"],
-                        "floor_level": bm.floors[space["floor_id"]]["level"],
-                    }
-                )
+        if count[name] != 1:
+            continue
+        space = next(s for s in bm.spaces.values() if str(s.get("name") or "").strip() == name)
+        if space["id"] == exclude or space.get("type") in GENERIC_SPACE_TYPES:
+            continue
+        if len(entries) < MAX_LOCATED_SPACES and all(e["space_id"] != space["id"] for e in entries):
+            entries.append(
+                {
+                    "space_id": space["id"],
+                    "space_name": space["name"],
+                    "floor_id": space["floor_id"],
+                    "floor_level": bm.floors[space["floor_id"]]["level"],
+                }
+            )
     return entries
 
 

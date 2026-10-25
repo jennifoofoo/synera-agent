@@ -211,10 +211,14 @@ def nearest(
         "others": [entry(*item) for item in ranked[1:3]],
         "needs_choice": False,
     }
-    tied = [item for item in ranked if item[1] - ranked[0][1] <= TIE_M][:MAX_OPTIONS]
+    tied: list[tuple[str, float]] = []
+    for item in ranked:  # the nearest of each label ("Toilets", "Toilets", "Kitchenette": two options)
+        if item[1] - ranked[0][1] <= TIE_M and all(place_label(bm, item[0]) != place_label(bm, t[0]) for t in tied):
+            tied.append(item)
+    tied = tied[:MAX_OPTIONS]
     # Rooms with the same name on the same floor ("Toilets" or "Toilets"?) give the person nothing to choose by:
     # the shorter route wins. A question only when the tied rooms can be told apart.
-    if len(tied) > 1 and len({place_label(bm, space_id) for space_id, _ in tied}) > 1:
+    if len(tied) > 1:
         listed = " or ".join(place_label(bm, space_id) for space_id, _ in tied)
         result["needs_choice"] = True
         result["tied"] = [entry(*item) for item in tied]

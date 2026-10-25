@@ -193,12 +193,14 @@ class Agent(StarterAgent):
         prompt = base + EMERGENCY_RULES if urgent or self.emergency else base  # this turn only
         self.emergency = urgent
         self.system[0]["text"] = with_voice_rules(prompt, voice, user_text)  # this turn only
+        told = getattr(self.guide, "told_position", None)
         note = page_note(self.map, self.guide)  # a position tapped on the page since the last message
         try:
             reply = self.run_tools(f"{note}\n{user_text}" if note else user_text)
             return question_last(reply) if voice_applies(voice, user_text) else reply
         except Exception:
             del self.messages[mark:]
+            self.guide.told_position = told  # the note left the history with the turn: send it again next time
             raise
         finally:
             self.system[0]["text"] = base

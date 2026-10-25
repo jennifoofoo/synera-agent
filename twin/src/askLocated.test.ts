@@ -30,6 +30,21 @@ function setup() {
 const reply = (extra: Partial<ChatReply>): ChatReply =>
   ({ reply: "The kitchen is the Kitchenette on Floor 1.", located: [], state: emptyState, ...extra }) as ChatReply;
 
+describe("openBuilding starts fresh only on the page load", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("calls /api/fresh before loading with fresh, never without it", async () => {
+    const building = { key: "b", floors, spaces, assets: [], openings: [], connectors: [], state: emptyState } as unknown as Building;
+    const order: string[] = [];
+    const fresh = vi.spyOn(api, "fresh").mockImplementation(async () => (order.push("fresh"), { state: emptyState }));
+    vi.spyOn(api, "building").mockImplementation(async () => (order.push("building"), building));
+    await useTwin.getState().openBuilding("b"); // Level 4 save, campus leg, building menu
+    expect(fresh).not.toHaveBeenCalled();
+    await useTwin.getState().openBuilding("b", { fresh: true }); // App's first loadBuildings
+    expect(order).toEqual(["building", "fresh", "building"]);
+  });
+});
+
 describe("ask shows the rooms a reply names", () => {
   afterEach(() => vi.restoreAllMocks());
 

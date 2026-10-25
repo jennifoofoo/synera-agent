@@ -554,7 +554,15 @@ def test_chat_reply_carries_the_rooms_the_reply_names(app, key, monkeypatch):
     """Regression (phone verifier): 'Where is Project Room West?' or an event's room came back with located=[] and
     the map did not move. The reply's named rooms come back as located_spaces (the page highlights and flies)."""
     bm = app.session(key).map
-    room = max((s for s in bm.spaces.values() if len(s["name"] or "") >= 3), key=lambda s: len(s["name"]))
+    names = [s["name"] for s in bm.spaces.values()]
+    room = max(
+        (
+            s
+            for s in bm.spaces.values()
+            if len(s["name"] or "") >= 3 and names.count(s["name"]) == 1 and s["type"] == "room"
+        ),
+        key=lambda s: len(s["name"]),
+    )
     monkeypatch.setattr("web.server.chat_available", lambda: True)
     monkeypatch.setattr("web.chat.chat_available", lambda: True)
     monkeypatch.setattr(
