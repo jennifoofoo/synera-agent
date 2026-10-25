@@ -45,6 +45,11 @@ Belegt (fast fertig, kommen in Kürze nach `main`):
 Frei für Leonie: `ui/Walk.tsx` ("Walk with me" ist auf `main`) und alles in `scene/` außer Labels, Markers, poiIcons (3D-Look).
 **Bis zum Freeze nur Fixes, mit einer Ausnahme als Wow-Effekt: Ortswissen mit Zeit** (Notizen, Probleme, Sperrungen "bis morgen" an Ort oder Gerät), Spec `docs/specs/place-knowledge.md`, wartet auf euer Okay. Leonie baut die Seite gegen den Vertrag dort.
 
+## Für Leonies 3D-Look (Jennifers Test 02:50)
+- Boden in 3D: das Punkteraster füllt bei flachem Blick die halbe Fläche bis zum Horizont und wirkt unruhig. Besser: sehr blasses Raster, das mit der Entfernung ausblendet, oder einfarbiger Boden.
+- Kippen begrenzt auf etwa 55 bis 60 Grad und weit entfernte Etiketten ausblenden: macht `fix/twin-trackpad` (Kamera, kleine Änderung in Labels.tsx).
+- Fadenkreuz des Tipp-Pins kürzer: macht `fix/twin-pin-label`.
+
 ## Sprache, Handtest Jennifer (25.10. nachts), Fix läuft auf `fix/twin-voice-wake-followup`
 - "Hey Wanda" wird als "Evander" / "E Wander" erkannt, der Satz geht dann als Frage an den Agenten ("Hey Evander"). Fix: Wake Word per Ähnlichkeit am Satzanfang, auch bei "Talk" abschneiden, nur "Hey Wanda" ergibt "I'm here."
 - Folge-Modus: nach jeder gesprochenen Antwort etwa 8 s zuhören, ohne Wake Word und ohne Knopf.
