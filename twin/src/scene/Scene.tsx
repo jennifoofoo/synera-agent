@@ -14,6 +14,7 @@ import { Labels } from "./Labels";
 import { Markers } from "./Markers";
 import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
+import { RoundMarks } from "./RoundMarks";
 import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
 import { Things } from "./Things";
 
@@ -80,6 +81,7 @@ function Building({ model }: { model: BuildingModel }) {
         flat={flat}
       />
       <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
+      <RoundMarks floorY={floorY} visibleFloors={visibleFloors} reducedMotion={reducedMotion} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
     </group>
   );

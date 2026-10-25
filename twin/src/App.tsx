@@ -14,6 +14,7 @@ import { Recenter } from "./ui/Recenter";
 import { TopBar } from "./ui/TopBar";
 import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
+import { Round } from "./ui/Round";
 import { Walk } from "./ui/Walk";
 
 /** One screen: the building, one input, one card. Everything else only when needed. */
@@ -45,6 +46,7 @@ export function App() {
       <Recenter />
       <ChangesPill />
       <Planner />
+      <Round />
       <Phone />
       <div className="dock">
         <CampusCard />
