@@ -41,8 +41,11 @@ def backend_name() -> str:
 class ChatAdapter:
     """One per loaded building. ask() returns {'reply', 'backend'} and never raises."""
 
-    def __init__(self, building_dir: Path, building_map: BuildingMap, level4=None, campus_source=None) -> None:
+    def __init__(
+        self, building_dir: Path, building_map: BuildingMap, level4=None, campus_source=None, knowledge=None
+    ) -> None:
         self.building_dir = building_dir
+        self.knowledge = knowledge  # the page's shared KnowledgeStore, so chat and facts API see the same facts
         self.map = building_map
         self.level4 = level4  # web.level4_api.PlanStudio: the page's floor plan draft, shared with the agent
         self.campus_source = campus_source  # callable returning the page's CampusHolder (or None): one campus for both
@@ -125,7 +128,10 @@ class ChatAdapter:
         campus = self.campus_source() if self.campus_source else None
         if self.session is None:
             self.session = Session(
-                self.map, OUTPUT_DIRECTORY / self.building_dir.name, **({"campus": campus} if campus else {})
+                self.map,
+                OUTPUT_DIRECTORY / self.building_dir.name,
+                **({"campus": campus} if campus else {}),
+                **({"knowledge": self.knowledge} if self.knowledge is not None else {}),
             )
             self.watch_saves(self.session)
             self.add_level4_tools()
@@ -182,7 +188,7 @@ class ChatAdapter:
 
     def move_to(self, building_dir: Path, building_map: BuildingMap) -> "ChatAdapter":
         """The conversation continues on another building (the one just saved); this adapter starts over."""
-        moved = ChatAdapter(building_dir, building_map, self.level4, self.campus_source)
+        moved = ChatAdapter(building_dir, building_map, self.level4, self.campus_source, self.knowledge)
         moved.session, self.session = self.session, None
         if moved.session is not None:
             moved.session.install_building(building_map)

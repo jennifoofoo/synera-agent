@@ -412,3 +412,16 @@ def _routes(bm, start, end) -> bool:
         return len(walking.build_walk(bm, routing.route(bm, start, end)).steps) >= walking.MIN_STEPS_FOR_OVERVIEW
     except MapError:
         return False
+
+
+def test_here_with_a_named_machine_of_the_room_anchors_on_the_machine(setup):
+    bm, state, tools = setup
+    press = asset_named(bm, "Drill press H-A1")
+    state.position = make_position(bm, press["space_id"], None, "said", 0)
+    say(state, "remember here: the drill press is leaking oil")
+    call(tools, "remember_here", text="the drill press is leaking oil")
+    assert state.pending.extra["anchor"]["asset_id"] == press["id"]
+    say(state, "remember here: the floor is wet")
+    state.pending = None
+    call(tools, "remember_here", text="the floor is wet")
+    assert state.pending.extra["anchor"]["asset_id"] is None  # nothing named: the note stays on the room

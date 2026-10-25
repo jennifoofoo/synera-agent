@@ -413,6 +413,20 @@ def here_anchor(bm: BuildingMap, state) -> Anchor:
     return space_anchor(bm, position.space_id, position.point)
 
 
+def asset_in_text(bm: BuildingMap, space_id: str, text: str) -> str | None:
+    """The one asset of this room the words name ('the drill press drips' in a zone with one drill press), else
+    None. Several of that kind in the room, or none named: the note stays on the room."""
+    said = f" {' '.join(words_of(text))} "
+    named = [
+        asset["id"]
+        for asset in bm.assets.values()
+        if asset["space_id"] == space_id
+        and (f" {' '.join(words_of(asset['name']))} " in said or f" {' '.join(words_of(asset['type']))} " in said)
+    ]
+    kinds = {bm.assets[asset_id]["type"] for asset_id in named}
+    return named[0] if len(named) == 1 and len(kinds) == 1 else None
+
+
 def resolve_anchor(bm: BuildingMap, state, place: str | None) -> Anchor:
     """The place the person means: their position for 'here', else an asset, a lift/stair/door, or a room.
 
@@ -711,6 +725,9 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             raise ToolError("text is empty: ask what to remember.")
         try:
             anchor = resolve_anchor(bm, state, place)
+            if anchor.asset_id is None and anchor.element_id is None:  # 'here: the drill press drips'
+                named = asset_in_text(bm, anchor.space_id, clean)
+                anchor = asset_anchor(bm, named) if named else anchor
             others = [resolve_anchor(bm, state, other) for other in (related or [])[:5] if not is_here(other)]
         except NeedsAnswer as asked:
             return as_json({**asked.payload, "stored": False})
