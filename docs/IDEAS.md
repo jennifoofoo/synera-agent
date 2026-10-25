@@ -391,3 +391,22 @@ Position und letzter Standort pro Sitzung (`state.position`), Sprachregeln, Kart
 - **Falsche Erinnerungen:** ein veralteter Schreibtisch führt in den falschen Raum. Erinnerungen immer mit Alter nennen ("du hast vor 3 Tagen gesagt …") und bei Routen bestätigen lassen.
 - **Prinzip bleibt:** Fakten über das Gebäude kommen weiter nur aus dem deterministischen Kern, das Gedächtnis liefert nur Wünsche und Bezüge der Person.
 - Wertung: Benchmark prüft das nicht. Gut für Interaction und den Pitch ("Wanda kennt dich"). Nicht vor dem Freeze bauen.
+
+## 14. Evakuierungsmodus an alle offenen Handys (Idee von Jennifer, 25.10.2026 früh)
+
+### Idee
+Der Facility Manager löst am Laptop "Evakuierung" aus (optional mit Gefahrenbereich, z. B. "Brand in Halle B"). Jedes Handy, auf dem die Seite für dieses Gebäude offen ist, wird in Echtzeit rot: Vibration, Wanda spricht, die Route zum nächsten Ausgang ab dem eigenen Standort startet automatisch und weicht dem Gefahrenbereich aus. Knopf "Ich bin draußen", der Laptop sieht "3 von 4 draußen".
+
+### Was heute schon da ist
+- `find_exit` (schnellster und zweiter Ausgang, nie Aufzug, fester Hinweis "folge den echten Schildern"), Notfall-Regeln im Prompt.
+- Sperrungen: der Gefahrenbereich ist eine Sperrung, Routen weichen aus.
+
+### Was gebaut werden müsste (ca. 2 bis 2,5 h)
+- Server: `POST /api/alert` und `GET /api/alert?key=` pro Gebäude (Zeitstempel, Gefahrenbereich).
+- Handy: alle 2 s nachfragen (Polling statt Push, läuft auch über den Tunnel), roter Vollbildhinweis, automatische Route zum Ausgang.
+- Laptop: Knopf mit Karte und Ja (wie jede Änderung), optional Rückmeldungen zählen.
+
+### Risiken und Haken
+- "Eingeloggt" heißt nur "Seite offen": keine Konten, kein Push bei gesperrtem Handy. Echte Benachrichtigung gehört auf die Roadmap.
+- Sicherheitsfunktion: muss zuverlässig sein, ein Fehlalarm in der Live-Demo ist schlimmer als keine Funktion.
+- Widerspricht "Nicht bauen: Mehrnutzer" in `docs/PLAN_SUNDAY.md`. Entscheidung Jennifer: erst muss alles andere sleek sein, dann eventuell.
