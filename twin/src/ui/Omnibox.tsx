@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { setHandsFreeMuted, useTwin } from "../store";
-import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, withoutIds, type Listener } from "../voice";
 import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
 import { parseWake } from "../wake";
@@ -606,7 +606,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
             onClick={walking ? undefined : () => inputRef.current?.focus()}
           >
             {mode === "speaking" && !walking && <span className="wb-kicker">Speaking · </span>}
-            <span className="wb-text">{caption}</span>
+            <span className="wb-text">{withoutIds(caption)}</span>
           </div>
           {!walking && (
             <button
