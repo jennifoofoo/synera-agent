@@ -260,6 +260,16 @@ function sharedBoundaries(first: Point[], second: Point[]): Gap[] {
 }
 
 /**
+ * Width used for drawing only (routing and answers read the data, never this). Doors and entrances are drawn 0.5 to 5 m wide,
+ * kind "opening" (open passages, factory bays up to 20 m in the kit data) 0.5 to 25 m; missing, zero, negative or NaN becomes 0.9 m.
+ */
+export function drawnWidth(opening: Opening): number {
+  const raw = opening.width_m;
+  if (typeof raw !== "number" || !(raw > 0)) return 0.9;
+  return Math.min(opening.kind === "opening" ? 25 : 5, Math.max(0.5, raw));
+}
+
+/**
  * The cuts an opening makes into the walls, gaps as segments in model metres (empty: nothing to cut).
  * - between two spaces: width_m centred on `position` projected onto the shared boundary of the two polygons,
  *   clamped to that boundary (an opening of kind "opening" wider than the boundary opens all of it).
@@ -268,7 +278,7 @@ function sharedBoundaries(first: Point[], second: Point[]): Gap[] {
  */
 export function openingCuts(opening: Opening, polygons: Point[][]): Cut[] {
   if (!polygons.length) return [];
-  const width = opening.width_m && opening.width_m > 0 ? opening.width_m : 0.9;
+  const width = drawnWidth(opening);
   if (polygons.length >= 2) {
     // Between two spaces the gap lies on their shared boundary, whatever else is near the position.
     let best: { segment: Gap; s: number; length: number; distance: number } | null = null;

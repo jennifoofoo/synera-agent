@@ -128,3 +128,45 @@ def test_cli_json_and_exit_code(tmp_path):
     )
     assert bad.returncode == 1
     assert json.loads(bad.stdout)["status"] == "FAIL"
+
+
+# ---------- plausibility ----------
+
+
+def _plausibility(findings):
+    return [f for f in findings if f.check == "plausibility" and f.level == preflight.WARN]
+
+
+def _ids(findings):
+    return {i for f in _plausibility(findings) for i in f.ids}
+
+
+def test_plausibility_flags_absurd_dimensions_without_changing_data(tmp_path):
+    directory, building = _copy(tmp_path)
+    doors = [o for o in building["openings"] if o["kind"] == "door"][:3]
+    for opening, width in zip(doors, (500.0, 0.0, float("nan")), strict=True):
+        opening["width_m"] = width
+    room = building["spaces"][0]
+    room["area_m2"] = -12.0
+    _write(directory, building)
+    before = (directory / "building.json").read_bytes()
+    findings = preflight.run(directory, DATA)
+    assert {doors[0]["id"], doors[1]["id"], doors[2]["id"], room["id"]} <= _ids(findings)
+    assert not [f for f in _levels(findings, preflight.FAIL) if f.check == "plausibility"]
+    assert (directory / "building.json").read_bytes() == before
+
+
+@pytest.mark.parametrize("prefix", SOURCES)
+def test_real_buildings_have_no_plausibility_warning(prefix):
+    assert not _plausibility(preflight.run(_first_of(prefix), DATA))
+
+
+def test_all_kit_buildings_have_no_plausibility_warning():
+    from starter_agent.building_map import BuildingMap
+
+    dirs = sorted(path.parent for path in DATA.glob("*/*/building.json"))
+    if not dirs:
+        pytest.skip("no data/")
+    for directory in dirs:
+        found = [f for f in preflight.check_plausibility(BuildingMap.load(directory)) if f.level != preflight.OK]
+        assert not found, directory.name
