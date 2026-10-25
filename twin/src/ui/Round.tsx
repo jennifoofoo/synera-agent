@@ -112,7 +112,7 @@ export function RoundCard() {
       <PhoneSheet open onClose={endRound} label="Inspection round">
         <section className="card round-panel round-panel-here" aria-label="Inspection round">
           <RoundBar />
-          <p className="round-note">You are in {stop.name}. Check it, then tap Done.</p>
+          <p className="round-note">{stop.device ? `${stop.device} is here in ${stop.name}.` : `You are in ${stop.name}.`} Check it, then tap Done.</p>
         </section>
       </PhoneSheet>
     );
@@ -120,7 +120,7 @@ export function RoundCard() {
   if (!round.open) return null;
 
   const { plan, whatIf, picking, busy, error, checked, finished, suggestion, pendingDoor } = round;
-  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings);
+  const startId = plan?.startId ?? round.startId ?? hereId ?? entranceRoom(model.building.openings, model.building.spaces);
   const startKind = round.startId ? null : hereId ? "Here" : "Entrance";
   const hintType = round.type || types[0]?.[0] || "fire_extinguisher";
   const hintArea = round.area && round.area !== "Whole building" ? ` on the ${round.area.toLowerCase()}` : "";
@@ -268,13 +268,13 @@ export function RoundCard() {
                 <span>Start: {plan.startName}</span>
               </li>
               {plan.stops.map((stop, index) => {
-                const done = checked.includes(stop.spaceId);
+                const done = checked.includes(stop.key);
                 return (
-                  <li key={stop.spaceId} className={done ? "done" : ""}>
+                  <li key={stop.key} className={done ? "done" : ""}>
                     <button className="round-stop" onClick={() => useTwin.getState().flyTo(stop.assetIds[0] ?? stop.spaceId)}>
                       <span className="round-num">{done ? "✓" : index + 1}</span>
-                      <span className="round-stop-name">{stop.name}</span>
-                      <span className="round-muted">{assetLabel(plan.type, stop.assetIds.length)}</span>
+                      <span className="round-stop-name">{stop.device || stop.name}</span>
+                      <span className="round-muted">{stop.device ? stop.name : assetLabel(plan.type, stop.assetIds.length)}</span>
                     </button>
                   </li>
                 );

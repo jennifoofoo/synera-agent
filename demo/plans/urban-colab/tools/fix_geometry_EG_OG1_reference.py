@@ -1,15 +1,15 @@
+# ruff: noqa: SIM115  (one-off data scripts)
 """Clean the Urban Colab geometry: rectilinear corridors, rooms cut out of corridors, no overlaps, exits from the plan.
 All space, opening and asset ids stay; new exits get new ids appended at the end."""
 
 import json
 import sys
-from pathlib import Path
 
 from shapely.geometry import MultiPolygon, Point, Polygon, box
 from shapely.ops import nearest_points, unary_union
 
 path = sys.argv[1]
-b = json.loads(Path(path).read_text())
+b = json.load(open(path))
 P = "plan-89323a15-"
 sp = {s["id"].replace(P, ""): s for s in b["spaces"]}
 geo = {k: Polygon(s["polygon"]).buffer(0) for k, s in sp.items()}
@@ -192,7 +192,7 @@ for a in b["assets"]:
         reassigned.append((a["id"][-6:], "none", k, "moved in"))
         a["space_id"] = P + k
 
-Path(path).write_text(json.dumps(b, ensure_ascii=False, indent=1))
+json.dump(b, open(path, "w"), ensure_ascii=False, indent=1)
 print("moved doors:", moved)
 print("doors without a shared wall:", broken)
 print("devices reassigned:", reassigned)

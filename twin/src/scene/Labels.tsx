@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
+import { GROW_FROM_SCREENS } from "../model/assetHeights";
 import { controlsRef } from "./FloorMesh";
 import { wallHeightFor } from "./geometry";
 import type { Asset, Point, Space } from "../api/types";
@@ -8,13 +9,13 @@ import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
 import { useMapZoom, type MapTier } from "./mapZoom";
 import { areasOf, type Area } from "./areas";
-import { prettyType } from "../model/palette";
+import { prettyType, spaceGroup } from "../model/palette";
 import { clusterDisruptions } from "./Markers";
 import { closedConnectorStops } from "../model/closures";
 import { HERE_RIM_PX, LABEL_LIFT, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_STALK_M } from "./markerLayout";
 import { LIFT as ROUTE_LIFT } from "./RouteLine";
 import { useLandmarks } from "./landmarks";
-import { blocked, capped, densityBudget, rankOfClass, type LabelClass } from "./labelRules";
+import { blocked, capped, densityBudget, mapRoomName, rankOfClass, type LabelClass } from "./labelRules";
 import { useRound } from "../round/round";
 import { labelDecision } from "./Declutter";
 import { crispCentre, roundedPosition } from "./crispHtml";
@@ -44,7 +45,7 @@ const HALO_PAD_PX = 2; // 3D room names are halo text (no box): the halo reaches
 const POI_DOT_PX = 10;
 const POI_BADGE_3D_PX = 20;
 const POI_TEXT_GAP_PX = 4;
-const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet", "meeting"]);
+const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet", "meeting", "kitchen"]);
 const GAP_PX = 4; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
@@ -72,7 +73,7 @@ interface Box {
 }
 
 type Item =
-  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean }
+  | { kind: "poi"; id: string; point: Point; poi: PoiKind; title: string; closed?: boolean; room?: boolean; named?: string }
   | { kind: "tag"; id: string; point: Point; dx: number }
   | { kind: "room"; id: string; point: Point; space: Space }
   | { kind: "area"; id: string; point: Point; area: Area }
@@ -100,7 +101,7 @@ const LAYOUT_HYSTERESIS = { hold: GAP_PX / 4, reveal: 0 };
 function classOf(item: Item, zones: ReadonlySet<string>, roundStopId: string | null): LabelClass {
   switch (item.kind) {
     case "poi":
-      return item.closed ? "closure" : item.poi === "extinguisher" ? "furniture" : "poi";
+      return item.closed ? "closure" : item.room ? "roomSymbol" : item.poi === "extinguisher" ? "furniture" : "poi";
     case "tag":
       return "closure";
     case "thing":
@@ -173,14 +174,24 @@ function spanOf(polygon: Point[]): [number, number] {
   return [maxX - minX, maxY - minY];
 }
 
-const MEETING_ROOMS: ReadonlySet<string> = new Set(["meeting_room", "seminar_room", "lecture_hall", "library"]);
-
+/** The symbol of a room: every coloured room carries its colour group's symbol (never colour without a symbol), from
+ * the same mapping as the room colours (palette.ts spaceGroup): stairs or lift, toilet (toilets, bathrooms, locker
+ * rooms), the cup (kitchens, canteens, whether or not a coffee machine stands there), meeting. */
 function poiKindOf(space: Space, model: BuildingModel): PoiKind | null {
   const connector = model.connectorBySpace.get(space.id);
   if (connector) return connector.kind === "lift" ? "lift" : "stairs";
-  if (space.room_type === "toilet") return "toilet";
-  if (MEETING_ROOMS.has(space.room_type)) return "meeting";
-  return null;
+  switch (spaceGroup(space.type, space.room_type, { name: space.name })) {
+    case "vertical":
+      return space.type === "lift" || space.room_type === "lift" ? "lift" : "stairs";
+    case "sanitary":
+      return "toilet";
+    case "food":
+      return "kitchen";
+    case "meeting":
+      return "meeting";
+    default:
+      return null;
+  }
 }
 
 /** What one zoom tier shows, in priority order (earlier items win collisions). Deterministic: sorted by a fixed
@@ -195,6 +206,7 @@ function candidates(
   landmarks: ReadonlySet<string>,
   closedStops: ReadonlyMap<string, string>,
   roundStopId: string | null,
+  overview: boolean,
 ): { items: Item[]; classes: Map<Item, LabelClass> } {
   const pois: Item[] = [];
   const later: Item[] = []; // symbols that yield to room names (fire extinguishers: many, and not sought after)
@@ -202,23 +214,28 @@ function candidates(
   for (const space of floor.spaces) {
     const poi = poiKindOf(space, model);
     const closed = closedStops.has(space.id);
-    if (poi) pois.push({ kind: "poi", id: space.id, point: space.anchor, poi, title: closed ? `${space.name || closedStops.get(space.id)} (closed)` : space.name, closed });
+    if (poi) pois.push({ kind: "poi", id: space.id, point: space.anchor, poi, title: closed ? `${space.name || closedStops.get(space.id)} (closed)` : space.name, closed, room: true });
     else if (space.name && space.type !== "outdoor" && space.type !== "corridor") rooms.push(space);
   }
   for (const opening of floor.openings) {
-    if (opening.kind === "entrance")
-      pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
-    else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
+    if (opening.kind === "entrance") {
+      // Exits from the mid tier on: in the overview a dozen exit badges along the facade crowd the calm plan.
+      if (!overview)
+        pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
+    } else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
   }
   // 2D, from mid on: the amenity symbols (coffee, printer, first aid, and the fire extinguishers after the room
   // names). Landmarks of the current directions always carry their name; machine names from near on (mapZoom.ts).
   const landmarkItems: Item[] = [];
   const machineNames: Item[] = [];
+  const kitchens = new Set(pois.flatMap((item) => (item.kind === "poi" && item.poi === "kitchen" ? [item.id] : [])));
   if (flat) {
     for (const asset of floor.assets) {
       // Fire extinguishers hang every few metres: only from near on, else they pepper the overview.
       const kind = amenityKindOf(asset.type);
-      const amenity = kind && (tier === "near" || tier === "mid") ? kind : null;
+      // A coffee machine in a kitchen: the kitchen's own cup already says it.
+      const inKitchen = kind === "coffee" && kitchens.has(asset.space_id);
+      const amenity = kind && !inKitchen && (tier === "near" || tier === "mid") ? kind : null;
       if (amenity) (amenity === "extinguisher" ? later : pois).push({ kind: "poi", id: asset.id, point: asset.position, poi: amenity, title: asset.name });
       if (landmarks.has(asset.id)) landmarkItems.push({ kind: "thing", id: asset.id, point: asset.position, asset, landmark: true });
       else if (tier === "near" && asset.category === "machine" && asset.name)
@@ -227,7 +244,7 @@ function candidates(
     landmarkItems.sort((a, b) => a.id.localeCompare(b.id));
     machineNames.sort((a, b) => a.id.localeCompare(b.id));
   }
-  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, meeting: 4, step: 5, firstaid: 6, extinguisher: 7, coffee: 8, printer: 9 };
+  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, meeting: 4, kitchen: 5, step: 6, firstaid: 7, extinguisher: 8, coffee: 9, printer: 10 };
   const rankOf = (item: Item) => (item.kind === "poi" ? poiRank[item.poi] : 0);
   pois.sort((a, b) => rankOf(a) - rankOf(b) || a.id.localeCompare(b.id));
   later.sort((a, b) => a.id.localeCompare(b.id));
@@ -278,6 +295,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const zoom = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy, floor.bounds.size);
   const scale = zoom.scale;
   const tier: MapTier = flat || zoom.tier !== "area" ? zoom.tier : "far"; // 3D keeps its own labels
+  // The overview: 2D at the area and far tiers; 3D while the whole floor fits the screen (a small building is
+  // near-tier sized already there, the same rule as the furniture height, model/assetHeights.ts growth).
+  const screenPx = useThree((s) => Math.max(s.size.width, s.size.height));
+  const overview = flat ? tier === "area" || tier === "far" : floor.bounds.size / scale / Math.max(1, screenPx) < GROW_FROM_SCREENS;
   useEffect(() => {
     if (flat) (window as unknown as { __twinMapZoom?: unknown }).__twinMapZoom = { tier, scale };
   }, [flat, tier, scale]);
@@ -431,7 +452,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       // marked rooms are pills in both views
       const mark = marks.get(item.id)!;
       const dest = mark.kind === "end";
-      const chars = item.kind === "room" ? item.space.name.length * (dest ? DEST_CHAR_PX : CHAR_PX) : 0;
+      const chars = item.kind === "room" ? mapRoomName(item.space.name).length * (dest ? DEST_CHAR_PX : CHAR_PX) : 0;
       const box = boxOf(item.point, chars / 2 + (dest ? DEST_PAD_PX : PILL_PAD_PX), (dest ? DEST_H_PX : PILL_H_PX) / 2, mark.lift);
       if (!free(box, `room-${item.id}`)) continue;
       kept.push(box);
@@ -466,7 +487,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       return routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)));
     };
     const roomBoxes = new Map<string, Box>();
-    const { items: all, classes: candidateClasses } = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops, roundStopId);
+    const { items: all, classes: candidateClasses } = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops, roundStopId, overview);
     const showTag = tier === "mid" || tier === "near"; // "Closed" beside a closed glyph, from the mid tier on
     // Closed lifts and stairs come first in `all`; once they are placed, each gets its "Closed" tag (right of the
     // glyph, else left), before any other symbol or name.
@@ -489,19 +510,36 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       if (!tagsDone && !(item.kind === "poi" && item.closed)) placeTags();
       if (item.kind === "door" || item.kind === "tag") continue; // doors after the second lines, below
       if ((marks.has(item.id) && !(item.kind === "poi" && item.closed)) || replaced.has(item.id)) continue; // a closed glyph always shows
-      const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
+      const text = item.kind === "room" ? mapRoomName(item.space.name) : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
       // Halo text in both views (3D keeps a 2 px margin for the halo); 3D symbols are a dot or a badge with a name.
       const pillPad = flat || item.kind === "poi" ? 0 : HALO_PAD_PX;
       const poi3d = !flat && item.kind === "poi" ? poiLayout3d(item, tier) : null;
-      const halfW = poi3d ? poi3d.halfW : (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
+      // 3D: this layout is in plan metres, not on the tilted screen, so a symbol's name (drawn to its right) would
+      // block a neighbouring room's symbol that is far away on screen; a room symbol claims only its badge here and
+      // Declutter.tsx settles real overlaps of the names on screen. A coloured room never loses its symbol to that.
+      const badgeOnly = !!poi3d && item.kind === "poi" && !!item.room;
+      const halfW = poi3d ? (badgeOnly ? poi3d.size / 2 : poi3d.halfW) : (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
       const halfH = poi3d ? poi3d.size / 2 : item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 + (flat ? 0 : 2) : LABEL_H_PX / 2;
       // An area name may also move up or down a little (inside the area) to make way for a symbol.
       const shifts = item.kind === "area" ? [0, AREA_SHIFT_PX, -AREA_SHIFT_PX] : [0];
       for (const shift of shifts) {
         const point: Point = shift ? [item.point[0], item.point[1] - shift * scale] : item.point;
         if (item.kind === "area" && shift && !item.area.polygons.some((polygon) => insidePolygon(point, polygon))) continue;
-        const box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
-        if (poi3d) {
+        let box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
+        let flatNamed = "";
+        if (flat && item.kind === "poi" && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title && (tier === "mid" || tier === "near")) {
+          // 2D: like 3D, the symbol of a room keeps its name beside it when that is free (else the symbol alone).
+          const name = mapRoomName(item.title);
+          const extra = POI_TEXT_GAP_PX + name.length * CHAR_PX; // the symbol and its name are centred together
+          const wide = { ...box, x0: box.x0 - extra / 2, x1: box.x1 + extra / 2 };
+          const room = model.spaceById.get(item.id);
+          const fits = !room || (POI_PX + extra) * scale <= spanOf(room.polygon)[0] * 1.05; // never across the walls
+          if (fits && free(wide, `poi-${item.id}`) && !onRoute(wide)) {
+            box = wide;
+            flatNamed = name;
+          }
+        }
+        if (poi3d && !badgeOnly) {
           // the badge sits on the point, its name to the right: shift the box so it covers both and nothing else
           box.x0 += poi3d.shift;
           box.x1 += poi3d.shift;
@@ -509,11 +547,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         const key = `${item.kind}-${item.id}`;
         const cls = candidateClasses.get(item) ?? "room";
         if (!free(box, key)) continue;
+        // 2D: a name wider than its room would run across the walls: it waits for a closer zoom (selected rooms keep theirs).
+        if (flat && item.kind === "room" && item.id !== selectedId && text.length * CHAR_PX * scale > spanOf(item.space.polygon)[0] * 1.1) continue;
         if ((item.kind === "room" || item.kind === "area") && selectedPx && boxOnPolygon(box, selectedPx)) continue;
         if ((item.kind === "room" || item.kind === "area" || (item.kind === "thing" && !item.landmark)) && onRoute(box)) continue; // landmarks keep their name on the route
         if (capped(cls) && !budget.take(box)) continue; // the density cap drops the lowest ranked first
         kept.push(box);
-        result.push(shift ? { ...item, point } : item);
+        result.push(shift ? { ...item, point } : flatNamed && item.kind === "poi" ? { ...item, named: flatNamed } : item);
         classes.set(key, cls);
         if (item.kind === "room") roomBoxes.set(item.id, box);
         if (item.kind === "poi" && item.closed) closedPlaced.push(item);
@@ -544,6 +584,8 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     for (const item of all) {
       if (item.kind !== "door") continue;
+      // Clear widths are a detail of the selected room (its doors), never debug text on every wide door.
+      if (!selectedId || !model.openingById.get(item.id)?.space_ids.includes(selectedId)) continue;
       const box = boxOf(item.point, (item.text.length * DOOR_CHAR_PX) / 2, DOOR_H_PX / 2);
       if (!free(box, `door-${item.id}`) || !budget.take(box)) continue;
       kept.push(box);
@@ -552,7 +594,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     lastShown.current = new Set(classes.keys());
     return { shown: result, pins, classes };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId, walking]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId, walking, overview]);
 
   return (
     <group position-y={y + 0.5}>
@@ -610,8 +652,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
             {flat ? (
-              <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-label-class={classes.get(`poi-${item.id}`) ?? "poi"} data-poi-space={item.id}>
+              <div className="zoom-fade poi-flat" style={item.named ? { transform: `translateX(${-(POI_TEXT_GAP_PX + item.named.length * CHAR_PX) / 2}px)` } : undefined} data-zoom-kind={`poi-${item.poi}`} data-label-class={classes.get(`poi-${item.id}`) ?? "poi"} data-poi-space={item.id}>
                 <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
+                {item.named && (
+                  <span className="label label-halo label-plan poi-pin-name">
+                    <NameWithNumber name={item.named} />
+                  </span>
+                )}
               </div>
             ) : (
               <PoiPin item={item} tier={tier} labelClass={classes.get(`poi-${item.id}`) ?? "poi"} />
@@ -691,7 +738,7 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
         // right from the first paint (Declutter may measure before the effect snaps it to whole pixels)
         style={crisp ? { transform: above ? `translate(-50%, calc(-100% - ${lift}px))` : "translate(-50%, -50%)" } : undefined}
       >
-        <NameWithNumber name={item.space.name} />
+        <NameWithNumber name={mapRoomName(item.space.name)} />
       </div>
     </Html>
   );
@@ -718,7 +765,7 @@ function NameWithNumber({ name }: { name: string }) {
 function poiLayout3d(item: Extract<Item, { kind: "poi" }>, tier: MapTier): { size: number; text: string; halfW: number; shift: number } {
   const badge = tier !== "far" || item.closed;
   const size = badge ? POI_BADGE_3D_PX : POI_DOT_PX;
-  const text = badge && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title ? item.title : "";
+  const text = badge && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title ? mapRoomName(item.title) : "";
   const textW = text ? POI_TEXT_GAP_PX + text.length * CHAR_PX : 0;
   return { size, text, halfW: (size + textW) / 2, shift: textW / 2 };
 }

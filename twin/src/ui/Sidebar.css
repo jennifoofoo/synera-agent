@@ -103,6 +103,7 @@
 /* empty: Wanda's welcome, the same words and chips as the welcome card on the map, set in the column */
 .sb-log-empty { justify-content: center; }
 .sb-welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 0 0 8vh; animation: sb-in var(--t-base) both; }
+.sb-welcome-fairy { margin: 0 0 10px -4px; } /* FairyFigure.tsx, Wanda above her greeting */
 .sb-welcome .welcome-title { font-size: var(--fs-28); text-wrap: balance; }
 .sb-welcome .welcome-sub { margin: 6px 0 18px; font-size: var(--fs-16); }
 .sb-welcome .welcome-chips { justify-content: flex-start; gap: 8px; }
@@ -110,8 +111,10 @@
 .sb-welcome .welcome-chip:hover { box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--hairline-strong); }
 
 /* ---- the card slot, right above the composer: route, place, walk, round and notes cards ---- */
-.sb-dock { flex: none; max-height: 58%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px var(--sb-pad) 10px; }
+.sb-dock { flex: none; max-height: 68%; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px var(--sb-pad) 10px; }
 .sb-dock:empty { display: none; }
+/* stacked cards keep their height (the dock scrolls) instead of being squeezed or cut */
+.sb-dock > * { flex: none; }
 .sidebar .card { box-shadow: var(--shadow-soft); }
 /* The reply card would repeat the newest answer, which stands in full in the conversation: only its route line
    (length, Guide me, End route) stays. */
@@ -153,6 +156,9 @@
 .omnibox.docked .ob-mic,
 .omnibox.docked .ob-chips,
 .omnibox.docked .wb-ask { display: none; }
+/* walking and idle: the bar has no caption of its own, so it says what the orb does instead of staying blank */
+.omnibox.docked:not(:has(> .omnibox-input)) .wb-text:empty::before { content: "Say “next” or “back”"; }
+.omnibox.docked:not(:has(> .omnibox-input)) .wanda-bar:has(.wb-orb.muted) .wb-text:empty::before { content: "Muted. Tap the orb to talk again"; }
 .omnibox.docked .ob-status { align-self: stretch; justify-content: center; }
 
 @media (prefers-reduced-motion: reduce) { .sb-msg, .sb-welcome { animation: none; } }

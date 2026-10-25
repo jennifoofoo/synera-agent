@@ -110,14 +110,12 @@ def test_the_agent_records_the_latest_message(tmp_path):
     def fake_ask(self, text):
         return "ok"
 
-    import starter_agent.agent as starter
-
-    original = starter.BuildingAgent.ask
-    starter.BuildingAgent.ask = fake_ask
+    original = Agent.run_tools
+    Agent.run_tools = fake_ask
     try:
         agent.ask("close it from Monday")
     finally:
-        starter.BuildingAgent.ask = original
+        Agent.run_tools = original
     assert agent.guide.last_user_text == "close it from Monday"
 
 

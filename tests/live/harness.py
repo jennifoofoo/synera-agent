@@ -6,11 +6,12 @@ keyed by script turns, model and prompt/tool version, so reruns without changes 
 import hashlib
 import json
 import re
+import sys
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
 from building_agent import exit_tools, guide_tools, knowledge_tools, pace_guide, position_tools, walk
 from building_agent.knowledge import KnowledgeStore
@@ -18,7 +19,8 @@ from building_agent.registry import load_kinds
 from building_agent.voice_rules import VOICE_RULES
 from starter_agent.building_map import BuildingMap
 
-LIVE_MODEL = "claude-sonnet-5-5"
+LIVE_MODEL = agent_module.CHAT_MODEL  # the live suite tests the page conversation: same model and effort
+LIVE_EFFORT = agent_module.CHAT_EFFORT
 LIVE_CACHE = Path("agent_output") / "live_cache"
 TICK = "<tick>"  # a user turn that is the page's timer tick (empty message, context.guide_tick true)
 LIVE_USAGE = Path("agent_output") / "live_usage.jsonl"  # one line of token counts per uncached script, for spend
@@ -113,7 +115,12 @@ def calls_in(new_messages: list[dict]) -> list[Call]:
 
 
 def cache_file(
-    building_directory: Path, user_turns: list[str], model: str, voice: bool = False, pace: str = "off"
+    building_directory: Path,
+    user_turns: list[str],
+    model: str,
+    voice: bool = False,
+    pace: str = "off",
+    seed: Callable | None = None,
 ) -> Path:
     version = (
         agent_module.PERSONA
@@ -129,6 +136,8 @@ def cache_file(
     raw = json.dumps([building_directory.name, user_turns, model, version] + ([VOICE_RULES] if voice else []))
     if pace != "off":  # pace runs get their own key (and one that follows the wiring); other keys stay as they were
         raw += pace + Path(pace_guide.__file__).read_text(encoding="utf-8")
+    if seed is not None:  # seeded facts (events) get their own key that follows the seed's code
+        raw += seed.__qualname__ + Path(sys.modules[seed.__module__].__file__).read_text(encoding="utf-8")
     return LIVE_CACHE / f"{hashlib.sha256(raw.encode()).hexdigest()}.json"
 
 
@@ -139,22 +148,28 @@ def run_script(
     use_cache: bool = True,
     voice: bool = False,
     pace: str = "off",
+    seed: Callable | None = None,
 ) -> Transcript:
     """Play the user turns in order against one fresh agent on one building (voice: the page's spoken-reply flag,
-    pace: the page's auto-pace switch; the turn TICK is the timer tick)."""
-    path = cache_file(building_directory, user_turns, model, voice, pace)
+    pace: the page's auto-pace switch; the turn TICK is the timer tick; seed(map, store) fills the fresh knowledge
+    store first, for example with events)."""
+    path = cache_file(building_directory, user_turns, f"{model}:{LIVE_EFFORT}", voice, pace, seed)
     if use_cache and path.exists():
         saved = json.loads(path.read_text(encoding="utf-8"))
         return Transcript([Turn(t["user"], t["reply"], [Call(**c) for c in t["calls"]]) for t in saved])
-    previous_model = starter_module.MODEL
-    starter_module.MODEL = model
     scratch = Path("agent_output") / "live_scratch"
     scratch.mkdir(parents=True, exist_ok=True)
     knowledge_root = tempfile.TemporaryDirectory(dir=scratch, prefix="knowledge-")
     try:  # like the page's Session: place knowledge on, with a fresh store per script so runs never leak facts
         agent = agent_module.Agent(
-            BuildingMap.load(building_directory), scratch, knowledge=KnowledgeStore(Path(knowledge_root.name))
+            BuildingMap.load(building_directory),
+            scratch,
+            knowledge=KnowledgeStore(Path(knowledge_root.name)),
+            model=model,
+            effort=LIVE_EFFORT,
         )
+        if seed is not None:
+            seed(agent.map, agent.guide.knowledge)
         turns = []
         for user_text in user_turns:
             seen = len(agent.messages)
@@ -168,7 +183,6 @@ def run_script(
         with LIVE_USAGE.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps({"turns": user_turns[:1], **agent.usage}) + "\n")
     finally:
-        starter_module.MODEL = previous_model
         knowledge_root.cleanup()
     LIVE_CACHE.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps([asdict(turn) for turn in turns], ensure_ascii=False), encoding="utf-8")

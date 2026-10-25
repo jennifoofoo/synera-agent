@@ -26,6 +26,8 @@ button {
 button:hover { background: var(--hairline-strong); }
 /* glass buttons on the canvas: hover brightens to solid white, never a dark wash */
 .recenter:hover, .planner-toggle:hover, .campus-recenter:hover, .campus-view-toggle:hover, .hf-btn:hover, .building-name:hover { background: var(--surface); }
+/* an ON hands-free button keeps its blue on hover (its icon is white) */
+.hf-btn.on:hover { background: var(--signal-dark); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 button.active { background: var(--signal-soft); box-shadow: inset 0 0 0 1.5px var(--signal); }
 button.danger { box-shadow: inset 0 0 0 1px var(--danger); color: var(--danger); }
@@ -177,7 +179,7 @@ button.x:hover { color: var(--text); background: transparent; }
 .app.planner .floorrail { left: auto; right: calc(var(--right-inset, 0px) + 12px); transition: right var(--t-fast, 150ms ease-out); }
 @media (prefers-reduced-motion: reduce) { .app.planner .floorrail { transition: none; } }
 /* the List button (top right, about 44 px tall) must never cover the floor rail when a sheet pushes the rail up */
-.app.planner.flat.directions-open .floorrail { top: max(calc(var(--top-inset, 0px) + 8px), 64px); }
+.app.planner.directions-open .floorrail { top: 64px; }
 .chip {
   display: inline-flex; align-items: center; gap: 5px; font-size: 12px; line-height: 16px; font-weight: 600; padding: 3px 9px;
   border-radius: var(--radius-pill); white-space: nowrap; background: var(--ink); border: 0; color: var(--surface);

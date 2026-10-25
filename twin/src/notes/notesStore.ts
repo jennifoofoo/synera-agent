@@ -13,7 +13,7 @@ import { metresLeft, readable } from "../walkInfo";
 import { normalizeSpeech } from "../wake";
 import { prettyType } from "../model/palette";
 import { endRound, useRound, type RoundStop } from "../round/round";
-import { isCurrent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
+import { isCurrent, isUpcomingEvent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
 
 /** The name notes are signed with until the person types their own (remembered per device). */
 export const DEFAULT_AUTHOR = "Technician";
@@ -55,8 +55,9 @@ export interface Job {
 
 /** What a round job records besides the common fields. lengthM of the job is the round's planned length. */
 export interface RoundJob {
+  /** spaceId holds the stop's key (the device id; the room id for a round of rooms), name the device or room. */
   stops: { spaceId: string; name: string }[];
-  /** Stops checked (space ids), in the order they were checked. */
+  /** Stops checked (stop keys, see RoundStop.key), in the order they were checked. */
   checked: string[];
   /** The leg being walked now (one route): where it goes, how long it is, how far the walker got on it. */
   legTo: string | null;
@@ -244,7 +245,7 @@ export function notesIn(spaceIds: Iterable<string>): Note[] {
   const now = Date.now();
   return useNotes
     .getState()
-    .notes.filter((note) => note.kind !== "closure" && ids.has(note.anchor.space_id) && isCurrent(note, now))
+    .notes.filter((note) => note.kind !== "closure" && ids.has(note.anchor.space_id) && (isCurrent(note, now) || isUpcomingEvent(note, now)))
     .sort(newestFirst);
 }
 
@@ -418,7 +419,10 @@ export function roundTitle(type: string, stops: number): string {
 function legNow(): Pick<RoundJob, "legTo" | "legLengthM" | "legMaxStep" | "legWalkedM"> {
   const route = useTwin.getState().state?.route;
   const ok = route?.ok && typeof route.length_m === "number";
-  return { legTo: ok ? (route.destination ?? null) : (currentStop()?.spaceId ?? null), legLengthM: ok ? Math.round(route.length_m as number) : 0, legMaxStep: 0, legWalkedM: 0 };
+  // No route: the next device is in the room the walker is in; the planned leg (a few metres along the wall) counts.
+  const { plan, index } = useRound.getState();
+  const planned = currentStop() ? Math.round(plan?.legsM?.[index] ?? 0) : 0;
+  return { legTo: currentStop()?.key ?? (ok ? (route.destination ?? null) : null), legLengthM: ok ? Math.round(route.length_m as number) : planned, legMaxStep: 0, legWalkedM: 0 };
 }
 
 function legClosures(): string[] {
@@ -441,7 +445,7 @@ function startRoundJob(): void {
     lengthM: plan.lengthM ? Math.round(plan.lengthM) : null,
     walkedM: 0,
     closures: legClosures(),
-    round: { stops: plan.stops.map((stop) => ({ spaceId: stop.spaceId, name: stop.name })), checked: [...checked], walkedBeforeM: 0, ...legNow() },
+    round: { stops: plan.stops.map((stop) => ({ spaceId: stop.key, name: stop.device || stop.name })), checked: [...checked], walkedBeforeM: 0, ...legNow() },
   };
   useNotes.setState({ job, dismissed: [], guide: null });
 }

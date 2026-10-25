@@ -187,7 +187,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
               {fact.text}
               <span className="kg-muted">
                 {" "}
-                · {fact.anchor}
+                {fact.role === "event" ? "· Event " : ""}· {fact.anchor}
                 {fact.person ? ` · ${fact.person}` : ""}
                 {fact.state === "ended" ? " · ended" : ""}
               </span>

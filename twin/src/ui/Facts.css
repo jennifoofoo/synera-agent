@@ -58,6 +58,7 @@
   display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 3px; font-size: 11px; font-weight: 700; line-height: 17px;
   text-transform: uppercase; letter-spacing: 0.04em; color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
+.note-kind.event { color: var(--ink-2); background: var(--paper-2); }
 .note-row.past { opacity: 0.72; }
 .note-row.past .note-text { font-size: 14px; }
 .note-history-toggle { margin-top: 8px; padding: 0; min-height: 28px; font-size: 13px; }
@@ -165,3 +166,8 @@
 }
 .note-name input:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 .note-tip { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-2); }
+
+/* phone: a pin is 22 px small, its tap area is not (an invisible margin around it) */
+.worker .note-pin::before { content: ""; position: absolute; inset: -10px -8px; }
+.worker .note-pin-pop { max-width: calc(100vw - 16px); }
+.worker .note-pin-pop .note-more, .worker .card button.link.note-more { min-height: 40px; }

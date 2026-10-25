@@ -56,13 +56,19 @@
 .poi-pin-entrance, .poi-pin-lift, .poi-pin-stairs { --poi: var(--signal); }
 .poi-pin-extinguisher { --poi: var(--safety-red); }
 .poi-pin-firstaid { --poi: var(--safety-green); }
+/* Same look as the 2D plan: a white chip with a dark glyph (safety symbols keep their norm colour). The overview dot
+   below keeps the symbol colour. */
 .poi-pin .poi-badge {
-  width: 20px; height: 20px; background: var(--poi); color: var(--surface);
-  box-shadow: 0 0 0 1.5px var(--surface), 0 2px 6px rgba(29, 36, 48, 0.22);
+  width: 20px; height: 20px; background: var(--glass-strong, #fff); color: var(--ink);
+  box-shadow: 0 1px 2px rgba(29, 36, 48, 0.18), 0 0 0 1px rgba(29, 36, 48, 0.05);
 }
+.poi-pin-extinguisher .poi-badge, .poi-pin-firstaid .poi-badge { background: var(--poi); color: #fff; }
 .poi-pin .poi-badge svg { width: 13px; height: 13px; }
 .poi-pin.poi-pin-dot { width: 10px; height: 10px; }
-.poi-pin.poi-pin-dot .poi-badge { width: 10px; height: 10px; box-shadow: 0 0 0 1.5px var(--surface), 0 1px 3px rgba(29, 36, 48, 0.25); }
+.poi-pin.poi-pin-dot .poi-badge { width: 10px; height: 10px; background: var(--poi); box-shadow: 0 0 0 1.5px var(--surface), 0 1px 3px rgba(29, 36, 48, 0.25); }
 .poi-pin.poi-pin-dot .poi-badge svg { display: none; }
 .poi-pin .poi-badge.poi-closed { background: var(--surface); color: var(--ink-2); }
 .poi-pin-name { position: absolute; left: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
+
+/* 2D: the symbol of a room with its name beside it (the badge stays centred on the point) */
+.poi-flat { position: relative; display: flex; align-items: center; justify-content: center; }

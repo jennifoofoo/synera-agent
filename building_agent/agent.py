@@ -4,11 +4,13 @@ Reuses the starter agent loop; swaps in our tools (building_agent/tools.py) and 
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
 import anthropic
 
+import starter_agent.agent as starter_module
 from building_agent import routing
 from building_agent.campus_tools import CampusHolder
 from building_agent.exit_tools import EMERGENCY_RULES, is_emergency
@@ -26,6 +28,11 @@ CACHE_DIRECTORY = Path("agent_output") / "cache"
 KNOWLEDGE_ROOT = Path("agent_output") / "knowledge"  # facts per building, shared with the page's facts API
 RETRIES = 3
 RETRYABLE = (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError)
+# The page conversation (chat and voice, Session) answers with a faster model; the benchmark (answer, Agent)
+# keeps the starter's MODEL and EFFORT (Opus, medium). The live suite tests the page conversation with these.
+CHAT_MODEL = os.environ.get("CHAT_MODEL", "claude-sonnet-5-5")
+# Sonnet at low effort failed 3 live rule tests (directions, change effect, ambiguous kitchens); medium passes all.
+CHAT_EFFORT = os.environ.get("CHAT_EFFORT", "medium")
 
 PERSONA = (  # last in the system prompt: at the start it shifted behaviour (pace, guide, forged-position live tests)
     "\n\nYou are Wanda, a friendly building guide. Keep facts exact; a light, warm tone is fine. "
@@ -96,7 +103,12 @@ a card: say it in one or two sentences, wait for a clear yes in the next message
 asks (needs_choice, where_are_you, needs_time), ask that. While guiding, a bare 'done' or 'erledigt' is a step.
 - 'What's here?', notes for a place, history ('this week'), open issues by type or area, what a person reported, what \
 is closed now, 'show me the photo': facts_here with the matching filters. Say at most three, each with since and by; \
-never add facts. A guided step with 'fact': read that one line after the step."""
+never add facts. A guided step with 'fact': read that one line after the step.
+- Events, sessions, deadlines and room bookings ('where are the pitches?', 'where is X happening?', 'wann ist der Code \
+Freeze?', 'what is on now?', 'is the Project Room free at 10:00?'): find_events (query = title words, when = their time \
+words, place = the room for 'is room Y free'). Say title, room and time only from its result, never invent a time, \
+room or booking; if free is false say what it is booked for, by whom and until when. Then offer the way to that room \
+(give_directions after their yes)."""
 
 
 CAMPUS_RULES = """
@@ -126,8 +138,11 @@ class Agent(StarterAgent):
         client: anthropic.Anthropic | None = None,
         campus: CampusHolder | None = None,
         knowledge=None,
+        model: str | None = None,
+        effort: str | None = None,
     ) -> None:
         self.campus = campus  # several buildings: adds the campus tools and rules
+        self.model, self.effort = model, effort  # None: the starter's MODEL and EFFORT, read at call time
         super().__init__(building_map, output_directory, client)
         self.guide = GuideState(knowledge=knowledge)  # knowledge: a KnowledgeStore (page sessions), None otherwise
         self.output_directory = output_directory
@@ -178,13 +193,44 @@ class Agent(StarterAgent):
         self.emergency = urgent
         self.system[0]["text"] = with_voice_rules(prompt, voice, user_text)  # this turn only
         try:
-            reply = super().ask(user_text)
+            reply = self.run_tools(user_text)
             return question_last(reply) if voice_applies(voice, user_text) else reply
         except Exception:
             del self.messages[mark:]
             raise
         finally:
             self.system[0]["text"] = base
+
+    def run_tools(self, user_text: str) -> str:
+        """The starter's tool loop (same history handling), with this agent's model and effort and a cache breakpoint
+        on the conversation as well: tools and system stay cached, and each tool round reads the turns before it from
+        the cache instead of sending the whole history again."""
+        self.messages.append({"role": "user", "content": user_text})
+        runner = self.client.beta.messages.tool_runner(
+            model=self.model or starter_module.MODEL,
+            max_tokens=starter_module.MAX_TOKENS,
+            max_iterations=starter_module.MAX_TOOL_ITERATIONS,
+            system=self.system,
+            tools=self.tools,
+            messages=list(self.messages),
+            output_config={"effort": self.effort or starter_module.EFFORT},
+            cache_control={"type": "ephemeral"},
+            betas=[starter_module.FALLBACK_BETA],
+            fallbacks="default",
+        )
+        final = None
+        for message in runner:
+            final = message
+            self.track_usage(message)
+            self.messages.append({"role": "assistant", "content": message.content})
+            tool_response = runner.generate_tool_call_response()
+            if tool_response is not None:
+                self.messages.append(tool_response)
+        if final is None:
+            return "(no response)"
+        if final.stop_reason == "refusal":
+            return "Sorry, I can't help with that request."
+        return "\n".join(block.text for block in final.content if block.type == "text").strip()
 
 
 class Session(Agent):
@@ -198,13 +244,15 @@ class Session(Agent):
         client=None,
         campus=None,
         knowledge=None,
+        model: str | None = CHAT_MODEL,
+        effort: str | None = CHAT_EFFORT,
     ) -> None:
         output_directory.mkdir(parents=True, exist_ok=True)
         if knowledge is None:
             from building_agent.knowledge import KnowledgeStore
 
             knowledge = KnowledgeStore(KNOWLEDGE_ROOT)
-        super().__init__(building_map, output_directory, client, campus, knowledge)
+        super().__init__(building_map, output_directory, client, campus, knowledge, model, effort)
 
 
 def cache_key(building_directory: Path, question_text: str) -> str:

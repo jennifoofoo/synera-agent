@@ -26,6 +26,21 @@ describe("inspection round choices", () => {
     expect(entranceRoom([])).toBeNull();
   });
 
+  it("prefers the lobby's entrance over a side door into a meeting room", () => {
+    const openings = [
+      { id: "O1", kind: "entrance", space_ids: ["S002"] },
+      { id: "O2", kind: "entrance", space_ids: ["S009"] },
+      { id: "O3", kind: "entrance", space_ids: ["S012"] },
+    ] as unknown as Opening[];
+    const spaces = [
+      { id: "S002", name: "Project Room", room_type: "meeting_room", type: "room" },
+      { id: "S009", name: "South Corridor", room_type: "corridor", type: "corridor" },
+      { id: "S012", name: "Foyer", room_type: "lobby", type: "room" },
+    ] as unknown as Space[];
+    expect(entranceRoom(openings, spaces)).toBe("S012");
+    expect(entranceRoom(openings, spaces.slice(0, 2))).toBe("S009");
+  });
+
   it("says why there is no round on a map without the devices", () => {
     const extinguisher = { id: "A1", name: "FE 1", type: "fire_extinguisher" } as Asset;
     expect(missingDevicesNote([])).toBe("This map has no devices yet, so there is no round to plan.");

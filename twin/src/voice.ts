@@ -182,6 +182,17 @@ export function withoutAnswerLine(reply: string): string {
   return lines.join("\n").trimEnd();
 }
 
+/** Text for display: raw ids such as "Project Room [plan-89323a15-F0-S002]" lose the id ("Project Room"). */
+export function withoutIds(text: string): string {
+  return text
+    .replace(BRACKET_REF, "")
+    .replace(ID_TOKEN, (token) => (/\d/.test(token) ? "" : token))
+    .replace(/\(\s*\)|\[\s*\]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
 /** What to say out loud: no final "Answer:" line, no ids, no markdown. */
 export function spokenText(reply: string): string {
   return withoutAnswerLine(reply)
@@ -361,4 +372,9 @@ if (typeof document !== "undefined") {
   // Guiding starts after an awaited reply, outside the tap. If the browser refused the lock then (it may want a
   // user gesture), the next tap while guiding takes it.
   document.addEventListener("pointerup", () => awakeReasons.size > 0 && !sentinel && void syncWakeLock(), true);
+}
+
+/** Read a typed or chip reply aloud when the speaker toggle is on (spoken questions are read out in Omnibox). */
+export function speakIfOn(reply: { reply: string } | null | undefined, voiceOut: boolean, speechAvailable: boolean): void {
+  if (reply && voiceOut) void speak(reply.reply, speechAvailable);
 }

@@ -3,7 +3,7 @@ import * as THREE from "three";
 import type { Route } from "../api/types";
 import { floorElevation, type BuildingModel, type FloorModel } from "../model/model";
 import { COLOURS } from "../model/palette";
-import type { FloorMode } from "../store";
+import { useTwin, type FloorMode } from "../store";
 
 /** How a floor is drawn in the scene: fully, as a thin footprint outline, or not at all. */
 export type FloorRole = "full" | "outline" | "hidden";
@@ -16,31 +16,55 @@ export function routeFloorIds(route: Route | null | undefined): string[] | null 
   return ids.length >= 2 ? ids : null;
 }
 
+/** Identifies a multi-floor route for the rail's "only this floor" choice ("" = no such route). */
+export function routeStackKey(route: Route | null | undefined): string {
+  const ids = routeFloorIds(route);
+  return ids && route?.ok ? `${ids.join("|")}>${route.destination ?? ""}` : "";
+}
+
+/** The floors the scene stacks for the shown route, joined by "|" ("" = none): a multi-floor route in 3D, unless the
+ * user picked a single floor in the rail for this route (store.routeStackOff). Guidance still moves the focused floor. */
+export function useRouteFloorsKey(): string {
+  return useTwin((s) => {
+    if (s.viewMode === "2d") return "";
+    const route = s.state?.route;
+    const key = routeStackKey(route);
+    if (!key || key === s.routeStackOff) return "";
+    return routeFloorIds(route)!.join("|");
+  });
+}
+
 /** The floor rule (3D):
- * - the active floor is drawn fully;
- * - floors above it are not drawn;
- * - floors below it are a thin footprint outline (the building visibly continues);
- * - a route over several floors shows only its floors, fully and stacked apart (the only case with two full floors);
- * - "all floors" (exploded) shows the active floor fully and the others as outlines.
+ * - the active floor is drawn fully, standing on the plinth (Studio.tsx);
+ * - floors above and below it are not drawn (the plinth sits right under the active floor and would hide them);
+ * - a route over several floors shows only its floors, fully and stacked apart (the only case with two full floors),
+ *   until the user picks one floor in the rail (useRouteFloorsKey: then the usual rule applies to that floor);
+ * - "all floors" (exploded, no plinth) shows every floor fully, pulled apart (floorLayout): a hairline outline of a
+ *   larger floor below (a hall under an office strip) read as a stray frame, not as a floor.
  * The 2D plan shows only the active floor. */
 export function floorRoles(model: BuildingModel, focused: string | null, mode: FloorMode, flat: boolean, routeFloors: string[] | null): Map<string, FloorRole> {
   const roles = new Map<string, FloorRole>();
-  const level = model.floorById.get(focused ?? "")?.level ?? model.floors[0]?.level ?? 0;
   for (const floor of model.floors) {
     let role: FloorRole;
     if (floor.id === focused) role = "full";
     else if (flat) role = "hidden";
     else if (routeFloors) role = routeFloors.includes(floor.id) ? "full" : "hidden";
-    else if (mode === "exploded") role = "outline";
-    else role = floor.level < level ? "outline" : "hidden";
+    else if (mode === "exploded") role = "full";
+    else role = "hidden";
     roles.set(floor.id, role);
   }
   return roles;
 }
 
-/** Floor heights: a multi-floor route and "all floors" pull the floors apart, otherwise the real elevations. */
-export function floorLayout(floor: FloorModel, model: BuildingModel, mode: FloorMode, routeFloors: string[] | null): number {
-  return floorElevation(floor, model, routeFloors ? "exploded" : mode);
+/** Vertical step between the outlines of the floors below the active one in "all floors" (m): fine lines just under
+ * it, not a full storey lower. */
+export const OUTLINE_STEP_M = 0.35;
+
+/** Floor heights: a multi-floor route and "all floors" pull the floors apart; otherwise the real elevations. */
+export function floorLayout(floor: FloorModel, model: BuildingModel, mode: FloorMode, routeFloors: string[] | null, focused: string | null = null): number {
+  if (routeFloors) return floorElevation(floor, model, "exploded");
+  void focused;
+  return floorElevation(floor, model, mode);
 }
 
 /** The outer edge of a floor: the edges of its space polygons that no other space shares (outdoor areas left out). */

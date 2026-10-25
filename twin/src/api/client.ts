@@ -37,16 +37,22 @@ export const api = {
       ...points,
     }),
   /** Plan an inspection round on the server (plan_round) and draw it; area: "Whole building", a floor, "Hall A", ... */
-  round: (building: string, type: string, options: { area?: string; start?: string | null; returnToStart?: boolean; stepFree?: boolean } = {}) =>
+  round: (
+    building: string,
+    type: string,
+    options: { area?: string; start?: string | null; startPoint?: [number, number] | null; returnToStart?: boolean; stepFree?: boolean } = {},
+  ) =>
     postJson<{ round: PlannedRound; state: BuildingState }>("/api/round", {
       building,
       type,
       ...(options.area ? { area: options.area } : {}),
       ...(options.start ? { start: options.start } : {}),
+      ...(options.start && options.startPoint ? { start_point: { x: options.startPoint[0], y: options.startPoint[1] } } : {}),
       return_to_start: !!options.returnToStart,
       step_free: !!options.stepFree,
     }),
   clearRoute: (building: string) => postJson<{ state: BuildingState }>("/api/route/clear", { building }),
+  clearHere: (building: string) => postJson<{ state: BuildingState }>("/api/here/clear", { building }),
   setStepFree: (building: string, enabled: boolean) =>
     postJson<{ state: BuildingState }>("/api/step_free", { building, enabled }),
   close: (building: string, element: string, closed: boolean) =>

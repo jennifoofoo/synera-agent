@@ -17,7 +17,7 @@ import { useTwin } from "../store";
 import { useWalkMotion, walkWithMeDriving } from "../walkWithMe";
 import { controlsRef } from "./FloorMesh";
 import { angleTo, behindAzimuth, buildFollowPath, newPathPoint, pointOnPath } from "./followPath";
-import { routeFloorIds } from "./floorVisibility";
+import { useRouteFloorsKey } from "./floorVisibility";
 
 /** Walking pace indoors (m/s), the same 1.2 m/s as walkMinutes and the auto-pace spec. */
 const WALK_MPS = 1.2;
@@ -73,7 +73,8 @@ export function FollowCam({ model, floorY }: Props) {
   const flat = useTwin((s) => s.viewMode === "2d");
   const reducedMotion = useTwin((s) => s.reducedMotion);
   const path = useMemo(() => (walking && route?.ok ? buildFollowPath(route) : null), [walking, route]);
-  const routeFloors = useMemo(() => routeFloorIds(route) ?? [], [route]);
+  const routeFloorsKey = useRouteFloorsKey(); // the floors stacked apart (none once the user picked one floor)
+  const routeFloors = useMemo(() => (routeFloorsKey ? routeFloorsKey.split("|") : []), [routeFloorsKey]);
 
   // Everything the frame loop changes lives in one ref: no React state, no allocations per frame.
   const sim = useRef({
@@ -136,6 +137,9 @@ export function FollowCam({ model, floorY }: Props) {
       const back = saved.current;
       saved.current = null;
       const now = controlsRef.current;
+      // The plan is north up again once the walk ends (the follow cam turned it heading up).
+      const store = useTwin.getState();
+      if (now && store.viewMode === "2d" && !store.viewHandover) void now.rotateTo(0, now.polarAngle, !store.reducedMotion);
       // Only the same controls on the same building (2D/3D switch or a new building: nothing to go back to).
       if (!back || !now || now !== back.controls || back.model !== useTwin.getState().model) return;
       const animate = !useTwin.getState().reducedMotion;

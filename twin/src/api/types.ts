@@ -106,9 +106,25 @@ export interface Route {
 export interface AgentRound {
   device_type: string;
   start: string;
-  stops: { space_id: string; asset_ids: string[] }[];
+  /** Exact start in the start room (the person's dot), [x, y] in model metres. */
+  start_point?: [number, number] | null;
+  /** One stop per device (asset_id, name, position, leg_m); older rounds have one stop per room (asset_ids only). */
+  stops: AgentRoundStop[];
   return_to_start: boolean;
+  back_to_start_m?: number;
+  total_m?: number;
   step_free?: boolean;
+}
+
+export interface AgentRoundStop {
+  space_id: string;
+  asset_ids: string[];
+  asset_id?: string;
+  name?: string;
+  /** The device's position, the end of the leg to it (destination_point). */
+  position?: [number, number] | null;
+  /** Metres from the stop before (or the start) to this device. */
+  leg_m?: number;
 }
 
 /** One stop of a round planned by POST /api/round (plan_round's own result). */
@@ -120,6 +136,9 @@ export interface PlannedStop {
   devices: string[];
   /** Metres from the stop before (or the start). */
   leg_m: number;
+  asset_id?: string;
+  device?: string;
+  position?: [number, number] | null;
 }
 
 /** POST /api/round: plan_round for the page (same order and metres as the chat agent), drawn as state.route.round. */

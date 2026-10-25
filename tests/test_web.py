@@ -254,8 +254,47 @@ def test_round_endpoint_plans_like_the_agent_and_draws_the_round(app):
     route = reply["state"]["route"]
     stops = [stop["space_id"] for stop in route["round"]["stops"]]
     assert route["start"] == start and route["via"] == stops[:-1] and route["destination"] == stops[-1]
+    # One stop per device: the page guides device to device with these ids, positions and legs.
+    info = route["round"]["stops"]
+    assert [stop["asset_id"] for stop in info] == [stop["asset_id"] for stop in expected["stops"]]
+    assert all(stop["position"] and stop["name"] for stop in info)
+    assert sum(stop["leg_m"] for stop in info) == pytest.approx(planned["total_m"], abs=0.3)
+    assert route["segments"][-1]["points"][-1] == pytest.approx(info[-1]["position"], abs=0.01)  # to the last device
     _, bad = app.post("/api/round", {"building": key, "type": "unicorn", "start": start})
     assert bad["round"]["ok"] is False and bad["round"]["error"]
+
+
+def test_round_endpoint_without_a_start_uses_the_position_or_asks(app):
+    """No "start": the person's position (dot) if the chat knows it, else needs_start with the entrances, no crash."""
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    body = {"building": key, "type": "fire extinguisher", "area": "Ground floor"}
+    _, asked = app.post("/api/round", body)
+    assert asked["round"]["ok"] is False and asked["round"]["needs_start"]
+    assert asked["round"]["question"] and asked["round"]["entrances"]
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    app.session(key).position = {"space_id": start, "floor_id": bm.spaces[start]["floor_id"], "point": None}
+    _, here = app.post("/api/round", body)
+    _, named = app.post("/api/round", {**body, "start": start})
+    assert here["round"]["ok"] and here["round"]["total_m"] == named["round"]["total_m"]
+
+
+def test_round_endpoint_starts_at_the_persons_dot(app):
+    """start_point (the page's "You are here" dot) is checked like /api/route and used for the first leg."""
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    body = {"building": key, "type": "fire extinguisher", "area": "Ground floor", "start": start}
+    _, plain = app.post("/api/round", body)
+    first = plain["round"]["stops"][0]
+    x, y = first["position"]
+    _, dot = app.post("/api/round", {**body, "start_point": {"x": x, "y": y}})
+    assert dot["round"]["stops"][0]["asset_id"] == first["asset_id"]
+    assert dot["round"]["stops"][0]["leg_m"] < first["leg_m"]
+    assert dot["state"]["route"]["round"]["start_point"] == pytest.approx([x, y], abs=0.01)
+    assert dot["state"]["route"]["segments"][0]["points"][0] == pytest.approx([x, y], abs=0.01)
+    _, far = app.post("/api/round", {**body, "start_point": {"x": 9999, "y": 9999}})
+    assert far["round"]["ok"] and far["round"]["total_m"] == plain["round"]["total_m"]  # a bad dot is ignored
 
 
 def test_page_route_asked_during_chat_wins_over_the_agent_route(app, key, monkeypatch):

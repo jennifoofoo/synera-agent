@@ -21,8 +21,9 @@ export const MIDPOINT_DECIDE_PX = 24;
 export const HANDOVER_POLAR = 0.1;
 /** Radians of tilt per pixel the fingers move up after the switch (until they lift). */
 export const TILT_RAD_PER_PX = 0.006;
-/** Below this polar angle a 3D view counts as straight down: a swipe down that ends here goes back to the plan. */
-export const FLAT_ENOUGH_POLAR = 0.12;
+/** Below this polar angle (about 17 degrees) a 3D view counts as nearly straight down: a swipe down that ends here goes
+ * back to the plan. Fingers rarely land exactly on the top, so this is not tighter. */
+export const FLAT_ENOUGH_POLAR = 0.3;
 
 const spread = ([a, b]: FingerPair) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const angle = ([a, b]: FingerPair) => Math.atan2(b[1] - a[1], b[0] - a[0]);
@@ -54,6 +55,23 @@ export function orthoZoomToDistance(zoom: number, frameHeightPx: number, fovDeg:
 /** Inverse of orthoZoomToDistance. */
 export function distanceToOrthoZoom(distance: number, frameHeightPx: number, fovDeg: number): number {
   return frameHeightPx / (2 * distance * Math.tan((fovDeg * Math.PI) / 360));
+}
+
+/** Option/Alt + mouse drag (button held), the mouse twin of the two-finger swipe:
+ *  - on the plan, a drag mostly up (|dy| > 2 |dx|) by OPTION_DRAG_SWITCH_PX switches to 3D and keeps tilting;
+ *  - in 3D, a drag mostly down by as much that leaves the view nearly straight down goes back at the release;
+ *  - a drag that goes sideways first (OPTION_DRAG_SIDEWAYS_PX) rotates as before and never switches.
+ * `dx`, `dy`: the pointer's move since the press (screen px, y down). */
+export const OPTION_DRAG_SWITCH_PX = 40;
+export const OPTION_DRAG_SIDEWAYS_PX = 12;
+export type OptionDrag = "tilt-up" | "tilt-down" | "rotate" | "undecided";
+
+export function classifyOptionDrag(dx: number, dy: number): OptionDrag {
+  const vertical = Math.abs(dy) > 2 * Math.abs(dx);
+  if (vertical && -dy >= OPTION_DRAG_SWITCH_PX) return "tilt-up";
+  if (vertical && dy >= OPTION_DRAG_SWITCH_PX) return "tilt-down";
+  if (!vertical && Math.abs(dx) >= OPTION_DRAG_SIDEWAYS_PX) return "rotate";
+  return "undecided";
 }
 
 /** Polar angle while the fingers keep moving up after the switch to 3D (`upPx` > 0 is up), within the 3D limits. */

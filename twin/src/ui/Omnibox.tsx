@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { setHandsFreeMuted, useTwin } from "../store";
-import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, withoutIds, type Listener } from "../voice";
 import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
 import { parseWake } from "../wake";
@@ -201,7 +201,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
       stopSpeaking();
       inputRef.current?.blur(); // the keyboard goes away, the reply card shows
       const reply = await ask(message, voice);
-      if (reply && voice && useTwin.getState().voiceOut) void speak(reply.reply, useTwin.getState().speechAvailable);
+      if (reply && useTwin.getState().voiceOut) void speak(reply.reply, useTwin.getState().speechAvailable);
       if (voice) followUpAfterSpeech(); // the mic opens again for a few seconds once Wanda has finished speaking
     },
     [ask],
@@ -543,19 +543,6 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
         </button>
         <button
           type="button"
-          ref={micRef}
-          className={`ob-mic mic ${listening ? "listening" : ""}`}
-          onPointerDown={(event) => event.preventDefault()}
-          onClick={toggleMic}
-          disabled={busy}
-          aria-label={listening ? "Stop and send" : "Speak"}
-          aria-pressed={listening}
-          title={listening ? "Tap to send" : "Tap and speak"}
-        >
-          <MicIcon />
-        </button>
-        <button
-          type="button"
           className="ob-icon ob-close"
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => {
@@ -579,7 +566,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
           <button
             type="button"
             ref={talkRef}
-            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""} ${walking && !handsFreeOn ? "muted" : ""}`}
+            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking && !(walking && !handsFreeOn) ? "speaking" : ""} ${walking && !handsFreeOn ? "muted" : ""}`}
             aria-label={orbLabel}
             aria-pressed={walking && !listening && !stops ? !handsFreeOn : listening}
             title={orbTitle}
@@ -607,7 +594,7 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
             onClick={walking ? undefined : () => inputRef.current?.focus()}
           >
             {mode === "speaking" && !walking && <span className="wb-kicker">Speaking · </span>}
-            <span className="wb-text">{caption}</span>
+            <span className="wb-text">{withoutIds(caption)}</span>
           </div>
           {!walking && (
             <button

@@ -1,8 +1,8 @@
+# ruff: noqa: SIM115  (one-off data scripts)
 """English room names for the Urban Colab (Wanda speaks English, the building's own signs are English). Ids stay."""
 
 import json
 import sys
-from pathlib import Path
 
 P = "plan-89323a15-"
 NAMES = {
@@ -43,14 +43,14 @@ NAMES = {
     "F1-S017": "Void",
 }
 path = sys.argv[1]
-b = json.loads(Path(path).read_text())
+b = json.load(open(path))
 changed = []
 for s in b["spaces"]:
     k = s["id"].replace(P, "")
     if k in NAMES and s["name"] != NAMES[k]:
         changed.append((k, s["name"], NAMES[k]))
         s["name"] = NAMES[k]
-Path(path).write_text(json.dumps(b, ensure_ascii=False, indent=1))
+json.dump(b, open(path, "w"), ensure_ascii=False, indent=1)
 for c in changed:
     print(*c, sep="  ")
 print(len(changed), "renamed;", sorted({s["name"] for s in b["spaces"]}))

@@ -12,7 +12,7 @@
 .card-kicker { font-weight: 600; font-size: 13px; }
 .card-note { color: var(--warn); font-size: 12.5px; margin-top: 6px; }
 .card-actions { display: flex; gap: 8px; margin-top: 10px; }
-.card-actions button { flex: 1; }
+.card-actions button { flex: 1 1 auto; min-width: 0; padding-left: 10px; padding-right: 10px; white-space: nowrap; }
 .card button.primary { background: var(--signal); color: var(--signal-ink); font-weight: 600; }
 .card button.primary:hover { background: var(--signal-dark); }
 .card button.quiet { flex: 0 0 auto; background: transparent; color: var(--muted); }

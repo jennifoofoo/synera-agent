@@ -29,6 +29,21 @@ function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 
   sphere.radius = Math.max(minRadius, sphere.radius * pad);
   void c.fitToSphere(sphere, animate);
 }
+/** 2D plan: fit the floor's rectangle into the visible map (orthographic zoom = px per metre) minus the chrome, so a
+ * long narrow building fits top to bottom too (fitToSphere fitted the diagonal and cut it). */
+function fitPlan(c: CameraControlsImpl, camera: THREE.Camera, box: THREE.Box3, view: { width: number; height: number }, animate: boolean) {
+  if (!(camera as THREE.OrthographicCamera).isOrthographicCamera || view.width < 1 || view.height < 1) {
+    fitBox(c, box, animate, 0.9);
+    return;
+  }
+  const size = box.getSize(new THREE.Vector3());
+  const centre = box.getCenter(new THREE.Vector3());
+  const availW = Math.max(60, view.width - 96); // the floor rail on the right
+  const availH = Math.max(60, view.height - 120); // buttons on top, a little air below
+  const zoom = Math.min(availW / Math.max(1, size.x), availH / Math.max(1, size.z));
+  void c.moveTo(centre.x, centre.y, centre.z, animate);
+  void c.zoomTo(zoom, animate);
+}
 const HOME_POLAR = Math.PI / 3.6;
 /** Screen space (px) the laptop chrome covers around the 3D home view: name chip, voice bar, floor rail. */
 const HOME_CHROME = { top: 80, bottom: 104, left: 24, right: 72 };
@@ -46,6 +61,7 @@ function fitHome(
   view: { width: number; height: number },
   animate: boolean,
   points?: THREE.Vector3[],
+  planner = false,
 ) {
   if (!(camera as THREE.PerspectiveCamera).isPerspectiveCamera || view.width < 1 || view.height < 1) {
     void c.rotateTo(azimuth, polar, animate);
@@ -53,7 +69,9 @@ function fitHome(
     return;
   }
   const probe = (camera as THREE.PerspectiveCamera).clone();
-  const chrome = view.width < 700 ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
+  // Phone chrome only on the phone profile: on the laptop a narrow map (next to the chat column) still has the
+  // floor rail on the right and the buttons on top.
+  const chrome = view.width < 700 && !planner ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
   const lo = new THREE.Vector2(-1 + (2 * chrome.left) / view.width, -1 + (2 * chrome.bottom) / view.height);
   const hi = new THREE.Vector2(1 - (2 * chrome.right) / view.width, 1 - (2 * chrome.top) / view.height);
   const direction = new THREE.Vector3().setFromSpherical(new THREE.Spherical(1, polar, azimuth));
@@ -206,7 +224,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     // go down to 0.2 px/m: the floor was a few pixels in a blank grey plane).
     const largest = Math.max(1, ...model.floors.map((floor) => floor.bounds.size));
     const fit = Math.min(viewport.width, viewport.height) / largest;
-    c.minZoom = fit * 0.35;
+    c.minZoom = fit * 0.6;
     c.maxZoom = Math.max(60, fit * 12);
     // Straight down but not exactly (a polar angle of 0 leaves the roll undefined and the plan may come up rotated).
     c.minPolarAngle = flat ? PLAN_TILT : 0.08;
@@ -230,7 +248,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     c.draggingSmoothTime = 0.04;
     c.dollyToCursor = true;
     c.infinityDolly = false;
-    const margin = size * 0.25; // the target stays near the building: a drag can not carry it into empty space
+    const margin = Math.max(2, size * 0.08); // the target stays inside the building (plus a little): a drag or pinch can not carry it off screen
     // The box must contain every target the rig itself sets (home framing puts it at the plinth, below y = 0): a
     // target outside the box in y makes camera-controls' _encloseToBoundary divide by zero on the next pan (offset
     // horizontal, clamp vertical: dot = 0) and the camera becomes NaN, the map goes blank.
@@ -252,7 +270,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
     const y = floorY(floor.id);
     const box = new THREE.Box3(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
     void c.rotateTo(0, PLAN_TILT, !reducedMotion);
-    fitBox(c, box, !reducedMotion, 0.9);
+    fitPlan(c, camera, box, viewport, !reducedMotion);
     invalidate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flat, focusedFloorId, camera]);
@@ -293,7 +311,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         const y = floorY(floor.id);
         box.set(new THREE.Vector3(floor.bounds.minX, y, -floor.bounds.maxY), new THREE.Vector3(floor.bounds.maxX, y + 1, -floor.bounds.minY));
         void c.rotateTo(0, PLAN_TILT, animate);
-        fitBox(c, box, animate, 0.9);
+        fitPlan(c, camera, box, viewport, animate);
         return;
       }
       const polar = profile === "worker" ? Math.PI / 5 : HOME_POLAR;
@@ -320,7 +338,7 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
       }
       for (const point of points) box.expandByPoint(point);
       if (box.isEmpty()) box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
-      fitHome(c, camera, box, HOME_AZIMUTH, polar, viewport, animate, points);
+      fitHome(c, camera, box, HOME_AZIMUTH, polar, viewport, animate, points, profile === "planner");
       return;
     }
     if (request.kind === "floor" && request.floorId) {

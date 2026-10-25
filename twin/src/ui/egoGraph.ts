@@ -22,7 +22,7 @@ export interface LdNode {
 }
 
 export type FactState = "open" | "ended" | "future" | "resolving";
-export type Role = "room" | "asset" | "door" | "connector" | "more" | "note" | "issue" | "closure" | "person";
+export type Role = "room" | "asset" | "door" | "connector" | "more" | "note" | "issue" | "closure" | "event" | "person";
 
 export interface EgoNode {
   id: string; // the JSON-LD @id ("more" for the +N node)
@@ -263,7 +263,7 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
       const spread = anchor === roomIri ? 0 : away * 0.5 + (k - (entries.length - 1) / 2) * 0.34;
       const angle = base + spread;
       const kind = (fact.kind ?? "note") as Role;
-      const role: Role = kind === "issue" || kind === "closure" ? kind : "note";
+      const role: Role = kind === "issue" || kind === "closure" || kind === "event" ? kind : "note";
       const person = fact.reportedBy ? byId.get(fact.reportedBy) : undefined;
       nodes.push({
         id: fact["@id"],

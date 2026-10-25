@@ -1,9 +1,10 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { AccumulativeShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import { boundsOf, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
+import { useTwin } from "../store";
 import { SLAB_THICKNESS } from "./geometry";
 
 /** The plinth: a thin slab under the ground floor, this much larger than the building on each side (m). */
@@ -14,9 +15,9 @@ const BAKE_DELAY_MS = 750;
 /** The shadow catcher sits this far above the floor slab (no z-fighting, below furniture tops and the route). */
 const SHADOW_LIFT_M = 0.02;
 
-/** Top of the plinth: the underside of the lowest floor slab, so the building stands on it. */
-export function plinthTop(model: BuildingModel): number {
-  return Math.min(...model.floors.map((floor) => floor.elevation_m)) - SLAB_THICKNESS;
+/** Top of the plinth: the underside of the lowest drawn floor's slab (scene heights), so that floor stands on it. */
+export function plinthTop(floorYs: readonly number[]): number {
+  return Math.min(...floorYs) - SLAB_THICKNESS;
 }
 
 type Pt = readonly [number, number];
@@ -39,8 +40,8 @@ function hullOf(points: Pt[]): Pt[] {
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** The plinth's rectangle in plan coordinates: the smallest rectangle around the indoor spaces of all floors (turned
- * with the building when it is not axis-aligned), plus the margin. Outdoor areas (yards, site) are left out. */
+/** The shadow catcher's rectangle in plan coordinates: the smallest rectangle around the indoor spaces of all floors
+ * (turned with the building when it is not axis-aligned), plus the margin. Outdoor areas (yards, site) are left out. */
 function plinthRect(model: BuildingModel) {
   const spaces = model.building.spaces;
   const indoor = spaces.filter((space) => space.type !== "outdoor");
@@ -73,7 +74,7 @@ function plinthRect(model: BuildingModel) {
 /** Spread of the plinth's shadow on the backdrop (m): how far the blur reaches past its edge. */
 const PLINTH_SHADOW_M = 1.6;
 
-/** The plinth follows the ground floor's footprint (indoor spaces, every shape, not a bounding rectangle), this
+/** The plinth follows the drawn floors' footprint (indoor spaces, every shape, not a bounding rectangle), this
  * much wider on each side (m). */
 const FOOTPRINT_MARGIN_M = 0.9;
 
@@ -88,11 +89,13 @@ interface Footprint {
   cy: number;
 }
 
-/** The ground floor's footprint drawn on a 2D canvas: every indoor polygon filled and stroked with a round line
- * twice the margin wide, which is exactly the union of the rooms grown by the margin. Drawn once, no render pass. */
-function footprintTextures(model: BuildingModel): Footprint | null {
-  const ground = model.floors.find((floor) => floor.spaces.some((space) => space.type !== "outdoor"));
-  const polygons = (ground?.spaces ?? []).filter((space) => space.type !== "outdoor").map((space) => space.polygon as Pt[]);
+/** The footprint of the drawn floors (`floorIds`: the active floor, or a route's floors; the lowest floor with
+ * indoor spaces when none are given) on a 2D canvas: every indoor polygon filled and stroked with a round line twice
+ * the margin wide, which is exactly the union of the rooms grown by the margin. Drawn once, no render pass. */
+function footprintTextures(model: BuildingModel, floorIds: readonly string[]): Footprint | null {
+  const drawn = model.floors.filter((floor) => floorIds.includes(floor.id) && floor.spaces.some((space) => space.type !== "outdoor"));
+  const floors = drawn.length ? drawn : model.floors.filter((floor) => floor.spaces.some((space) => space.type !== "outdoor")).slice(0, 1);
+  const polygons = floors.flatMap((floor) => floor.spaces.filter((space) => space.type !== "outdoor").map((space) => space.polygon as Pt[]));
   if (!polygons.length) return null;
   const b = boundsOf(polygons.flat() as [number, number][]);
   const pad = FOOTPRINT_MARGIN_M + PLINTH_SHADOW_M * 1.5;
@@ -136,11 +139,16 @@ function footprintTextures(model: BuildingModel): Footprint | null {
   return { mask: draw(0), shadow: draw(PLINTH_SHADOW_M * 0.9), w, d, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2 };
 }
 
-/** The base the model stands on, like an architectural model on a table (3D only): the ground floor's own outline
- * with a small margin (not a rectangle around every floor, which left a large empty slab beside an L-shaped or
- * offset building), with its own soft shadow on the backdrop. */
-export function Plinth({ model }: { model: BuildingModel }) {
-  const footprint = useMemo(() => footprintTextures(model), [model]);
+/** How fast the plinth follows the active floor (1/s, exponential approach). */
+const PLINTH_FOLLOW = 9;
+
+/** The base the model stands on, like an architectural model on a table (3D only): the drawn floors' own outline
+ * (`floorIds`: the active floor, or a route's floors) with a small margin (not a rectangle around every floor, which
+ * left a large empty slab beside an L-shaped or offset building or under a big basement), with its own soft shadow on
+ * the backdrop. Its top is `top` (plinthTop); it glides there when the active floor changes. */
+export function Plinth({ model, floorIds, top }: { model: BuildingModel; floorIds: readonly string[]; top: number }) {
+  const key = floorIds.join("|");
+  const footprint = useMemo(() => footprintTextures(model, key ? key.split("|") : []), [model, key]);
   useEffect(
     () => () => {
       footprint?.mask.dispose();
@@ -148,11 +156,28 @@ export function Plinth({ model }: { model: BuildingModel }) {
     },
     [footprint],
   );
+  const reducedMotion = useTwin((s) => s.reducedMotion);
+  const invalidate = useThree((s) => s.invalidate);
+  const group = useRef<THREE.Group>(null);
+  const placed = useRef(false);
+  useLayoutEffect(() => {
+    if (!group.current) return;
+    if (!placed.current || reducedMotion) group.current.position.y = top;
+    placed.current = true;
+    invalidate();
+  }, [top, reducedMotion, invalidate, footprint]);
+  useFrame((_, delta) => {
+    const g = group.current;
+    if (!g || g.position.y === top) return;
+    const dy = top - g.position.y;
+    g.position.y = Math.abs(dy) < 0.005 ? top : g.position.y + dy * (1 - Math.exp(-PLINTH_FOLLOW * Math.min(delta, 0.1)));
+    invalidate();
+  });
   if (!footprint) return null;
   const { w, d, cx, cy, mask, shadow } = footprint;
-  const top = plinthTop(model);
+  // position-y is set imperatively (glides); React only places x/z.
   return (
-    <group position={[cx, top, -cy]}>
+    <group ref={group} position-x={cx} position-z={-cy}>
       <mesh position-y={-0.004} rotation-x={-Math.PI / 2} raycast={() => null} receiveShadow>
         <planeGeometry args={[w, d]} />
         <meshStandardMaterial color={COLOURS.plinth} roughness={0.9} metalness={0} alphaMap={mask} alphaTest={0.5} />

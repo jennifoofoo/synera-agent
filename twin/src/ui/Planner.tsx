@@ -149,20 +149,20 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
         {(!q || changes.some(match)) && (
           <section>
             <h3>Changes</h3>
-            {changes.length === 0 ? <p className="planner-empty">Same as the loaded building.</p> : <Rows model={model} rows={changes.filter(match)} grouped={false} />}
-            <Impact model={model} />
+            {changes.length === 0 ? <p className="planner-empty">Same as the loaded building.</p> : <Rows model={model} rows={changes.filter(match)} grouped={false} onPick={onClose} />}
+            <Impact model={model} onPick={onClose} />
           </section>
         )}
         {(!q || shownRooms.length > 0) && (
           <section className="planner-rooms">
             <h3>Rooms</h3>
-            <Rows model={model} rows={shownRooms} />
+            <Rows model={model} rows={shownRooms} onPick={onClose} />
           </section>
         )}
         {shownThings.length > 0 && (
           <section>
             <h3>Things</h3>
-            <Rows model={model} rows={shownThings} />
+            <Rows model={model} rows={shownThings} onPick={onClose} />
           </section>
         )}
         {q && !shownRooms.length && !shownThings.length && !changes.some(match) && <p className="planner-empty">Nothing matches “{query.trim()}”.</p>}
@@ -171,7 +171,8 @@ function Sheet({ model, onClose }: { model: BuildingModel; onClose: () => void }
   );
 }
 
-function Rows({ model, rows, grouped = true }: { model: BuildingModel; rows: Row[]; grouped?: boolean }) {
+/** `onPick` runs after a row's own action: the list closes once a room is chosen, so it never covers the route. */
+function Rows({ model, rows, grouped = true, onPick }: { model: BuildingModel; rows: Row[]; grouped?: boolean; onPick?: () => void }) {
   const stacked = !grouped; // changes: full sentence, detail below
   const groups: { floorId: string; rows: Row[] }[] = [];
   for (const row of rows) {
@@ -188,7 +189,13 @@ function Rows({ model, rows, grouped = true }: { model: BuildingModel; rows: Row
             {grouped && floor && <div className="planner-floor">{floorLabel(floor)}</div>}
             {group.rows.map((row) => (
               <div key={row.key} className="planner-line">
-                <button className={`planner-row ${stacked ? "stacked" : ""}`} onClick={row.go}>
+                <button
+                  className={`planner-row ${stacked ? "stacked" : ""}`}
+                  onClick={() => {
+                    row.go();
+                    onPick?.();
+                  }}
+                >
                   <span className="planner-label">{row.label}</span>
                   {row.detail && <span className="planner-detail">{row.detail}</span>}
                 </button>
@@ -341,7 +348,7 @@ function roomsNamed(model: BuildingModel, text: string): string[] {
   return [...ids];
 }
 
-function Impact({ model }: { model: BuildingModel }) {
+function Impact({ model, onPick }: { model: BuildingModel; onPick?: () => void }) {
   const closed = useTwin((s) => s.state?.closed ?? []);
   const chatAvailable = useTwin((s) => s.chatAvailable);
   const [busy, setBusy] = useState(false);
@@ -394,6 +401,7 @@ function Impact({ model }: { model: BuildingModel }) {
             <Rows
               model={model}
               grouped={false}
+              onPick={onPick}
               rows={answer.rooms.map((id) => {
                 const space = model.spaceById.get(id)!;
                 const floor = model.floorById.get(space.floor_id);

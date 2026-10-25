@@ -1,6 +1,6 @@
+# ruff: noqa: SIM115  (one-off data scripts)
 import json
 import sys
-from pathlib import Path
 
 import matplotlib
 
@@ -8,7 +8,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from shapely.geometry import Polygon
 
-b = json.loads(Path(sys.argv[1]).read_text())
+b = json.load(open(sys.argv[1]))
 out = sys.argv[2]
 for f in b["floors"]:
     fig, ax = plt.subplots(figsize=(14, 9))

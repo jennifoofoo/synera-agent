@@ -243,6 +243,17 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 - Danach Vorschau neu bauen, Seed-Notiz, Drehbuch-Zahlen (Runde dann 8 Stopps pro Gerät, Start "South Corridor").
 - Falls du gerade selbst mergst: sag kurz Bescheid, sonst holt Leonies Sitzung sie nach grüner Live-Suite selbst nach `main` (nach Leonies OK).
 
+### Leonie an Jennifer (So ~09:55)
+- `feat/twin-ui-missing` ist jetzt in main (1f5660d): Floor-Rail bei mehrstöckigen Routen, keine Roh-IDs in der Wanda-Leiste, Hover-Fix. tsc sauber, 244 Twin-Tests grün. Nur App, kein Agent.
+- `feat/round-per-device` noch NICHT in main: mit dem Branch fallen 2 Live-Tests, die auf main grün sind (step_free off, change_of_mind). Unsere Session merged gerade main rein, fixt die beiden und pusht auf den Branch. Wir melden uns, wenn er grün ist.
+- `test_two_kitchens` ist auch auf main rot (nicht von uns).
+
+### Leonie an Jennifer (So ~10:30)
+- `feat/round-per-device` ist jetzt in main (c60cf58): ein Stopp pro Gerät, Wege Gerät zu Gerät, „how far“ mit leg_m, /api/round ohne start crasht nicht mehr. Frische Review: MERGE. Die 2 roten Live-Tests waren flaky (Live-Cache spielte einen alten Fehllauf ab), Live-Suite mit leerem Cache 74 passed.
+- Damit ist auch `check.sh` auf main wieder grün (deine 3 Urban-Colab-Tool-Skripte sind formatiert, nur Format/Imports).
+- Offene Punkte aus der Review (nicht blockierend): im Chat-Guiding kann „how far“ die gezeichnete Route statt der Leg-Länge lesen; `state.route.via` fasst aufeinanderfolgende Stopps im selben Raum zusammen.
+- Als Nächstes: `feat/mucl-all-floors` (3. + 4. OG, 2. OG kommt) — wir drehen im 3. OG.
+
 ## Leonie (mucl-all-floors)
 - ~09:35 Floor 3 built (`feat/mucl-all-floors`): 35 spaces from OG3.04 + OG3.08 (OG3.08 is rotated 90°, joined via the shared kitchen/IT core, not the terrace), 6 fire extinguishers, 3 call points, 1 first aid kit; lift V01 and Main Stairs V02 extended to F3. Tests, preflight (25 OK/5 WARN, unreachable only voids) green. Round F3 from Main Stairs: 6 extinguishers, 5 stops, 127.9 m. Script: `demo/plans/urban-colab/tools/add_floor3.py`.
 - ~09:38 Floor 4 built from OG4.04: 22 spaces (Kitchen, Activity Room / Library, Meeting Room 4.01–4.04, core, Lift Lobby, Terrace, Think Tank 4.01, Open Office, 4 voids), 5 extinguishers, 3 call points, 1 first aid kit; V01/V02 extended. Tests, preflight green. Round F4 from Main Stairs: 5 extinguishers, 4 stops, 65.6 m. Café → Meeting Room 4.02 79.3 m. Script `add_floor4.py`.

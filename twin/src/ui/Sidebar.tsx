@@ -6,6 +6,7 @@
 // The map gets the rest: App makes .app a grid and every other child sits in the map column (Sidebar.css).
 // Phone (worker) and windows under 1024 px never render this.
 
+import { speakIfOn } from "../voice";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { create } from "zustand";
 import { floorLabel } from "../model/model";
@@ -16,6 +17,7 @@ import { NotesButton } from "./Facts";
 import { Omnibox } from "./Omnibox";
 import { Round } from "./Round";
 import { TopBar } from "./TopBar";
+import { FairyFigure } from "./FairyFigure";
 import { useWelcomeChips } from "./Welcome";
 import "./Sidebar.css";
 
@@ -167,12 +169,13 @@ function ColumnWelcome() {
   const chips = useWelcomeChips();
   return (
     <li className="sb-welcome" aria-label="Welcome">
+      <FairyFigure className="sb-welcome-fairy" />
       <h2 className="welcome-title">Hi, I'm Wanda.</h2>
       <p className="welcome-sub">What can I help you find in {name ?? "this building"}?</p>
       {chips.length > 0 && (
         <div className="welcome-chips">
           {chips.map((text) => (
-            <button key={text} type="button" className="welcome-chip" onClick={() => void useTwin.getState().ask(text)}>
+            <button key={text} type="button" className="welcome-chip" onClick={() => void useTwin.getState().ask(text).then((reply) => speakIfOn(reply, useTwin.getState().voiceOut, useTwin.getState().speechAvailable))}>
               {text}
             </button>
           ))}
