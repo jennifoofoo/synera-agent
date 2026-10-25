@@ -367,3 +367,65 @@ def test_nothing_overlaps(kind, device, view, train_url, chromium, playwright_in
     finally:
         context.close()
     assert not findings, f"{len(findings)} overlaps:\n" + "\n".join(findings[:60])
+
+
+SIDEBAR_LABELS_LEFT = """() => {
+  const edge = document.querySelector('.sidebar').getBoundingClientRect().right;
+  const inMap = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) if (e.style && e.style.transform.includes('translate3d')) return true; return false; };
+  const visible = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.05) return false; } return true; };
+  return [...document.querySelectorAll('.label, .chip, [data-zoom-kind]')].filter((el) => inMap(el) && visible(el))
+    .map((el) => ({ text: el.textContent.trim().slice(0, 30), r: el.getBoundingClientRect() }))
+    .filter((x) => x.r.width > 0 && x.r.left < edge - 1).map((x) => x.text);
+}"""
+
+
+@pytest.mark.parametrize("view", ["2d", "3d"])
+def test_laptop_with_sidebar(view, train_url, chromium):
+    """Laptop 1440x900 with the chat column (docs/specs/chat-sidebar.md): a route and a tapped room, nothing overlaps
+    on the map or in the column, and no map label sits under the column."""
+    context = chromium.new_context(viewport={"width": 1440, "height": 900}, device_scale_factor=1)
+    context.add_init_script(NO_AO)
+    context.add_init_script("try { localStorage.removeItem('twin.sidebarCollapsed'); } catch (e) {}")
+    page = context.new_page()
+    page.errors = []
+    page.on("pageerror", lambda e: page.errors.append(str(e)))
+    findings: list[str] = []
+    try:
+        page.goto(f"{train_url}?building=train/{BUILDINGS['campus']}", timeout=60000)
+        page.wait_for_function(
+            "window.__twinStore && window.__twinStore.getState().model && window.__twinControls && window.__twinControls.current",
+            timeout=60000,
+        )
+        page.wait_for_selector(".sidebar", timeout=20000)
+        page.evaluate("() => window.__twinStore.getState().reset()")
+        page.evaluate(f"window.__twinStore.getState().setViewMode('{view}')")
+        page.wait_for_timeout(1500)
+        plan = page.evaluate(PLAN)
+        rooms, floor = plan["rooms"], plan["floor"]
+        start, goal, tapped = rooms[0], rooms[min(3, len(rooms) - 1)], rooms[1]
+        page.evaluate(
+            "([s, p, f]) => window.__twinStore.getState().setHere({ space_id: s, floor_id: f, point: p })",
+            [start[0], start[1], floor],
+        )
+        page.evaluate("([a, b]) => window.__twinStore.getState().route(a, b)", [start[0], goal[0]])
+        page.wait_for_timeout(1500)
+        page.evaluate(
+            "([id, p, f]) => window.__twinStore.getState().select({ kind: 'space', id, floor_id: f, point: p })",
+            [tapped[0], tapped[1], floor],
+        )
+        page.evaluate("() => window.__twinStore.getState().requestCamera({ kind: 'home' })")
+        page.wait_for_timeout(2500)
+        _settle(page)
+        assert page.locator(".sidebar .card").count() >= 1, "the place card sits in the column"
+        _audit(page, f"laptop-sidebar {view} route+tap home", findings)
+        under = page.evaluate(SIDEBAR_LABELS_LEFT)
+        assert not under, f"map labels under the column: {under[:10]}"
+        page.evaluate(ZOOM_TO, [TIERS["near"], tapped[1]])
+        _settle(page)
+        _audit(page, f"laptop-sidebar {view} route+tap near", findings)
+        under = page.evaluate(SIDEBAR_LABELS_LEFT)
+        assert not under, f"map labels under the column (near): {under[:10]}"
+        assert not page.errors, page.errors
+    finally:
+        context.close()
+    assert not findings, f"{len(findings)} overlaps:\n" + "\n".join(findings[:60])

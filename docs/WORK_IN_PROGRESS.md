@@ -222,3 +222,23 @@ Mit `main` 32fcca3 zusammengeführt (dein `clear_position` und die Werkzeug-Rege
 Live-Suite auf dem zusammengeführten Stand: 69 grün, 2 rot. **`test_voice::test_two_kitchens_on_one_floor_get_one_short_question` scheitert auch auf sauberem `origin/main`** (Modell nimmt die nähere Küche, nennt die andere, endet aber nicht mit der erwarteten Frage) – vermutlich seit 2ab429c (Persona am Ende des Prompts), bitte bei dir prüfen. `test_position::test_4_nearest_coffee…` ist wackelig (Wortlaut), grün bei Wiederholung.
 Zahlen pro Gerät (Feuerlöscher, EG): train-015 ab Main aisle H-B3 5 Stopps 111,9 m; dev-003 ab H-B5 6 Stopps 167,0 m; Urban Colab (alte Geometrie) ab Flur West 8 Stopps 108,5 m. Länger als vorher, weil jede Etappe bis zum Gerät an der Wand geht. Mit deiner neuen Geometrie nehmen wir die Urban-Colab-Zahl neu.
 Bekannte Grenzen: "guide me" im Chat führt noch Raum für Raum (nur die Seite führt Gerät für Gerät); die gezeichnete Rundenlinie geht durch Raummitten, ihre Länge weicht von `total_m` ab.
+
+## Leonie an Jennifer (Sonntag ~08:40): `feat/twin-ui-fixes` war bis eben leer – jetzt richtig gepusht
+Unser Branch `feat/twin-ui-fixes` zeigte auf GitHub nur die Basis (a3976bc), die 8 Commits lagen lokal. Jetzt gepusht (000e799). Du hast inzwischen eigene Versionen gebaut (ruhige Fundstücke, ganze Pixel), darum **Konflikte mit `main`**. Vorschlag: deine Versionen behalten und nur übernehmen, was in `main` noch fehlt:
+- `5861e9a` Etagenleiste: Klick zeigt bei einer Route über mehrere Etagen nur diese Etage, "alle Etagen" stapelt wieder (`floorVisibility.tsx`).
+- `95d5e2a` keine rohen IDs im Untertitel der Wanda-Leiste (`Omnibox.tsx`).
+- `2f86769` keine Willkommenskarte, solange das Runden-Panel offen ist.
+- `9cf723c` Hover am eingeschalteten Sprachknopf (falls es den Knopf nach deinem Umbau noch gibt, sonst weg).
+Der Rest (`3cbcd85`, `ec25974`, `000e799` scharfe Labels; `8401008` ruhige Fundstücke) ist durch deine Commits abgedeckt.
+
+## Leonie (Sonntag ~08:55): fehlende UI-Stücke selbst nachgezogen, `feat/twin-ui-missing` (auf aktuellem `main`, gepusht)
+Nur was in `main` noch fehlte, deine Versionen bleiben: (1) Etagenleiste: bei einer Route über mehrere Etagen zeigt ein Klick nur diese Etage, "alle Etagen" stapelt wieder (beim Gehen bleibt dein Verhalten ohne "alle Etagen"); (2) keine rohen IDs im Untertitel der Wanda-Leiste (`withoutIds` in `voice.ts`, Test); (3) Hover am eingeschalteten Sprachknopf (harmlos, falls der Knopf weg ist). Willkommenskarte bei offener Runde hattest du schon. tsc, Build, vitest 230 grün. `feat/twin-ui-fixes` bitte nicht mehr mergen, ist hiermit erledigt.
+
+## Jennifer an Leonie (Sonntag 09:15): Urban Colab fertig auf `main`, englische Raumnamen
+Geometrie aufgeräumt und Raumnamen auf Englisch, IDs unverändert. Details, neue Zahlen und die Namensliste: `docs/HANDOVER_JENNIFER_TO_LEONIE.md`. Wichtig fürs Drehbuch: Start der Runde heißt jetzt **"South Corridor"** (war Flur Süd). Runde EG 8 Feuerlöscher, 7 Stopps, 81,6 m (war 106 m); Project Room → Foyer 17,5 m (war 55,8 m). Dein `tests/test_demo_urban_colab.py` grün. Bereits installierte Kopien neu installieren: `rm -rf agent_output/buildings/plan-89323a15 && scripts/install_demo_buildings.sh`.
+Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus building.json), neues Gebäude, ähnliche Fragen, Prüfung auf Overfitting. Siehe Handover Abschnitt 5.
+
+## Leonie an Jennifer (Sonntag ~09:30): bitte jetzt mergen, beide Branches sind auf aktuellem `main` und getestet
+- **`feat/round-per-device`** (57c3d9f) und **`feat/twin-ui-missing`** (809ee61) enthalten `main` (inkl. deiner englischen Urban-Colab-Namen), konfliktfrei. Zusammen getestet (lokal kombiniert): tsc, Build, vitest 245, ruff, pytest Runde/Web/Registry/Urban-Colab/Demo-Gebäude/Position 660 grün. Live-Suite auf dem kombinierten Stand läuft gerade, Ergebnis kommt hier.
+- Danach Vorschau neu bauen, Seed-Notiz, Drehbuch-Zahlen (Runde dann 8 Stopps pro Gerät, Start "South Corridor").
+- Falls du gerade selbst mergst: sag kurz Bescheid, sonst holt Leonies Sitzung sie nach grüner Live-Suite selbst nach `main` (nach Leonies OK).
