@@ -415,3 +415,9 @@ Position und letzter Standort pro Sitzung (`state.position`), Sprachregeln, Kart
 - **Falsche Erinnerungen:** ein veralteter Schreibtisch führt in den falschen Raum. Erinnerungen immer mit Alter nennen ("du hast vor 3 Tagen gesagt …") und bei Routen bestätigen lassen.
 - **Prinzip bleibt:** Fakten über das Gebäude kommen weiter nur aus dem deterministischen Kern, das Gedächtnis liefert nur Wünsche und Bezüge der Person.
 - Wertung: Benchmark prüft das nicht. Gut für Interaction und den Pitch ("Wanda kennt dich"). Nicht vor dem Freeze bauen.
+
+## Outdoor handover (Google/Apple Maps), parked 2026-10-25 03:40
+Jennifer's question: link the twin with the outside world. Kit buildings carry no address or coordinates, so a map embed is not feasible before the freeze.
+Cheap version (about 30 min, no API key): one address per building in a small file, a "Route to the building" button that opens Google or Apple Maps with that address, handover to our map at the entrance. Pitch line: inside Wanda knows every room, outside she hands over to Maps; next step entrances with coordinates for a door-to-machine route from the train station.
+Build only after the round and overlap merges and after both agree.
+Variant without Maps: a made-up surrounding in 3D (lawn around the footprint, a few trees, a path to each `outside` entrance, parking at the dock). About 1 to 2 h, only through the design session, after the merges; watch phone performance.
