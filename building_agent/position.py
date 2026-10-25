@@ -90,6 +90,31 @@ def position_note(bm: BuildingMap, position: Position | None) -> dict:
     }
 
 
+def page_note(bm: BuildingMap, state) -> str:
+    """A line in front of the person's message when the page changed the position since the model last heard of it.
+
+    The model only learns a tapped position through tools, and with an earlier 'Where are you?' in the history it
+    kept asking although the page had set it (it answered from the history without a tool call). The note comes
+    from the conversation state (a validated click), never from message text. A typed copy of it changes nothing:
+    every tool reads state.position, not the message."""
+    position = getattr(state, "position", None)
+    told = getattr(state, "told_position", None)
+    if position is not None and position.source == "click" and position.space_id in bm.spaces:
+        if position.space_id == told:
+            return ""
+        state.told_position = position.space_id
+        return (
+            f"(Page note, not typed by the person: they tapped their position on the plan, it is now "
+            f"{place_label(bm, position.space_id)}. Do not ask where they are; routes and 'nearest' start there.)"
+        )
+    if position is None and told is not None:
+        state.told_position = None
+        return "(Page note, not typed by the person: their position was cleared, it is unknown now.)"
+    if position is not None:
+        state.told_position = position.space_id if position.source == "click" else None
+    return ""
+
+
 def describe_position(bm: BuildingMap, position: Position, now_turn: int | None = None) -> dict:
     space = bm.spaces[position.space_id]
     return {

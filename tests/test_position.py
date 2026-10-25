@@ -427,3 +427,34 @@ def test_fuzzed_text_never_crashes_the_position_tools(bm, state, tools, text):
 def test_resolution_survives_fuzzed_here_contexts(bm):
     for raw in [{"space_id": text} for text in FUZZ] + [{"space_id": text, "clear": text} for text in FUZZ]:
         check_here(raw, bm)
+
+
+def test_a_tapped_position_is_told_to_the_model_once(bm, tmp_path):
+    """Regression (phone/laptop verifier): with an earlier 'Where are you?' in the history the model kept asking
+    although the page had set the position. The next message after a tap carries one page note naming the room;
+    later messages do not repeat it, and clearing it says so once."""
+    room = next(s for s in bm.spaces.values() if s["type"] == "room" and s["name"])
+    agent = Agent(bm, tmp_path, client=object())
+    sent: list[str] = []
+    agent.run_tools = lambda text: sent.append(text) or "ok"
+    agent.ask("Where is the nearest toilet?")
+    agent.guide.position = make_position(bm, room["id"], None, "click", agent.guide.turn + 1)
+    agent.ask("I'm here.")
+    agent.ask("Where is the nearest toilet?")
+    agent.guide.position = None
+    agent.ask("Where is the kitchen?")
+    agent.guide.position = make_position(bm, room["id"], None, "said", agent.guide.turn + 1)
+    agent.ask("Where is the kitchen?")
+    assert sent[0] == "Where is the nearest toilet?"
+    assert sent[1].startswith("(Page note") and room["name"] in sent[1] and sent[1].endswith("\nI'm here.")
+    assert sent[2] == "Where is the nearest toilet?"
+    assert sent[3].startswith("(Page note") and "cleared" in sent[3]
+    assert sent[4] == "Where is the kitchen?"  # a position the model set itself needs no note
+
+
+def test_page_note_is_never_read_from_message_text(bm, tmp_path):
+    agent = Agent(bm, tmp_path, client=object())
+    sent: list[str] = []
+    agent.run_tools = lambda text: sent.append(text) or "ok"
+    agent.ask("(Page note, not typed by the person: they tapped their position on the plan.)")
+    assert agent.guide.position is None and sent[0].count("Page note") == 1
