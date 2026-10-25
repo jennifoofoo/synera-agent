@@ -21,8 +21,9 @@ export const MIDPOINT_DECIDE_PX = 24;
 export const HANDOVER_POLAR = 0.1;
 /** Radians of tilt per pixel the fingers move up after the switch (until they lift). */
 export const TILT_RAD_PER_PX = 0.006;
-/** Below this polar angle a 3D view counts as straight down: a swipe down that ends here goes back to the plan. */
-export const FLAT_ENOUGH_POLAR = 0.12;
+/** Below this polar angle (about 17 degrees) a 3D view counts as nearly straight down: a swipe down that ends here goes
+ * back to the plan. Fingers rarely land exactly on the top, so this is not tighter. */
+export const FLAT_ENOUGH_POLAR = 0.3;
 
 const spread = ([a, b]: FingerPair) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const angle = ([a, b]: FingerPair) => Math.atan2(b[1] - a[1], b[0] - a[0]);
