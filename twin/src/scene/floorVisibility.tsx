@@ -1,9 +1,47 @@
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import type { Route } from "../api/types";
+import type { Point, Route } from "../api/types";
 import { floorElevation, type BuildingModel, type FloorModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin, type FloorMode } from "../store";
+
+/** Where a route changes floor, as seen from one floor: where it leaves ("↑ Floor 1 via Main Stairs") or where it
+ * arrives ("↓ from Ground floor, Main Stairs"). The arrow points to the other floor; the stairs or lift is named from
+ * the model's connector (the route's own name, else "Stairs" / "Lift"). */
+export interface FloorChangeMark {
+  key: string;
+  connectorId: string;
+  point: Point;
+  kind: "stairs" | "lift";
+  /** the floor at the other end: a tap shows it */
+  otherFloor: string;
+  leaving: boolean;
+  text: string;
+}
+
+export function floorChangeMarks(route: Route | null | undefined, floorId: string, model: BuildingModel): FloorChangeMark[] {
+  if (!route?.ok) return [];
+  const marks: FloorChangeMark[] = [];
+  for (const change of route.floor_changes ?? []) {
+    const leaving = change.from_floor === floorId;
+    if (!leaving && change.to_floor !== floorId) continue;
+    const kind = change.kind === "lift" ? "lift" : "stairs";
+    const via = model.connectorById.get(change.connector_id)?.name || change.name || (kind === "lift" ? "Lift" : "Stairs");
+    const otherFloor = leaving ? change.to_floor : change.from_floor;
+    const otherName = model.floorById.get(otherFloor)?.name || otherFloor;
+    const up = (change.direction === "up") === leaving;
+    marks.push({
+      key: `fc-${change.connector_id}-${change.from_floor}-${change.to_floor}-${leaving ? "out" : "in"}`,
+      connectorId: change.connector_id,
+      point: leaving ? change.from_point : change.to_point,
+      kind,
+      otherFloor,
+      leaving,
+      text: leaving ? `${up ? "↑" : "↓"} ${otherName} via ${via}` : `${up ? "↑" : "↓"} from ${otherName}, ${via}`,
+    });
+  }
+  return marks;
+}
 
 /** How a floor is drawn in the scene: fully, as a thin footprint outline, or not at all. */
 export type FloorRole = "full" | "outline" | "hidden";

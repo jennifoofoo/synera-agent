@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Building } from "../api/types";
 import { buildModel } from "../model/model";
 import type { Route } from "../api/types";
-import { STACK_POLAR, floorLayout, floorRoles, routeFloorIds, routeStackElevations, routeStackGap } from "./floorVisibility";
+import { STACK_POLAR, floorChangeMarks, floorLayout, floorRoles, routeFloorIds, routeStackElevations, routeStackGap } from "./floorVisibility";
 import { floorRuns } from "./RouteLine";
 
 const square = (floor_id: string, id: string) => ({
@@ -114,5 +114,29 @@ describe("a route over two floors (stacked apart in 3D)", () => {
     expect(runs[0].toArray().map((v) => Math.round(v * 100) / 100)).toEqual([8, 0.15, -1]);
     expect(runs[1].toArray().map((v) => Math.round(v * 100) / 100)).toEqual([8, 20.15, -2]);
     expect(floorRuns([twoFloorRoute.segments![0]], y)).toEqual([]);
+  });
+});
+
+describe("floorChangeMarks: the same pill at both ends of a floor change", () => {
+  const withStairs = {
+    ...twoFloorRoute,
+    floor_changes: [{ connector_id: "V02", kind: "stairs", name: "Main Stairs", from_floor: "g", to_floor: "f1", from_point: [8, 1], to_point: [8, 2], direction: "up" }],
+  } as unknown as Route;
+
+  it("says where the route leaves, with the stairs' name", () => {
+    const [mark] = floorChangeMarks(withStairs, "g", model);
+    expect(mark).toMatchObject({ leaving: true, otherFloor: "f1", point: [8, 1], kind: "stairs", text: "↑ Floor 1 via Main Stairs" });
+  });
+
+  it("says where it arrives on the next floor, pointing back down", () => {
+    const [mark] = floorChangeMarks(withStairs, "f1", model);
+    expect(mark).toMatchObject({ leaving: false, otherFloor: "g", point: [8, 2], text: "↓ from Ground, Main Stairs" });
+  });
+
+  it("names a lift 'Lift' when it has no name, and marks nothing on floors the change does not touch", () => {
+    const lift = { ...withStairs, floor_changes: [{ ...withStairs.floor_changes![0], kind: "lift", name: "", direction: "down", from_floor: "f1", to_floor: "g" }] } as unknown as Route;
+    expect(floorChangeMarks(lift, "f1", model)[0].text).toBe("↓ Ground via Lift");
+    expect(floorChangeMarks(lift, "g", model)[0].text).toBe("↑ from Floor 1, Lift");
+    expect(floorChangeMarks(withStairs, "b", model)).toEqual([]);
   });
 });

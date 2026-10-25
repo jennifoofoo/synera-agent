@@ -7,6 +7,7 @@ import { wallHeightFor } from "./geometry";
 import type { Asset, Point, Space } from "../api/types";
 import type { FloorModel, BuildingModel } from "../model/model";
 import { useTwin } from "../store";
+import { floorChangeMarks } from "./floorVisibility";
 import { useMapZoom, type MapTier } from "./mapZoom";
 import { areasOf, type Area } from "./areas";
 import { prettyType, spaceGroup } from "../model/palette";
@@ -366,18 +367,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     [flat, model, state?.closed, floor.id],
   );
   const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
-  // 2D: the route's floor changes on this floor, where it leaves (continues on the next floor) and where it arrives
-  // (back to the floor before); each becomes a tappable hint that shows the other floor.
-  const changes = useMemo(() => {
-    if (!flat || !route?.ok) return [];
-    const out: { connectorId: string; kind: string; name: string; point: Point; toFloor: string; leaving: boolean; up: boolean }[] = [];
-    for (const change of route.floor_changes ?? []) {
-      const up = change.direction === "up";
-      if (change.from_floor === floor.id) out.push({ connectorId: change.connector_id, kind: change.kind, name: change.name, point: change.from_point, toFloor: change.to_floor, leaving: true, up });
-      else if (change.to_floor === floor.id) out.push({ connectorId: change.connector_id, kind: change.kind, name: change.name, point: change.to_point, toFloor: change.from_floor, leaving: false, up: !up });
-    }
-    return out;
-  }, [flat, route, floor.id]);
+  // 2D: the route's floor changes on this floor, where it leaves and where it arrives (floorChangeMarks); each is a
+  // tappable hint that shows the other floor.
+  const changes = useMemo(() => (flat ? floorChangeMarks(route, floor.id, model) : []), [flat, route, floor.id, model]);
 
   const { shown, pins, classes } = useMemo(() => {
     // One decision (label-rules.md): this layout only runs when the zoom step, the floor, the route, the selection,
@@ -411,13 +403,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     // 2. Floor changes of the route: one small badge where to go up or down (it replaces that stairs/lift POI).
     const replaced = new Set<string>();
     for (const change of changes) {
-      const connector = model.connectorById.get(change.connectorId);
-      for (const spaceId of connector?.space_ids ?? []) replaced.add(spaceId);
-      const toName = model.floorById.get(change.toFloor)?.name ?? change.toFloor;
-      const text = `${change.leaving ? "Continues on" : "Back to"} ${toName} ${change.up ? "↑" : "↓"}`;
-      const box = boxOf(change.point, floorHintWidth(text) / 2, FLOOR_BADGE_H_PX / 2 + 2);
-      kept.push(box);
-      pins.push({ kind: "floor", id: `fc-${change.connectorId}-${change.toFloor}`, point: change.point, connector: change.kind === "lift" ? "lift" : "stairs", toFloor: change.toFloor, text, title: `${change.name}: show ${toName}` });
+      for (const spaceId of model.connectorById.get(change.connectorId)?.space_ids ?? []) replaced.add(spaceId);
+      kept.push(boxOf(change.point, floorHintWidth(change.text) / 2, FLOOR_BADGE_H_PX / 2 + 2));
+      const otherName = model.floorById.get(change.otherFloor)?.name ?? change.otherFloor;
+      pins.push({ kind: "floor", id: change.key, point: change.point, connector: change.kind, toFloor: change.otherFloor, text: change.text, title: `${change.text}: show ${otherName}` });
     }
     // 3. Found things: a dot each; dots that would touch merge into one with a count.
     const dots: { pin: Extract<Pin, { kind: "found" }>; names: string[]; box: Box }[] = [];
