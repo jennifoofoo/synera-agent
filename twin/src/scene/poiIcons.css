@@ -8,6 +8,8 @@
 .poi-badge svg { width: 15px; height: 15px; fill: currentColor; }
 .poi-badge svg .stroke { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .poi-badge svg .stroke.thin { stroke-width: 1.1; }
+/* the meeting glyph (three people round a table) is the busiest: drawn a little larger in the same 22 px badge */
+.poi-badge.poi-meeting svg { width: 18px; height: 18px; }
 
 /* Floor change on the route: a blue pill with the stairs/lift glyph and "↑ 1" (22 px tall, see FLOOR_BADGE_H_PX). */
 .floor-badge {
