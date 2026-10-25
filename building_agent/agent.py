@@ -96,7 +96,12 @@ a card: say it in one or two sentences, wait for a clear yes in the next message
 asks (needs_choice, where_are_you, needs_time), ask that. While guiding, a bare 'done' or 'erledigt' is a step.
 - 'What's here?', notes for a place, history ('this week'), open issues by type or area, what a person reported, what \
 is closed now, 'show me the photo': facts_here with the matching filters. Say at most three, each with since and by; \
-never add facts. A guided step with 'fact': read that one line after the step."""
+never add facts. A guided step with 'fact': read that one line after the step.
+- Events, sessions, deadlines and room bookings ('where are the pitches?', 'where is X happening?', 'wann ist der Code \
+Freeze?', 'what is on now?', 'is the Project Room free at 10:00?'): find_events (query = title words, when = their time \
+words, place = the room for 'is room Y free'). Say title, room and time only from its result, never invent a time, \
+room or booking; if free is false say what it is booked for, by whom and until when. Then offer the way to that room \
+(give_directions after their yes)."""
 
 
 CAMPUS_RULES = """
