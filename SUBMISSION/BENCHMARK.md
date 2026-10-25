@@ -20,8 +20,9 @@ uv run --env-file .env python -m building_agent.submission data/test --csv team_
 One command, no manual steps. It answers every question, writes the CSV (`question_id,answer`, kit README section 6)
 and `answers.json`, then checks the CSV the way the judge app reads it (UTF-8, header row, every id exactly once,
 under 5 MB, an `Answer:` line in every reply) and exits non-zero if anything is off. Questions that match a known
-sentence template are answered by plain Python without an API call; finished model replies are cached, so a re-run
-after an interruption only asks what is missing.
+sentence template are answered by plain Python without an API call; on `data/test` that is all 145, so the file is
+reproducible without the model. Other questions go to Claude; finished model replies are cached, so a re-run after an
+interruption only asks what is missing.
 
 ## Run on an unseen building
 
@@ -37,9 +38,10 @@ Accepted inputs: a split directory (like `data/test`), one building directory, o
 as a list or `{"questions": [...]}` with `id` and `text`). Use `--root DIR` if the questions file is not next to the
 building folders, `--workers N` for parallel questions (default 4).
 
-Level 4 (a building given as floor plans): put the plan images (with their `.svg` and `building.json` if present) in a
-folder and ask in the chat page (`scripts/build_twin.sh`, then `uv run python -m web`), or let the agent convert
-them; the converted building is then a normal building directory for the command above.
+Level 4 (a building given as floor plans): build the page once (`scripts/build_twin.sh`), start it
+(`uv run python -m web`), open the building menu, "New building", and add the plan images (with their `.svg` and
+`building.json` if present). After the confirm card it is saved under `agent_output/buildings/<id>/` and is a normal
+building directory for the command above.
 
 ## Format of `answers.json`
 
@@ -53,7 +55,8 @@ them; the converted building is then a normal building directory for the command
 
 - `question_id` / `id`: the question id (both names, as in the kit CSV and the challenge brief).
 - `answer`: the full reply, exactly as in the kit's submission CSV. The official scorer (`benchmark/score.py`) reads the
-  last line starting with `Answer:` from it. All 145 entries were checked with that scorer.
+  last line starting with `Answer:` from it. All 145 entries have exactly such a line, and `answer` is the same text as
+  in `team_synera.csv`.
 - `answer_line`: the text of that final `Answer:` line, for convenience.
 
 ## Check without a key
