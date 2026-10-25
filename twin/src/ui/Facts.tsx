@@ -293,6 +293,7 @@ function AddForm() {
         </label>
       )}
       {problem && <p className="note-problem">{problem}</p>}
+      <p className="note-tip">Tip: say “Wanda, note: …” anywhere.</p>
       <div className="card-actions">
         <button onClick={() => openNotes("here")}>Cancel</button>
         <button className="primary" onClick={() => void save()} disabled={busy || (!text.trim() && !photo)}>

@@ -164,6 +164,7 @@ def make_position_tools(bm: BuildingMap, state) -> list:
         "ich bin nicht mehr da"). Then ask where they are now. Same as the page's "forget where I am"."""
         had = state.position is not None
         state.position = state.walk = state.session = None
+        state.asked_position = True  # the reply asks where they are now: the page's next tap answers it
         return as_json({"cleared": had, "question": "Where are you now? Tap the map or tell me a room."})
 
     @beta_tool

@@ -2,6 +2,7 @@
 // (store.awaitingPlace) the tap answers instead: the position is set on screen like "I'm here" on the card (exact
 // spot included) and "I'm here." goes to the agent at once with context.here, so the original question continues.
 
+import type { Point } from "./api/types";
 import { useTwin, type Selection } from "./store";
 import { speak } from "./voice";
 import { followUpAfterSpeech } from "./handsFree";
@@ -18,6 +19,17 @@ export function tapMap(selection: Selection, screen?: [number, number]): void {
   useTwin.setState({ awaitingPlace: null, selection: null, popover: null });
   state.setHere({ space_id: space.id, floor_id: selection.floor_id ?? space.floor_id, point });
   void answer(awaiting.voice);
+}
+
+/** "I'm here" on the room card: set on screen as always; while Wanda waits for a place it also answers her at once
+ * (the pending question continues with context.here). True when it answered. */
+export function hereAnswers(here: { space_id: string; floor_id: string; point?: Point | null }): boolean {
+  const { awaitingPlace, directions, setHere } = useTwin.getState();
+  setHere(here);
+  if (!awaitingPlace || directions) return false;
+  useTwin.setState({ awaitingPlace: null });
+  void answer(awaitingPlace.voice);
+  return true;
 }
 
 async function answer(voice: boolean): Promise<void> {

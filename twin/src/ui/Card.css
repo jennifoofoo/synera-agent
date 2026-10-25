@@ -119,3 +119,10 @@
   .worker .card-walk .card-head .card-kicker { font-size: 12px; }
   .worker .card-walk .card-head .walk-end { padding: 4px 4px; }
 }
+
+/* place card: notes already here (one quiet line that opens them) and the "Note" action (icon + short label) */
+.card .card-notes-line { display: flex; align-items: center; gap: 6px; max-width: 100%; margin-top: 6px; color: var(--ink-2); text-align: left; }
+.card .card-notes-line span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .card-notes-line:hover { color: var(--ink); }
+.card .card-notes-line svg { flex: none; color: var(--signal); }
+.card-actions .card-note-add { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }

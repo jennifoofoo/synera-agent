@@ -645,12 +645,8 @@ export function installNotes(): () => void {
     const { storage, buildingKey } = useNotes.getState();
     if (storage?.kind === "server" && buildingKey) void storage.list(buildingKey).then((notes) => useNotes.setState({ notes: mergeStateFacts(notes) }), () => {});
   });
-  // The sheet never opens just because a position was set; only when the room you are now in has notes.
-  const unsubscribePosition = useTwin.subscribe((now, before) => {
-    const space = now.state?.position?.space_id ?? null;
-    if (!space || space === (before.state?.position?.space_id ?? null) || now.walkStep !== null) return;
-    if (useNotes.getState().sheet === "closed" && notesIn([space]).length) openNotes("here");
-  });
+  // The sheet never opens by itself when the position changes (it would cover a pending question or a reply card):
+  // it opens on a tap on Notes, on "what's here?" by voice, and as the guidance note card while walking.
   const unsubscribeNotes = useNotes.subscribe((now, before) => {
     if (now.notes !== before.notes) updateGuide(useTwin.getState().walkStep);
   });
@@ -659,7 +655,6 @@ export function installNotes(): () => void {
     unsubscribe();
     unsubscribeRound();
     unsubscribeFacts();
-    unsubscribePosition();
     unsubscribeNotes();
   };
 }

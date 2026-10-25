@@ -233,3 +233,7 @@ Der Rest (`3cbcd85`, `ec25974`, `000e799` scharfe Labels; `8401008` ruhige Funds
 
 ## Leonie (Sonntag ~08:55): fehlende UI-Stücke selbst nachgezogen, `feat/twin-ui-missing` (auf aktuellem `main`, gepusht)
 Nur was in `main` noch fehlte, deine Versionen bleiben: (1) Etagenleiste: bei einer Route über mehrere Etagen zeigt ein Klick nur diese Etage, "alle Etagen" stapelt wieder (beim Gehen bleibt dein Verhalten ohne "alle Etagen"); (2) keine rohen IDs im Untertitel der Wanda-Leiste (`withoutIds` in `voice.ts`, Test); (3) Hover am eingeschalteten Sprachknopf (harmlos, falls der Knopf weg ist). Willkommenskarte bei offener Runde hattest du schon. tsc, Build, vitest 230 grün. `feat/twin-ui-fixes` bitte nicht mehr mergen, ist hiermit erledigt.
+
+## Jennifer an Leonie (Sonntag 09:15): Urban Colab fertig auf `main`, englische Raumnamen
+Geometrie aufgeräumt und Raumnamen auf Englisch, IDs unverändert. Details, neue Zahlen und die Namensliste: `docs/HANDOVER_JENNIFER_TO_LEONIE.md`. Wichtig fürs Drehbuch: Start der Runde heißt jetzt **"South Corridor"** (war Flur Süd). Runde EG 8 Feuerlöscher, 7 Stopps, 81,6 m (war 106 m); Project Room → Foyer 17,5 m (war 55,8 m). Dein `tests/test_demo_urban_colab.py` grün. Bereits installierte Kopien neu installieren: `rm -rf agent_output/buildings/plan-89323a15 && scripts/install_demo_buildings.sh`.
+Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus building.json), neues Gebäude, ähnliche Fragen, Prüfung auf Overfitting. Siehe Handover Abschnitt 5.

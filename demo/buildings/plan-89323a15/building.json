@@ -39,7 +39,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "meeting_room",
-   "name": "Projektraum West",
+   "name": "Project Room West",
    "ref": null,
    "polygon": [
     [
@@ -93,7 +93,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "corridor",
    "room_type": "corridor",
-   "name": "Flur West",
+   "name": "West Corridor",
    "ref": null,
    "polygon": [
     [
@@ -128,7 +128,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "locker_room",
-   "name": "Umkleide",
+   "name": "Changing Room West",
    "ref": null,
    "polygon": [
     [
@@ -163,7 +163,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "server_room",
-   "name": "EDV",
+   "name": "IT Room",
    "ref": null,
    "polygon": [
     [
@@ -190,7 +190,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "storage",
-   "name": "ELT-Verteiler",
+   "name": "Electrical Room",
    "ref": null,
    "polygon": [
     [
@@ -217,7 +217,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "storage",
-   "name": "Lager",
+   "name": "Storage by the Lift",
    "ref": null,
    "polygon": [
     [
@@ -271,7 +271,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "corridor",
    "room_type": "corridor",
-   "name": "Flur Süd",
+   "name": "South Corridor",
    "ref": null,
    "polygon": [
     [
@@ -386,7 +386,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "storage",
-   "name": "Lager",
+   "name": "Storage Foyer",
    "ref": null,
    "polygon": [
     [
@@ -413,7 +413,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "stair",
    "room_type": "stairwell",
-   "name": "Treppe Mitte",
+   "name": "Main Stairs",
    "ref": null,
    "polygon": [
     [
@@ -518,7 +518,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "canteen",
-   "name": "Café (Gastraum)",
+   "name": "Café",
    "ref": null,
    "polygon": [
     [
@@ -545,7 +545,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "corridor",
    "room_type": "corridor",
-   "name": "Flur Nord",
+   "name": "North Corridor",
    "ref": null,
    "polygon": [
     [
@@ -580,7 +580,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "office",
-   "name": "Büro",
+   "name": "Office",
    "ref": null,
    "polygon": [
     [
@@ -607,7 +607,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "storage",
-   "name": "Lager",
+   "name": "Storage North",
    "ref": null,
    "polygon": [
     [
@@ -634,7 +634,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "storage",
-   "name": "Müll",
+   "name": "Waste Room",
    "ref": null,
    "polygon": [
     [
@@ -661,7 +661,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "locker_room",
-   "name": "Umkleide",
+   "name": "Changing Room East",
    "ref": null,
    "polygon": [
     [
@@ -688,7 +688,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "toilet",
-   "name": "WC",
+   "name": "Toilets",
    "ref": null,
    "polygon": [
     [
@@ -715,7 +715,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "toilet",
-   "name": "WC",
+   "name": "Toilets",
    "ref": null,
    "polygon": [
     [
@@ -742,7 +742,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "room",
    "room_type": "toilet",
-   "name": "WC",
+   "name": "Toilets",
    "ref": null,
    "polygon": [
     [
@@ -777,7 +777,7 @@
    "floor_id": "plan-89323a15-F0",
    "type": "corridor",
    "room_type": "corridor",
-   "name": "Flur Ost",
+   "name": "East Corridor",
    "ref": null,
    "polygon": [
     [
@@ -804,7 +804,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "office",
-   "name": "Arbeitsbereich",
+   "name": "Work Area",
    "ref": null,
    "polygon": [
     [
@@ -930,7 +930,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "storage",
-   "name": "Putzraum",
+   "name": "Cleaning Room",
    "ref": null,
    "polygon": [
     [
@@ -957,7 +957,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "server_room",
-   "name": "EDV",
+   "name": "IT Room",
    "ref": null,
    "polygon": [
     [
@@ -984,7 +984,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "toilet",
-   "name": "WC",
+   "name": "Toilets",
    "ref": null,
    "polygon": [
     [
@@ -1011,7 +1011,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "toilet",
-   "name": "WC",
+   "name": "Toilets",
    "ref": null,
    "polygon": [
     [
@@ -1065,7 +1065,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "storage",
-   "name": "Lager",
+   "name": "Storage",
    "ref": null,
    "polygon": [
     [
@@ -1092,7 +1092,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "corridor",
    "room_type": "corridor",
-   "name": "Flur 1. OG",
+   "name": "First Floor Corridor",
    "ref": null,
    "polygon": [
     [
@@ -1243,7 +1243,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "stair",
    "room_type": "stairwell",
-   "name": "Treppe West",
+   "name": "West Stairs",
    "ref": null,
    "polygon": [
     [
@@ -1270,7 +1270,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "stair",
    "room_type": "stairwell",
-   "name": "Treppe Mitte",
+   "name": "Main Stairs",
    "ref": null,
    "polygon": [
     [
@@ -1297,7 +1297,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "outdoor",
    "room_type": "balcony",
-   "name": "Terrasse",
+   "name": "Terrace",
    "ref": null,
    "polygon": [
     [
@@ -1351,7 +1351,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "outdoor",
-   "name": "Luftraum",
+   "name": "Void",
    "ref": null,
    "polygon": [
     [
@@ -1378,7 +1378,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "kitchen",
-   "name": "Teeküche",
+   "name": "Kitchenette",
    "ref": null,
    "polygon": [
     [
@@ -1405,7 +1405,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "lab",
-   "name": "Living Lab Einzelhandel",
+   "name": "Retail Living Lab",
    "ref": null,
    "polygon": [
     [
@@ -1432,7 +1432,7 @@
    "floor_id": "plan-89323a15-F1",
    "type": "room",
    "room_type": "outdoor",
-   "name": "Luftraum",
+   "name": "Void",
    "ref": null,
    "polygon": [
     [
