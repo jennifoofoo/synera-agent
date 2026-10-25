@@ -1,8 +1,8 @@
 // The one input: "Ask or search…". Typing completes the best place inline as grey ghost text (see Autocomplete);
 // accepting it flies there and selects it. Enter on a sentence asks the building (the reply shows in the Card).
 // Voice in via the mic (push-to-talk), replies to spoken questions are spoken back (mute toggle).
-// By default one bottom bar shows: the Wanda orb, a one-line caption (what Wanda hears, thinks or says), Ask (opens the
-// input), Talk (push-to-talk) and, while listening or speaking, Stop. The input stays mounted but invisible, so the
+// By default one bottom bar shows: the Wanda orb, which is the Talk button (push-to-talk), a one-line caption (what
+// Wanda hears, thinks or says), Ask (opens the input) and, while listening or speaking, Stop. The input stays mounted but invisible, so the
 // header search, Cmd/Ctrl+K, the caption and Ask just focus it; focus opens it, an empty blur or Escape closes it.
 // Owner: chat/search session, see ARCHITECTURE.md.
 
@@ -68,7 +68,6 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const talkRef = useRef<HTMLButtonElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);
-  const orbRef = useRef<HTMLSpanElement>(null);
   const [speaking, setSpeaking] = useState(false);
   const [lingering, setLingering] = useState(false);
 
@@ -76,7 +75,6 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
     const value = level.toFixed(3);
     talkRef.current?.style.setProperty("--wanda-level", value);
     micRef.current?.style.setProperty("--wanda-level", value);
-    orbRef.current?.style.setProperty("--wanda-level", value);
   }, []);
 
   // Listening: the ring follows the microphone. Not on iOS, where a second mic stream can cut the recognition.
@@ -377,7 +375,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   } else if (!chatAvailable && !walking) {
     caption = "Search rooms and things";
   } else {
-    caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Tap the mic to ask";
+    caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Say “Wanda” or tap the mic";
   }
   const showStop = listening || followUpListening || speaking;
 
@@ -557,7 +555,30 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
 
       {(!expanded || walking) && (
         <div className={`wanda-bar ob-fabs ${mode}`}>
-          <span ref={orbRef} className={`wanda-orb ${mode}`} aria-hidden />
+          {/* The orb is the mic: one voice button, voice first. While walking it stays: "next", "back", "repeat",
+              "stop" by voice (see store.ask). */}
+          <button
+            type="button"
+            ref={talkRef}
+            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""}`}
+            aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
+            aria-pressed={listening}
+            title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
+            disabled={busy}
+            onPointerDown={talkDown}
+            onPointerUp={talkUp}
+            onPointerLeave={talkUp}
+            onPointerCancel={talkUp}
+            onContextMenu={(event) => event.preventDefault()}
+            onClick={talkClick}
+          >
+            <MicIcon />
+            {!voiceOut && !listening && (
+              <span className="ob-badge" aria-hidden>
+                <MutedIcon />
+              </span>
+            )}
+          </button>
           <div
             className="wb-caption"
             role="status"
@@ -582,29 +603,6 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
           )}
           {/* "Hey Wanda" is switched on in the step sheet; here only while it is on, to see and mute it */}
           {handsFreeOn && !walking && <HandsFreeButton className="wb-btn" />}
-          {/* While walking Talk stays: "next", "back", "repeat", "stop" by voice (see store.ask). */}
-          <button
-            type="button"
-            ref={talkRef}
-            className={`wb-btn wb-mic ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""}`}
-            aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
-            aria-pressed={listening}
-            title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
-            disabled={busy}
-            onPointerDown={talkDown}
-            onPointerUp={talkUp}
-            onPointerLeave={talkUp}
-            onPointerCancel={talkUp}
-            onContextMenu={(event) => event.preventDefault()}
-            onClick={talkClick}
-          >
-            <MicIcon />
-            {!voiceOut && !listening && (
-              <span className="ob-badge" aria-hidden>
-                <MutedIcon />
-              </span>
-            )}
-          </button>
           {showStop && (
             <button type="button" className="wb-btn wb-stop" aria-label="Stop" title="Stop" onClick={stopAll}>
               <StopIcon />
