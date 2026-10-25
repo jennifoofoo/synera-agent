@@ -6,9 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { downscalePhoto, endedLabel, eventLabel, sinceLabel, type Note } from "../notes/notes";
 import {
-  DEFAULT_AUTHOR,
   addNote,
-  authorRemembered,
   canResolve,
   canUndo,
   closeNotes,
@@ -20,7 +18,6 @@ import {
   notesIn,
   openNotes,
   resolveNote,
-  setAuthor,
   setLayer,
   undoNote,
   useNotes,
@@ -197,11 +194,6 @@ export function NotesButton({ docked = false }: { docked?: boolean }) {
 function AddForm() {
   const place = useNotes((s) => s.place);
   const draft = useNotes((s) => s.draft);
-  const storageLabel = useNotes((s) => s.storageLabel);
-  const author = useNotes((s) => s.author);
-  // The name is asked once, with the first note saved by tap; after that it is remembered on this device.
-  const [askName] = useState(() => !authorRemembered());
-  const [name, setName] = useState(author);
   const [text, setText] = useState(draft);
   const [issue, setIssue] = useState(false);
   const [photo, setPhoto] = useState<Blob | null>(null);
@@ -242,7 +234,6 @@ function AddForm() {
   };
   const save = async () => {
     setBusy(true);
-    if (askName) setAuthor(name);
     const note = await addNote({ text, photo, place, kind: issue ? "issue" : "note", source: "tap" });
     setBusy(false);
     if (note) openNotes("here");
@@ -255,7 +246,7 @@ function AddForm() {
         <textarea
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder={issue ? "What is wrong here?" : "What should the next person know here?"}
+          placeholder={issue ? "What is wrong here?" : "What should the next person know?"}
           rows={3}
           maxLength={500}
           aria-label="Note"
@@ -293,12 +284,7 @@ function AddForm() {
           It's a problem
         </label>
       </div>
-      {askName && (
-        <label className="note-name">
-          <span>Your name, optional (remembered here)</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder={DEFAULT_AUTHOR} aria-label="Your name" autoComplete="name" maxLength={40} />
-        </label>
-      )}
+      {/* No name field: the note is signed from the profile (notesStore.noteAuthor). */}
       {problem && <p className="note-problem">{problem}</p>}
       <p className="note-tip">Tip: say “Wanda, note: …” anywhere.</p>
       <div className="card-actions">
@@ -307,7 +293,6 @@ function AddForm() {
           Save note
         </button>
       </div>
-      <p className="note-storage">{storageLabel}</p>
     </div>
   );
 }
