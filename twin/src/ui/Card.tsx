@@ -222,7 +222,7 @@ function SelectionCard({ model }: { model: BuildingModel }) {
         </div>
       )}
       {notesHere.length > 0 && (
-        <button className="link card-notes" data-testid="card-notes" onClick={() => openNotes("here")}>
+        <button className="link card-notes-line" data-testid="card-notes" onClick={() => openNotes("here")}>
           <NoteGlyph size={14} />
           <span>
             {notesHere.length} {notesHere.length === 1 ? "note" : "notes"} · {notesHere[0].text || "Photo"}
