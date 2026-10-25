@@ -245,3 +245,4 @@ Neu von Synera (Discord 09:04): Sonntags-"Build" = gleiche Eingaben (Bilder plus
 
 ## Leonie (mucl-all-floors)
 - ~10:05 Floor 3 built (`feat/mucl-all-floors`): 35 spaces from OG3.04 + OG3.08 (OG3.08 is rotated 90°, joined via the shared kitchen/IT core, not the terrace), 6 fire extinguishers, 3 call points, 1 first aid kit; lift V01 and Main Stairs V02 extended to F3. Tests, preflight (25 OK/5 WARN, unreachable only voids) green. Round F3 from Main Stairs: 6 extinguishers, 5 stops, 127.9 m. Script: `demo/plans/urban-colab/tools/add_floor3.py`.
+- ~10:30 Floor 4 built from OG4.04: 22 spaces (Kitchen, Activity Room / Library, Meeting Room 4.01–4.04, core, Lift Lobby, Terrace, Think Tank 4.01, Open Office, 4 voids), 5 extinguishers, 3 call points, 1 first aid kit; V01/V02 extended. Tests, preflight green. Round F4 from Main Stairs: 5 extinguishers, 4 stops, 65.6 m. Café → Meeting Room 4.02 79.3 m. Script `add_floor4.py`.
