@@ -6,6 +6,12 @@
   animation: welcome-in var(--t-base) both; transition: opacity var(--t-base), transform var(--t-base);
 }
 .welcome.leaving .welcome-card { opacity: 0; transform: scale(0.98); pointer-events: none; }
+/* Wanda's fairy light (WandaFairy.tsx, without the mic: a greeting, not a button), gently idling above the title */
+.welcome-fairy { position: relative; width: 56px; height: 56px; margin: -4px auto 6px; }
+.welcome-fairy .wf { position: absolute; inset: 0; width: 100%; height: 100%; }
+.welcome-fairy .wf-body { animation: wf-float 3s ease-in-out infinite; }
+.welcome-fairy .wf-wings { animation: wf-flap 2.4s ease-in-out infinite; }
+.welcome-fairy .wf-halo { animation: wf-breathe 3s ease-in-out infinite; }
 .welcome-title { margin: 0; font-size: var(--fs-28); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; text-wrap: balance; }
 .welcome-sub { margin: 8px 0 18px; font-size: var(--fs-16); color: var(--ink-2); }
 .welcome-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
@@ -21,6 +27,7 @@
 /* phone: the card leaves the floor rail free (right edge, 44 px at right 12 px; on its side the rail is on the left) */
 .worker .welcome { top: calc(var(--head-y) + 56px); left: calc(var(--safe-l) + 12px); right: calc(var(--safe-r) + 64px); width: auto; transform: none; }
 .worker .welcome-card { padding: 14px 14px 12px; max-height: 40vh; overflow: hidden; }
+.worker .welcome-fairy { width: 48px; height: 48px; margin: -2px auto 2px; }
 .worker .welcome-sub { margin: 4px 0 10px; font-size: 14px; }
 .worker .welcome-chips { gap: 6px; }
 @media (orientation: landscape) and (max-height: 520px) {
@@ -32,6 +39,7 @@
 @media (orientation: portrait) { .worker .welcome-chip:nth-child(n + 4) { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
+  .welcome-fairy .wf *, .welcome-fairy .wf { animation: none !important; }
   .welcome-card { animation: none; transition: opacity var(--t-base); }
   .welcome.leaving .welcome-card { transform: none; }
 }
