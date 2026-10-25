@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Floor, Opening, Space } from "../api/types";
-import { areaOptions, entranceRoom, hallOf, normType } from "./choices";
+import type { Asset, Floor, Opening, Space } from "../api/types";
+import { areaOptions, entranceRoom, hallOf, missingDevicesNote, normType } from "./choices";
 
 const floor = (id: string, level: number, name: string): Floor => ({ id, level, name, elevation_m: level * 4, height_m: 4 });
 const space = (id: string, name: string, floor_id = "F0"): Space => ({
@@ -24,5 +24,14 @@ describe("inspection round choices", () => {
     ] as unknown as Opening[];
     expect(entranceRoom(openings)).toBe("S4");
     expect(entranceRoom([])).toBeNull();
+  });
+
+  it("says why there is no round on a map without the devices", () => {
+    const extinguisher = { id: "A1", name: "FE 1", type: "fire_extinguisher" } as Asset;
+    expect(missingDevicesNote([])).toBe("This map has no devices yet, so there is no round to plan.");
+    expect(missingDevicesNote([], "fire_extinguisher")).toBe("This map has no devices yet, so there is no round to plan.");
+    expect(missingDevicesNote([extinguisher], "defibrillator")).toBe("This map has no defibrillators yet.");
+    expect(missingDevicesNote([extinguisher], "Fire extinguishers")).toBeNull();
+    expect(missingDevicesNote([extinguisher])).toBeNull();
   });
 });

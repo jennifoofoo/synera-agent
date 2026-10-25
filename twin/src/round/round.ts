@@ -13,7 +13,7 @@ import type { AgentRound, Building, BuildingState, PlannedRound, Route } from ".
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
 import { walkMinutes } from "../walkInfo";
-import { areaOptions, entranceRoom, typeMatches } from "./choices";
+import { areaOptions, entranceRoom, missingDevicesNote, typeMatches } from "./choices";
 
 export const ROUND_BLUE = "#004fab";
 
@@ -211,6 +211,12 @@ export async function openRound(type?: string, area?: string): Promise<void> {
     finished: false,
     error: null,
   });
+  // A map without the devices (a plan read before anyone added them): say so instead of an empty "What" list.
+  const missing = missingDevicesNote(building?.assets ?? [], type);
+  if (missing) {
+    useRound.setState({ plan: null, error: missing });
+    return;
+  }
   if (type || area) await busy("Planning the round…", planRound);
 }
 

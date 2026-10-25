@@ -39,3 +39,10 @@ export function entranceRoom(openings: Opening[]): string | null {
   const rooms = openings.filter((opening) => opening.kind === "entrance" && opening.space_ids.length).map((opening) => opening.space_ids[0]);
   return rooms.sort()[0] ?? null;
 }
+
+/** Why no round can be planned on this map, or null: no devices at all, or none of the type asked for. */
+export function missingDevicesNote(assets: Asset[], type?: string): string | null {
+  if (!assets.length) return "This map has no devices yet, so there is no round to plan.";
+  if (type && !assets.some((asset) => typeMatches(asset, type))) return `This map has no ${normType(type)}s yet.`;
+  return null;
+}
