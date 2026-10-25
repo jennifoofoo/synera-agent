@@ -155,8 +155,8 @@ def test_find_by_time_and_running_now(tools):
 
 
 def test_find_by_place(tools):
-    result = find(tools, query="booked", place="Projektraum West")
-    assert [e["title"] for e in result["events"]] == ["Projektraum West booked: Jury prep"]
+    result = find(tools, query="booked", place="Project Room West")
+    assert [e["title"] for e in result["events"]] == ["Project Room West booked: Jury prep"]
 
 
 def test_room_busy_with_booking(tools):

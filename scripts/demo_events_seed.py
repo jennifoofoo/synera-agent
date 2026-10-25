@@ -18,21 +18,35 @@ from starter_agent.building_map import BuildingMap
 
 DEFAULT_BUILDING = Path("agent_output") / "buildings" / "plan-89323a15"
 
+# Rooms as (space id suffix, name): anchored by id, which stays when the plan's room names change; the name is the
+# fallback and the printout.
+FOYER = ("F0-S012", "Foyer")
+SEMINAR = ("F1-S002", "Seminar Rooms 1-3")
+AUDITORIUM = ("F0-S013", "Auditorium (Arena)")
+CAFE = ("F0-S014", "Café")
+PROJECT_ROOM = ("F0-S002", "Project Room")
+PROJECT_ROOM_WEST = ("F0-S001", "Project Room West")
+
 # (title, rooms (first = anchor), start (days from today, hour, minute), end (days, hour, minute), organiser)
 EVENTS = [
-    ("Manage & More × UVC × Anthropic Hackathon", ["Foyer", "Seminar Rooms 1-3"], (-1, 9, 0), (0, 18, 0), None),
-    ("Code freeze", ["Foyer"], (0, 13, 0), (0, 13, 15), None),
-    ("Pitches", ["Auditorium (Arena)"], (0, 14, 0), (0, 16, 0), None),
-    ("Lunch", ["Café (Gastraum)"], (0, 12, 30), (0, 13, 30), None),
-    ("Project Room booked: Team Synera", ["Project Room"], (0, 9, 0), (0, 12, 0), "Leonie"),
-    ("Projektraum West booked: Jury prep", ["Projektraum West"], (0, 13, 0), (0, 14, 0), None),
+    ("Manage & More × UVC × Anthropic Hackathon", [FOYER, SEMINAR], (-1, 9, 0), (0, 18, 0), None),
+    ("Code freeze", [FOYER], (0, 13, 0), (0, 13, 15), None),
+    ("Pitches", [AUDITORIUM], (0, 14, 0), (0, 16, 0), None),
+    ("Lunch", [CAFE], (0, 12, 30), (0, 13, 30), None),
+    ("Project Room booked: Team Synera", [PROJECT_ROOM], (0, 9, 0), (0, 12, 0), "Leonie"),
+    ("Project Room West booked: Jury prep", [PROJECT_ROOM_WEST], (0, 13, 0), (0, 14, 0), None),
 ]
 
 
-def room_id(bm: BuildingMap, name: str) -> str:
+def room_id(bm: BuildingMap, room: tuple[str, str]) -> str:
+    """The room by id (<building id>-<suffix>), else by its name; stops when neither exists."""
+    suffix, name = room
+    space_id = f"{bm.data['building']['id']}-{suffix}"
+    if space_id in bm.spaces:
+        return space_id
     found = [space["id"] for space in bm.spaces.values() if space["name"] == name]
     if not found:
-        raise SystemExit(f"No room named {name!r} in this building.")
+        raise SystemExit(f"No room {space_id} or named {name!r} in this building.")
     return found[0]
 
 
@@ -68,7 +82,7 @@ def seed_events(bm: BuildingMap, store: KnowledgeStore, now: datetime | None = N
         )
         added += 1
         if not quiet:
-            print(f"{begins:%a %d.%m %H:%M} to {ends:%H:%M}  {', '.join(rooms):34}  {title}")
+            print(f"{begins:%a %d.%m %H:%M} to {ends:%H:%M}  {', '.join(name for _, name in rooms):34}  {title}")
     if not quiet:
         print(f"{added} events added, {len(EVENTS) - added} already there ({bm.data['building']['id']}).")
     return added
