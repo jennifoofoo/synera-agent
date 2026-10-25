@@ -137,10 +137,19 @@ function Stats() {
   const state = useTwin((s) => s.state);
   useEffect(() => {
     // frameloop="demand": anything that changes what is drawn asks for a frame (and one more after layout).
+    // A late one too: floors finish building after the first frames, and a tab opened in the background may have
+    // skipped them (a teammate saw an empty map until the first tap).
     invalidate();
-    const timer = setTimeout(invalidate, 50);
-    return () => clearTimeout(timer);
+    const timers = [setTimeout(invalidate, 50), setTimeout(invalidate, 600)];
+    return () => timers.forEach(clearTimeout);
   }, [model, viewMode, state, invalidate]);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") invalidate();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [invalidate]);
   useFrame(() => {
     const w = window as unknown as { __twinFirstFrame?: number };
     // With the EffectComposer gl.info holds only the last pass, so count frames instead of triangles.

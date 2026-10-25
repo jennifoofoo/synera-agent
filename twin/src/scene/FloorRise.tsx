@@ -32,8 +32,9 @@ export function FloorRise({ active, y, children }: { active: boolean; y: number;
     if (!group || start.current === null) return;
     const t = Math.min(1, (performance.now() - start.current) / RISE_MS);
     group.scale.y = FLAT + (1 - FLAT) * (1 - (1 - t) ** 3);
+    // One more frame after the end: on demand (phones) the map is drawn at full height without waiting for input.
     if (t >= 1) start.current = null;
-    else invalidate();
+    invalidate();
   });
 
   return (
