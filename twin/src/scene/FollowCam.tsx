@@ -30,7 +30,7 @@ const MIN_DISTANCE_M = 10;
 const AHEAD_M = 0.5;
 /** 2D: metres across the shorter side of the canvas, and the share of it the target leads the dot. */
 const PLAN_SPAN_M = 26;
-const PLAN_AHEAD = 0.2;
+const PLAN_AHEAD = 0.06;
 /** Heading: look this far along the route to get the walking direction (smooths corners), low-pass time constant
  * and the largest turn rate. */
 const LOOK_M = 3;
@@ -42,7 +42,7 @@ const RISE_TAU_S = 0.45;
 const FRAME_TAU_S = 0.6;
 const PAUSE_MS = 3000;
 const REQUEST_PAUSE_MS = 4000;
-const UNCERTAINTY_M = 1.5;
+const UNCERTAINTY_M = 1;
 
 interface Props {
   model: BuildingModel;
