@@ -62,7 +62,7 @@ def report(rows: list[tuple[str, float, float]]) -> list[str]:
         out.append(f"{line_id:<5}{real:>6.1f}s{target:>7.1f}s{flag}")
     total_real = sum(real for _, real, _ in rows)
     total_target = sum(target for _, _, target in rows)
-    out.append(f"{'sum':<5}{total_real:>6.1f}s{total_target:>7.1f}s  (narrator only; the round 0:52-1:32 has none)")
+    out.append(f"{'sum':<5}{total_real:>6.1f}s{total_target:>7.1f}s  (narrator only; the round 0:48-1:28 has none)")
     return out
 
 

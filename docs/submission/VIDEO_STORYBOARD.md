@@ -38,39 +38,65 @@ Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recor
 
 | Time | Shot | On screen | Spoken (exact) | Caption (burned in) | Purpose |
 |---|---|---|---|---|---|
-| 0:00–0:03 | F | Close-up: Gisela's gloved hand on a fire extinguisher bracket in a corridor, dim. Cut to black on the last word. | VO: "Every building has one person who knows it by heart." | – | **Hook 1** (see §2) |
+| 0:00–0:03 | F | Close-up: Gisela's gloved hand on a fire extinguisher bracket in a corridor, dim. Cut to black on the last word. | VO: "Every building has one person who knows it by heart." | – | **Hook** (see §2) |
 | 0:03–0:06 | F | Black, white text appears. | VO: "Last spring, that person retired." | "Last spring, that person retired." | Turn the hook into a loss |
-| 0:06–0:13 | F | Slow push-in on Gisela on floor 3 at the Main Stairs, iPhone in hand, looking down a corridor full of doors. | VO: "By 2036, 12.9 million people in Germany reach retirement age." | "12.9 million people reach retirement age by 2036 (Destatis, via dbb magazin 9/2024)" | The one sourced number, big |
-| 0:13–0:21 | F | Gisela opens a paper folder: a printed plan, a handwritten list "Extinguishers, 3rd floor", crossed out, coffee stain. | VO: "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked." | – | Concrete: knowledge lives in heads |
-| 0:21–0:29 | F | Gisela walks into a dead end (closed door), turns back, checks her phone (generic, no app). Time stamp caption ticks up. | VO: "So the new shift searches. Asks around. Writes it up later, if at all." | "06:12 … 06:31" (ticking) | Pain 2 + 3: time lost, handover lost |
-| 0:29–0:38 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Maintenance software knows what. Location tracking knows roughly where. Nobody tells you, hands-free, where to go, and nobody keeps what you learned there." | "Knows what. Knows roughly where. Nobody guides you. Nobody remembers." | Positioning line = the gap |
-| 0:38–0:41 | F | Logo card: "Wanda – the building that talks back". | VO: "This is Wanda." | "Wanda – the building that talks back" | Product name |
-| 0:41–0:52 | F (laptop screen recording, slight zoom) | Laptop, 3D twin of the Urban Colab. Gisela clicks **Round**: what = fire extinguisher, where = Floor 3, from = taps the Main Stairs on the map. Panel: "[N] stops · [X] m · about N min", stops in order, route drawn. Quick pan to the knowledge view with note pins. | VO: "Gisela plans her fire-extinguisher round on the laptop. The shortest order is computed on the building's own plans, and she sees what colleagues left at each stop." | "Plan: [N] stops · [X] m" (copy from panel) | Laptop beat: planning + knowledge overview |
-| 0:52–0:57 | L\|R | L: Gisela steps out of the Main Stairs on floor 3, raises the phone, taps the Wanda orb. R: phone map, orb listening. | Gisela: "Wanda, fire extinguisher round, third floor. I start at the main stairs. Guide me." | "Same round, on her phone, hands-free" | Hand-off to the walk |
-| 0:57–1:02 | L\|R | L: Gisela walks into Open Office East, checks extinguisher 3.03. R: "Stop 1 of [N]", dot at the device. | Gisela (taps the orb): "Done." | "Stop 1 of [N]" | Stop 1 live |
-| 1:02–1:08 | L\|R | L: walks out into the Third Floor Corridor, follows the turn. R: route line moves, step sheet "Turn left …". | Gisela (taps the orb): "How far?" Wanda answers (keep the real audio, about 2 s). | – | Guidance live |
-| 1:08–1:18 | L\|R | L: arrives at extinguisher 3.02 in the Third Floor Corridor. R: note card pops up, **photo of the loose bracket** fades in. Gisela wiggles the bracket. | Wanda (real app audio): "Night shift reported a problem here, today [time]: Bracket is loose, always check it first." | "From the night shift, at this extinguisher" | **Mid hook**: knowledge arrives at the right place |
-| 1:18–1:20 | L\|R | L: Gisela tightens the bracket. R: Stop 2 checked. | Gisela (taps the orb): "Done." | "Stop 2 of [N]" | Close the loop |
-| 1:20–1:24 | L\|R time-lapse | Stops 3 to [N]–1 (IT Room, Open Office West; per device also 3.04) at 8× speed, both sides in sync; R shows the stop counter running. | (music only) | "Stops 3–[N−1]" | Middle stops as 2–4 s time-lapse |
-| 1:24–1:28 | L\|R | L: last stop, extinguisher 3.05 in the West Wing Corridor, Gisela takes a photo of a cracked hose. R: note pin with photo appears. | Gisela (taps the orb): "Note: hose is cracked, replace next week." | "Her note stays here for the next shift" | She leaves knowledge (3 s) |
-| 1:28–1:32 | L\|R | L: Gisela lowers the phone. R: job report: [N] of [N] stops, metres walked, 1 note left, "read during the round: Night shift". | Gisela (taps the orb): "Finished." | "Job report, written for her" | Documentation without typing |
-| 1:32–1:42 | F (diagram) | Simple diagram: voice → Wanda (Claude picks a tool) → deterministic tools → building graph → answer. A tool result JSON flashes on the "tools" box. | VO: "Every fact comes from code, not from the language model. Areas, walls, floors, door widths, routes: computed on Synera's route model. The model only picks the tool and phrases the answer." | "Facts from code. Language from the model." | Trust 1: architecture |
-| 1:42–1:47 | F | Terminal or `SUBMISSION/BENCHMARK.md`: "145 answers, all produced by code" (not a claim that all are correct). | VO: "That's why all 145 benchmark answers are reproducible." | "145 benchmark answers, reproducible" | Trust 2: proof |
-| 1:47–1:55 | F | Photo of the real evacuation plan on the Urban Colab wall → crossfade → the 2D map → 3D twin. | VO: "And it works on any building, even from the evacuation plan on the wall. This is the building we're standing in." | "Read from its evacuation plans" | Trust 3: any building (Level 4) |
-| 1:55–2:00 | F | Map full of note pins, Wanda orb glows, logo + team names. | VO: "The knowledge stays in the building." | "Wanda – the building that talks back · Built today, ready for the 6G building." | **Last line** + product name |
+| 0:06–0:13 | F | Slow push-in on Gisela on floor 3 at the Main Stairs, iPhone in hand, looking down a corridor full of doors. | VO: "By 2036, 12.9 million people in Germany reach retirement age." | "12.9 million people reach retirement age by 2036 (Destatis, via dbb magazin 9/2024)" | The one sourced number |
+| 0:13–0:20 | F | Gisela opens a paper folder: a printed plan, a handwritten list "Extinguishers, 3rd floor", crossed out, coffee stain. | VO: "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked." | – | Knowledge lives in heads |
+| 0:20–0:27 | F | Gisela walks into a closed door, turns back, scrolls an old photo gallery on her phone looking for "that bracket". Clock caption ticks up. | VO: "So the new shift searches. Asks around. Writes it up later, if at all." | "06:12 … 06:31" (ticking) | Time lost, handover lost |
+| 0:27–0:35 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Maintenance software knows what. Tracking knows roughly where. Nobody guides you hands-free, and nobody keeps what you learned." | "Knows what. Knows roughly where. Nobody guides you. Nobody remembers." | Positioning = the gap |
+| 0:35–0:38 | F | Logo card. | VO: "This is Wanda." | "Wanda – the building that talks back" | Product name |
+| 0:38–0:48 | F (laptop recording, slight zoom) | Laptop, 3D twin of the Urban Colab. Gisela clicks **Round**: fire extinguisher, Floor 3, taps the Main Stairs. Panel: "[N] stops · [X] m · about 2 min", stops in order, route drawn on floor 3. | VO: "Gisela plans her round on the laptop: the shortest order, computed on the building's own plans." | "Plan: [N] stops · [X] m" (copy from panel) | Laptop: planning |
+| 0:48–0:53 | L\|R | L: Gisela steps out of the Main Stairs, taps the Wanda orb, speaks. R: orb listening, then route + "Stop 1 of [N]". | Gisela: "Wanda, fire extinguisher round, third floor. I start at the main stairs. Guide me." Wanda answers (real app audio, keep or duck). | "She talks. Hands stay free." | Voice start |
+| 0:53–0:57 | L\|R | L: Open Office East, she checks extinguisher 3.03. R: dot at the device. | Gisela (taps the orb): "Done." | "Stop 1 of [N]" | Stop 1 |
+| 0:57–1:01 | L\|R | L: walking into the Third Floor Corridor. R: route line moves, step sheet. | Gisela (taps the orb): "How many stops left?" Wanda answers (real audio). | – | She keeps talking to it |
+| 1:01–1:10 | L\|R | L: arrives at extinguisher 3.02, wiggles the bracket. R: note card pops up, **night shift's photo of the loose bracket** fades in. | Wanda (real app audio): "Night shift reported a problem here, today [time]: Bracket is loose, always check it first." | "From the night shift, with photo, at this extinguisher" | **Mid hook**: knowledge arrives at the right place |
+| 1:10–1:13 | L\|R | L: tightens the bracket. R: stop 2 checked. | Gisela (taps the orb): "Done." | "Stop 2 of [N]" | Close the loop |
+| 1:13–1:16 | L\|R time-lapse | Stops 3 to [N]–1 (IT Room, Open Office West; per device also 3.04) at 8×, both sides in sync. | (music only) | "Stops 3–[N−1]" | Time-lapse |
+| 1:16–1:24 | L\|R | L: last stop, extinguisher 3.05 in the West Wing Corridor; cracked hose. She taps **Notes → Add photo**, the camera opens, she takes the photo, taps the text field's mic and **dictates**. R: photo preview, text appears, **Save note**, pin with photo on the map. | Gisela (dictating): "Hose is cracked, replace next week." | "Photo + note, pinned to this extinguisher" | **Photo**: she leaves knowledge |
+| 1:24–1:28 | L\|R | L: lowers the phone. R: job report: [N] of [N] stops, metres walked, 1 note with photo, "read during the round: Night shift". | Gisela (taps the orb): "Finished." Wanda: "Round finished: [N] of [N] stops checked. …" (real audio) | "Job report, written for her" | Documentation without typing |
+| 1:28–1:37 | F (laptop recording) | Laptop: click the West Wing Corridor → room card → **Knowledge**. Ego graph: room in the centre, extinguisher 3.05, Gisela's note with photo, her name as a person node. Drag the **time slider** back: the night shift's note on 3.02 (Third Floor Corridor graph) appears and disappears in time. | VO: "Every note lands in the building's knowledge graph: who, where, when, with a photo. The next shift hears it at the right spot." | "Knowledge graph: who · where · when" | **Knowledge graph** |
+| 1:37–1:46 | F (diagram, `architecture.html`) | voice → Wanda (Claude picks a tool) → deterministic tools → building graph → facts back. | VO: "Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks." | "Facts from code. Language from the model." | Trust 1 |
+| 1:46–1:50 | F | 145 card. | VO: "All 145 benchmark answers are reproducible." | "145 benchmark answers, computed by code" | Trust 2 |
+| 1:50–1:56 | F | Floor-3 evacuation plan photo on the wall → crossfade → 2D map → 3D twin. | VO: "It works on any building, even from the evacuation plan on the wall." | "This building, read from its evacuation plans" | Trust 3: Level 4 |
+| 1:56–2:00 | F | Map full of note pins with photo thumbnails, Wanda orb glows, logo + team names. | VO: "The knowledge stays in the building." | "Wanda – the building that talks back · Built today, ready for the 6G building." | **Last line** |
+
+Gisela talks to the phone **six times** (start, done, how many left, done, dictated note, finished) and Wanda answers out loud four times. Every line of hers is a real command on main (`handsFree.ts`, `notesStore.ts notesCommand`); "how many stops left" works only while a round runs.
 
 ### Timing summary
 
 | Block | Time | Length |
 |---|---|---|
-| Hook + problem | 0:00–0:38 | 38 s |
-| Product name | 0:38–0:41 | 3 s |
-| Laptop planning | 0:41–0:52 | 11 s |
-| Split-screen round (stops 1–2 live, time-lapse, own note, report) | 0:52–1:32 | 40 s |
-| Why you can trust it | 1:32–1:55 | 23 s (+5 s close = 28 s) |
-| Close | 1:55–2:00 | 5 s |
+| Hook + problem | 0:00–0:35 | 35 s |
+| Product name | 0:35–0:38 | 3 s |
+| Laptop planning | 0:38–0:48 | 10 s |
+| Split-screen round (voice, night-shift note with photo, her photo note, report) | 0:48–1:28 | 40 s |
+| Knowledge graph (laptop) | 1:28–1:37 | 9 s |
+| Why you can trust it | 1:37–1:56 | 19 s |
+| Close | 1:56–2:00 | 4 s |
 
-VO word budget: about 2.3 words per second. Problem VO is 70 words in 38 s, trust VO 55 words in 23 s: both fit with pauses. If the cut runs long, cut in this order: (1) "How far?" beat 1:02–1:08 (just walk), (2) knowledge-view pan in the laptop beat, (3) the dead-end shot shortened to 4 s. Never cut the night-shift note, the sourced number or the last line.
+VO-first: the real lengths come from `make_vo.py` (§6); if a line runs over, shorten it there and here. Cut order if the cut runs long: (1) "How many stops left?" beat, (2) time slider drag in the knowledge-graph beat, (3) closed-door shot to 4 s. Never cut the night-shift note, her photo note, the knowledge graph, the sourced number or the last line.
+
+### Features we have and how they fit the story
+
+| Feature | Status | In the video | Where else |
+|---|---|---|---|
+| Inspection round: shortest order over all devices of a type on a floor, panel "N stops · X m" | main (floor 3: `feat/mucl-all-floors`) | 0:38 laptop, 0:48 phone | – |
+| Voice: tap the Wanda orb, talk; Wanda answers aloud (ElevenLabs) | main | whole round | – |
+| Local voice commands: "done", "next", "back", "repeat", "how far", "where am I", "stop", "how many stops left" (in a round) | main | done ×2, how many left | Q&A: they run on the phone, no LLM |
+| Turn-by-turn guidance stop to stop, step sheet, "Stop n of m" | main ("· device name" needs `feat/round-per-device`) | round | – |
+| Notes by voice: "note: …" / "problem: …" saved at the current place | main (text only, no photo) | – (her note uses the form for the photo) | alternative at stop 2: "Problem: bracket still loose" |
+| **Photo notes**: Notes sheet → Add photo (camera) → text (dictation) → Save | main | 1:16 her own note; 1:01 night shift's photo | thumbnails at 1:56 |
+| Note read aloud at the right place while guiding, with photo | main | 1:01 | – |
+| "What's here?" by voice: reads the notes of the current place | main | – | spare line if the auto-read misfires |
+| Job report on "finished": stops, metres, notes left and read | main | 1:24 | – |
+| **Knowledge graph** (laptop): room ego graph from JSON-LD (Brick / RealEstateCore), persons, time slider, AAS export | main | 1:28 | pitch: "Export as AAS" for Industry 4.0 |
+| Facts with time: valid from/to, "fixed" supersedes, nothing deleted | main | implied by the time slider | Q&A |
+| Timed closure by voice ("Lift out of order until tomorrow") → card → clear yes → reroute, reopens by itself | main (via Wanda's chat) | – | live pitch |
+| What-if door on the round: "Round X m shorter (before → after m)" | main | – | live pitch, engineers |
+| 3D twin, floors stacked | main | 0:38 background, 1:50 | – |
+| Level 4: building from evacuation-plan photos | main (floor 3 from OG3 photos on `feat/mucl-all-floors`) | 1:50 | – |
+| Walk with me: step counting moves an estimated dot, no GPS | main | – | Q&A, 6G roadmap line |
+| 145 benchmark answers by code | main | 1:46 | – |
 
 ## 2. Hooks (pick marked ★)
 
@@ -79,7 +105,7 @@ VO word budget: about 2.3 words per second. Problem VO is 70 words in 38 s, trus
 2. "Where's the extinguisher with the loose bracket? Only one person knew." More concrete, but needs the context to land.
 3. "12.9 million people retire by 2036. Their knowledge goes with them." Strong number, but colder as the first frame; better as the third beat.
 
-**Mid hook (about 1:08)**
+**Mid hook (about 1:01)**
 1. ★ Wanda reads the night-shift note at the exact extinguisher, photo fades in: the problem from 0:13 solved on camera.
 2. "Round [X] m shorter (before → after m)" from "What if a door here?" on the laptop: impressive for engineers, but adds a second story and needs the what-if door shot (keep for the live pitch).
 3. "No GPS, no beacons: the building's own evacuation plan." Good, but it is the trust section's job.
@@ -99,10 +125,11 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
 | S2 | Gisela at the Main Stairs, push-in | floor 3, Main Stairs door | Camera B, gimbal | 8 s |
 | S3 | Paper folder, crossed-out list, printed plan | table in the floor-3 Kitchen | Camera B, top-down | prop: print the evacuation plan + handwritten list |
 | S4 | Dead end: closed door, turn back | any closed door | Camera B | no app visible on her phone |
-| S5 | Laptop planning (round panel, Floor 3, start Main Stairs, knowledge view) | anywhere | Laptop screen recording | record 3 takes, keep the cleanest; mouse slow |
+| S5 | Laptop planning (round panel, Floor 3, start Main Stairs) | anywhere | Laptop screen recording | record 3 takes, keep the cleanest; mouse slow |
+| S5b | **Knowledge graph after the round**: West Wing Corridor → room card → Knowledge (Gisela's note with photo, her name), then Third Floor Corridor → Knowledge, drag the time slider | anywhere, **after** S6/S7 so her note exists | Laptop screen recording | the Knowledge button shows only on the laptop and only for rooms with notes |
 | S6 | **Round, camera side**: the whole walk from the Main Stairs, stops 1 → last (Open Office East → Third Floor Corridor → IT Room → Open Office West → West Wing Corridor) | floor 3 | Camera B follows 2–3 m behind/side | one continuous take, Gisela speaks her lines |
 | S7 | **Round, phone side**: same walk | – | iPhone A screen recording **with mic audio on** (long-press record button → Microphone on) | starts before the sync cue |
-| S8 | Photo of the cracked hose (her note) | last stop | iPhone A (in-app camera) | real object or tape on a hose |
+| S8 | Photo note at the last stop: Notes → Add photo → camera → dictate the text → Save note | West Wing Corridor, extinguisher 3.05 | iPhone A (in-app camera, inside the screen recording) | real cracked hose or tape on one; the name prompt appears once with the first tapped note: answer "Gisela" in a rehearsal, not on camera |
 | S9 | Evacuation-plan photo on the wall | the floor-3 evacuation plan on the wall (OG3.04, east) | Camera B, straight on | also usable: `demo/plans/urban-colab/photos/OG3-04_floor3_east.jpeg` |
 | S10 | Diagram + 145 table | – | Keynote/Figma export, 1080p | made by the editor, no filming |
 
@@ -124,6 +151,8 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
   ```
   Check the asset id in the installed building first (`grep -n '"Fire extinguisher 3.02"' -B2 agent_output/buildings/plan-89323a15/building.json`); it can change if floor 3 is rebuilt.
 - [ ] `scripts/demo_knowledge_seed.py` (history for the knowledge view) only writes ground-floor and floor-1 places, so it does not collide with the floor-3 round. Fine to run it for the laptop beat.
+- [ ] In a rehearsal, save one tapped note on iPhone A and answer the name prompt with "Gisela" (asked once per device), then undo it: her real note on camera then carries her name into the knowledge graph.
+- [ ] Check the Knowledge button appears on the laptop for the Third Floor Corridor (it shows only for rooms with notes).
 - [ ] Reset between takes: Undo Gisela's own note (or delete it on the server), clear the round, keep the night-shift note.
 - [ ] Demo link on iPhone A (https tunnel, needed for the mic): `/?building=user/plan-89323a15#round=fire_extinguisher&area=Floor%203` (then tap the Main Stairs as start). Mic allowed, speaker on, Do Not Disturb on, battery > 50 %, screen brightness max, auto-lock off.
 - [ ] Mic: clip-on on Gisela; 5-s test take in the corridor (echo); quiet moment for the voice lines.
@@ -153,7 +182,7 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
 | Phone screen recording | iPhone Control Centre → Screen Recording, **long-press → Microphone on** (so Gisela's line and Wanda's voice are in the file for sync) | – |
 | Camera | second iPhone, 4K 30 fps, landscape, locked exposure (long-press on the subject) | any camera |
 | Edit, split screen, captions | **CapCut desktop** (free): drag both clips onto two tracks, "Picture in picture" / crop to 50/50, auto-captions → edit → burn in on export | **iMovie** (split screen exists, captions are weak), **DaVinci Resolve** only if someone knows it, **Descript** if you want to edit by deleting words in the transcript |
-| Voiceover | **ElevenLabs via `docs/submission/video/make_vo.py`** (model `eleven_multilingual_v2`): pick one female narrator voice that is clearly **not** Wanda's (`jqcCZkN6Knx8BJ5TBdYR`; the script refuses it), render all 12 lines, check lengths, import the MP3s into CapCut | – |
+| Voiceover | **ElevenLabs via `docs/submission/video/make_vo.py`** (model `eleven_multilingual_v2`): pick one female narrator voice that is clearly **not** Wanda's (`jqcCZkN6Knx8BJ5TBdYR`; the script refuses it), render all 13 lines, check lengths, import the MP3s into CapCut | – |
 | Captions | CapCut auto-captions, fix names by hand ("Wanda", "Urban Colab", "Main Stairs", "Third Floor Corridor"), white text, dark box, bottom third, at least 5 % of frame height | Descript captions |
 | Music | royalty-free, calm, no vocals (CapCut library, YouTube Audio Library, Pixabay Music), at **−25 to −30 dB** under the VO, ducked further under Wanda's voice | none (fine) |
 | Architecture diagram | **Keynote** with Magic Move (see below), export as 1080p movie | an HTML motion slide (below), screen-recorded |
@@ -186,15 +215,15 @@ uv run --env-file .env python docs/submission/video/make_vo.py --voice VOICE_ID 
 | Step | What | Time |
 |---|---|---|
 | 1 | **Pick the narrator:** `--list-voices`, choose 3 female voices (not Wanda), `--samples` renders the hook line with each into `docs/submission/video/vo/samples/`; listen, pick one (optionally put it in `.env` as `NARRATOR_VOICE_ID`) | 10 min |
-| 2 | **Render the VO:** default run writes `vo/S01.mp3 … S12.mp3` and prints each line's real length against its slot, flagging `OVER` | 3 min |
+| 2 | **Render the VO:** default run writes `vo/S01.mp3 … S13.mp3` and prints each line's real length against its slot, flagging `OVER` | 3 min |
 | 3 | **Fix overruns:** shorten the text in `vo_lines.json` **and** the same "VO:" line in §1 (the test keeps them equal), re-render only those lines with `--only`; or `--speed 1.05`. Stop when nothing says OVER | 10 min |
 | 4 | Prep checklist (§4), seed, reset, rehearse twice | 20 min |
 | 5 | Shoot S1–S4, S9 (problem shots, plan photo) | 20 min |
 | 6 | Shoot S6+S7 (round, split screen), 2–3 full takes, sync clap each take | 25 min |
-| 7 | Record S5 (laptop planning), 3 takes | 10 min |
+| 7 | Record S5 (laptop planning) and, after the round, S5b (knowledge graph), 3 takes each | 15 min |
 | 8 | Diagram + 145 card: `docs/submission/video/architecture.html` (Space plays, screen-record), split frames with `mockup.html` | 10 min |
 | 9 | AirDrop everything to the Mac, rename (below), pick best takes | 10 min |
-| 10 | **Cut picture to the VO in CapCut:** put S01–S12 on the audio track at their slot times first, then lay the picture under them; the round (0:52–1:32) carries Wanda's app audio and Gisela's lines | 25 min |
+| 10 | **Cut picture to the VO in CapCut:** put S01–S13 on the audio track at their slot times first, then lay the picture under them; the round (0:48–1:28) carries Wanda's app audio and Gisela's lines | 25 min |
 | 11 | Captions (auto, then correct), music, levels | 15 min |
 | 12 | Export 1080p, QA (below), upload | 15 min |
 
@@ -206,7 +235,7 @@ Total about 3 h including the shoot. Steps 1–3 can run before the shoot (no fo
 
 ### Architecture / trust beat: animated diagram (Keynote, 10 s + 8 s)
 
-Slide A (1:32–1:42), white background, one accent colour, builds left to right, one box per beat of the VO:
+Slide A (1:37–1:46), white background, one accent colour, builds left to right, one box per beat of the VO:
 1. Microphone icon → box **"Gisela's voice"**
 2. Arrow → box **"Wanda (Claude)"**, small line under it: *"picks a tool, phrases the answer"*
 3. Arrow → stack of three small boxes **"route · round · notes"**, label **"Deterministic tools (Python)"**
@@ -214,9 +243,9 @@ Slide A (1:32–1:42), white background, one accent colour, builds left to right
 5. Return arrow back to Wanda, labelled **"facts"**; a tiny JSON flashes on it: `{"stops": [N], "total_m": [X]}` (numbers as on the panel)
 6. Title builds last at the top: **"Facts from code. Language from the model."**
 
-Card B (1:42–1:47): big **"145 benchmark answers. All computed by code. Reproducible."**
+Card B (1:46–1:50): big **"145 benchmark answers. All computed by code. Reproducible."**
 
-Slide C (1:47–1:55), Magic Move: the evacuation-plan photo (`demo/plans/urban-colab/photos/OG3-04_floor3_east.jpeg`, the floor-3 plan) shrinks to the left → arrow **"Level 4: plan reading"** → screenshot of the 2D map → 3D twin screenshot. Caption: **"Read from its evacuation plans."**
+Slide C (1:50–1:56), Magic Move: the evacuation-plan photo (`demo/plans/urban-colab/photos/OG3-04_floor3_east.jpeg`, the floor-3 plan) shrinks to the left → arrow **"Level 4: plan reading"** → screenshot of the 2D map → 3D twin screenshot. Caption: **"Read from its evacuation plans."**
 
 ### Final QA checklist (watch the exported file, not the timeline)
 

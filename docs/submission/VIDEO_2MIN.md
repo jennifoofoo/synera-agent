@@ -8,5 +8,6 @@
 - Real venue: the Munich Urban Colab (`user/plan-89323a15`), read from its evacuation plans, English room names. The walk is on **floor 3** (no access to the ground floor); the round starts at the **Main Stairs**. No wake word: Gisela taps the Wanda orb.
 - Problem first and heavy (about 38 s), one sourced number only: "By 2036, 12.9 million people in Germany reach retirement age" (Federal Statistical Office, via dbb magazin 9/2024).
 - Laptop for planning, phone for the walk; the round is shown as a split screen (camera left, phone recording right).
+- Must be in the video: Gisela talks to the phone a lot, photos (night shift's and her own), the knowledge graph on the laptop after the round.
 - The what-if door is not in the video (live pitch / Q&A only).
 - Closing: "The knowledge stays in the building." / "Built today, ready for the 6G building."

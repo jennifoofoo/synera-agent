@@ -4,14 +4,15 @@
     {"id": "S01", "slot": "0:00-0:03", "target_s": 3, "text": "Every building has one person who knows it by heart."},
     {"id": "S02", "slot": "0:03-0:06", "target_s": 3, "text": "Last spring, that person retired."},
     {"id": "S03", "slot": "0:06-0:13", "target_s": 7, "text": "By 2036, 12.9 million people in Germany reach retirement age."},
-    {"id": "S04", "slot": "0:13-0:21", "target_s": 8, "text": "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked."},
-    {"id": "S05", "slot": "0:21-0:29", "target_s": 8, "text": "So the new shift searches. Asks around. Writes it up later, if at all."},
-    {"id": "S06", "slot": "0:29-0:38", "target_s": 9, "text": "Maintenance software knows what. Location tracking knows roughly where. Nobody tells you, hands-free, where to go, and nobody keeps what you learned there."},
-    {"id": "S07", "slot": "0:38-0:41", "target_s": 3, "text": "This is Wanda."},
-    {"id": "S08", "slot": "0:41-0:52", "target_s": 11, "text": "Gisela plans her fire-extinguisher round on the laptop. The shortest order is computed on the building's own plans, and she sees what colleagues left at each stop."},
-    {"id": "S09", "slot": "1:32-1:42", "target_s": 10, "text": "Every fact comes from code, not from the language model. Areas, walls, floors, door widths, routes: computed on Synera's route model. The model only picks the tool and phrases the answer."},
-    {"id": "S10", "slot": "1:42-1:47", "target_s": 5, "text": "That's why all 145 benchmark answers are reproducible."},
-    {"id": "S11", "slot": "1:47-1:55", "target_s": 8, "text": "And it works on any building, even from the evacuation plan on the wall. This is the building we're standing in."},
-    {"id": "S12", "slot": "1:55-2:00", "target_s": 5, "text": "The knowledge stays in the building."}
+    {"id": "S04", "slot": "0:13-0:20", "target_s": 7, "text": "What they knew was never written down. Which extinguisher has the loose bracket. Which door is always locked."},
+    {"id": "S05", "slot": "0:20-0:27", "target_s": 7, "text": "So the new shift searches. Asks around. Writes it up later, if at all."},
+    {"id": "S06", "slot": "0:27-0:35", "target_s": 8, "text": "Maintenance software knows what. Tracking knows roughly where. Nobody guides you hands-free, and nobody keeps what you learned."},
+    {"id": "S07", "slot": "0:35-0:38", "target_s": 3, "text": "This is Wanda."},
+    {"id": "S08", "slot": "0:38-0:48", "target_s": 10, "text": "Gisela plans her round on the laptop: the shortest order, computed on the building's own plans."},
+    {"id": "S09", "slot": "1:28-1:37", "target_s": 9, "text": "Every note lands in the building's knowledge graph: who, where, when, with a photo. The next shift hears it at the right spot."},
+    {"id": "S10", "slot": "1:37-1:46", "target_s": 9, "text": "Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks."},
+    {"id": "S11", "slot": "1:46-1:50", "target_s": 4, "text": "All 145 benchmark answers are reproducible."},
+    {"id": "S12", "slot": "1:50-1:56", "target_s": 6, "text": "It works on any building, even from the evacuation plan on the wall."},
+    {"id": "S13", "slot": "1:56-2:00", "target_s": 4, "text": "The knowledge stays in the building."}
   ]
 }
