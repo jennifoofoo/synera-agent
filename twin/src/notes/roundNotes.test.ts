@@ -35,7 +35,6 @@ const plan: RoundPlan = {
     { spaceId: "S3", floorId: "F0", name: "Hall C", assetIds: ["A3"] },
   ],
   lengthM: 100,
-  measured: "route",
   unreachable: [],
   returnToStart: false,
 };
@@ -123,6 +122,17 @@ describe("the job report of a round", () => {
     const report = useNotes.getState().report!;
     expect(report).toMatchObject({ arrived: true, lengthM: 125, walkedM: 95 });
     expect(stopsLine(report)?.count).toBe("3 of 3");
+  });
+
+  it("says the completed round's report again on 'finished' instead of an empty job", async () => {
+    leg(0, route("S0", "S1", 30));
+    await addNoteHere("Bracket tightened");
+    useRound.setState({ checked: ["S1", "S2", "S3"], finished: true, guiding: false });
+    useTwin.setState({ walkStep: null });
+    const report = useNotes.getState().report!;
+    expect(report.round?.checked).toHaveLength(3);
+    expect(finishJob()).toMatch(/^Round finished: 3 of 3 stops checked\. .*1 note saved\.$/);
+    expect(useNotes.getState().report).toBe(report);
   });
 });
 

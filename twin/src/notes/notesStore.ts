@@ -559,7 +559,7 @@ function updateGuide(step: number | null): void {
   useNotes.setState({ guide: { stepKey, notes }, ...(job && seen.length ? { job: { ...job, seenIds: [...job.seenIds, ...seen] } } : {}) });
   if (spokenFor !== stepKey) {
     spokenFor = stepKey;
-    void speakAfterStep(noteSpeech(notes));
+    void speakAfterStep(noteSpeech(notes), stepKey);
   }
 }
 
@@ -583,16 +583,16 @@ export function noteSpeech(notes: Note[]): string {
   return `${noteHeadline(first)}, ${whenLabel(first.valid_from)}${text}${/[.!?]$/.test(text) ? "" : "."}${more}`;
 }
 
-/** Speak after the step line the Walk sheet is reading (speak() would cut it off), only with voice on. */
-async function speakAfterStep(text: string): Promise<void> {
+/** Speak after the step line the Walk sheet is reading (speak() would cut it off), only with voice on, and only while
+ * the card for `stepKey` is still shown (the walker may have gone on to the next step or stop in the meantime). */
+async function speakAfterStep(text: string, stepKey: string): Promise<void> {
   const twin = useTwin.getState();
   if (!text || !(twin.voiceOut || twin.handsFree)) return;
   const deadline = Date.now() + 15_000;
   await new Promise((resolve) => setTimeout(resolve, 400));
   while ((isSpeaking() || speechPending()) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 250));
-  const now = useTwin.getState();
-  if (now.walkStep === null && !useNotes.getState().guide) return;
-  await speak(text, now.speechAvailable);
+  if (useNotes.getState().guide?.stepKey !== stepKey) return;
+  await speak(text, useTwin.getState().speechAvailable);
 }
 
 // ---- wiring to the twin store ----
@@ -688,7 +688,8 @@ export function finishJob(): string {
     void twin.clearRoute();
     return report ? reportSpeech(report) : "Done.";
   }
-  const report = endJob(false) ?? showEmptyReport();
+  // A round that just completed already shows its report: "finished" says it again instead of an empty job.
+  const report = endJob(false) ?? useNotes.getState().report ?? showEmptyReport();
   return reportSpeech(report);
 }
 

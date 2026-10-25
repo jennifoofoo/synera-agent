@@ -2,12 +2,12 @@
 // (floor, hall or the whole building), from where; then "14 stops · 230 m · ~4 min", the stops in order, Start, and
 // "What if a door here?". While walking, RoundBar sits on top of the step sheet (Walk.tsx): "Stop 3 of 14 · …" + Done.
 // URL trigger: #round=fire%20extinguisher&area=Ground%20floor[&building=<key>][&door=<room id>,<room id>].
-// All facts from round.ts (model + /api/route), nothing from the agent.
+// All facts from round.ts (POST /api/round: the same plan_round the chat agent uses).
 
 import { useEffect, useMemo, useRef } from "react";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
-import { areaOptions } from "../round/order";
+import { areaOptions, assetInArea } from "../round/choices";
 import {
   assetLabel,
   cancelDoor,
@@ -38,10 +38,17 @@ export function Round() {
 
   const types = useMemo(() => {
     if (!model) return [];
+    // The count in brackets is for the chosen area (Hall A, a floor), not the whole building; types with none there
+    // drop out of the list, except the one already chosen.
     const counts = new Map<string, number>();
-    for (const asset of model.building.assets) counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
+    const spaceName = (id: string) => model.spaceById.get(id)?.name ?? "";
+    for (const asset of model.building.assets) {
+      if (!assetInArea(asset, round.area, model.building.floors, spaceName)) continue;
+      counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
+    }
+    for (const asset of model.building.assets) if (asset.type === round.type && !counts.has(asset.type)) counts.set(asset.type, 0);
     return [...counts.entries()].sort((a, b) => prettyType(a[0]).localeCompare(prettyType(b[0])));
-  }, [model]);
+  }, [model, round.area, round.type]);
   const areas = useMemo(() => (model ? areaOptions(model.building.floors, model.building.spaces) : []), [model]);
 
   if (!model || walking) return null;
@@ -129,7 +136,6 @@ export function Round() {
         <>
           <p className="round-summary">
             <strong>{summary(plan)}</strong>
-            {plan.measured === "straight" && <span className="round-muted"> · order by straight line</span>}
           </p>
           {whatIf && (
             <div className="round-whatif" role="status">
