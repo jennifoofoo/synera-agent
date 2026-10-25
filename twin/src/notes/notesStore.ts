@@ -297,6 +297,7 @@ export async function addNote(input: { text: string; photo?: Blob | null; place?
     return null;
   }
   applyServerState(state);
+  savedHere.add(note.id);
   const job = useNotes.getState().job ?? newJob(null);
   // A new note shows on the map at once, even with the layer off until now.
   useNotes.setState((s) => ({ notes: [note, ...s.notes.filter((n) => n.id !== note.id)], error: null, job: { ...job, noteIds: [...job.noteIds, note.id] } }));
@@ -313,9 +314,12 @@ function applyServerState(state: unknown): void {
 /** Undo is only for a note just made (typos); later a note is resolved, never deleted (spec). */
 export const UNDO_MS = 2 * 60_000;
 
+/** Notes saved from this page (this tab): only these can be undone here. */
+const savedHere = new Set<string>();
+
 export function canUndo(note: Note): boolean {
   const { storage, notes } = useNotes.getState();
-  if (!storage?.undo || Date.now() - Date.parse(note.created_at) >= UNDO_MS) return false;
+  if (!storage?.undo || !savedHere.has(note.id) || Date.now() - Date.parse(note.created_at) >= UNDO_MS) return false;
   // The server undoes only the building's newest fact.
   return storage.kind !== "server" || [...notes].sort(newestFirst)[0]?.id === note.id;
 }
@@ -327,11 +331,22 @@ export function canResolve(note: Note): boolean {
 export async function undoNote(id: string): Promise<void> {
   const { buildingKey, storage } = useNotes.getState();
   if (!buildingKey || !storage?.undo) return;
+  let undoneId: string | undefined;
   try {
     const reply = await storage.undo(buildingKey, id);
     if (reply) applyServerState(reply.state);
+    undoneId = reply ? reply.undoneId : undefined;
   } catch (error) {
     useNotes.setState({ error: error instanceof Error && storage.kind === "server" ? `${error.message}` : "Could not undo that note." });
+    return;
+  }
+  if (undoneId && undoneId !== id) {
+    // Someone saved a note between our check and the undo: the server removed theirs, ours stays.
+    const other = useNotes.getState().notes.find((note) => note.id === undoneId);
+    useNotes.setState((s) => ({
+      notes: s.notes.filter((note) => note.id !== undoneId),
+      error: `Warning: the server removed a different note${other ? ` (${other.author ?? "someone"}: “${other.text}”)` : ""}, not yours. Please tell the team.`,
+    }));
     return;
   }
   useNotes.setState((s) => ({ notes: s.notes.filter((note) => note.id !== id), job: s.job ? { ...s.job, noteIds: s.job.noteIds.filter((n) => n !== id) } : s.job }));

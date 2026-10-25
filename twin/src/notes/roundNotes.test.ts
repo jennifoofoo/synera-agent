@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import type { Building, BuildingState, Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
-import { roundDone, roundStatus, useRound, type RoundPlan } from "../round/round";
+import { cancelDoor, openRound, proposeDoor, roundConfirmDoor, roundDone, roundHowFar, roundStatus, useRound, type RoundPlan } from "../round/round";
 import { useTwin } from "../store";
 import { stopsLine } from "../ui/Report";
-import { MemoryFacts, type Note } from "./notes";
-import { addNoteHere, finishJob, installNotes, relevantNotes, useNotes } from "./notesStore";
+import { MemoryFacts, type FactsStorage, type Note } from "./notes";
+import { addNoteHere, canUndo, finishJob, installNotes, relevantNotes, undoNote, useNotes } from "./notesStore";
 
 const floor = { id: "F0", level: 0, name: "Ground floor", elevation_m: 0, height_m: 3 };
 const space = (id: string, name: string, anchor: [number, number]) => ({ id, name, floor_id: "F0", ref: null, anchor });
@@ -123,5 +123,55 @@ describe("the job report of a round", () => {
     const report = useNotes.getState().report!;
     expect(report).toMatchObject({ arrived: true, lengthM: 125, walkedM: 95 });
     expect(stopsLine(report)?.count).toBe("3 of 3");
+  });
+});
+
+describe("round safety and answers", () => {
+  it("ignores a second Done while the next leg is loading", async () => {
+    leg(0, route("S0", "S1", 30));
+    let release: (value: unknown) => void = () => {};
+    const routeCall = vi.spyOn(api, "route").mockReturnValue(new Promise((resolve) => (release = resolve)) as never);
+    const first = roundDone();
+    expect(await roundDone()).toBe("One moment, the next stop is loading.");
+    release({ route: route("S1", "S2", 40), state: state(route("S1", "S2", 40)) });
+    await first;
+    expect(routeCall).toHaveBeenCalledTimes(1);
+    expect(useRound.getState()).toMatchObject({ index: 1, checked: ["S1"] });
+  });
+
+  it("answers how far: to the next stop and for the rest of the round", () => {
+    useRound.setState({ plan: { ...plan, legsM: [30, 40, 30] } });
+    leg(1, route("S1", "S2", 40));
+    expect(roundHowFar(25)).toBe("25 metres to the next stop, 55 metres left in the round.");
+    useRound.setState({ returning: true });
+    expect(roundHowFar(20)).toBe("20 metres back to the start.");
+  });
+
+  it("adds a what-if door only after a yes", async () => {
+    const addDoor = vi.spyOn(api, "addDoor").mockRejectedValue(new Error("not in this test"));
+    proposeDoor("S1", "S2");
+    expect(useRound.getState().pendingDoor).toEqual(["S1", "S2"]);
+    cancelDoor();
+    expect(addDoor).not.toHaveBeenCalled();
+    proposeDoor("S1", "S2");
+    await roundConfirmDoor();
+    expect(addDoor).toHaveBeenCalledWith("b", "S1", "S2", true);
+  });
+
+  it("opens the panel without choosing a type for the person", async () => {
+    useRound.setState({ type: "", plan: null });
+    await openRound();
+    expect(useRound.getState()).toMatchObject({ open: true, type: "", plan: null });
+  });
+
+  it("undoes only a note saved here, and warns when the server removed another one", async () => {
+    const mine = note("mine", "S1", null);
+    const other = note("other", "S1", null);
+    const storage = { kind: "server", label: "", list: async () => [mine], add: async () => ({ fact: mine }), undo: async () => ({ undoneId: "other" }) } as unknown as FactsStorage;
+    useNotes.setState({ storage, notes: [mine, other] });
+    expect(canUndo(other)).toBe(false); // not saved from this page
+    await undoNote("mine");
+    expect(useNotes.getState().notes.map((n) => n.id)).toEqual(["mine"]);
+    expect(useNotes.getState().error).toMatch(/removed a different note/);
   });
 });

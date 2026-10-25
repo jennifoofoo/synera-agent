@@ -65,7 +65,7 @@ export interface FactsStorage {
   /** Mark done: the fact gets valid_to = now and status resolved (local only; the server resolves through the chat). */
   resolve?(buildingKey: string, id: string, author: string | null): Promise<Fact>;
   /** Undo right after creating (typos); the only real delete. Returns the new state from the server, if any. */
-  undo?(buildingKey: string, id: string): Promise<{ state?: unknown } | void>;
+  undo?(buildingKey: string, id: string): Promise<{ state?: unknown; undoneId?: string } | void>;
 }
 
 /** Valid now: started, not ended, not resolved (spec "jetzt gültig"). */
@@ -255,12 +255,14 @@ export class ServerFacts implements FactsStorage {
 
   /** POST /api/facts/undo removes the building's newest fact if it is younger than 2 minutes; refuse when that is
    * not this note (someone saved after it, or it is too old), so undo never removes another person's note. */
-  async undo(buildingKey: string, id: string): Promise<{ state?: unknown }> {
+  async undo(buildingKey: string, id: string): Promise<{ state?: unknown; undoneId?: string }> {
+    // Fetched again right before: the server undoes the newest fact, whoever saved it.
     const newest = (await this.list(buildingKey))[0];
     if (newest?.id !== id) throw new Error("Only the newest note can be undone.");
     const reply = await postJson("/api/facts/undo", { key: buildingKey });
     if (!reply.undone) throw new Error("Too late to undo.");
-    return { state: reply.state };
+    const undone = reply.undone as { id?: unknown };
+    return { state: reply.state, undoneId: typeof undone.id === "string" ? undone.id : undefined };
   }
 }
 
