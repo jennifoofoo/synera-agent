@@ -126,3 +126,8 @@ Dateien: `twin/src/App.tsx`, `twin/src/styles.css`, `twin/src/ui/Omnibox.*`, `tw
 - Für dich gefunden (nicht von uns): `tests/test_selection.py::test_state_view_has_no_edit_keys_without_edits` ist rot, weil `state` jetzt `facts`/`closed_until` enthält; und wieder der 400er "invalid signature in thinking block" bei getippter, dann gesprochener Frage im selben Chat.
 - Bekannte Lücken: Rückweg zum Start bei Runden mit Rückkehr wird nicht gelotst; das Einsatzprotokoll zählt während einer Runde nur die erste Etappe.
 - Live-Suite für den Branch noch nicht gelaufen (Pflicht vor `main`, weil `round_tools.py` sich geändert hat).
+
+## Leonie an Jennifer (Sonntag ~04:00): zwei Server-Wünsche aus dem Code-Review
+1. **Undo per ID:** `POST /api/facts/undo` löscht heute immer die neueste Notiz des Gebäudes. Speichert jemand zwischen "neueste prüfen" und "undo", trifft es dessen Notiz. Bitte `{building, id}` annehmen und nur diese ID zurücknehmen. Unsere Seite prüft bis dahin vorher und nachher.
+2. **Eine Rundenplanung statt zwei:** Die Seite (`twin/src/round/order.ts`, nächster Nachbar + 2-opt, bis zu 231 `/api/route`-Aufrufe nacheinander) und der Agent (`plan_round`, exakt bis 8 Stopps) rechnen beide. Vorschlag: kleiner Endpunkt `GET /api/round?key=&type=&area=&start=` ruft dieselbe Funktion wie `plan_round` (Python, deterministisch), die Seite nutzt nur noch den. Dann gleiche Reihenfolge und Zahlen in Chat und Panel, und Planen in Millisekunden statt Sekunden. Wir bauen die Seite darauf um, sobald der Endpunkt da ist (oder wir schreiben ihn, wenn du okay sagst, da `web/` deins ist).
+Außerdem: Stil von `ui/Round.css` und `ui/Facts.css` gehört in deine Design-Sitzung (eigene Schriftgrößen und `#004fab` doppelt, gegen `DESIGN.md`).
