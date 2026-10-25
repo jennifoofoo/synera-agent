@@ -39,7 +39,7 @@ const HALO_PAD_PX = 2; // 3D room names are halo text (no box): the halo reaches
 const POI_DOT_PX = 10;
 const POI_BADGE_3D_PX = 20;
 const POI_TEXT_GAP_PX = 4;
-const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet"]);
+const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet", "meeting"]);
 const GAP_PX = 4; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
@@ -140,10 +140,13 @@ function spanOf(polygon: Point[]): [number, number] {
   return [maxX - minX, maxY - minY];
 }
 
+const MEETING_ROOMS: ReadonlySet<string> = new Set(["meeting_room", "seminar_room", "lecture_hall", "library"]);
+
 function poiKindOf(space: Space, model: BuildingModel): PoiKind | null {
   const connector = model.connectorBySpace.get(space.id);
   if (connector) return connector.kind === "lift" ? "lift" : "stairs";
   if (space.room_type === "toilet") return "toilet";
+  if (MEETING_ROOMS.has(space.room_type)) return "meeting";
   return null;
 }
 
@@ -190,7 +193,7 @@ function candidates(
     landmarkItems.sort((a, b) => a.id.localeCompare(b.id));
     machineNames.sort((a, b) => a.id.localeCompare(b.id));
   }
-  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, step: 4, firstaid: 5, extinguisher: 6, coffee: 7, printer: 8 };
+  const poiRank: Record<PoiKind, number> = { entrance: 0, lift: 1, stairs: 2, toilet: 3, meeting: 4, step: 5, firstaid: 6, extinguisher: 7, coffee: 8, printer: 9 };
   // Closed lifts and stairs first: they must never yield to another symbol.
   const rankOf = (item: Item) => (item.kind === "poi" ? (item.closed ? -1 : poiRank[item.poi]) : 0);
   pois.sort((a, b) => rankOf(a) - rankOf(b) || a.id.localeCompare(b.id));

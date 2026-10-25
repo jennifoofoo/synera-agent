@@ -37,13 +37,13 @@
   --warn: #4a5260; /* stairs / caution text */
   --info: #004fab; /* "you are here" */
 
-  /* room groups (scene, palette.ts GROUP_COLOURS): a very low-saturation tint only for places people look for, the
+  /* room groups (scene, palette.ts GROUP_COLOURS): a soft, calm tint only for places people look for, the
    * rest stays a near-white grey. Never colour alone: each also has an icon and a legend row. */
-  --room-food: #efe6d4; /* kitchen, canteen: sand */
-  --room-sanitary: #dce8ec; /* toilet, bathroom, locker room: pale aqua */
-  --room-vertical: #dcd6e6; /* stairs and lifts: muted violet (also the shafts) */
-  --room-meeting: #dbe3d5; /* meeting, seminar, lecture hall, library: pale sage */
-  --room-walkway: #f2edd3; /* main aisles in factory halls: pale lemon, like a floor marking */
+  --room-food: #f2dbaa; /* kitchen, canteen: sand */
+  --room-sanitary: #bde1ea; /* toilet, bathroom, locker room: pale aqua */
+  --room-vertical: #d0c6ea; /* stairs and lifts: muted violet (also the shafts) */
+  --room-meeting: #d1e4c5; /* meeting, seminar, lecture hall, library: pale sage */
+  --room-walkway: #f1ecc3; /* main aisles in factory halls: pale lemon, like a floor marking */
 
   /* safety (ISO 7010 / ISO 3864), icons only, never room fills */
   --safety-red: #a52019; /* fire extinguisher (scene) */
