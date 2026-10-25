@@ -7,10 +7,10 @@ import { create } from "zustand";
 import type { BuildingState, Point, Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { closedOnRoute } from "../model/closures";
-import { useTwin, walkSteps } from "../store";
+import { setLocalAnswer, useTwin, walkSteps } from "../store";
 import { isSpeaking, speak, speechPending } from "../voice";
 import { metresLeft, readable } from "../walkInfo";
-import { normalizeSpeech } from "../wake";
+import { normalizeSpeech, parseWake } from "../wake";
 import { prettyType } from "../model/palette";
 import { endRound, useRound, type RoundStop } from "../round/round";
 import { isCurrent, isUpcomingEvent, newestFirst, pickFactsStorage, whenLabel, type FactKind, type FactsStorage, type Note } from "./notes";
@@ -489,6 +489,7 @@ function endJob(quietIfShort: boolean, roundComplete = false): Job | null {
   }
   const report = { ...job, endedAt, walkedM, arrived };
   const short = endedAt - job.startedAt < MIN_JOB_MS && !job.noteIds.length;
+  if (job.round) lastRoundReport = report;
   useNotes.setState({ job: null, guide: null, report: quietIfShort && short ? null : report });
   return quietIfShort && short ? null : report;
 }
@@ -704,8 +705,18 @@ export function finishJob(): string {
     return report ? reportSpeech(report) : "Done.";
   }
   // A round that just completed already shows its report: "finished" says it again instead of an empty job.
-  const report = endJob(false) ?? useNotes.getState().report ?? showEmptyReport();
+  const report = endJob(false) ?? useNotes.getState().report ?? showLastRoundReport() ?? showEmptyReport();
   return reportSpeech(report);
+}
+
+/** The report of the round just walked (kept after its sheet was closed), so "finished" after the last stop shows it
+ * again instead of an empty job. Only while that round is still the finished one in the panel. */
+let lastRoundReport: Job | null = null;
+function showLastRoundReport(): Job | null {
+  const { finished, plan } = useRound.getState();
+  if (!lastRoundReport || !finished || !plan) return null;
+  useNotes.setState({ report: lastRoundReport });
+  return lastRoundReport;
 }
 
 function showEmptyReport(): Job {
@@ -725,7 +736,7 @@ function reportSpeech(job: Job): string {
 const ISSUE_SAID = /^\s*(?:problem|issue|report a problem|störung|stoerung|defekt)\b\s*(?:here|hier)?\s*[:,.-]?\s*(.+)$/i;
 const NOTE_SAID = /^\s*(?:note|take a note|make a note|merk dir|merke dir|merk|notiz|notiere)\b\s*(?:that|this|here|hier|dass|das)?\s*[:,.-]?\s*(.+)$/i;
 const HERE_SAID = /^(?:what'?s here|what is here|any notes(?: here)?|notes here|was gibt'?s hier|was gibt es hier|gibt es hier notizen)$/;
-const FINISH_SAID = /^(?:finished|i'?m finished|i am finished|job done|finish(?: the)? job|end(?: the)? job|fertig|ich bin fertig|feierabend|auftrag fertig)$/;
+const FINISH_SAID = /^(?:finished|i'?m finished|i am finished|job done|finish(?: the)? job|end(?: the)? job|fertig|ich bin fertig|feierabend|auftrag fertig|(?:i'?m |i am )?done with the round|(?:the )?round (?:is )?(?:done|finished|complete)|finish(?: the)? round|end(?: the)? round|runde fertig)$/;
 
 /** One call for the hands-free handler: a notes command ("note: …", "what's here", "finished") runs here and
  * returns the sentence to speak; anything else returns null. While walking, "finished"/"fertig" before the last step
@@ -749,6 +760,18 @@ export function notesCommand(text: string): Promise<string> | null {
   }
   return null;
 }
+
+/** In an inspection round (walking it, or just finished it), typed or spoken "note: …" and "finished" are answered
+ * on the device (store.ask, before the agent): the note lands on the current stop's device, "finished" shows the job
+ * report. Outside a round everything goes to Wanda as before. */
+export function roundCommand(text: string): Promise<string> | null {
+  const round = useRound.getState();
+  const inRound = !!currentStop() || !!useNotes.getState().job?.round || (round.finished && !!round.plan);
+  if (!inRound) return null;
+  const wake = parseWake(text); // typed or heard "Wanda, note: …"
+  return notesCommand(wake?.rest || text);
+}
+setLocalAnswer(roundCommand);
 
 if (typeof window !== "undefined") {
   (window as unknown as { __twinNotes: unknown }).__twinNotes = { useNotes, addNoteHere, notesHere, finishJob, notesCommand, openNotes, spacesAtStep };

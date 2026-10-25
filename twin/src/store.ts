@@ -260,6 +260,15 @@ function autoProfile(): Profile {
   return narrow || phone ? "worker" : "planner";
 }
 
+/** Words answered on the device before any agent call, typed or spoken (registered by notes/notesStore: "note: …" and
+ * "finished" in an inspection round, so a note lands on the stop's device and "finished" shows the job report). store.ts
+ * cannot import notesStore (it imports this store): a hook. Returns the sentence to show, or null for the agent. */
+type LocalAnswer = (message: string) => Promise<string> | null;
+let localAnswer: LocalAnswer | null = null;
+export function setLocalAnswer(answer: LocalAnswer | null): void {
+  localAnswer = answer;
+}
+
 const NEW_BUILDING_COMMAND = /^(new building|neues geb(ä|ae)ude|new floor ?plan|neuer grundriss|upload (a )?(floor ?)?plan)\.?$/i;
 
 export const useTwin = create<TwinState>((set, get) => ({
@@ -577,6 +586,13 @@ export const useTwin = create<TwinState>((set, get) => ({
         await get().clearRoute();
         return null;
       }
+    }
+    const local = localAnswer?.(message.trim());
+    if (local) {
+      set((s) => ({ chat: [...s.chat, { id: ++messageId, role: "user", text: message }], awaitingPlace: null, pendingHere: null, hereArmed: false }));
+      const text = await local;
+      set((s) => ({ chat: [...s.chat, { id: ++messageId, role: "agent", text }], replyShown: true }));
+      return { reply: text, backend: "local" };
     }
     if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
       get().startWalk(); // the drawn route already has its steps; no agent call
