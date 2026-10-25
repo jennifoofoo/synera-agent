@@ -1,40 +1,48 @@
 # 2-minute video: "The knowledge stays in the building"
 
-> **Status 03:30 (Jennifer's session):** on `main` today: place knowledge server (notes, issues, timed closures with "until", history, graph export), Walk with me, tap answers "where are you", Hey Wanda with follow-up listening. Coming tonight: Wanda's knowledge tools (`feat/knowledge-agent`) and the knowledge page (`feat/twin-knowledge-page`, notes layer, pins, photos). **Not on `main`:** the inspection round (`feat/twin-round`, `feat/agent-plan-round`) and the browser notes (`feat/twin-notes`) exist only on Leonie's laptop; Jennifer decided not to build new features except place knowledge. If the round is not merged by the shoot, use this fallback for 0:25-0:55: Tom asks "Hey Wanda, take me to fire extinguisher H-A2", Walk with me moves the dot, and on arrival Wanda reads Klaus's note; then "lift 1 is out until tomorrow" shows the timed closure and the reroute.
+> **Status (Leonie's session, Sunday morning):** team decision: the video and the pitch use the **real venue, the Munich Urban Colab** (`user/plan-89323a15`, Jennifer's branch `feat/demo-urban-colab`), not a dataset building. The map shows the building we film in. Round, notes and report work on it (branch `feat/demo-urban-colab-prep`, checked with test extinguishers in a copy). **Blocked:** the building has **no fire extinguishers yet**; Jennifer adds them by hand from the plan photos. Until then the round numbers below are placeholders `[N stops]`, `[X m]`, and the round panel says "This map has no devices yet, so there is no round to plan."
 
-Language: English. **One device: the iPhone** (team decision Sunday). The whole story is mobile: "as easy as Google Maps, which everyone already knows, and you talk to it like to a person, however technical you are." Voice through the **Talk button** (push to talk; reliable on iOS). Filmed in the Urban Colab with printed signs; the twin shows the dataset building **"Produktion West 39"** (`train/proc-factory-train-015`). Say on screen once: "Demo building from the dataset, acted out in our venue."
+Language: English. **One device: the iPhone** (team decision Sunday). The whole story is mobile: "as easy as Google Maps, which everyone already knows, and you talk to it like to a person, however technical you are." Voice through the **Wanda voice bar** at the bottom of the screen (tap the mic, or say "Hey Wanda" with hands-free on; push to talk is the reliable one on iOS).
 
-Update (Leonie's session): the inspection round, `plan_round` and the browser notes are now pushed on `feat/inspection-round-and-notes` (on top of main); notes use `/api/facts` automatically.
+**The building is real.** Level 4 read the Urban Colab from photos of its evacuation plans on site (ground floor and 1st floor); doors were added by hand because the plans draw no door widths. Room names are the venue's own (Foyer, Auditorium (Arena), Project Room, Café). Say on screen once: "This is the building you are standing in, read from its evacuation plans."
 
-**Rule: always say the start point** ("I start at the entrance in Main aisle H-B3"), otherwise Wanda asks for it (no entrance is marked as the main one).
+**Start point:** the round starts at the main entrance room, which is the page's default start: **Flur West** (`plan-89323a15-F0-S003`, the room behind the first entrance). Always say it ("I start at the entrance in Flur West"), otherwise Wanda asks where to start (the building has two entrances, Flur West and Flur Süd).
 
-Real numbers: all fire extinguishers on the ground floor, start at the entrance in Main aisle H-B3: **5 stops, about 100 m** (page 100 m, agent 99.1 m). (For Q&A only: a new door between Production zone H-A2 and Server room 0.16 makes it 62 m.)
-Demo link (opens the round and the "Try a door" button): `#round=fire%20extinguisher&area=Ground%20floor&building=train/proc-factory-train-015&door=proc-factory-train-015-F0-S002,proc-factory-train-015-F0-S016`
+Real numbers (fill in once the extinguishers are in; `scripts/demo_seed.py` prints them): all fire extinguishers on the ground floor from Flur West: **[N stops], about [X m]**. The page panel and the chat use the same `plan_round` on the server, so both say the same; `tests/test_demo_urban_colab.py` checks that the round equals the route over the same stops (±1 m).
+
+Demo link (opens the round panel on the ground floor and plans at once, start = Flur West):
+`http://localhost:8798/?building=user/plan-89323a15#round=fire_extinguisher&area=Ground%20floor`
+(over the tunnel: same path and hash on the https address).
+
+## Before the shoot (once per machine)
+1. `scripts/install_demo_buildings.sh` (copies the Urban Colab into `agent_output/buildings`; skips if it is already there, so after Jennifer adds the extinguishers delete `agent_output/buildings/plan-89323a15` first and install again).
+2. Start the page: `uv run --env-file .env python -m web --port 8798`.
+3. Seed the night shift's note: `uv run python scripts/demo_seed.py user/plan-89323a15 --port 8798 [--photo bracket.jpg]`. It puts "Bracket is loose, always check it first." (author "Night shift", kind issue) on the extinguisher at **stop 2** of the round from Flur West, prints the round (stops, metres) and adds nothing when run again. Without extinguishers it says so and exits.
 
 ## Cast and props
 - **One person: Gisela**, service technician (team decision: one person only, women only; no facility manager in the 2-minute video).
-- The knowledge from others appears only as notes already on the map ("from the night shift"), never as a second person on screen. Seed one note before the shoot at fire extinguisher 2 (Production zone H-A2) with a photo: "Bracket is loose, always check it first" (author: night shift).
-- Printed signs on real spots: "Fire extinguisher" ×5 (numbered to match the stops), "Main aisle H-B3 – Entrance".
+- The knowledge from others appears only as notes already on the map ("from the night shift"), never as a second person on screen. The note is seeded with `scripts/demo_seed.py` (above), ideally with a photo of the real bracket.
+- The real fire extinguishers of the Urban Colab (no printed signs needed); a sign "Entrance – Flur West" only if the entrance is not obvious on camera.
 - iPhone (screen recording on), gloves, a tripod or second phone for the outside shot.
 
 ## Script (2:00: 60 s product, 60 s technology)
 
 | Time | Picture | Said | Notes |
 |---|---|---|---|
-| 0:00–0:10 | Gisela at the hall entrance with gloves and the iPhone. Caption: "Gisela, service technician." | Voiceover: "By 2036, 12.9 million people in Germany reach retirement age. In maintenance, much of what they know was never written down." (Source: Federal Statistical Office via dbb magazin 9/2024.) Claim on screen: "The building talks back." | |
-| 0:10–0:30 | Gisela walks; screen recording of the map | Gisela (Talk): "Inspection round: all fire extinguishers on the ground floor. I start at the entrance in Main aisle H-B3." Wanda: "Five stops, about 100 metres." Route appears, "Stop 1 of 5". Two stops with "Done", the rest as a 2-second time-lapse. | round |
-| 0:30–0:45 | At stop 2 | Wanda: "**Note from the night shift:** the bracket is loose, always check it first." Photo fades in. Gisela checks it. | notes |
-| 0:45–0:49 | Gisela at stop 4 takes a photo (3–4 s, no explanation) | Gisela (Talk): "Note: hose is cracked, replace next week." Pin with photo appears: the next person will hear it. | notes |
-| 0:55–1:00 | End of the round | Gisela (Talk): "Finished." Job report: 5 of 5 stops, 2 notes with photos. | report |
+| 0:00–0:10 | Gisela at the Urban Colab entrance with gloves and the iPhone. Caption: "Gisela, service technician." | Voiceover: "By 2036, 12.9 million people in Germany reach retirement age. In maintenance, much of what they know was never written down." (Source: Federal Statistical Office via dbb magazin 9/2024.) Claim on screen: "The building talks back." | |
+| 0:10–0:30 | Gisela walks; screen recording of the map of the room she is in | Gisela (voice bar): "Inspection round: all fire extinguishers on the ground floor. I start at the entrance in Flur West." Wanda: "[N] stops, about [X] metres." Route appears, "Stop 1 of [N]". Two stops with "Done", the rest as a 2-second time-lapse. | round |
+| 0:30–0:45 | At stop 2 | Wanda: "**Night shift reported a problem here:** Bracket is loose, always check it first." Photo fades in. Gisela checks it. | notes |
+| 0:45–0:49 | Gisela at a later stop takes a photo (3–4 s, no explanation) | Gisela (voice bar): "Note: hose is cracked, replace next week." Pin with photo appears: the next person will hear it. | notes |
+| 0:55–1:00 | End of the round | Gisela (voice bar): "Finished." Job report: [N] of [N] stops, her note, "read during the round: Night shift". | report |
 | 1:00–1:25 | Diagram: voice → Wanda (agent) → tools → building graph | Voiceover: "Every fact comes from code, not from the language model: areas from polygons, shared walls, floors in 3D, door widths, door-to-door routes on Synera's route model. The model picks the tool and phrases the answer; the shortest round is computed, not guessed. That's why all 145 benchmark answers are reproducible." | |
-| 1:25–1:45 | A floor plan image turning into the twin | Voiceover: "It works on any building, even from a floor plan: every furniture symbol becomes an asset, so we tell kitchens from offices." | Level 4 |
+| 1:25–1:45 | The photo of the Urban Colab evacuation plan turning into the twin | Voiceover: "It works on any building, even from a plan on the wall: this is the building we are standing in, read from its evacuation plans." | Level 4 |
 | 1:45–2:00 | Map full of note pins; roadmap card | Voiceover: "As easy as the maps you already use, and you just talk to it. The knowledge stays in the building. Today Gisela confirms where she is. Built today, ready for the 6G building." Logo, team names. | |
 
 Cut first if too long: the report (0:55–1:00). The what-if door (facility manager level) is not in the video; mention it in the live pitch or Q&A only.
 
 ## Shoot checklist
 - iPhone: open the page over the tunnel (https, needed for the mic), allow the mic, speaker on, screen recording on; quiet spot for the voice takes.
-- Reset the building before each take; open the demo link; check "5 stops · 100 m".
+- Reset the building before each take (Gisela's own notes from the last take: Undo, or delete them on the server), keep the night shift's note; open the demo link; check "[N] stops · [X] m".
 - Run the whole script twice without recording. Keep a screen recording of every take as backup.
 - No secrets or personal tabs on screen.
 - Cut to exactly 2:00; watch once without sound: the map alone should tell the story.
