@@ -12,7 +12,7 @@ export const HERE_HALO_PX = 22;
 /** Gap between a marker and the drag hint below it. */
 export const BADGE_GAP_PX = 4;
 /** Route start when no "You are here" dot stands there: a paper dot with a blue ring (radius in px). */
-export const START_DOT_PX = 5;
+export const START_DOT_PX = 6;
 /** Route destination: a slim pin standing on its tip (px): head radius, head centre above the tip, total height. */
 export const PIN_HEAD_PX = 6.5;
 export const PIN_HEAD_Y_PX = 14;
@@ -26,6 +26,18 @@ export const LABEL_LIFT = {
 };
 
 const at = new THREE.Vector3();
+
+/** A slow breathing scale on the floor plane (markers that want attention); still under reduced motion. */
+export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
+  const group = useRef<THREE.Group>(null);
+  useFrame(({ clock, invalidate }) => {
+    if (!group.current || reducedMotion) return;
+    invalidate();
+    const s = 1 + amount * (0.5 + 0.5 * Math.sin(clock.elapsedTime * speed * Math.PI));
+    group.current.scale.set(s, 1, s);
+  });
+  return <group ref={group}>{children}</group>;
+}
 
 /** Children are authored in px on the floor plane (x/z); the group scales them so they keep that size on screen.
  * The y axis stays in metres, so the small lifts above the floor stay the same. With `uniform` the y axis is in px

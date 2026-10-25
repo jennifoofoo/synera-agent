@@ -5,6 +5,7 @@ import type { Asset, BuildingState } from "../api/types";
 import type { FloorModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
+import { tapMap } from "../tapAnswer";
 import { useLandmarks } from "./landmarks";
 import { MIN_SHAPE_PX, useMapZoom } from "./mapZoom";
 
@@ -14,9 +15,9 @@ const temp = new THREE.Object3D();
 const colour = new THREE.Color();
 
 /** 2D plan shapes: one quiet grey just darker than the floor; fainter while a route is shown, landmarks stronger. */
-const PLAN_THING = "#c3c0b9";
-const PLAN_THING_FAINT = "#cac8c2";
-const PLAN_LANDMARK = "#8f8a80";
+const PLAN_THING = COLOURS.planThing;
+const PLAN_THING_FAINT = COLOURS.planThingFaint;
+const PLAN_LANDMARK = COLOURS.planLandmark;
 /** 2D: things are thin slabs, so they never cover the route, pins or labels drawn above the floor. */
 const PLAN_HEIGHT = 0.06;
 
@@ -43,7 +44,7 @@ interface Props {
 
 /** All things of one floor as one instanced mesh (true size from the footprint) plus an inverted-hull outline (3D). */
 export function Things({ floor, y, state, limit, flat = false }: Props) {
-  const select = useTwin((s) => s.select);
+  const select = tapMap; // a map tap selects, or answers Wanda's "where are you?" (tapAnswer.ts)
   const mesh = useRef<THREE.InstancedMesh>(null);
   const outline = useRef<THREE.InstancedMesh>(null);
   const removed = useMemo(() => new Set(state?.removed_assets ?? []), [state?.removed_assets]);
@@ -114,10 +115,10 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
     <group position-y={y}>
       {/* key: the material type changes between 2D (unlit, exact plan colour) and 3D (lit) */}
       <instancedMesh key={flat ? "plan" : "solid"} ref={mesh} args={[unitBox, undefined, capacity]} onClick={onClick} frustumCulled={false}>
-        {flat ? <meshBasicMaterial /> : <meshStandardMaterial roughness={0.8} metalness={0.05} />}
+        {flat ? <meshBasicMaterial /> : <meshStandardMaterial roughness={0.9} metalness={0.0} />}
       </instancedMesh>
       <instancedMesh ref={outline} args={[unitBox, undefined, capacity]} frustumCulled={false} raycast={() => null}>
-        <meshBasicMaterial color={COLOURS.thingEdge} side={THREE.BackSide} transparent opacity={0.6} />
+        <meshBasicMaterial color={COLOURS.thingEdge} side={THREE.BackSide} transparent opacity={0.45} />
       </instancedMesh>
     </group>
   );

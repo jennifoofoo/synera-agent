@@ -129,7 +129,7 @@ export class RouteMatcher {
   resetTo(target: ResetTarget, calibrate = false): MatchEvent[] {
     const routeM = "distanceAlong" in target ? clamp(target.distanceAlong, 0, this.total) : this.project(target);
     if (calibrate) this.recalibrate(routeM);
-    const { legIndex, along } = this.locate(routeM);
+    const { legIndex, along } = this.locate(routeM, "point" in target ? target.floorId : undefined);
     this.moveTo(legIndex, along);
     this.arrived = false;
     this.anchor();
@@ -229,7 +229,18 @@ export class RouteMatcher {
     return events;
   }
 
-  private locate(routeM: number): { legIndex: number; along: number } {
+  private locate(routeM: number, floorId?: string): { legIndex: number; along: number } {
+    // A point on a given floor at a stairs/lift boundary (end of one leg = start of the next) belongs to the leg on
+    // that floor: the start of the new floor after a ride, not the waiting spot on the floor before.
+    const prev = this.locate0(routeM);
+    const next = this.legs[prev.legIndex + 1];
+    if (floorId && this.legs[prev.legIndex].floorId !== floorId && next?.floorId === floorId && Math.abs(routeM - next.offset) < 1e-3) {
+      return { legIndex: prev.legIndex + 1, along: 0 };
+    }
+    return prev;
+  }
+
+  private locate0(routeM: number): { legIndex: number; along: number } {
     for (let i = 0; i < this.legs.length; i++) {
       const leg = this.legs[i];
       if (routeM <= leg.offset + leg.length + EPS || i === this.legs.length - 1) {

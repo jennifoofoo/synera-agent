@@ -39,18 +39,18 @@
 .campus-label.link.closed { fill: var(--danger); font-weight: 600; }
 
 .campus-recenter, .campus-view-toggle {
-  position: absolute; right: 12px; z-index: 3; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  position: absolute; right: 12px; z-index: 3; background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float); color: var(--ink);
 }
-.campus-view-toggle { top: 64px; width: 40px; height: 34px; min-height: 34px; padding: 0; border-radius: var(--radius-sm); font-weight: 600; font-size: 12px; }
-.campus-recenter { bottom: calc(var(--dock-h, 90px) + 24px); width: 44px; height: 44px; border-radius: var(--radius-sm); font-size: 20px; }
+.campus-view-toggle { top: 64px; width: 44px; height: 36px; min-height: 36px; padding: 0; border-radius: var(--radius-sm); font-weight: 600; font-size: 12px; }
+.campus-recenter { bottom: calc(var(--dock-h, 90px) + 24px); width: 44px; height: 44px; border-radius: var(--radius-pill); font-size: 20px; }
 
 /* 3D labels */
 .campus-3d-label {
-  font-size: 12.5px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--hairline-strong);
-  border-radius: 2px; padding: 2px 7px; min-height: 0; white-space: nowrap; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; color: var(--ink); background: var(--glass-strong); border: 0; box-shadow: var(--shadow-soft);
+  border-radius: var(--radius-pill); padding: 3px 9px; min-height: 0; white-space: nowrap; cursor: pointer;
 }
-.campus-3d-label.on-route { border-color: var(--signal); }
-.campus-3d-link { font-size: 11px; color: var(--ink-2); background: var(--surface); border-radius: 2px; padding: 1px 5px; white-space: nowrap; }
+.campus-3d-label.on-route { box-shadow: var(--shadow-soft), inset 0 0 0 1.5px var(--signal); }
+.campus-3d-link { font-size: 11px; color: var(--ink-2); background: var(--glass-strong); border-radius: var(--radius-pill); padding: 2px 7px; white-space: nowrap; }
 .campus-3d-link.closed { color: var(--danger); font-weight: 600; }
 
 /* the site hides the building scene (its HTML labels too; visibility keeps the canvas size) and its controls */
@@ -60,8 +60,8 @@ body.campus-site-open .floorrail, body.campus-site-open .recenter, body.campus-s
 /* back to the site, next to the building name */
 .topbar { display: flex; gap: 8px; align-items: center; }
 .campus-back {
-  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--surface);
-  border: 1px solid var(--line); font-weight: 600; color: var(--text); min-height: 0;
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-pill); background: var(--glass); -webkit-backdrop-filter: blur(var(--blur)) saturate(1.2); backdrop-filter: blur(var(--blur)) saturate(1.2); border: 0; box-shadow: var(--shadow-float);
+  font-weight: 600; color: var(--text); min-height: 0;
 }
 .campus-back-name { max-width: 30vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app.worker .campus-back { display: none; } /* phones: the header's back arrow goes back to the site */
@@ -69,11 +69,11 @@ body.campus-site-open .floorrail, body.campus-site-open .recenter, body.campus-s
 /* campus card */
 .campus-steps { position: relative; list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .campus-step {
-  min-height: 30px; padding: 4px 10px; border-radius: var(--radius-sm); font-size: 13px; background: var(--surface); border: 1px solid var(--line); color: var(--muted);
+  min-height: 30px; padding: 4px 12px; border-radius: var(--radius-pill); font-size: 13px; background: var(--paper-2); border: 0; color: var(--muted);
 }
 .campus-step .n { font-variant-numeric: tabular-nums; font-weight: 600; }
 .campus-step.done { color: var(--muted); background: var(--paper); }
-.campus-step.now { background: var(--signal-soft); border-color: var(--signal); color: var(--signal-dark); font-weight: 600; }
+.campus-step.now { background: var(--signal-soft); box-shadow: inset 0 0 0 1.5px var(--signal); color: var(--signal-dark); font-weight: 600; }
 .campus-link-dot { flex: none; width: 10px; height: 10px; border-radius: 1px; background: #b9b3a7; }
 .campus-link-dot.closed { background: var(--danger); }
 .card .campus-closed { color: var(--danger); font-weight: 600; }

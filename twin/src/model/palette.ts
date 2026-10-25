@@ -1,4 +1,4 @@
-// The look ("Blueprint minimal"): warm paper, flat graphite greys for the building, one signal colour (Synera blue) for
+// The look ("Architectural white model"): a near-white building on calm paper, one signal colour (Synera blue) for
 // the route, selection and primary actions. State colours (green / red) only for exceptions. Values marked "token"
 // mirror src/styles/tokens.css; change both together. Spec: docs/specs/room-colours.md.
 
@@ -20,20 +20,21 @@ export type SpaceGroup =
 // neutral grey that differs by lightness only. Colour is never alone: every hue group also has an icon and a legend
 // entry (LEGEND_GROUPS). The signal blue stays reserved for route, selection and primary buttons, and no room is ever
 // filled red or green (those are safety and state colours). The hue groups also differ in lightness, so they stay
-// apart under red-green colour blindness. Walls are one step (8 %) darker than their slab, never near-black.
-// Ink labels (#1d2430) on every slab are at least 7.8:1 (technical, the darkest grey); WCAG AA needs 4.5:1.
+// apart under red-green colour blindness. Walls are off-white (half way from the slab to white), so the building
+// reads as an architectural white model; the light and a thin edge line give them their shape, not a dark colour.
+// Ink labels (#1d2430) on every slab are at least 10:1 (technical, the darkest grey); WCAG AA needs 4.5:1.
 export const GROUP_COLOURS: Record<SpaceGroup, { slab: string; wall: string; label: string }> = {
-  food: { slab: "#e8d8b8", wall: "#d5c7a9", label: "Food and break" }, // token --room-food
-  sanitary: { slab: "#cde2e8", wall: "#bdd0d5", label: "Toilets" }, // token --room-sanitary
-  vertical: { slab: "#c5bcd8", wall: "#b5adc7", label: "Stairs and lifts" }, // token --room-vertical
-  meeting: { slab: "#c9d6c0", wall: "#b9c5b1", label: "Meeting" }, // token --room-meeting
-  walkway: { slab: "#eee7b8", wall: "#dbd5a9", label: "Walkways" }, // token --room-walkway
-  circulation: { slab: "#efede8", wall: "#dcdad5", label: "Corridors" },
-  work: { slab: "#dcdad4", wall: "#cac9c3", label: "Work and living" },
-  production: { slab: "#c4c7cb", wall: "#b4b7bb", label: "Production" },
-  logistics: { slab: "#cbc9c3", wall: "#bbb9b3", label: "Logistics" },
-  technical: { slab: "#b4b8bd", wall: "#a6a9ae", label: "Technical" },
-  outdoor: { slab: "#e2e3dc", wall: "#d0d1ca", label: "Outdoor" },
+  food: { slab: "#efe6d4", wall: "#f7f2e9", label: "Food and break" }, // token --room-food
+  sanitary: { slab: "#dce8ec", wall: "#edf3f5", label: "Toilets" }, // token --room-sanitary
+  vertical: { slab: "#dcd6e6", wall: "#edebf2", label: "Stairs and lifts" }, // token --room-vertical
+  meeting: { slab: "#dbe3d5", wall: "#edf1ea", label: "Meeting" }, // token --room-meeting
+  walkway: { slab: "#f2edd3", wall: "#f8f6e9", label: "Walkways" }, // token --room-walkway
+  circulation: { slab: "#f5f4f1", wall: "#faf9f8", label: "Corridors" },
+  work: { slab: "#ecebe7", wall: "#f5f5f3", label: "Work and living" },
+  production: { slab: "#e3e5e7", wall: "#f1f2f3", label: "Production" },
+  logistics: { slab: "#e7e5e0", wall: "#f3f2ef", label: "Logistics" },
+  technical: { slab: "#dadde0", wall: "#ecedef", label: "Technical" },
+  outdoor: { slab: "#eceee9", wall: "#f5f6f4", label: "Outdoor" },
 };
 
 /** Per-vertex group index for the 2D plan shader (geometry.ts). */
@@ -56,12 +57,12 @@ const PLAN_KEEPS_COLOUR: SpaceGroup[] = ["food", "sanitary", "vertical", "meetin
 
 /** GLSL for the 2D plan colour of a slab (`roomGroup` attribute -> `plan`, a vec3; `vColor` is the slab colour). */
 export const PLAN_GLSL = `
-          vec3 plan = vec3(0.975, 0.97, 0.955);
+          vec3 plan = vec3(0.985, 0.982, 0.975);
           if (roomGroup > ${GROUP_INDEX.circulation - 0.5} && roomGroup < ${GROUP_INDEX.circulation + 0.5}) plan = vec3(1.0);
-          if (roomGroup > ${GROUP_INDEX.technical - 0.5} && roomGroup < ${GROUP_INDEX.technical + 0.5}) plan = vec3(0.93, 0.93, 0.915);
-          if (roomGroup > ${GROUP_INDEX.outdoor - 0.5} && roomGroup < ${GROUP_INDEX.outdoor + 0.5}) plan = vec3(0.925, 0.925, 0.905);
+          if (roomGroup > ${GROUP_INDEX.technical - 0.5} && roomGroup < ${GROUP_INDEX.technical + 0.5}) plan = vec3(0.945, 0.945, 0.935);
+          if (roomGroup > ${GROUP_INDEX.outdoor - 0.5} && roomGroup < ${GROUP_INDEX.outdoor + 0.5}) plan = vec3(0.94, 0.94, 0.925);
           if (roomGroup > ${Math.min(...PLAN_KEEPS_COLOUR.map((g) => GROUP_INDEX[g])) - 0.5}) plan = vColor.rgb;
-          if (wall > 0.5) plan = vec3(0.76, 0.76, 0.74);`;
+          if (wall > 0.5) plan = vec3(0.58, 0.60, 0.63);`;
 
 export type LegendIcon = "food" | "toilet" | "stairs" | "lift" | "meeting" | "walkway";
 
@@ -75,12 +76,31 @@ export const LEGEND_GROUPS: { group: SpaceGroup; label: string; colour: string; 
 ];
 
 export const COLOURS = {
-  edge: "#48505b", // wall outlines, graphite (readable thin lines, not near-black)
-  edgeGhost: "#7b828c",
+  edge: "#9aa0a8", // wall top edges: a thin, light, crisp line on off-white walls
+  edgeGhost: "#c4c8ce",
   ghost: "#9aa0a8",
-  ground: "#eae7e1", // token --paper-2
-  background: "#f4f2ee", // token --paper
-  plan: "#f4f2ee", // 2D map background, token --paper
+  ground: "#eeedea", // the ground plane beyond the gradient (same as groundOuter), token --paper-2
+  background: "#f6f5f2", // token --paper
+  plan: "#f6f5f2", // 2D map background, token --paper
+  // 3D ground (GroundGrid.tsx): a soft radial gradient with a faint dot lattice that fades with distance
+  groundInner: "#f8f7f4",
+  groundOuter: "#eeedea",
+  dot: "#cfd3d8",
+  // lights (Scene.tsx) and the ambient occlusion tint (Effects.tsx): neutral, never a grey wash
+  sky: "#ffffff",
+  groundLight: "#dcd9d3",
+  fill: "#eef1f5",
+  aoTint: "#b4bcc6",
+  // 2D plan: dark crisp wall lines, quiet zone lines, furniture one step darker than the floor
+  planEdge: "#6b7079",
+  planZone: "#c9c8c3",
+  planThing: "#dedcd6",
+  planThingFaint: "#e7e5e0",
+  planLandmark: "#8f8a80",
+  // view cube (planner, 3D)
+  gizmoFace: "#ffffff",
+  gizmoHover: "#f0efec",
+  gizmoStroke: "#c9ccd2",
   signal: "#004fab", // token --signal
   mapBlue: "#004fab", // 2D route line (the signal colour; the name is historic)
   mapBlueDark: "#002478", // 2D route casing
@@ -90,9 +110,9 @@ export const COLOURS = {
   gold: "#004fab",
   stairs: GROUP_COLOURS.vertical.wall, // stairs shafts, the vertical group colour
   accentBlue: GROUP_COLOURS.vertical.wall, // lift shafts, the vertical group colour (the name is historic)
-  thing: "#d0d2d4", // furniture: neutral and quiet
-  machine: "#aeb2b8", // machines: a little darker, still neutral
-  thingEdge: "#8e939a", // furniture outline
+  thing: "#e4e3df", // furniture: the floor's own tone, shape comes from the light
+  machine: "#d4d6d8", // machines: a touch darker, still neutral
+  thingEdge: "#c3c6c9", // furniture outline, faint
   ok: "#2f7d5b", // token --ok
   warn: "#4a5260", // token --warn
   danger: "#b3382c", // token --danger

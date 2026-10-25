@@ -13,6 +13,8 @@ import { closedConnectorStops } from "../model/closures";
 import type { Highlight, Selection } from "../store";
 import { outlineGeometry, polygonGeometry } from "./geometry";
 import { HereDot, TapPin } from "./HerePin";
+import { ClosedGlyph } from "./Labels";
+import { Pulse } from "./markerLayout";
 import { FloorBadge } from "./poiIcons";
 import { assetSize } from "./Things";
 
@@ -59,16 +61,7 @@ export function clusterDisruptions(model: BuildingModel, closed: string[]): Disr
   return clusters;
 }
 
-export function Pulse({ children, reducedMotion, speed = 1.6, amount = 0.12 }: { children: React.ReactNode; reducedMotion: boolean; speed?: number; amount?: number }) {
-  const group = useRef<THREE.Group>(null);
-  useFrame(({ clock, invalidate }) => {
-    if (!group.current || reducedMotion) return;
-    invalidate();
-    const s = 1 + amount * (0.5 + 0.5 * Math.sin(clock.elapsedTime * speed * Math.PI));
-    group.current.scale.set(s, 1, s);
-  });
-  return <group ref={group}>{children}</group>;
-}
+export { Pulse };
 
 export function Ring({ radius, colour, width = 0.18, y = 0.06, opacity = 1, through = false, order }: { radius: number; colour: string; width?: number; y?: number; opacity?: number; through?: boolean; order?: number }) {
   return (
@@ -157,9 +150,21 @@ function SpaceOverlay({ polygon, height, colour, opacity, outline }: { polygon: 
   );
 }
 
+/** Closed rooms (not lifts or stairs: their stops get the hatched fill), for the red tint of the whole room. */
+export function closedSpaces(model: BuildingModel, closed: string[]): { id: string; floor_id: string; polygon: Point[] }[] {
+  const spaces: { id: string; floor_id: string; polygon: Point[] }[] = [];
+  for (const id of closed) {
+    if (model.connectorById.has(id) || model.connectorBySpace.has(id)) continue;
+    const space = model.spaceById.get(id);
+    if (space) spaces.push({ id: space.id, floor_id: space.floor_id, polygon: space.polygon });
+  }
+  return spaces;
+}
+
 export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, highlights, selection, reducedMotion, worker, flat = false }: Props) {
   const hereColour = COLOURS.here;
   const disruptions = useMemo(() => clusterDisruptions(model, state?.closed ?? []), [model, state?.closed]);
+  const closedRooms = useMemo(() => closedSpaces(model, state?.closed ?? []), [model, state?.closed]);
   const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
   const at = (floorId: string, point: Point): [number, number, number] => [point[0], floorY(floorId), -point[1]];
   const shown = (floorId: string) => visibleFloors.has(floorId);
@@ -176,7 +181,7 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
   return (
     <group>
       {/* You are here (draggable) and the pin of the last floor tap */}
-      <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} colour={hereColour} />
+      <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} worker={worker} colour={hereColour} />
       <TapPin model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} />
 
       {/* floor changes of the route in 3D: one small "↑ 1" badge where to go up or down (2D: Labels.tsx lays it out) */}
@@ -197,30 +202,54 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
           ) : null,
         )}
 
-      {/* disruptions: red circles, radius ~ sqrt(n), pulsing ring and a "⚠" chip (2D: Labels.tsx lays the chip out) */}
+      {/* closures: a closed room gets a red tint with an outline ... */}
+      {closedRooms
+        .filter((room) => shown(room.floor_id))
+        .map((room) => (
+          <group key={room.id} name="closed-room" position-y={floorY(room.floor_id)}>
+            <SpaceOverlay polygon={room.polygon} height={0.12} colour={COLOURS.danger} opacity={0.1} outline />
+          </group>
+        ))}
+      {/* ... and a small flat disc with a "Closed · name" badge on the spot (2D: Labels.tsx lays the badge out) */}
       {disruptions
         .filter((d) => shown(d.floor_id))
         .map((d, index) => {
-          const radius = 1.6 * Math.sqrt(d.names.length) + 0.6;
-          const label = d.names.length === 1 ? d.names[0] : `${d.names.length} closed`;
+          const label = d.names.length === 1 ? `Closed · ${d.names[0]}` : `${d.names.length} closed`;
           return (
             <group key={index} name="closed-marker" userData={{ count: d.names.length }} position={at(d.floor_id, d.point)}>
-              <Disc radius={radius} colour={COLOURS.danger} opacity={0.28} through />
-              <Pulse reducedMotion={reducedMotion}>
-                <Ring radius={radius} colour={COLOURS.danger} width={0.2} through />
-              </Pulse>
-              {!flat && <group position-y={1.6}>{chip(`⚠ ${label}`, "danger")}</group>}
+              <Disc radius={0.9} colour={COLOURS.danger} opacity={0.14} through />
+              {!flat && (
+                <group position-y={1.6}>
+                  <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                    <div className="chip chip-danger chip-closed">
+                      <ClosedGlyph />
+                      {label}
+                    </div>
+                  </Html>
+                </group>
+              )}
             </group>
           );
         })}
 
-      {/* closed lifts and stairs: pale red hatching on their slab (2D and 3D); the glyph and tag come from Labels.tsx */}
-      {[...closedStops.keys()].map((spaceId) => {
+      {/* closed lifts and stairs: pale red hatching on their slab (2D and 3D); in 2D the glyph and tag come from
+          Labels.tsx, in 3D (no POI glyphs there) a "Closed · name" badge floats above the stop */}
+      {[...closedStops.entries()].map(([spaceId, name]) => {
         const space = model.spaceById.get(spaceId);
         if (!space || !shown(space.floor_id)) return null;
         return (
           <group key={`closed-fill-${spaceId}`} position-y={floorY(space.floor_id)}>
             <ClosedFill polygon={space.polygon} spaceId={spaceId} />
+            {!flat && (
+              <group position={[space.anchor[0], 1.6, -space.anchor[1]]}>
+                <Html center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
+                  <div className="chip chip-danger chip-closed">
+                    <ClosedGlyph />
+                    {`Closed · ${name}`}
+                  </div>
+                </Html>
+              </group>
+            )}
           </group>
         );
       })}

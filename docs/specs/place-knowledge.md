@@ -1,6 +1,7 @@
 # Spec: Ortswissen mit Zeit ("Wanda merkt sich, was im Gebäude gerade gilt")
 
 Status: Entwurf, wartet auf Okay von Jennifer und Leonie. Ziel: Wow-Effekt bis Code-Freeze 13:00.
+Es gibt kein "nach dem Freeze": alles hier wird bis 13:00 gebaut oder gestrichen.
 Hintergrund: Leonies Servicetechniker-Story (Schichtübergabe, Wissen des Erfahrenen), Recherche Knowledge Graph (Graphiti-Zeitmodell, Brick/RealEstateCore), Jennifers Idee "Sperrungen mit Zeitraum".
 
 ## Ziel in einem Satz
@@ -26,7 +27,7 @@ Jeder Techniker kann per Sprache oder Tippen Wissen an einen Ort oder ein Gerät
   "valid_from": "ISO-Zeit", "valid_to": "ISO-Zeit | null",
   "status": "open | resolved | expired",
   "resolved_by": "<fact id> | null",
-  "author": "Techniker A | null", "source": "voice | text | tap", "utterance": "Originalsatz", "photo": "url | null",
+  "author": "Techniker A | null", "person_id": "techniker-a | null", "related": [], "source": "voice | text | tap", "utterance": "Originalsatz", "photo": "url | null",
   "created_at": "ISO-Zeit"
 }
 ```
@@ -48,13 +49,35 @@ Jeder Techniker kann per Sprache oder Tippen Wissen an einen Ort oder ein Gerät
 | "Was ist gerade gesperrt?" | aktive Sperrungen mit "bis wann" |
 Regeln: Fakten nur nach Karte und klarem "Ja" (wie jede Änderung). Zeitwörter ("bis morgen", "bis 14 Uhr", "für zwei Stunden", "bis Freitag") deterministisch auflösen, Unklares nachfragen. Wanda erfindet nichts; sie nennt Alter und Autor ("seit heute 8:10, von Techniker A").
 
+## Entscheidungen (Jennifer, 25.10. nachts)
+- **So wenig Klicken wie möglich, Sprache zuerst:** "Zeig mir das Foto", "Was gibt's hier?", "Zeig alle Notizen in Halle A" öffnen das Foto bzw. heben die Stellen auf der Karte hervor (Agent liefert `facts`-Treffer wie heute `located`).
+- **Ebene "Notes & photos"** (Laptop und Handy), Standard **aus**: eingeschaltet Pins für alle jetzt gültigen Notizen, Probleme, Fotos. Schalter neben der Etagenleiste bzw. in der Legende. Antippen eines Pins: Text, Alter, Autor, kleines Foto, sonst nichts.
+- **Immer sichtbar, auch bei ausgeschalteter Ebene:** Sperrungen (ändern Wege, Sicherheit) mit "Closed until …"; beim Begleiten die Fakten der Räume auf der eigenen Route (und Wanda liest sie beim Betreten vor).
+- **"bis morgen"** = morgen 18:00 (Schichtende), "bis Freitag" = Freitag 18:00, Zeitzone Europe/Berlin; Unklares fragt Wanda nach.
+- **Autor:** Name einmal auf der Seite eingeben ("Techniker A"), im Browser gemerkt, sonst "Technician". Kein Login.
+- **Erledigt melden:** jeder, der Verlauf zeigt wer.
+- **Löschen:** nur "undo" direkt nach dem Anlegen; sonst nur ablösen.
+- **Fotos:** optional, Handy-Kamera, verkleinert, EXIF und Ortsdaten entfernt.
+- **Speicher:** pro Gebäude in einer Datei, bleibt nach Neustart erhalten.
+- **Bestätigung:** Notizen und Probleme per Sprache/Chat: kurze Karte, dann "Ja". Sperrungen: Karte mit Wirkung auf die Wege wie heute. Knopf "Notiz hier" in der Seite: Absenden gilt als Bestätigung.
+
+## Wissensgraph (mit Jennifer abgestimmt)
+Mit dieser Spec ist es ein zeitlicher Wissensgraph über das Gebäude, ohne Graph-Datenbank:
+- **Knoten:** Räume, Türen, Aufzüge, Treppen, Geräte (gibt es), Fakten (neu), **Personen** (neu: `person_id` aus dem Autornamen, normalisiert; Abfrage "Was hat Techniker A diese Woche gemeldet?").
+- **Kanten:** Fakt `hängt an` Raum/Gerät/Element; Fakt `löst ab` älteren Fakt; Fakt `gemeldet von` Person; vorhanden: Tür `verbindet` Räume, Gerät `steht in` Raum, Raum `liegt auf` Etage. Jede Fakt-Kante gilt **von bis**.
+- **Abfragen über Beziehungen** (vor dem Freeze): `facts_here` bzw. `GET /api/facts` filtern nach Status (offen/erledigt/abgelaufen), Gerätetyp oder Kategorie, Bereich/Zone/Etage/Raum, Person und Zeitraum. Beispiel: "alle offenen Probleme an Pumpen in Halle A diese Woche".
+- **Export** `GET /api/graph?key=…` als **JSON-LD** mit Typen aus **Brick Schema** und **RealEstateCore** (Zuordnungstabelle unserer `room_type`/Gerätetypen, z. B. `kitchen` → `rec:Kitchen`, `fire_extinguisher` → `brick:Fire_Extinguisher`, Unbekanntes als `rec:Room` bzw. `brick:Equipment`), Fakten mit `validFrom`/`validTo`, `resolves`, `reportedBy`. Für Video und Technik-Text: "Gebäude plus Menschenwissen, mit Zeit, im Gebäude-Standard."
+- **Fakt an mehreren Knoten** (`related: [ids]`): Wanda schlägt weitere betroffene Orte/Geräte vor ("betrifft auch Halle A2?"), die Karte listet alle Anker, gespeichert wird erst nach "Ja"; Pin am Hauptanker, die anderen Orte zeigen einen Verweis; "erledigt" an einem Ort löst den ganzen Fakt ab.
+- **Asset Administration Shell (Export):** pro Maschine ein AAS-Teilmodell "Nameplate" (Name, Typ, Kategorie, Ort: Raum, Etage, Gebäude) plus "OpenIssues" (jetzt gültige Probleme) im Graph-Export (`GET /api/graph?key=…&format=aas` oder als Teil des JSON-LD). Nur Daten, die wir haben, nichts erfunden.
+- **Kein Graphiti / keine Graph-DB:** das eigene Zeitmodell deckt "gültig von bis", Ablösen und Verlauf ab; eine Graph-Datenbank brächte nur Infrastruktur, keine Funktion.
+
 ## Aufteilung
 | Teil | Wer | Dateien |
 |---|---|---|
 | Faktenspeicher, Zeitlogik ("jetzt gültig", Ablösen, Ablauf), Zeitwörter-Parser, Sperrung mit `valid_to` im Routing (Tick beim Abfragen, kein Hintergrundjob) | Jennifer (Agent K1) | neu `building_agent/knowledge.py`, `building_agent/time_words.py` (gibt es? sonst neu), kleine Anbindung in `guide_tools.py` (Aktion `close` bekommt `until`) |
 | API: `GET /api/facts?key=&space_id=&asset_id=&at=` (jetzt gültig / Verlauf), `POST /api/facts` (nur über bestätigte Karte bzw. lokal nach Bestätigung), Foto-Upload (verkleinert, EXIF weg), `state_view.facts` (aktive Fakten pro Etage) | Jennifer (Agent K1, nutzt den halben Notizen-Branch) | neu `web/knowledge_api.py`, `web/server.py` (Routen), `web/api.py` (state_view) |
 | Agent-Werkzeuge: `remember_here(text, kind, until?)` (schlägt Karte vor), `resolve_here(…)`, `facts_here(scope, when=now|history)`, Hinweis beim Begleiten in `walk.py` (Raum mit aktiven Fakten) | Jennifer (Agent K2, Prompt-Änderung → Live-Suite) | `building_agent/knowledge_tools.py`, eine Prompt-Zeile in `agent.py`, Registrierung in `tools.py` |
-| Seite: Pins für aktive Fakten (Notiz-Symbol, Problem-Symbol, Sperrung "until …"), Antippen zeigt Liste mit Alter/Autor/Foto, "Notiz hier"-Knopf in der Raumkarte (Text, Foto), Verlauf aufklappbar, "Closed until …" am Sperr-Symbol, freihändig "merk dir …" an den Chat geben | **Leonie** | neu `ui/Facts.tsx`, `scene/FactPins.tsx`, kleine Einhängepunkte in `Card.tsx`, `poiIcons`, `handsFree.ts` |
+| Seite: Ebene "Notes & photos" (Standard aus) mit Pins für aktive Fakten (Notiz-Symbol, Problem-Symbol), Sperrung "until …" immer sichtbar, Antippen zeigt Text/Alter/Autor/Foto, Foto per Sprache öffnen, "Notiz hier"-Knopf in der Raumkarte (Text, Foto), Verlauf aufklappbar, "Closed until …" am Sperr-Symbol, freihändig "merk dir …" an den Chat geben | **Leonie** | neu `ui/Facts.tsx`, `scene/FactPins.tsx`, kleine Einhängepunkte in `Card.tsx`, `poiIcons`, `handsFree.ts` |
 
 ## Vertrag für die Seite (Leonie)
 - `state.facts`: `[{id, kind, anchor: {space_id, asset_id, element_id, point, floor_id}, text, valid_from, valid_to, status, author, photo}]` nur jetzt gültige, in jeder Antwort mit `state`.

@@ -137,7 +137,9 @@ class Builder {
       const i3 = this.vertex(p[0], y1, p[1], n, colour, outward, sid, 1);
       this.indices.push(i0, i1, i2, i0, i2, i3);
     }
-    const t = corners.map((c) => this.vertex(c[0], y1, c[1], [0, 1, 0], colour, outward, sid, 1));
+    // The top face is a step darker than the sides: with the light edge line it reads as a crisp wall top.
+    const topColour = colour.clone().multiplyScalar(0.94);
+    const t = corners.map((c) => this.vertex(c[0], y1, c[1], [0, 1, 0], topColour, outward, sid, 1));
     this.indices.push(t[0], t[1], t[2], t[0], t[2], t[3]);
     // Edge lines along the top of the wall (both long sides); in the 2D plan they become the wall lines.
     this.line([corners[0][0], y1, corners[0][1]], [corners[1][0], y1, corners[1][1]], outward, 1);
@@ -152,7 +154,7 @@ class Builder {
     for (const [a, b, c] of triangles) this.indices.push(base + a, base + b, base + c);
     // Sides of the slab (thin), darker so the stack reads as plates. Left out where an opening cuts the edge, so the
     // plan has no outline across a gap.
-    const sideColour = colour.clone().multiplyScalar(0.82);
+    const sideColour = colour.clone().multiplyScalar(0.9);
     for (let i = 0; i < polygon.length; i++) {
       const edgeStart = polygon[i];
       const edgeEnd = polygon[(i + 1) % polygon.length];
