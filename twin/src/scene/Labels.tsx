@@ -26,8 +26,15 @@ const ZONE_COUNT = 6;
 const FIT_OVERFLOW = 1.15; // a name may run 15 % past its room's width
 const CHAR_PX = 7.0; // average glyph width of the 12 px semibold label font (Inter)
 const LABEL_H_PX = 16;
-const PILL_PAD_PX = 8; // horizontal padding of a pill label (each side); 3D labels and marked rooms are pills
+const PILL_PAD_PX = 8; // horizontal padding of a pill label (each side); marked and tapped rooms are pills
 const PILL_H_PX = 20; // a pill's height (16 px line plus 2 px padding above and below)
+const HALO_PAD_PX = 2; // 3D room names are halo text (no box): the halo reaches about 2 px past the glyphs
+/** 3D points of interest (Apple Maps style): a small coloured dot in the overview, from the mid tier on a round badge
+ * with its glyph and the name beside it (POI_TEXT_KINDS only). Sizes must match .poi-pin in poiIcons.css. */
+const POI_DOT_PX = 10;
+const POI_BADGE_3D_PX = 20;
+const POI_TEXT_GAP_PX = 4;
+const POI_TEXT_KINDS: ReadonlySet<PoiKind> = new Set(["lift", "stairs", "toilet"]);
 const GAP_PX = 4; // free space kept around every label and badge
 const THING_LIFT_PX = 9; // a thing's name sits just above its shape, never on it
 const ROUTE_CLEAR_PX = 7; // half the route line width plus a margin: room names never sit on the route
@@ -402,16 +409,22 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       if (item.kind === "door" || item.kind === "tag") continue; // doors after the second lines, below
       if ((marks.has(item.id) && !(item.kind === "poi" && item.closed)) || replaced.has(item.id)) continue; // a closed glyph always shows
       const text = item.kind === "room" ? item.space.name : item.kind === "thing" ? item.asset.name : item.kind === "area" ? item.area.name : "";
-      // 3D: every label is a pill (padding and a taller box); 2D: plain halo text on the plan
-      const pillPad = flat || item.kind === "poi" ? 0 : PILL_PAD_PX;
-      const halfW = (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
-      const halfH = item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 + (flat ? 0 : 2) : flat ? LABEL_H_PX / 2 : PILL_H_PX / 2;
+      // Halo text in both views (3D keeps a 2 px margin for the halo); 3D symbols are a dot or a badge with a name.
+      const pillPad = flat || item.kind === "poi" ? 0 : HALO_PAD_PX;
+      const poi3d = !flat && item.kind === "poi" ? poiLayout3d(item, tier) : null;
+      const halfW = poi3d ? poi3d.halfW : (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
+      const halfH = poi3d ? poi3d.size / 2 : item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 + (flat ? 0 : 2) : LABEL_H_PX / 2;
       // An area name may also move up or down a little (inside the area) to make way for a symbol.
       const shifts = item.kind === "area" ? [0, AREA_SHIFT_PX, -AREA_SHIFT_PX] : [0];
       for (const shift of shifts) {
         const point: Point = shift ? [item.point[0], item.point[1] - shift * scale] : item.point;
         if (item.kind === "area" && shift && !item.area.polygons.some((polygon) => insidePolygon(point, polygon))) continue;
         const box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
+        if (poi3d) {
+          // the badge sits on the point, its name to the right: shift the box so it covers both and nothing else
+          box.x0 += poi3d.shift;
+          box.x1 += poi3d.shift;
+        }
         if (kept.some((other) => overlaps(box, other))) continue;
         if ((item.kind === "room" || item.kind === "area") && selectedPx && boxOnPolygon(box, selectedPx)) continue;
         if ((item.kind === "room" || item.kind === "area" || (item.kind === "thing" && !item.landmark)) && onRoute(box)) continue; // landmarks keep their name on the route
@@ -507,9 +520,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
           </Html>
         ) : (
           <Html key={`poi-${item.id}`} position={[item.point[0], 0, -item.point[1]]} center zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-            <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
-              <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
-            </div>
+            {flat ? (
+              <div className="zoom-fade" data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
+                <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
+              </div>
+            ) : (
+              <PoiPin item={item} tier={tier} />
+            )}
           </Html>
         ),
       )}
@@ -544,5 +561,26 @@ function RoomLabel({ item, mark, flat, selected }: { item: Extract<Item, { kind:
         {item.space.name}
       </div>
     </Html>
+  );
+}
+
+/** 3D symbol layout: dot (far) or badge (mid, near), and the name beside the badge for the sought-after kinds. `halfW`
+ * and `shift` describe the collision box relative to the point (badge centred on it, name to the right). */
+function poiLayout3d(item: Extract<Item, { kind: "poi" }>, tier: MapTier): { size: number; text: string; halfW: number; shift: number } {
+  const badge = tier !== "far" || item.closed;
+  const size = badge ? POI_BADGE_3D_PX : POI_DOT_PX;
+  const text = badge && !item.closed && POI_TEXT_KINDS.has(item.poi) && item.title ? item.title : "";
+  const textW = text ? POI_TEXT_GAP_PX + text.length * CHAR_PX : 0;
+  return { size, text, halfW: (size + textW) / 2, shift: textW / 2 };
+}
+
+/** A 3D point of interest: a coloured dot, or a round badge with its glyph and the name beside it (Apple Maps style). */
+function PoiPin({ item, tier }: { item: Extract<Item, { kind: "poi" }>; tier: MapTier }) {
+  const { size, text } = poiLayout3d(item, tier);
+  return (
+    <div className={`poi-pin poi-pin-${item.poi} ${size === POI_DOT_PX ? "poi-pin-dot" : ""} zoom-fade`} data-zoom-kind={`poi-${item.poi}`} data-poi-space={item.id}>
+      <PoiBadge kind={item.poi} title={item.title} closed={item.closed} />
+      {text && <span className="label label-halo poi-pin-name">{text}</span>}
+    </div>
   );
 }

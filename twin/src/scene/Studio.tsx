@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { useThree } from "@react-three/fiber";
 import { AccumulativeShadows, Environment, Lightformer, RandomizedLight } from "@react-three/drei";
 import { boundsOf, type BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
@@ -120,6 +121,23 @@ export function Plinth({ model }: { model: BuildingModel }) {
   );
 }
 
+const softwareCache = new WeakMap<object, boolean>();
+
+/** Whether WebGL runs on a software rasterizer (SwiftShader, llvmpipe: headless browsers, VMs, blocklisted GPUs).
+ * There a frame costs seconds, so the studio keeps to the cheap lights and skips the baked shadows. */
+export function useSoftwareGl(): boolean {
+  const gl = useThree((s) => s.gl);
+  let software = softwareCache.get(gl);
+  if (software === undefined) {
+    const context = gl.getContext();
+    const info = context.getExtension("WEBGL_debug_renderer_info");
+    const renderer = info ? String(context.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+    software = /swiftshader|llvmpipe|software/i.test(renderer);
+    softwareCache.set(gl, software);
+  }
+  return software;
+}
+
 /** Studio light for the planner (3D): a large softbox above the front, a rim light behind, a weak fill, baked once
  * into an environment map. White surfaces stay white; the shape comes from the gradients, not from dark faces. */
 export function StudioLight() {
@@ -200,7 +218,7 @@ function BuildingLight({ size, centre }: { size: number; centre: [number, number
         size={size * 0.75 + PLINTH_MARGIN_M + 2}
         far={size * 4}
         mapSize={1024}
-        bias={0.0005}
+        bias={0.002}
       />
     </group>
   );

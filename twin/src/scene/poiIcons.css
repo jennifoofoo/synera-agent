@@ -46,3 +46,21 @@
 @keyframes zoom-fade-in { from { opacity: 0; } }
 .zoom-fade { animation: zoom-fade-in 180ms ease-out; }
 @media (prefers-reduced-motion: reduce) { .zoom-fade { animation: none; } }
+
+/* 3D (Apple Maps style): no white chips. A 10 px dot in the symbol's colour in the overview, from the mid tier on a
+   20 px round badge with a white glyph and the name beside it (POI_DOT_PX / POI_BADGE_3D_PX in Labels.tsx). Colours:
+   signal blue for the ways in and up (entrances, lifts, stairs), the safety colours for safety, ink for the rest. */
+.poi-pin { --poi: var(--ink); position: relative; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
+.poi-pin-entrance, .poi-pin-lift, .poi-pin-stairs { --poi: var(--signal); }
+.poi-pin-extinguisher { --poi: var(--safety-red); }
+.poi-pin-firstaid { --poi: var(--safety-green); }
+.poi-pin .poi-badge {
+  width: 20px; height: 20px; background: var(--poi); color: var(--surface);
+  box-shadow: 0 0 0 1.5px var(--surface), 0 2px 6px rgba(29, 36, 48, 0.22);
+}
+.poi-pin .poi-badge svg { width: 13px; height: 13px; }
+.poi-pin.poi-pin-dot { width: 10px; height: 10px; }
+.poi-pin.poi-pin-dot .poi-badge { width: 10px; height: 10px; box-shadow: 0 0 0 1.5px var(--surface), 0 1px 3px rgba(29, 36, 48, 0.25); }
+.poi-pin.poi-pin-dot .poi-badge svg { display: none; }
+.poi-pin .poi-badge.poi-closed { background: var(--surface); color: var(--ink-2); }
+.poi-pin-name { position: absolute; left: calc(100% + 4px); top: 50%; transform: translateY(-50%); }

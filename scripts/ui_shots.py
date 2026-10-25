@@ -140,6 +140,11 @@ def main() -> None:
             set_route(page)
             settle(page)
             page.screenshot(path=str(out / "mobile-sheet.png"))
+            # the phone in 3D with the same route
+            store(page, "setViewMode('3d')")
+            store(page, "requestCamera({ kind: 'home' })")
+            settle(page)
+            page.screenshot(path=str(out / "mobile-3d.png"))
             phone.close()
             browser.close()
     finally:
@@ -149,7 +154,7 @@ def main() -> None:
     if errors:
         print("ERRORS:\n" + "\n".join(errors))
         raise SystemExit(1)
-    print(f"saved 4 screenshots to {out}")
+    print(f"saved 5 screenshots to {out}")
 
 
 if __name__ == "__main__":

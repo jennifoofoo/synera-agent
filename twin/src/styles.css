@@ -91,16 +91,23 @@ button.x:hover { color: var(--text); background: transparent; }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(246, 245, 242, 0.7); z-index: 5; pointer-events: none; }
 .overlay.error { color: var(--danger); pointer-events: auto; }
 
-/* labels and chips inside the scene (3D): white pills with a soft shadow, semibold name */
+/* labels inside the scene (3D, Apple Maps style): semibold ink text with a paper halo, no box. Only the tapped room
+   and the rooms with a marker (route ends, "you are here") are pills. */
 .label {
-  font-size: 12px; line-height: 16px; font-weight: 600; color: var(--ink); background: var(--glass-strong); font-variant-numeric: tabular-nums;
-  border: 0; border-radius: var(--radius-pill); padding: 2px 8px; white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(29, 36, 48, 0.14), 0 0 0 0.5px rgba(29, 36, 48, 0.05);
+  font-size: 12px; line-height: 16px; font-weight: 600; color: var(--ink); background: transparent; font-variant-numeric: tabular-nums;
+  border: 0; border-radius: var(--radius-pill); padding: 0; white-space: nowrap; box-shadow: none;
   transition: opacity var(--t-fast);
 }
-.label-connector { background: var(--paper-2); }
+/* 3D: rooms with a marker float as a white card pill above it */
+.label.label-marked {
+  background: var(--surface); padding: 2px 8px; text-shadow: none;
+  box-shadow: 0 1px 2px rgba(29, 36, 48, 0.12), 0 4px 12px rgba(29, 36, 48, 0.1);
+}
 /* the tapped room (both views): ink pill, white text */
-.label.label-selected, .label.label-plan.label-selected { background: var(--ink); color: var(--surface); text-shadow: none; padding: 2px 9px; }
+.label.label-selected, .label.label-plan.label-selected {
+  background: var(--ink); color: var(--surface); text-shadow: none; padding: 2px 9px;
+  box-shadow: 0 1px 2px rgba(29, 36, 48, 0.2), 0 4px 12px rgba(29, 36, 48, 0.14);
+}
 /* 2D: rooms with a marker (route ends, "you are here") keep a pill so they stand out from the plain plan text */
 .label.label-plan.label-marked {
   background: var(--glass-strong); border-radius: var(--radius-pill); padding: 2px 8px; text-shadow: none;

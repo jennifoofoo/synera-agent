@@ -17,7 +17,7 @@ import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
 import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
 import { Things } from "./Things";
-import { Plinth, StudioLight, StudioShadows } from "./Studio";
+import { Plinth, StudioLight, StudioShadows, useSoftwareGl } from "./Studio";
 import { openingEditsOf } from "./geometry";
 
 const NEAR_THINGS_LIMIT = 6000;
@@ -35,6 +35,7 @@ function Building({ model }: { model: BuildingModel }) {
   const viewMode = useTwin((s) => s.viewMode);
   const worker = profile === "worker";
   const flat = viewMode === "2d";
+  const software = useSoftwareGl();
 
   const focused = focusedFloorId ?? model.floors[0]?.id ?? null;
   // Floor rule (floorVisibility.tsx): active floor full, floors below as outlines, floors above hidden; a route over
@@ -53,6 +54,7 @@ function Building({ model }: { model: BuildingModel }) {
   const route = state?.route ?? null;
   // The soft shadow is baked again only when what casts it changes (floor, floor mode, route floors, things, doors).
   const bakeKey = `${model.building.key}:${focused}:${floorMode}:${thingsMode}:${routeFloorsKey}:${JSON.stringify(openingEditsOf(state))}`;
+  const shadowFloor = routeFloors ? routeFloors.reduce((top, id) => (floorY(id) > floorY(top) ? id : top), routeFloors[0]) : focused;
   const guideSegments = state?.guide?.active ? state.guide.leg.segments : null;
 
   return (
@@ -70,7 +72,8 @@ function Building({ model }: { model: BuildingModel }) {
           </FloorRise>
         );
       })}
-      {!flat && !worker && focused && <StudioShadows model={model} y={floorY(focused)} bakeKey={bakeKey} />}
+      {/* the shadow lies on the top full floor: a floor stacked above would throw its slab over the one below */}
+      {!flat && !worker && !software && shadowFloor && <StudioShadows model={model} y={floorY(shadowFloor)} bakeKey={bakeKey} />}
       {/* No see-through stair and lift shafts any more: a multi-floor route draws its vertical run (RouteLine). */}
       <RouteLine route={route} guideSegments={guideSegments} model={model} floorY={floorY} onlyFloor={routeFloors ? null : focused} reducedMotion={reducedMotion} flat={flat} worker={worker} />
       <Markers
@@ -88,6 +91,21 @@ function Building({ model }: { model: BuildingModel }) {
       <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
     </group>
+  );
+}
+
+/** Planner (3D): studio light from an environment map plus a low sky dome as a safety net. Phone, 2D and software
+ * WebGL: the cheap lights (a bright sky dome, a steep key light, a cool fill). */
+function Lights({ studio, centre, size }: { studio: boolean; centre: [number, number, number]; size: number }) {
+  const software = useSoftwareGl();
+  const full = studio && !software;
+  return (
+    <>
+      {full && <StudioLight />}
+      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, full ? 0.6 : 2.1]} />
+      {!full && <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={0.9} color={COLOURS.sky} />}
+      {!full && <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.6} color={COLOURS.fill} />}
+    </>
   );
 }
 
@@ -159,12 +177,7 @@ export function Scene() {
       )}
       {flat && <color attach="background" args={[COLOURS.plan]} />}
       {!flat && <fog attach="fog" args={[COLOURS.studioBottom, size * 3, size * 10]} />}
-      {/* Planner (3D): studio light from an environment map plus a low sky dome as a safety net. Phone and 2D: the
-          cheap lights (a bright sky dome, a steep key light, a cool fill). */}
-      {!flat && !worker && <StudioLight />}
-      <hemisphereLight args={[COLOURS.sky, COLOURS.groundLight, flat || worker ? 2.1 : 0.6]} />
-      {(flat || worker) && <directionalLight position={[centre[0] + size * 0.6, size * 1.6, centre[2] + size * 0.4]} intensity={0.9} color={COLOURS.sky} />}
-      {(flat || worker) && <directionalLight position={[centre[0] - size * 0.8, size * 0.5, centre[2] - size * 0.6]} intensity={0.6} color={COLOURS.fill} />}
+      <Lights studio={!flat && !worker} centre={centre} size={size} />
       <PerformanceMonitor
         flipflops={4}
         bounds={() => [40, 58]}
