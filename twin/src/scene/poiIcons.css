@@ -66,3 +66,6 @@
 .poi-pin.poi-pin-dot .poi-badge svg { display: none; }
 .poi-pin .poi-badge.poi-closed { background: var(--surface); color: var(--ink-2); }
 .poi-pin-name { position: absolute; left: calc(100% + 4px); top: 50%; transform: translateY(-50%); }
+
+/* 2D: the symbol of a room with its name beside it (the badge stays centred on the point) */
+.poi-flat { position: relative; display: flex; align-items: center; justify-content: center; }
