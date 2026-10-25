@@ -24,24 +24,36 @@ sentence template are answered by plain Python without an API call; on `data/tes
 reproducible without the model. Other questions go to Claude; finished model replies are cached, so a re-run after an
 interruption only asks what is missing.
 
-## Run on an unseen building
-
-Same command, pointed at what you hand us:
+## Run on an unseen building (your secret building)
 
 ```bash
-uv run --env-file .env python -m building_agent.submission <building_dir | split_dir | questions_file> \
-  --csv team_synera.csv --json answers.json
+git clone https://github.com/jennifoofoo/synera-agent && cd synera-agent
+export ANTHROPIC_API_KEY=...        # or put ANTHROPIC_API_KEY=... into a .env file in this folder
+./run_benchmark.sh <split_dir | building_dir | questions_file> [out_dir]
 ```
 
-Accepted inputs: a split directory (like `data/test`), one building directory, or a questions file
-(`questions.jsonl` as in the kit, `questions.csv` with `question_id,building_id,kind,question`, or `questions.json`
-as a list or `{"questions": [...]}` with `id` and `text`). Use `--root DIR` if the questions file is not next to the
-building folders, `--workers N` for parallel questions (default 4).
+That is all: it runs `uv sync`, answers every question without stopping (one failed question never stops the
+others), and writes `<out_dir>/answers.json` and `<out_dir>/answers.csv` (default `benchmark_out/`), then checks
+them. No `data/` download is needed for a new building. Tested on a fresh clone with the key as an environment
+variable and with a `.env` file.
 
-Level 4 (a building given as floor plans): build the page once (`scripts/build_twin.sh`), start it
-(`uv run python -m web`), open the building menu, "New building", and add the plan images (with their `.svg` and
-`building.json` if present). After the confirm card it is saved under `agent_output/buildings/<id>/` and is a normal
-building directory for the command above.
+The same as one command, if you prefer:
+
+```bash
+uv run --env-file .env python -m building_agent.submission <input> --csv answers.csv --json answers.json
+```
+
+Accepted inputs: a split directory (like `data/test`), one building directory (with its `building.json`, plan images
+and `questions.jsonl`, the kit format), or a questions file (`questions.jsonl` as in the kit, `questions.csv` with
+`question_id,building_id,kind,question`, or `questions.json` as a list or `{"questions": [...]}` with `id` and
+`text`). Use `--root DIR` if the questions file is not next to the building folders, `--workers N` for parallel
+questions (default 4).
+
+Level 4: per the organisers (Discord, 25.10.) the secret building comes in the same format as the kit (plans plus
+`building.json` with the scale), so the command above covers it. Building a building from plan images alone is
+also in the app: start it (`scripts/build_twin.sh`, then `uv run python -m web`), building menu, "New building",
+add the plan images; after the confirm card it is saved under `agent_output/buildings/<id>/`, a normal building
+directory for the command above.
 
 ## Format of `answers.json`
 
