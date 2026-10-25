@@ -6,7 +6,7 @@ Copy everything between the two lines.
 
 **Wanda – the building that talks back.** A voice guide for service technicians that knows a building like its facility manager, and keeps what people learn on site where it happened.
 
-**Facts from code. Language from the model.** The building is a graph of rooms, doors, stairs, lifts and devices. Areas, walls, floors, door widths and routes are computed in Python on Synera's route model. Claude only picks a tool, asks what is missing and phrases the reply. All 145 benchmark answers come from code without a model call, so they are reproducible; on the labelled dev set 138 of 138 are correct. One command runs the same system on a new building.
+**Facts from code. Language from the model.** The building is a graph of rooms, doors, stairs, lifts and devices. Areas, walls, floors, door widths and routes are computed in Python on Synera's route model. Claude only picks a tool, asks what is missing and phrases the reply. All 145 benchmark answers come from code without a model call, so they are reproducible; on the labelled dev set 138 of 138 are correct. One command runs the same system on a new building in the kit format (plans plus building.json).
 
 **Talk to it, hands busy.** Tap the Wanda orb and ask, in English or German. Tap the map to say where you are. "Where is the nearest toilet?" draws the route, "yes" starts guiding. Directions come turn first with metres ("Walk 5 m, then turn left"). "Walk with me" counts steps and moves an estimated dot, no GPS. Step-free mode avoids stairs. The mic stays muted while walking so noise never triggers it.
 
@@ -14,7 +14,7 @@ Copy everything between the two lines.
 
 **The knowledge stays in the building.** Notes, problems, timed closures, events and room bookings hang on a room, device, door or lift, with author, time and photo. Nothing is deleted, a fix supersedes. Problem words make a note a problem, a closure reroutes until it ends. Each room opens as a knowledge graph with Brick and RealEstateCore types and an Asset Administration Shell export.
 
-**Any building, even from a plan.** A floor plan becomes a building: scale, storeys, doors and room types from furniture symbols. Our demo building is the venue, read from photos of its evacuation plans.
+**Any building, even from a plan alone.** Without any building data, a floor plan image becomes a building: scale, storeys, doors and room types from furniture symbols. Built this way, the dev buildings still answer 80 % of the usual questions. Our demo building is the venue itself, read from photos of its evacuation plans.
 
 **Safe by design.** Every change shows a card with its effect and needs a clear yes.
 
@@ -23,6 +23,8 @@ Copy everything between the two lines.
 ---
 
 ## Sources
+
+- Plan-only 80 %: `scripts/level4_questions_eval.py --no-log` on main, each dev building rebuilt from its plan files only, 191 of 238 labelled questions correct (83 % of those whose rooms were found).
 
 - 145 answers produced by code: all 145 questions of `data/test` match a sentence template of `building_agent/question_parser.py` and are answered by the kind functions without an API call (checked Sunday 25.10. on `main` 168f0b9); `building_agent.submission --check` says "ready to submit"; `SUBMISSION/answers.json` equals `answers/team_synera.csv` in all 145 replies.
 - 138 of 138 dev questions: full `benchmark.evaluate data/dev` run by the team this weekend (not re-run here, it calls the API).
