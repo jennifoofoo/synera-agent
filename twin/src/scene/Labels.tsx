@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
+import { GROW_FROM_SCREENS } from "../model/assetHeights";
 import { controlsRef } from "./FloorMesh";
 import { wallHeightFor } from "./geometry";
 import type { Asset, Point, Space } from "../api/types";
@@ -205,6 +206,7 @@ function candidates(
   landmarks: ReadonlySet<string>,
   closedStops: ReadonlyMap<string, string>,
   roundStopId: string | null,
+  overview: boolean,
 ): { items: Item[]; classes: Map<Item, LabelClass> } {
   const pois: Item[] = [];
   const later: Item[] = []; // symbols that yield to room names (fire extinguishers: many, and not sought after)
@@ -216,9 +218,11 @@ function candidates(
     else if (space.name && space.type !== "outdoor" && space.type !== "corridor") rooms.push(space);
   }
   for (const opening of floor.openings) {
-    if (opening.kind === "entrance")
-      pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
-    else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
+    if (opening.kind === "entrance") {
+      // Exits from the mid tier on: in the overview a dozen exit badges along the facade crowd the calm plan.
+      if (!overview)
+        pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "entrance", title: opening.step_free === false ? "Entrance / exit (not step-free)" : "Entrance / exit" });
+    } else if (opening.step_free === false) pois.push({ kind: "poi", id: opening.id, point: opening.position, poi: "step", title: "Not step-free (a step or threshold)" });
   }
   // 2D, from mid on: the amenity symbols (coffee, printer, first aid, and the fire extinguishers after the room
   // names). Landmarks of the current directions always carry their name; machine names from near on (mapZoom.ts).
@@ -291,6 +295,10 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   const zoom = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy, floor.bounds.size);
   const scale = zoom.scale;
   const tier: MapTier = flat || zoom.tier !== "area" ? zoom.tier : "far"; // 3D keeps its own labels
+  // The overview: 2D at the area and far tiers; 3D while the whole floor fits the screen (a small building is
+  // near-tier sized already there, the same rule as the furniture height, model/assetHeights.ts growth).
+  const screenPx = useThree((s) => Math.max(s.size.width, s.size.height));
+  const overview = flat ? tier === "area" || tier === "far" : floor.bounds.size / scale / Math.max(1, screenPx) < GROW_FROM_SCREENS;
   useEffect(() => {
     if (flat) (window as unknown as { __twinMapZoom?: unknown }).__twinMapZoom = { tier, scale };
   }, [flat, tier, scale]);
@@ -479,7 +487,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       return routePx.some((points) => points.some((p, i) => i > 0 && segmentHitsBox(points[i - 1], p, clear)));
     };
     const roomBoxes = new Map<string, Box>();
-    const { items: all, classes: candidateClasses } = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops, roundStopId);
+    const { items: all, classes: candidateClasses } = candidates(floor, model, tier, scale, limit, flat, landmarks, closedStops, roundStopId, overview);
     const showTag = tier === "mid" || tier === "near"; // "Closed" beside a closed glyph, from the mid tier on
     // Closed lifts and stairs come first in `all`; once they are placed, each gets its "Closed" tag (right of the
     // glyph, else left), before any other symbol or name.
@@ -506,7 +514,11 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
       // Halo text in both views (3D keeps a 2 px margin for the halo); 3D symbols are a dot or a badge with a name.
       const pillPad = flat || item.kind === "poi" ? 0 : HALO_PAD_PX;
       const poi3d = !flat && item.kind === "poi" ? poiLayout3d(item, tier) : null;
-      const halfW = poi3d ? poi3d.halfW : (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
+      // 3D: this layout is in plan metres, not on the tilted screen, so a symbol's name (drawn to its right) would
+      // block a neighbouring room's symbol that is far away on screen; a room symbol claims only its badge here and
+      // Declutter.tsx settles real overlaps of the names on screen. A coloured room never loses its symbol to that.
+      const badgeOnly = !!poi3d && item.kind === "poi" && !!item.room;
+      const halfW = poi3d ? (badgeOnly ? poi3d.size / 2 : poi3d.halfW) : (item.kind === "poi" ? POI_PX / 2 : (text.length * (item.kind === "area" ? AREA_CHAR_PX : CHAR_PX)) / 2) + pillPad;
       const halfH = poi3d ? poi3d.size / 2 : item.kind === "poi" ? POI_PX / 2 : item.kind === "area" ? AREA_H_PX / 2 + (flat ? 0 : 2) : LABEL_H_PX / 2;
       // An area name may also move up or down a little (inside the area) to make way for a symbol.
       const shifts = item.kind === "area" ? [0, AREA_SHIFT_PX, -AREA_SHIFT_PX] : [0];
@@ -514,7 +526,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
         const point: Point = shift ? [item.point[0], item.point[1] - shift * scale] : item.point;
         if (item.kind === "area" && shift && !item.area.polygons.some((polygon) => insidePolygon(point, polygon))) continue;
         const box = boxOf(point, halfW, halfH, item.kind === "thing" ? THING_LIFT_PX : 0);
-        if (poi3d) {
+        if (poi3d && !badgeOnly) {
           // the badge sits on the point, its name to the right: shift the box so it covers both and nothing else
           box.x0 += poi3d.shift;
           box.x1 += poi3d.shift;
@@ -565,7 +577,7 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     }
     lastShown.current = new Set(classes.keys());
     return { shown: result, pins, classes };
-  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId, walking]);
+  }, [floor, model, tier, scale, limit, routeOnFloor, marks, changes, found, closed, closedStops, selectedId, selectedAssetId, state?.position, flat, landmarks, tapPoint, roundStopId, walking, overview]);
 
   return (
     <group position-y={y + 0.5}>

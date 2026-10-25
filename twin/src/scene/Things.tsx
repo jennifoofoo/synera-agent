@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import type { Asset, BuildingState } from "../api/types";
 import type { FloorModel } from "../model/model";
-import { assetHeight, isFloorMarking, zoomedHeight } from "../model/assetHeights";
+import { assetHeight, growsWithZoom, growth, isFloorMarking, zoomedHeight } from "../model/assetHeights";
 import { COLOURS, GROUP_COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { tapMap } from "../tapAnswer";
@@ -15,7 +15,7 @@ import { MIN_SHAPE_PX, useMapZoom } from "./mapZoom";
 // (rounded, a darker top, a soft shadow) because they are what people steer by; everything else is a low body at its
 // default height by type (model/assetHeights.ts: a desk at table height, a pallet a hand high, else 0.3 m), one
 // instanced mesh for all of them. Furniture of flats and offices grows with zoom: a low block far out (at most
-// 0.25 m), its full type height at the near tier, so an overview of a flat is rooms, not a field of white boxes. Floor markings stay flat in that mesh, tinted like the walkway floor marking.
+// 0.15 m, faded towards the floor tone), its full type height near, so an overview of a flat is rooms, not a field of white boxes. Floor markings stay flat in that mesh, tinted like the walkway floor marking.
 
 /** Bodies: a rounded box standing on the floor, vertex colour darkens the top face a step (instance colour on top). */
 const bodyBox = new RoundedBoxGeometry(1, 1, 1, 3, 0.06);
@@ -60,6 +60,8 @@ const colour = new THREE.Color();
 const paper = new THREE.Color(COLOURS.groundInner);
 /** Focus mode: things in rooms off the route take this share of the paper tone (as their rooms, geometry.ts). */
 const FOCUS_FADE = 0.6;
+/** 3D overview: furniture takes this share of the paper tone (none once it has grown to full height near). */
+const FURNITURE_FADE = 0.65;
 
 /** 2D plan shapes: one quiet grey just darker than the floor; fainter while a route is shown, landmarks stronger. */
 const PLAN_THING = COLOURS.planThing;
@@ -164,11 +166,14 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       if (onRoute && !landmarks.has(asset.id) && !onRoute.has(asset.space_id)) colour.lerp(paper, FOCUS_FADE);
       return colour;
     };
+    const grown = growth(scale, floorScreens);
     split.slab.forEach((asset, index) => {
       // 3D: furniture grows with zoom (a low block far out, full type height near; model/assetHeights.ts).
       place(asset, flat ? PLAN_HEIGHT : zoomedHeight(asset, scale, floorScreens, kept.has(asset.id)));
       slab.setMatrixAt(index, temp.matrix);
       colour.set(flat ? planColour(asset) : isFloorMarking(asset) ? MARKING : COLOURS.footprint);
+      // 3D overview: low furniture also fades towards the floor tone, so rooms read as calm surfaces.
+      if (!flat && growsWithZoom(asset) && !kept.has(asset.id)) colour.lerp(paper, FURNITURE_FADE * (1 - grown));
       slab.setColorAt(index, focus(asset));
     });
     slab.count = split.slab.length;

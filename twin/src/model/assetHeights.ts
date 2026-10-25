@@ -109,7 +109,7 @@ export function assetHeight(asset: Pick<Asset, "type" | "category">): number {
 
 /** Furniture height grows with zoom (3D): far out every piece of furniture is a low block at most this high, so a
  * flat full of beds, sofas and wardrobes reads as rooms, not as a field of white boxes. */
-export const FAR_FURNITURE_CAP = 0.25;
+export const FAR_FURNITURE_CAP = 0.15;
 /** Metres per screen pixel where furniture starts to grow (the mid tier's outer edge, scene/mapZoom.ts MID_MAX) and
  * where it reaches its full type height (the near tier, mapZoom.ts NEAR_MAX). */
 export const GROW_FROM_MPP = 0.3;
@@ -139,8 +139,8 @@ export function growsWithZoom(asset: Pick<Asset, "type" | "category">): boolean 
 /** A small floor is near-tier sized already when it fits the screen (a flat at its overview is ~0.05 m/px), so the
  * overview is also told by how many screens wide the floor is: furniture starts to grow once the floor is wider than
  * GROW_FROM_SCREENS screens and stands at full height from FULL_AT_SCREENS (zoomed into a few rooms). */
-export const GROW_FROM_SCREENS = 0.9;
-export const FULL_AT_SCREENS = 2.2;
+export const GROW_FROM_SCREENS = 1.3;
+export const FULL_AT_SCREENS = 3;
 
 const smooth = (t: number) => {
   const c = Math.min(1, Math.max(0, t));
