@@ -155,9 +155,12 @@ html, body { overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
 .wanda-orb.muted .wf-core-g, .wanda-orb.muted .wf-glow, .wanda-orb.muted .wf-wings { animation: none; transform: none; }
 .wanda-orb.muted { filter: grayscale(0.85); opacity: 0.7; }
 
-/* Walking: the floors rail stops above the recenter button (it sits right above the dock) */
-:root .app.worker.walking:has(.recenter) .floorrail {
-  max-height: calc(var(--vvh, 100dvh) - var(--rail-top, calc(var(--head-y) + 56px)) - var(--dock-h, 90px) - 16px - 56px);
+/* The floors rail stops above the locate/recenter button (it sits right above the dock, on the rail's edge), walking
+   or not, with or without a sheet. Upright only: on its side the rail is on the left. */
+@media (orientation: portrait), (min-height: 521px) {
+  :root .app.worker:has(.recenter) .floorrail, :root .app.worker.directions-open:has(.recenter) .floorrail {
+    max-height: calc(var(--vvh, 100dvh) - var(--rail-top, calc(var(--head-y) + 56px)) - var(--dock-h, 90px) - 16px - 56px);
+  }
 }
 /* ... and the note on the route is a slim banner, not a card that covers the dot */
 .app.worker .card-guide-note { padding: 6px 4px 6px 10px; gap: 8px; align-items: center; font-size: 13px; }
