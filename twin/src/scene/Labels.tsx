@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { controlsRef } from "./FloorMesh";
@@ -637,16 +637,22 @@ export function ClosedGlyph() {
 const FAR_LABEL = 1.3;
 
 function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extract<Item, { kind: "room" }>; mark?: { lift: number; height: number; kind: string }; flat: boolean; selected: boolean; y: number; labelClass: LabelClass }) {
-  const div = useRef<HTMLDivElement>(null);
+  const div = useRef<HTMLDivElement | null>(null);
+  // drei <Html> renders its children into their own root after this component's effects: track the node itself.
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const attach = useCallback((el: HTMLDivElement | null) => {
+    div.current = el;
+    setNode(el);
+  }, []);
   const cull = !flat && !mark && !selected;
   // The destination and the selected room are read closely: placed on whole pixels so their text stays sharp.
   const crisp = !!mark || selected;
+  const above = !!mark;
   const lift = mark?.lift ?? 0;
   useLayoutEffect(() => {
-    const el = div.current;
-    if (!crisp || !el) return;
-    return crispCentre(el, !!mark, lift);
-  }, [crisp, mark, lift]);
+    if (!crisp || !node) return;
+    return crispCentre(node, above, lift);
+  }, [crisp, node, above, lift]);
   const decided = useRef(-1);
   useEffect(() => {
     decided.current = -1; // decide again for the new role
@@ -675,7 +681,7 @@ function RoomLabel({ item, mark, flat, selected, y, labelClass }: { item: Extrac
       style={{ pointerEvents: "none" }}
     >
       <div
-        ref={div}
+        ref={attach}
         className={`label label-halo ${flat ? "label-plan" : ""} ${mark ? "label-marked" : ""} ${selected ? "label-selected" : ""} ${mark?.kind === "end" ? "label-dest" : ""} zoom-fade`}
         data-label-space={item.space.id}
         data-zoom-kind="room"
