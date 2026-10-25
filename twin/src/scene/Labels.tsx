@@ -19,7 +19,7 @@ import { blocked, capped, densityBudget, mapRoomName, rankOfClass, type LabelCla
 import { useRound } from "../round/round";
 import { labelDecision } from "./Declutter";
 import { crispCentre, roundedPosition } from "./crispHtml";
-import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorBadge, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorBadgeWidth, type PoiKind } from "./poiIcons";
+import { CLOSED_TAG_PX, FLOOR_BADGE_H_PX, FOUND_DOT_PX, FOUND_MANY_PX, FloorHint, FoundDot, PoiBadge, POI_PX, amenityKindOf, floorHintWidth, type PoiKind } from "./poiIcons";
 
 interface Props {
   floor: FloorModel;
@@ -83,7 +83,7 @@ type Item =
 
 /** Map markers laid out before the labels (screen px), in this order: they win every collision. */
 type Pin =
-  | { kind: "floor"; id: string; point: Point; connector: "stairs" | "lift"; direction: "up" | "down"; level: number; title: string }
+  | { kind: "floor"; id: string; point: Point; connector: "stairs" | "lift"; toFloor: string; text: string; title: string }
   | { kind: "found"; id: string; point: Point; ids: string[]; title: string }
   | { kind: "closed"; id: string; point: Point; text: string; title: string; dy: number }
   | { kind: "name"; id: string; point: Point; text: string; dx: number; dy: number };
@@ -366,7 +366,18 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     [flat, model, state?.closed, floor.id],
   );
   const closedStops = useMemo(() => closedConnectorStops(model, state?.closed ?? []), [model, state?.closed]);
-  const changes = useMemo(() => (flat && route?.ok ? (route.floor_changes ?? []).filter((change) => change.from_floor === floor.id) : []), [flat, route, floor.id]);
+  // 2D: the route's floor changes on this floor, where it leaves (continues on the next floor) and where it arrives
+  // (back to the floor before); each becomes a tappable hint that shows the other floor.
+  const changes = useMemo(() => {
+    if (!flat || !route?.ok) return [];
+    const out: { connectorId: string; kind: string; name: string; point: Point; toFloor: string; leaving: boolean; up: boolean }[] = [];
+    for (const change of route.floor_changes ?? []) {
+      const up = change.direction === "up";
+      if (change.from_floor === floor.id) out.push({ connectorId: change.connector_id, kind: change.kind, name: change.name, point: change.from_point, toFloor: change.to_floor, leaving: true, up });
+      else if (change.to_floor === floor.id) out.push({ connectorId: change.connector_id, kind: change.kind, name: change.name, point: change.to_point, toFloor: change.from_floor, leaving: false, up: !up });
+    }
+    return out;
+  }, [flat, route, floor.id]);
 
   const { shown, pins, classes } = useMemo(() => {
     // One decision (label-rules.md): this layout only runs when the zoom step, the floor, the route, the selection,
@@ -400,13 +411,13 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
     // 2. Floor changes of the route: one small badge where to go up or down (it replaces that stairs/lift POI).
     const replaced = new Set<string>();
     for (const change of changes) {
-      const connector = model.connectorById.get(change.connector_id);
+      const connector = model.connectorById.get(change.connectorId);
       for (const spaceId of connector?.space_ids ?? []) replaced.add(spaceId);
-      const level = model.floorById.get(change.to_floor)?.level ?? 0;
-      const box = boxOf(change.from_point, floorBadgeWidth(level) / 2, FLOOR_BADGE_H_PX / 2);
+      const toName = model.floorById.get(change.toFloor)?.name ?? change.toFloor;
+      const text = `${change.leaving ? "Continues on" : "Back to"} ${toName} ${change.up ? "↑" : "↓"}`;
+      const box = boxOf(change.point, floorHintWidth(text) / 2, FLOOR_BADGE_H_PX / 2 + 2);
       kept.push(box);
-      const toName = model.floorById.get(change.to_floor)?.name ?? change.to_floor;
-      pins.push({ kind: "floor", id: `fc-${change.connector_id}-${change.to_floor}`, point: change.from_point, connector: change.kind === "lift" ? "lift" : "stairs", direction: change.direction, level, title: `${change.name} ${change.direction} to ${toName}` });
+      pins.push({ kind: "floor", id: `fc-${change.connectorId}-${change.toFloor}`, point: change.point, connector: change.kind === "lift" ? "lift" : "stairs", toFloor: change.toFloor, text, title: `${change.name}: show ${toName}` });
     }
     // 3. Found things: a dot each; dots that would touch merge into one with a count.
     const dots: { pin: Extract<Pin, { kind: "found" }>; names: string[]; box: Box }[] = [];
@@ -599,9 +610,9 @@ export function Labels({ floor, model, y, limit, flat = false }: Props) {
   return (
     <group position-y={y + 0.5}>
       {pins.map((pin) => (
-        <Html key={`${pin.kind}-${pin.id}`} position={[pin.point[0], 0, -pin.point[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: "none" }}>
+        <Html key={`${pin.kind}-${pin.id}`} position={[pin.point[0], 0, -pin.point[1]]} center zIndexRange={[4, 0]} style={{ pointerEvents: pin.kind === "floor" ? "auto" : "none" }}>
           {pin.kind === "floor" ? (
-            <FloorBadge kind={pin.connector} direction={pin.direction} level={pin.level} title={pin.title} />
+            <FloorHint kind={pin.connector} text={pin.text} title={pin.title} onGo={() => useTwin.getState().focusFloor(pin.toFloor)} />
           ) : pin.kind === "found" ? (
             <FoundDot count={pin.ids.length} title={pin.title} />
           ) : pin.kind === "closed" ? (

@@ -60,10 +60,38 @@ export function floorRoles(model: BuildingModel, focused: string | null, mode: F
  * it, not a full storey lower. */
 export const OUTLINE_STEP_M = 0.35;
 
-/** Floor heights: a multi-floor route and "all floors" pull the floors apart; otherwise the real elevations. */
+/** Camera tilt (polar angle from straight down, rad) that the route stack is framed at (CameraRig) and laid out for. */
+export const STACK_POLAR = 0.95;
+/** Share of the worst case (the diagonal straight along the view) the gap covers: the far corner of the lower floor
+ * may just touch the near corner of the upper one, the plans and their routes stay apart. */
+const STACK_SHARE = 0.8;
+
+/** Vertical gap between two stacked route floors (m): seen from STACK_POLAR, the lower floor's plan must end on screen
+ * before the upper floor's begins, whichever way the camera looks. A floor of horizontal extent D projects to about
+ * D·cos(polar) on screen, the gap to gap·sin(polar), so gap > D·cot(polar); D is the diagonal of both
+ * floors' footprints together (any heading), plus the cut wall height and a little air. */
+export function routeStackGap(lower: FloorModel, upper: FloorModel): number {
+  // the two floors together (an upper floor may sit off to one side of the one below)
+  const width = Math.max(lower.bounds.maxX, upper.bounds.maxX) - Math.min(lower.bounds.minX, upper.bounds.minX);
+  const depth = Math.max(lower.bounds.maxY, upper.bounds.maxY) - Math.min(lower.bounds.minY, upper.bounds.minY);
+  const extent = Math.hypot(width, depth);
+  return Math.max(lower.height_m + 6, (extent / Math.tan(STACK_POLAR)) * STACK_SHARE + lower.height_m);
+}
+
+/** Heights of a route's floors stacked apart: the lowest stays at its real elevation, each next one (in floor order)
+ * a routeStackGap higher. Floors not on the route keep their real elevation (they are hidden). */
+export function routeStackElevations(model: BuildingModel, routeFloors: string[]): Map<string, number> {
+  const floors = model.floors.filter((floor) => routeFloors.includes(floor.id)).sort((a, b) => a.elevation_m - b.elevation_m || a.level - b.level);
+  const out = new Map<string, number>();
+  floors.forEach((floor, i) => out.set(floor.id, i === 0 ? floor.elevation_m : out.get(floors[i - 1].id)! + routeStackGap(floors[i - 1], floor)));
+  return out;
+}
+
+/** Floor heights: a multi-floor route stacks its floors far enough apart to read each one (routeStackElevations),
+ * "all floors" pulls every floor apart; otherwise the real elevations. */
 export function floorLayout(floor: FloorModel, model: BuildingModel, mode: FloorMode, routeFloors: string[] | null, focused: string | null = null): number {
-  if (routeFloors) return floorElevation(floor, model, "exploded");
   void focused;
+  if (routeFloors) return routeStackElevations(model, routeFloors).get(floor.id) ?? floor.elevation_m;
   return floorElevation(floor, model, mode);
 }
 

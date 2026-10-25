@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Building } from "../api/types";
 import { buildModel } from "../model/model";
-import { floorLayout, floorRoles } from "./floorVisibility";
+import type { Route } from "../api/types";
+import { STACK_POLAR, floorLayout, floorRoles, routeFloorIds, routeStackElevations, routeStackGap } from "./floorVisibility";
+import { floorRuns } from "./RouteLine";
 
 const square = (floor_id: string, id: string) => ({
   id,
@@ -55,5 +57,62 @@ describe("floorRoles", () => {
   it("draws every floor fully in 'all floors' (a hairline outline of a bigger floor below read as a stray frame)", () => {
     const roles = floorRoles(model, "g", "exploded", false, null);
     expect([...roles.values()]).toEqual(["full", "full", "full"]);
+  });
+});
+
+const twoFloorRoute = {
+  ok: true,
+  start: "s2",
+  destination: "s3",
+  length_m: 30,
+  floors: ["g", "f1"],
+  segments: [
+    { floor_id: "g", points: [[1, 1], [8, 1]] },
+    { floor_id: "f1", points: [[8, 2], [8, 9]] },
+  ],
+} as unknown as Route;
+
+describe("a route over two floors (stacked apart in 3D)", () => {
+  it("knows its floors in route order", () => {
+    expect(routeFloorIds(twoFloorRoute)).toEqual(["g", "f1"]);
+    expect(routeFloorIds({ ...twoFloorRoute, segments: [twoFloorRoute.segments![0]] } as Route)).toBeNull();
+  });
+
+  it("draws exactly the route's floors, the others hidden", () => {
+    const roles = floorRoles(model, "g", "single", false, ["g", "f1"]);
+    expect(Object.fromEntries(roles)).toEqual({ b: "hidden", g: "full", f1: "full" });
+    // 2D shows only the active floor, route or not
+    expect(Object.fromEntries(floorRoles(model, "g", "single", true, ["g", "f1"]))).toEqual({ b: "hidden", g: "full", f1: "hidden" });
+  });
+
+  it("keeps the lowest route floor in place and lifts the next one by a readable gap", () => {
+    const heights = routeStackElevations(model, ["f1", "g"]);
+    expect(heights.get("g")).toBe(0);
+    const gap = heights.get("f1")! - heights.get("g")!;
+    expect(gap).toBe(routeStackGap(model.floorById.get("g")!, model.floorById.get("f1")!));
+    // seen from the stack's tilt, the ground floor (walls included) ends on screen before most of Floor 1 begins
+    const diagonal = Math.hypot(10, 10);
+    expect(gap * Math.sin(STACK_POLAR)).toBeGreaterThan(0.75 * diagonal * Math.cos(STACK_POLAR) + 3 * Math.sin(STACK_POLAR));
+    expect(gap).toBeGreaterThan(model.floorById.get("g")!.height_m + 5);
+    // floorLayout uses the same heights; floors off the route keep their real elevation
+    const at = (id: string) => floorLayout(model.floorById.get(id)!, model, "single", ["g", "f1"], "g");
+    expect(at("f1")).toBe(heights.get("f1"));
+    expect(at("b")).toBe(-3);
+  });
+
+  it("stacks route floors that skip a storey directly on top of each other", () => {
+    const heights = routeStackElevations(model, ["b", "f1"]);
+    expect(heights.get("b")).toBe(-3);
+    expect(heights.get("f1")! - heights.get("b")!).toBe(routeStackGap(model.floorById.get("b")!, model.floorById.get("f1")!));
+    expect(heights.has("g")).toBe(false);
+  });
+
+  it("joins the floors with one run at the stairs, from the last point below to the first above", () => {
+    const y = (id: string) => (id === "g" ? 0 : 20);
+    const runs = floorRuns(twoFloorRoute.segments!, y);
+    expect(runs).toHaveLength(2);
+    expect(runs[0].toArray().map((v) => Math.round(v * 100) / 100)).toEqual([8, 0.15, -1]);
+    expect(runs[1].toArray().map((v) => Math.round(v * 100) / 100)).toEqual([8, 20.15, -2]);
+    expect(floorRuns([twoFloorRoute.segments![0]], y)).toEqual([]);
   });
 });
