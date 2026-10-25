@@ -20,7 +20,7 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useTwin } from "../store";
 import { useRound } from "../round/round";
-import { blocked, rankOfClass, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
+import { blocked, rankOfClass, ZOOM_MARGIN, zoomStepChanged, type Box, type LabelClass } from "./labelRules";
 import { metresPerPixelOf } from "./mapZoom";
 import { controlsRef } from "./FloorMesh";
 import { frameSize, HERE_RIM_PX, PIN_HEAD_PX, PIN_HEIGHT_PX, START_DOT_PX, TAP_CROSS_PX, TAP_RING_PX, TAP_STALK_M } from "./markerLayout";
@@ -64,8 +64,40 @@ function touches(a: Box, b: Box): boolean {
   return blocked(a, b, true, HYSTERESIS);
 }
 
+/** A box grown about its centre by ZOOM_MARGIN. Between two decisions the map may zoom out by up to that factor,
+ * which brings every pair of centres closer by it while the labels keep their size on screen; testing the grown
+ * boxes keeps them apart anywhere inside the zoom step. */
+function grown(box: Box): Box {
+  const dx = ((box.x1 - box.x0) * (ZOOM_MARGIN - 1)) / 2;
+  const dy = ((box.y1 - box.y0) * (ZOOM_MARGIN - 1)) / 2;
+  return { x0: box.x0 - dx, y0: box.y0 - dy, x1: box.x1 + dx, y1: box.y1 + dy };
+}
+
 const v = new THREE.Vector3();
 const target = new THREE.Vector3();
+
+const MARKERS = new Set(["here-dot", "walk-estimate", "route-start", "route-end", "tap-pin"]);
+
+/** Is a marker drawn? The tap pin hidden by an earlier pass still counts, so it can come back once there is room. */
+function markerShown(obj: THREE.Object3D): boolean {
+  if (!obj.visible && !(obj.userData.declutterHidden && obj.name === "tap-pin")) return false;
+  for (let p = obj.parent; p; p = p.parent) if (!p.visible) return false;
+  return true;
+}
+
+const markerAt = new THREE.Vector3();
+
+/** Which markers are drawn and where (to 10 cm): a marker that appears, goes or moves is a decision point (a route
+ * end drawn anew, the tap pin, the "you are here" dot walking). Camera moves do not change it. */
+function markerSignature(scene: THREE.Scene): string {
+  const parts: string[] = [];
+  scene.traverse((obj) => {
+    if (!obj.name || !MARKERS.has(obj.name) || !markerShown(obj)) return;
+    obj.getWorldPosition(markerAt);
+    parts.push(`${obj.uuid}@${Math.round(markerAt.x * 10)},${Math.round(markerAt.y * 10)},${Math.round(markerAt.z * 10)}`);
+  });
+  return parts.join("|");
+}
 
 /** Screen boxes (client px) of the markers drawn in three.js at a constant size on screen (markerLayout.tsx). */
 function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): { fixed: Box[]; taps: { obj: THREE.Object3D; boxes: Box[] }[] } {
@@ -92,17 +124,10 @@ function markerBoxes(scene: THREE.Scene, camera: THREE.Camera, rect: DOMRect): {
   const fixed: Box[] = [];
   const taps: { obj: THREE.Object3D; boxes: Box[] }[] = [];
   const at = new THREE.Vector3();
-  // the tap pin may be hidden by an earlier pass (below): it still counts, so it can come back once there is room
-  const shown = (obj: THREE.Object3D) => {
-    if (!obj.visible && !(obj.userData.declutterHidden && obj.name === "tap-pin")) return false;
-    for (let p = obj.parent; p; p = p.parent) if (!p.visible) return false;
-    return true;
-  };
   scene.traverse((obj) => {
     if (!obj.name) return;
     const name = obj.name;
-    if (name !== "here-dot" && name !== "walk-estimate" && name !== "route-start" && name !== "route-end" && name !== "tap-pin") return;
-    if (!shown(obj)) return;
+    if (!MARKERS.has(name) || !markerShown(obj)) return;
     const boxes = name === "tap-pin" ? [] : fixed;
     if (name === "tap-pin") taps.push({ obj, boxes });
     obj.getWorldPosition(at);
@@ -138,7 +163,8 @@ export function Declutter() {
   // (2D / 3D) are checked every frame. `settle` counts the frames left before the pass (labels and transforms update).
   const dirty = useRef(true);
   const settle = useRef(0);
-  const decided = useRef<{ mpp: number | null; camera: string; size: string }>({ mpp: null, camera: "", size: "" });
+  const decided = useRef<{ mpp: number | null; camera: string; size: string; markers: string }>({ mpp: null, camera: "", size: "", markers: "" });
+  const checked = useRef(0);
 
   useEffect(
     () => () => {
@@ -211,11 +237,13 @@ export function Declutter() {
       const measured = (kind.startsWith("poi-") && content.firstElementChild) || content;
       const r = measured.getBoundingClientRect();
       if (r.width < 1 || r.height < 1) continue;
-      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: { x0: r.left, y0: r.top, x1: r.right, y1: r.bottom } });
+      items.push({ wrapper, rank: rankOf(content), shown: !wrapper.classList.contains(HIDDEN), order, box: grown({ x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }) });
     }
     items.sort((a, b) => a.rank - b.rank || Number(b.shown) - Number(a.shown) || a.order - b.order);
     const shownBefore = new Map(items.map((item) => [item, item.shown]));
-    const { fixed, taps } = markerBoxes(scene, camera, rect);
+    const markers = markerBoxes(scene, camera, rect);
+    const fixed = markers.fixed.map(grown);
+    const taps = markers.taps.map(({ obj, boxes }) => ({ obj, boxes: boxes.map(grown) }));
     const kept = fixed;
     // The tap pin yields to the "You are here" dot and the route ends (zoomed out they can fall on one spot); the
     // tapped room stays named in its card. Hidden through three.js visibility, nothing about its look changes.
@@ -236,9 +264,10 @@ export function Declutter() {
         item.wrapper.style.visibility = hide ? "hidden" : "";
       }
     }
+    invalidate(); // one more frame: a zoom step taken while this pass waited is seen at once (phones render on demand)
   };
 
-  useFrame(({ camera, size }) => {
+  useFrame(({ camera, size, scene }) => {
     if (pending.current !== null) return;
     if (settle.current > 0) {
       // a decision is under way: one more frame so labels re-rendered for it (and their transforms) are on screen
@@ -255,9 +284,14 @@ export function Declutter() {
     const mpp = metresPerPixelOf(camera, size.width, size.height, focus);
     const sizeKey = `${size.width}x${size.height}`;
     const before = decided.current;
-    if (!dirty.current && before.camera === camera.uuid && before.size === sizeKey && !zoomStepChanged(mpp, before.mpp)) return; // pan, rotate: keep
+    // the markers are looked at as often as the old per-frame pass ran (a scene walk)
+    const now = performance.now();
+    const look = dirty.current || now - checked.current >= THROTTLE_MS;
+    if (look) checked.current = now;
+    const markers = look ? markerSignature(scene) : before.markers;
+    if (!dirty.current && before.camera === camera.uuid && before.size === sizeKey && before.markers === markers && !zoomStepChanged(mpp, before.mpp)) return; // pan, rotate: keep
     dirty.current = false;
-    decided.current = { mpp, camera: camera.uuid, size: sizeKey };
+    decided.current = { mpp, camera: camera.uuid, size: sizeKey, markers };
     labelDecision.epoch++;
     settle.current = 2;
     invalidate(); // phones render on demand
