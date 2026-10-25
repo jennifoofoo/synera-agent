@@ -83,3 +83,10 @@ Richtung wie bei Archilogic, Smplrspace, MapsIndoors 3D ("Architekturmodell" / P
 | `feat/agent-plan-round` | **Agent-Werkzeug `plan_round`**: Gerätetyp und Bereich rein, kürzeste Reihenfolge mit Metern raus (Python, kein LLM), damit "Hey Wanda, inspection round" im Chat nicht mehr per Hand Reihenfolgen durchprobiert (heute 20 s und nicht garantiert optimal) | neue Datei unter `building_agent/`, Registrierung in den Werkzeugen (gemeinsamer Code: Review-Agent und Live-Suite vor dem Merge) |
 | `feat/twin-notes` | Ortsnotizen mit Foto und Einsatzprotokoll, erst im Browser gespeichert | neue Dateien `twin/src/notes/*`, `ui/Notes.*`, `ui/Report.*`, `scene/NotePins.tsx` |
 Nicht angefasst: Jennifers belegte Dateien (Sprache, Sperrungen, `web/api.py`, `web/route_draw.py`). Sprachbefehle ("done", "note …", "finished") hängt Leonie mit je einer Zeile an, sobald Jennifers Sprach-Fix in `main` ist.
+
+## Frage an Jennifer (Leonie, Sonntag früh): zweiter Startknopf bei der Prüfrunde
+`feat/twin-round` (Leonie) zeichnet die Prüfrunde als normale Route mit Zwischenstopps. Dadurch zeigt die Routenkarte in `ui/Card.tsx` (deine Datei) zusätzlich "Guide me". Der startet die normale Führung über die ganze Runde **ohne** Stationen ("Stop 2 of 5", "Done", Abhaken). Zwei Startknöpfe, einer davon falsch, verwirrt in der Demo.
+Vorschlag, eine Zeile in `Card.tsx`, du entscheidest:
+- A: Während eine Runde aktiv ist (`roundStatus().active` aus `twin/src/round/round.ts`), die normale Routenkarte ausblenden.
+- B: "Guide me" startet bei aktiver Runde die Runden-Führung (`startRoundGuide()`), sonst wie bisher.
+Leonie empfiehlt A (weniger Knöpfe).
