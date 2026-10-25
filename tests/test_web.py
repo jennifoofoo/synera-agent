@@ -10,6 +10,7 @@ import pytest
 from shapely.geometry import Polygon
 
 from building_agent import routing
+from building_agent.round_tools import plan_round
 from web.server import App, make_handler
 
 DATA = Path("data")
@@ -216,6 +217,43 @@ def test_agent_route_is_drawn_with_its_via_stops(app, key, monkeypatch):
     _, reply = app.post("/api/chat", {"building": key, "message": "take me there via the other room"})
     route = reply["state"]["route"]
     assert route["ok"] and route["via"] == [via] and via in route["space_path"]
+
+
+def test_agent_round_carries_its_stops_for_the_page(app, monkeypatch):
+    """plan_round's route reaches the page with route.round (stops in order), so the page guides it stop by stop;
+    the page's own next route has no round."""
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    planned = {}
+    fake_chat(app, key, monkeypatch, lambda m: planned.update(plan_round(m, "fire extinguisher", start, floor_level=0)))
+    _, reply = app.post("/api/chat", {"building": key, "message": "inspection round fire extinguishers ground floor"})
+    route = reply["state"]["route"]
+    stops = [stop["space_id"] for stop in route["round"]["stops"]]
+    assert stops == [stop["space_id"] for stop in planned["stops"]]
+    assert route["round"]["start"] == start and route["via"] == stops[:-1] and route["destination"] == stops[-1]
+    assert all(route["round"]["stops"][0]["asset_ids"])
+    _, page = app.post("/api/route", {"building": key, "start": stops[0], "destination": stops[1]})
+    assert "round" not in page["state"]["route"]
+
+
+def test_round_endpoint_plans_like_the_agent_and_draws_the_round(app):
+    """POST /api/round runs plan_round (same order and metres as the chat) and draws it with route.round."""
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    expected = plan_round(bm, "fire extinguisher", start, floor_level=0)
+    _, reply = app.post(
+        "/api/round", {"building": key, "type": "fire extinguisher", "area": "Ground floor", "start": start}
+    )
+    planned = reply["round"]
+    assert planned["ok"] and [s["space_id"] for s in planned["stops"]] == [s["space_id"] for s in expected["stops"]]
+    assert planned["total_m"] == expected["total_m"]
+    route = reply["state"]["route"]
+    stops = [stop["space_id"] for stop in route["round"]["stops"]]
+    assert route["start"] == start and route["via"] == stops[:-1] and route["destination"] == stops[-1]
+    _, bad = app.post("/api/round", {"building": key, "type": "unicorn", "start": start})
+    assert bad["round"]["ok"] is False and bad["round"]["error"]
 
 
 def test_page_route_asked_during_chat_wins_over_the_agent_route(app, key, monkeypatch):

@@ -368,6 +368,30 @@ Standort (gesagt, geklickt, am Gerät), Klick-Auswahl mit Validierung auf dem Se
 - **Datenmenge:** Fotos sind groß, Handy-Upload über schlechtes Netz in der Halle. Verkleinern vor dem Hochladen.
 - Wertung: Die Sonntagsfragen prüfen das vermutlich nicht. Gut für Creativity, Demo ("Capture on site" und "Make things move" aus den Level-5-Ideen) und für den Pitch.
 
+## 11. Positionierung und Story für den Servicetechniker (Leonie, 25.10.2026)
+Status: Grundlage für Pitch, Video und Technik-Text.
+
+### Unsere Lücke (Satz für den Pitch)
+Fast niemand verbindet **Gespräch, Gebäudegeometrie und Wegführung**. Die Wartungssoftware weiß *was*, die Ortung weiß *wo ungefähr*, aber keiner sagt dir freihändig: "Links an der Presse vorbei, das Ersatzteil liegt auf dem Weg im Lager H-C2."
+
+### Schmerzpunkte im Alltag (von Leonie ausgewählt)
+- Suchen kostet Zeit: Teile, Werkzeug, Maschine, Kollegen, Dokumente.
+- Wissen steckt in Köpfen: der erfahrene Kollege geht in Rente.
+- Dokumentation passiert nachträglich und schlecht.
+
+### Prüfrunde planen (Favorit für die Demo)
+"Ich muss heute alle 14 Feuerlöscher in Halle A prüfen." Wanda rechnet die kürzeste Runde (Tour wie `errand`), lotst Station für Station und schaltet mit "Hey Wanda, erledigt" weiter. Baut auf Geräte-Suche, Touren und der freihändigen Führung auf.
+
+### Kleine Features aus den Schmerzpunkten (nicht Overkill)
+- Suchen: "Hey Wanda, ich brauch noch X" baut den nächsten X als Zwischenstopp in die laufende Route (`via`).
+- Wissen: Ortsnotizen per Sprache ("Hey Wanda, merk dir hier: ..."), beim nächsten Vorbeilotsen vorgelesen.
+- Dokumentation: "Hey Wanda, fertig" erzeugt ein Einsatzprotokoll (Ziel, Zeit, Meter, Sperrungen, Notizen), ohne LLM.
+
+### Ortsnotizen: Schichtübergabe und Wissen des Erfahrenen (Leonie: "spannend", "cute")
+Ein Feature, zwei Geschichten:
+- **Schichtübergabe:** "Hey Wanda, merk dir: Ventil an Presse 2 tropft, morgen tauschen." Die Notiz hängt am Ort; die nächste Schicht hört sie beim Vorbeilotsen.
+- **Wissen des Erfahrenen:** Der Senior sagt beim Rundgang "hier immer erst den Hebel links". Der Neue hört es an derselben Stelle.
+Technik: Standort + freihändiger Befehl "merk dir" (lokal, ohne LLM) + Pin auf der Karte + Vorlesen in der Schrittliste, wenn die Route den Raum betritt. Für mehrere Geräte braucht es einen kleinen Speicher auf dem Server (Jennifer).
 ## 13. Gedächtnis pro Person mit mem0 (Idee von Jennifer, 25.10.2026 nachts)
 
 ### Idee
@@ -391,3 +415,28 @@ Position und letzter Standort pro Sitzung (`state.position`), Sprachregeln, Kart
 - **Falsche Erinnerungen:** ein veralteter Schreibtisch führt in den falschen Raum. Erinnerungen immer mit Alter nennen ("du hast vor 3 Tagen gesagt …") und bei Routen bestätigen lassen.
 - **Prinzip bleibt:** Fakten über das Gebäude kommen weiter nur aus dem deterministischen Kern, das Gedächtnis liefert nur Wünsche und Bezüge der Person.
 - Wertung: Benchmark prüft das nicht. Gut für Interaction und den Pitch ("Wanda kennt dich"). Nicht vor dem Freeze bauen.
+
+## Outdoor handover (Google/Apple Maps), parked 2026-10-25 03:40
+Jennifer's question: link the twin with the outside world. Kit buildings carry no address or coordinates, so a map embed is not feasible before the freeze.
+Cheap version (about 30 min, no API key): one address per building in a small file, a "Route to the building" button that opens Google or Apple Maps with that address, handover to our map at the entrance. Pitch line: inside Wanda knows every room, outside she hands over to Maps; next step entrances with coordinates for a door-to-machine route from the train station.
+Build only after the round and overlap merges and after both agree.
+Variant without Maps: a made-up surrounding in 3D (lawn around the footprint, a few trees, a path to each `outside` entrance, parking at the dock). About 1 to 2 h, only through the design session, after the merges; watch phone performance.
+
+## 14. Evakuierungsmodus an alle offenen Handys (Idee von Jennifer, 25.10.2026 früh)
+
+### Idee
+Der Facility Manager löst am Laptop "Evakuierung" aus (optional mit Gefahrenbereich, z. B. "Brand in Halle B"). Jedes Handy, auf dem die Seite für dieses Gebäude offen ist, wird in Echtzeit rot: Vibration, Wanda spricht, die Route zum nächsten Ausgang ab dem eigenen Standort startet automatisch und weicht dem Gefahrenbereich aus. Knopf "Ich bin draußen", der Laptop sieht "3 von 4 draußen".
+
+### Was heute schon da ist
+- `find_exit` (schnellster und zweiter Ausgang, nie Aufzug, fester Hinweis "folge den echten Schildern"), Notfall-Regeln im Prompt.
+- Sperrungen: der Gefahrenbereich ist eine Sperrung, Routen weichen aus.
+
+### Was gebaut werden müsste (ca. 2 bis 2,5 h)
+- Server: `POST /api/alert` und `GET /api/alert?key=` pro Gebäude (Zeitstempel, Gefahrenbereich).
+- Handy: alle 2 s nachfragen (Polling statt Push, läuft auch über den Tunnel), roter Vollbildhinweis, automatische Route zum Ausgang.
+- Laptop: Knopf mit Karte und Ja (wie jede Änderung), optional Rückmeldungen zählen.
+
+### Risiken und Haken
+- "Eingeloggt" heißt nur "Seite offen": keine Konten, kein Push bei gesperrtem Handy. Echte Benachrichtigung gehört auf die Roadmap.
+- Sicherheitsfunktion: muss zuverlässig sein, ein Fehlalarm in der Live-Demo ist schlimmer als keine Funktion.
+- Widerspricht "Nicht bauen: Mehrnutzer" in `docs/PLAN_SUNDAY.md`. Entscheidung Jennifer: erst muss alles andere sleek sein, dann eventuell.

@@ -118,6 +118,9 @@ class Session:
             "start_point": recorded.get("start_point") if recorded else None,
             "destination_point": recorded.get("destination_point") if recorded else None,
         }
+        planned = getattr(self.map, "planned_round", None)  # plan_round's stops, so the page can guide stop by stop
+        if planned and planned.get("route") is route:
+            self.route_request["round"] = planned["info"]
         self.route_version += 1
         return True
 
@@ -373,6 +376,43 @@ def route_view(
     return draw_route(session, start, destination, step_free, via, start_point, destination_point)
 
 
+def round_view(
+    session: Session,
+    what: str,
+    start: str | None,
+    area: str = "",
+    return_to_start: bool = False,
+    step_free: bool = False,
+) -> dict:
+    """The inspection round the page asks for, planned by the same plan_round the agent uses (same order and metres in
+    chat and panel), drawn as a page route that carries its stops (state.route.round). `area` is a floor ("Ground
+    floor", "Level 1", a floor name), the whole building ("", "all") or a room area plan_round understands."""
+    from building_agent.round_tools import plan_round  # imported here: keeps the web module light to import
+
+    bm = session.map
+    floor_level, said = None, area.strip()
+    folded = said.lower()
+    if folded in ("", "all", "building", "whole building"):
+        said = ""
+    elif folded == "ground floor":
+        floor_level, said = 0, ""
+    else:
+        for floor in bm.floors.values():
+            names = {(floor.get("name") or "").lower(), f"level {floor['level']}", f"floor {floor['level']}"}
+            if folded in names:
+                floor_level, said = floor["level"], ""
+                break
+    result = plan_round(bm, what, start, floor_level, said or None, return_to_start, step_free)
+    if result.get("needs_choice"):
+        return {"ok": False, **result}
+    info = bm.planned_round["info"]
+    stops = [stop["space_id"] for stop in info["stops"]]
+    via, destination = (stops, info["start"]) if return_to_start else (stops[:-1], stops[-1])
+    route = route_view(session, info["start"], destination, step_free, via)
+    session.route_request["round"] = info
+    return {"ok": True, **result, "info": info, "route": route}
+
+
 def draw_route(
     session: Session,
     start: str,
@@ -438,7 +478,7 @@ def current_route(session: Session) -> dict | None:
         return None
     request = session.route_request
     try:
-        return draw_route(
+        drawn = draw_route(
             session,
             request["start"],
             request["destination"],
@@ -447,6 +487,7 @@ def current_route(session: Session) -> dict | None:
             request.get("start_point"),
             request.get("destination_point"),
         )
+        return {**drawn, "round": request["round"]} if request.get("round") else drawn
     except MapError as error:
         return {"ok": False, "error": str(error), "message": readable_error(session.map, str(error)), **request}
 

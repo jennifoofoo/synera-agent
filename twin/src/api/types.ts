@@ -99,6 +99,16 @@ export interface Route {
   segments?: RouteSegment[];
   floor_changes?: FloorChange[];
   floors?: string[];
+  /** Set when the chat agent planned this route as an inspection round (plan_round): the stops in order. */
+  round?: AgentRound;
+}
+
+export interface AgentRound {
+  device_type: string;
+  start: string;
+  stops: { space_id: string; asset_ids: string[] }[];
+  return_to_start: boolean;
+  step_free?: boolean;
 }
 
 export interface Position {

@@ -28,6 +28,8 @@ import {
 import { normalizeSpeech, parseWake } from "./wake";
 import { placeAt, walkMinutes, walkNow } from "./walkInfo";
 import { ABOUT_THERE, walkWithMeDriving } from "./walkWithMe";
+import { inRound, roundDone, roundStatus } from "./round/round";
+import { notesCommand } from "./notes/notesStore";
 
 export type Command = "next" | "back" | "repeat" | "howFar" | "stop" | "where";
 
@@ -47,7 +49,7 @@ const LANG_PREF = "twin.handsFreeLang";
 export { parseWake };
 
 const COMMANDS: [Command, RegExp][] = [
-  ["next", /^(?:next(?: step)?|weiter|ok|okay|done|fertig|bin da|ich bin da|i'?m here|i am here|i'?m there|go on|continue)$/],
+  ["next", /^(?:next(?: step)?|weiter|ok|okay|done|checked|erledigt|fertig|bin da|ich bin da|i'?m here|i am here|i'?m there|go on|continue)$/],
   ["back", /^(?:back|go back|previous(?: step)?|zurück|zurueck)$/],
   ["repeat", /^(?:again|repeat(?: that)?|say (?:it|that) again|noch ?mal|wiederholen|wiederhole|wiederhol das)$/],
   ["howFar", /^(?:how far(?: is it)?(?: still)?(?: to go)?|how much further|wie weit(?: noch| ist es(?: noch)?)?)$/],
@@ -82,6 +84,10 @@ function runLocal(command: Command): void {
   const { steps, step, last, left } = walk;
   switch (command) {
     case "next":
+      if (last && inRound()) {
+        void roundDone().then(say); // inspection round: "done" checks the stop and walks on to the next one
+        return;
+      }
       if (last) {
         state.stopWalk();
         void state.clearRoute();
@@ -125,7 +131,27 @@ export async function handleUtterance(text: string): Promise<void> {
     return;
   }
   if (wake) text = wake.rest;
+  const notesReply = notesCommand(text); // "note: …", "problem: …", "what's here", "finished": saved and answered on the device
+  if (notesReply) {
+    setStatus("listening");
+    say(await notesReply);
+    followUpAfterSpeech();
+    return;
+  }
+  if (inRound() && /^(?:how many(?: stops)?(?: are)? left|which stop|wie viele(?: stationen)? noch)\b/i.test(text.trim())) {
+    setStatus("listening");
+    say(roundStatus().text);
+    followUpAfterSpeech();
+    return;
+  }
   const command = parseCommand(text);
+  if (command === "next" && inRound() && !walkNow()) {
+    // At a round stop without a step sheet (the stop is in the room you are in): "done" checks it and goes on.
+    setStatus("listening");
+    say(await roundDone());
+    followUpAfterSpeech();
+    return;
+  }
   if (command && (walkNow() || command === "stop")) {
     setStatus("listening");
     runLocal(command);
@@ -442,4 +468,9 @@ export function installHandsFree(): void {
     if (document.visibilityState === "hidden") halt();
     else start();
   });
+}
+
+if (typeof window !== "undefined") {
+  // For browser tests without a microphone: run a spoken sentence as if it was heard.
+  (window as unknown as { __handsFree: unknown }).__handsFree = { handleUtterance };
 }

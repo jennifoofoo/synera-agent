@@ -23,6 +23,7 @@ from building_agent.level4.tools import BMHolder, make_level4_tools
 from building_agent.position import EXACT_POSITION_NOTE, exact_start_point, no_position_error, position_note
 from building_agent.position_tools import distance_annotator, make_position_tools
 from building_agent.registry import Kind, load_kinds
+from building_agent.round_tools import make_round_tools
 from building_agent.selection_tools import make_selection_tools
 from building_agent.task_tools import make_task_tools
 from building_agent.walk import guide_conflict, remember_route
@@ -215,6 +216,7 @@ def make_tools(
         *make_position_tools(bm, guide),
         *make_exit_tools(bm, guide),
         *make_task_tools(bm, annotate),
+        *make_round_tools(bm, guide),
         *make_impact_tools(bm),
         *guide_tools,
         *knowledge_tools,
