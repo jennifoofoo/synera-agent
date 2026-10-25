@@ -25,6 +25,8 @@ import { useState } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { frameSize } from "./markerLayout";
+import { controlsRef } from "./FloorMesh";
+import { ZOOM_MARGIN } from "./labelRules";
 
 export type MapTier = "area" | "far" | "mid" | "near";
 
@@ -41,8 +43,8 @@ export const MIN_SHAPE_PX = 3.5;
  * gives the same tier on every device. */
 const AREA_MAX_PX = 480;
 /** Hysteresis: a bucket is only left once the scale is this far (in half octaves) past its edge, so a slight zoom
- * back and forth at a boundary never flickers. */
-const HYSTERESIS = 0.2;
+ * back and forth at a boundary never flickers: 15 % of zoom (labelRules.ts ZOOM_MARGIN, docs/specs/label-rules.md). */
+const HYSTERESIS = Math.log2(ZOOM_MARGIN) * BUCKETS_PER_OCTAVE;
 const HELD_FACTOR = Math.pow(2, HYSTERESIS / BUCKETS_PER_OCTAVE);
 
 /** The tier of a scale; `extentM` (the floor's larger side in metres) enables the outermost "area" tier. */
@@ -54,14 +56,16 @@ export function tierOf(metresPerPixel: number, extentM = 0): MapTier {
 
 const centre = new THREE.Vector3();
 
-function metresPerPixelOf(camera: THREE.Camera, canvasWidth: number, canvasHeight: number, focus: THREE.Vector3): number {
+/** Metres per screen pixel at the focus. In 3D at the orbit target's distance when there are controls, so panning
+ * (which moves the camera away from the floor's centre) never changes the zoom step (label-rules.md, rule 5). */
+export function metresPerPixelOf(camera: THREE.Camera, canvasWidth: number, canvasHeight: number, focus: THREE.Vector3): number {
   const [width, height] = frameSize(camera, canvasWidth, canvasHeight);
   if ((camera as THREE.OrthographicCamera).isOrthographicCamera) {
     const ortho = camera as THREE.OrthographicCamera;
     return (ortho.right - ortho.left) / ortho.zoom / Math.max(1, width);
   }
   const perspective = camera as THREE.PerspectiveCamera;
-  const distance = camera.position.distanceTo(focus);
+  const distance = controlsRef.current?.distance ?? camera.position.distanceTo(focus);
   return (2 * distance * Math.tan(THREE.MathUtils.degToRad(perspective.fov / 2))) / Math.max(1, height);
 }
 
