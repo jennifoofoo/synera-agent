@@ -1,0 +1,81 @@
+/* ===== Inspection round (owner: round session). Left column under the building name; one signal blue. */
+.round-toggle {
+  position: absolute; left: 12px; top: 56px; z-index: 3; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 4px 12px; border-radius: var(--radius-sm); background: var(--surface);
+  border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.round-toggle svg { color: var(--signal); }
+.round-toggle:hover { border-color: var(--signal); }
+
+.round-panel {
+  position: absolute; left: 12px; top: 56px; z-index: 4; width: 320px;
+  max-height: calc(100% - 56px - var(--bottom-inset, 0px) - 96px); overflow: auto;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-float);
+  font-size: 14px;
+}
+.round-head { display: flex; align-items: center; justify-content: space-between; }
+.round-head h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.round-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.round-fields label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.round-fields label:first-child { grid-column: 1 / -1; }
+.round-fields select { width: 100%; min-height: 32px; font-size: 13.5px; }
+.round-summary { margin: 0; font-size: 18px; font-variant-numeric: tabular-nums; }
+.round-summary strong { font-weight: 700; }
+.round-muted { color: var(--muted); font-size: 12.5px; }
+.round-note { margin: 0; font-size: 13px; color: var(--ink-2); }
+.round-error { color: var(--danger); }
+.round-done-note { margin: 0; padding: 6px 8px; border-radius: var(--radius-sm); background: var(--signal-soft); color: var(--signal-dark); font-weight: 600; font-size: 13px; }
+.round-wide { width: 100%; }
+.round-panel button.primary, .round-bar-done { background: var(--signal); border-color: var(--signal); color: #fff; }
+.round-panel button.primary:hover, .round-bar-done:hover { background: var(--signal-dark); border-color: var(--signal-dark); }
+
+.round-whatif {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center;
+  padding: 8px 10px; border-radius: var(--radius-sm); background: var(--signal-soft); border-left: 3px solid var(--signal);
+}
+.round-whatif strong { color: var(--signal-dark); font-size: 14.5px; }
+.round-whatif span { grid-column: 1; font-size: 12.5px; color: var(--ink-2); }
+.round-whatif button { grid-column: 2; grid-row: 1 / span 2; }
+
+.round-stops { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.round-stops li { border-bottom: 1px solid var(--line); }
+.round-stops .round-start { display: flex; gap: 10px; align-items: center; padding: 7px 4px; color: var(--muted); font-size: 13px; }
+.round-stop {
+  display: flex; gap: 10px; align-items: baseline; width: 100%; min-height: 36px; padding: 7px 4px;
+  border: 0; border-radius: 0; background: transparent; color: var(--text); text-align: left; font-size: 13.5px;
+}
+.round-stop:hover { background: var(--paper-2); }
+.round-stop-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.round-num {
+  flex: none; width: 20px; height: 20px; display: inline-grid; place-items: center; border-radius: 50%;
+  background: var(--signal); color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.round-start .round-num { background: transparent; color: var(--signal); font-size: 14px; }
+.round-stops li.done .round-num { background: var(--signal-soft); color: var(--signal-dark); }
+.round-stops li.done .round-stop-name { color: var(--muted); text-decoration: line-through; }
+.round-actions { display: flex; gap: 8px; }
+.round-actions button { flex: 1; min-height: 36px; }
+.round-suggest { align-self: flex-start; text-align: left; }
+
+/* On top of the step sheet while walking a round */
+.round-bar {
+  display: flex; align-items: center; gap: 8px; margin: -2px 0 8px; padding: 6px 8px 6px 10px;
+  border-radius: var(--radius-sm); background: var(--signal-soft); color: var(--signal-dark); font-size: 13.5px;
+}
+.round-bar-text { flex: 1; min-width: 0; line-height: 1.3; }
+.round-bar-done { min-height: 32px; padding: 4px 16px; font-weight: 600; }
+.worker .round-bar-done { min-height: 44px; min-width: 64px; }
+.worker .round-bar-exit { min-height: 44px; }
+
+/* Phones: full width under the top bar, above the dock */
+/* Phones: compact, under the top bar, the map stays visible (the stops are numbered on the map and walked one by one) */
+/* left of the centred building name: an icon-only 44 px button (the changes pill sits under it) */
+.app.worker .round-toggle { top: 8px; left: 8px; width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; font-size: 0; }
+.app.worker .round-toggle svg { width: 20px; height: 20px; }
+.app.worker .round-panel {
+  left: 10px; right: 10px; width: auto; top: 60px; gap: 8px; padding: 10px 12px 12px;
+  max-height: min(52vh, calc(var(--vvh, 100dvh) - 60px - var(--dock-h, 90px) - var(--safe-b, 0px) - 16px));
+}
+.app.worker .round-stops { display: none; }
+.app.worker .round-actions button { min-height: 44px; }

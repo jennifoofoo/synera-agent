@@ -13,8 +13,10 @@ import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
 import { Labels } from "./Labels";
 import { Markers } from "./Markers";
+import { FactPins } from "./FactPins";
 import { OpeningMarks } from "./OpeningMarks";
 import { RouteLine } from "./RouteLine";
+import { RoundMarks } from "./RoundMarks";
 import { FloorOutline, floorLayout, floorRoles, routeFloorIds } from "./floorVisibility";
 import { Things } from "./Things";
 
@@ -81,6 +83,8 @@ function Building({ model }: { model: BuildingModel }) {
         flat={flat}
       />
       <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
+      <RoundMarks floorY={floorY} visibleFloors={visibleFloors} reducedMotion={reducedMotion} />
+      <FactPins model={model} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
     </group>
   );
