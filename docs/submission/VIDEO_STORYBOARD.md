@@ -45,11 +45,11 @@ Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recor
 | 0:00–0:03 | F | Close-up: Gisela's gloved hand on a fire extinguisher bracket in a corridor, dim. Cut to black on the last word. | VO: "Every building has one person who knows it by heart." | – | **Hook** (see §2) |
 | 0:03–0:06 | F | Black, white text appears. | VO: "Last spring, that person retired." | "Last spring, that person retired." | Turn the hook into a loss |
 | 0:06–0:13 | F | Slow push-in on Gisela on floor 3 at the Main Stairs, iPhone in hand, looking down a corridor full of doors. | VO: "By 2036, 12.9 million people in Germany reach retirement age." | "12.9 million people reach retirement age by 2036 (Destatis, via dbb magazin 9/2024)" | The one sourced number |
-| 0:13–0:19 | F | Gisela in front of extinguisher 3.02 in the Third Floor Corridor, reads the inspection tag, looks around: nobody to ask. | VO: "What they knew was never written down. Which extinguisher has the loose bracket." | – | Knowledge lives in heads |
+| 0:13–0:19 | F | Gisela in front of extinguisher 3.02 in the Third Floor Corridor, reads the inspection tag, looks around: nobody to ask. | VO: "Gisela is new here. Nobody told her which bracket is loose." | "Gisela, service technician, new on this site" | Introduce Gisela + the concrete gap (sets up the payoff at 1:01) |
 | 0:19–0:28 | F | Gisela at a closed door, turns back, scrolls an old photo gallery looking for "that bracket". One big number builds over the picture: **42 %**. | VO: "Forty-two percent of a company's knowledge sits with one single person. When that person leaves, the money walks out with them." | "42 % of company knowledge sits with one person (Panopto / YouGov 2018)" | **Business case**: lost knowledge is money |
-| 0:28–0:35 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Software knows what. Tracking knows roughly where. Nobody guides you, and nobody keeps what you learned." | "Knows what. Knows roughly where. Nobody guides you. Nobody remembers." | Positioning = the gap |
-| 0:35–0:38 | F | Logo card. | VO: "This is Wanda." | "Wanda – the building that talks back" | Product name |
-| 0:38–0:48 | F (laptop recording, slight zoom) | Laptop, 3D twin of the Urban Colab. Gisela clicks **Round**: fire extinguisher, Floor 3, taps the Main Stairs. Panel: "[N] stops · [X] m · about 2 min", stops in order, route drawn on floor 3. | VO: "Gisela plans her round on the laptop: the shortest order, computed on the building's own plans." | "The shortest round, computed" | Laptop: planning |
+| 0:28–0:35 | F | Still of Gisela in the corridor, text builds line by line. | VO: "Today's tools list what to check. None of them walks you there. None remembers what you found." | "Lists what to check. Doesn't walk you there. Doesn't remember." | Positioning: existing tools stop at the list |
+| 0:35–0:41 | F | Logo card, then cut to the phone: 2D map with the blue route line and the Wanda orb, just like a maps app. | VO: "Meet Wanda: Google Maps for the inside of your building." | "Wanda – the building that talks back" | Product name + the easy angle |
+| 0:41–0:48 | F (laptop recording, slight zoom) | Laptop, 3D twin of the Urban Colab. Gisela clicks **Round**: fire extinguisher, Floor 3, taps the Main Stairs. Panel: "[N] stops · [X] m · about 2 min", stops in order, route drawn on floor 3. | VO: "She plans her round on the laptop. Then she just talks to it, like to a colleague." | "The shortest round, computed" | Laptop: planning |
 | 0:48–0:53 | L\|R | L: Gisela steps out of the Main Stairs, taps the Wanda orb, speaks. R: orb listening, then route + "Stop 1 of [N]". | Gisela: "Wanda, fire extinguisher round, third floor. I start at the main stairs. Guide me." Wanda answers (real app audio, keep or duck). | "She talks. Hands stay free." | Voice start |
 | 0:53–0:57 | L\|R | L: Open Office East, she checks extinguisher 3.03. R: dot at the device. | Gisela (taps the orb): "Done." | "Stop 1 of [N]" | Stop 1 |
 | 0:57–1:01 | L\|R | L: walking into the Third Floor Corridor. R: route line moves, step sheet. | Gisela (taps the orb): "How many stops left?" Wanda answers (real audio). | – | She keeps talking to it |
@@ -59,7 +59,7 @@ Shot: **F** = full frame, **L|R** = split screen (left camera, right phone recor
 | 1:16–1:24 | L\|R | L: last stop, extinguisher 3.05 in the West Wing Corridor; cracked hose. She taps **Notes → Add photo**, the camera opens, she takes the photo, taps the text field's mic and **dictates**. R: photo preview, text appears, **Save note**, pin with photo on the map. | Gisela (dictating): "Hose is cracked, replace next week." | "Photo + note, pinned to this extinguisher" | **Photo**: she leaves knowledge |
 | 1:24–1:28 | L\|R | L: lowers the phone. R: job report: [N] of [N] stops, metres walked, 1 note with photo, "read during the round: Night shift". | Gisela (taps the orb): "Finished." Wanda: "Round finished: [N] of [N] stops checked. …" (real audio) | "Job report, written for her" | Documentation without typing |
 | 1:28–1:37 | F (laptop recording) | Laptop: click the West Wing Corridor → room card → **Knowledge**. Ego graph: room in the centre, extinguisher 3.05, Gisela's note with photo, her name as a person node. Drag the **time slider** back: the night shift's note on 3.02 (Third Floor Corridor graph) appears and disappears in time. | VO: "Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays, even when people retire." | "Knowledge graph: who · where · when. The know-how stays a company asset." | **Knowledge graph** |
-| 1:37–1:46 | F (diagram, `architecture.html`) | voice → Wanda (Claude picks a tool) → deterministic tools → building graph → facts back. | VO: "Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks." | "Facts from code. Language from the model." | Trust 1 |
+| 1:37–1:46 | F (diagram, `architecture.html`) | voice → Wanda (Claude picks a tool) → deterministic tools → building graph → facts back. | VO: "Behind the easy talk, every fact comes from code: routes, rounds, doors. The AI only listens and speaks." | "Facts from code. Language from the model." | Trust 1 |
 | 1:46–1:50 | F | Benchmark answers scrolling past in the terminal (no number on screen). | VO: "Every answer is computed, so every answer can be checked." | "Computed, not guessed" | Trust 2 |
 | 1:50–1:56 | F | Floor-3 evacuation plan photo on the wall → crossfade → 2D map → 3D twin. | VO: "It works on any building, even from the evacuation plan on the wall." | "This building, read from its evacuation plans" | Trust 3: Level 4 |
 | 1:56–2:00 | F | Map full of note pins with photo thumbnails, Wanda orb glows, logo + team names. | VO: "The knowledge stays in the building." | "Wanda – the building that talks back · Built today, ready for the 6G building." | **Last line** |
@@ -71,8 +71,8 @@ Gisela talks to the phone **six times** (start, done, how many left, done, dicta
 | Block | Time | Length |
 |---|---|---|
 | Hook + problem + business case | 0:00–0:35 | 35 s |
-| Product name | 0:35–0:38 | 3 s |
-| Laptop planning | 0:38–0:48 | 10 s |
+| Product name + "Google Maps for inside" | 0:35–0:41 | 6 s |
+| Laptop planning + "talk like to a colleague" | 0:41–0:48 | 7 s |
 | Split-screen round (voice, night-shift note with photo, her photo note, report) | 0:48–1:28 | 40 s |
 | Knowledge graph (laptop) | 1:28–1:37 | 9 s |
 | Why you can trust it | 1:37–1:56 | 19 s |
@@ -97,7 +97,7 @@ VO-first: the real lengths come from `make_vo.py` (§6); if a line runs over, sh
 | Facts with time: valid from/to, "fixed" supersedes, nothing deleted | main | implied by the time slider | Q&A |
 | Timed closure by voice ("Lift out of order until tomorrow") → card → clear yes → reroute, reopens by itself | main (via Wanda's chat) | – | live pitch |
 | What-if door on the round: "Round X m shorter (before → after m)" | main | – | live pitch, engineers |
-| 3D twin, floors stacked | main | 0:38 background, 1:50 | – |
+| 3D twin, floors stacked | main | 0:41 background, 1:50 | – |
 | Level 4: building from evacuation-plan photos | main (floor 3 from OG3 photos on `feat/mucl-all-floors`) | 1:50 | – |
 | Walk with me: step counting moves an estimated dot, no GPS | main | – | Q&A, 6G roadmap line |
 | 145 benchmark answers by code | main | 1:46 | – |
@@ -274,13 +274,13 @@ Source of truth: `docs/submission/video/vo_lines.json` (the test keeps it equal 
 | S01 | 0:00–0:03 | 3 s | Every building has one person who knows it by heart. |
 | S02 | 0:03–0:06 | 3 s | Last spring, that person retired. |
 | S03 | 0:06–0:13 | 7 s | By 2036, 12.9 million people in Germany reach retirement age. |
-| S04 | 0:13–0:19 | 6 s | What they knew was never written down. Which extinguisher has the loose bracket. |
+| S04 | 0:13–0:19 | 6 s | Gisela is new here. Nobody told her which bracket is loose. |
 | S05 | 0:19–0:28 | 9 s | Forty-two percent of a company's knowledge sits with one single person. When that person leaves, the money walks out with them. |
-| S06 | 0:28–0:35 | 7 s | Software knows what. Tracking knows roughly where. Nobody guides you, and nobody keeps what you learned. |
-| S07 | 0:35–0:38 | 3 s | This is Wanda. |
-| S08 | 0:38–0:48 | 10 s | Gisela plans her round on the laptop: the shortest order, computed on the building's own plans. |
+| S06 | 0:28–0:35 | 7 s | Today's tools list what to check. None of them walks you there. None remembers what you found. |
+| S07 | 0:35–0:41 | 6 s | Meet Wanda: Google Maps for the inside of your building. |
+| S08 | 0:41–0:48 | 7 s | She plans her round on the laptop. Then she just talks to it, like to a colleague. |
 | S09 | 1:28–1:37 | 9 s | Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays, even when people retire. |
-| S10 | 1:37–1:46 | 9 s | Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks. |
+| S10 | 1:37–1:46 | 9 s | Behind the easy talk, every fact comes from code: routes, rounds, doors. The AI only listens and speaks. |
 | S11 | 1:46–1:50 | 4 s | Every answer is computed, so every answer can be checked. |
 | S12 | 1:50–1:56 | 6 s | It works on any building, even from the evacuation plan on the wall. |
 | S13 | 1:56–2:00 | 4 s | The knowledge stays in the building. |
@@ -293,12 +293,12 @@ Needs: the page running locally with the floor-3 building (`feat/mucl-all-floors
 
 | # | Slot | What is recorded | Note |
 |---|---|---|---|
-| P1 | 0:38–0:48 | Laptop planning: 3D twin → **Round** → fire extinguisher, Floor 3, tap Main Stairs → panel with the round, route drawn | slow scripted mouse moves |
+| P1 | 0:41–0:48 | Laptop planning: 3D twin → **Round** → fire extinguisher, Floor 3, tap Main Stairs → panel with the round, route drawn | slow scripted mouse moves |
 | P2 | 1:28–1:37 | **Knowledge graph**: West Wing Corridor → room card → Knowledge (Gisela's note with photo), Third Floor Corridor → Knowledge, drag the time slider | record **after** the shoot, so her real note and photo are there |
 | P3 | 1:37–1:50 | `docs/submission/video/architecture.html`: the diagram only (cut before the 145 card), then benchmark answers scrolling in a terminal | already built; Playwright presses Space and records |
 | P4 | 1:50–1:56 | Floor-3 2D map, then the 3D twin, same angle | the plan photo itself is a file (`demo/plans/urban-colab/photos/OG3-04_floor3_east.jpeg`); crossfade in CapCut |
 | P5 | 1:56–2:00 | End shot: map with the "Notes & photos" layer on, pins with photo thumbnails | after the shoot |
-| P6 | 0:35–0:38 and end card | Logo card "Wanda – the building that talks back" | a static HTML card or CapCut text, no recording |
+| P6 | 0:35–0:41 and end card | Logo card "Wanda – the building that talks back", then 3 s of the phone view (390×844): 2D map, blue route line, Wanda orb (or a clip from the iPhone recording F7) | a static HTML card or CapCut text, no recording |
 | P7 | fallback only | Phone view (390×844) of the round, driven by injected commands (`window.__handsFree.handleUtterance`) | only if the iPhone recording fails; it has no sound and is not "real hands" |
 
 ### C. You film yourselves (camera + the real iPhone)
