@@ -1,2228 +1,2661 @@
 {
- "building": {
-  "id": "plan-89323a15",
-  "name": "Munich Urban Colab",
-  "source": "plan_upload",
-  "source_ref": {
-   "floor_offsets_m": {
-    "1": [
-     -17.631,
-     3.997
-    ]
-   },
-   "floors_aligned": true
-  },
-  "license": "",
-  "attribution": "Built from uploaded floor plans",
-  "split": "user",
-  "units": "m"
- },
- "floors": [
-  {
-   "id": "plan-89323a15-F0",
-   "level": 0,
-   "name": "Ground floor",
-   "elevation_m": 0.0,
-   "height_m": 3.0
-  },
-  {
-   "id": "plan-89323a15-F1",
-   "level": 1,
-   "name": "Floor 1",
-   "elevation_m": 3.0,
-   "height_m": 3.0
-  }
- ],
- "spaces": [
-  {
-   "id": "plan-89323a15-F0-S001",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Projektraum West",
-   "ref": null,
-   "polygon": [
-    [
-     0.859,
-     32.202
-    ],
-    [
-     6.583,
-     32.202
-    ],
-    [
-     6.583,
-     22.899
-    ],
-    [
-     0.859,
-     22.899
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S002",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Project Room",
-   "ref": null,
-   "polygon": [
-    [
-     10.648,
-     32.202
-    ],
-    [
-     23.7,
-     32.202
-    ],
-    [
-     23.7,
-     21.181
-    ],
-    [
-     10.648,
-     21.468
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S003",
-   "floor_id": "plan-89323a15-F0",
-   "type": "corridor",
-   "room_type": "corridor",
-   "name": "Flur West",
-   "ref": null,
-   "polygon": [
-    [
-     6.641,
-     32.202
-    ],
-    [
-     10.648,
-     32.202
-    ],
-    [
-     10.648,
-     21.468
-    ],
-    [
-     9.16,
-     21.468
-    ],
-    [
-     9.16,
-     17.46
-    ],
-    [
-     6.641,
-     17.46
-    ],
-    [
-     6.641,
-     22.899
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S004",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Umkleide",
-   "ref": null,
-   "polygon": [
-    [
-     1.145,
-     22.756
-    ],
-    [
-     4.351,
-     22.756
-    ],
-    [
-     4.351,
-     17.604
-    ],
-    [
-     1.145,
-     17.604
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S005",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "EDV",
-   "ref": null,
-   "polygon": [
-    [
-     4.437,
-     20.752
-    ],
-    [
-     6.526,
-     20.752
-    ],
-    [
-     6.526,
-     17.604
-    ],
-    [
-     4.437,
-     17.604
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S006",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "ELT-Verteiler",
-   "ref": null,
-   "polygon": [
-    [
-     3.721,
-     22.756
-    ],
-    [
-     6.526,
-     22.756
-    ],
-    [
-     6.526,
-     20.752
-    ],
-    [
-     3.721,
-     20.752
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S007",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Lager",
-   "ref": null,
-   "polygon": [
-    [
-     13.31,
-     21.181
-    ],
-    [
-     17.174,
-     21.181
-    ],
-    [
-     17.174,
-     17.317
-    ],
-    [
-     13.31,
-     17.317
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S008",
-   "floor_id": "plan-89323a15-F0",
-   "type": "lift",
-   "room_type": "lift",
-   "name": "Lift",
-   "ref": null,
-   "polygon": [
-    [
-     9.875,
-     21.038
-    ],
-    [
-     12.594,
-     21.038
-    ],
-    [
-     12.594,
-     17.46
-    ],
-    [
-     9.875,
-     17.46
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S009",
-   "floor_id": "plan-89323a15-F0",
-   "type": "corridor",
-   "room_type": "corridor",
-   "name": "Flur Süd",
-   "ref": null,
-   "polygon": [
-    [
-     0.572,
-     17.46
-    ],
-    [
-     13.31,
-     17.317
-    ],
-    [
-     17.747,
-     20.609
-    ],
-    [
-     23.471,
-     21.038
-    ],
-    [
-     23.471,
-     17.747
-    ],
-    [
-     19.75,
-     17.747
-    ],
-    [
-     19.607,
-     12.165
-    ],
-    [
-     21.325,
-     9.16
-    ],
-    [
-     21.325,
-     5.009
-    ],
-    [
-     8.587,
-     5.152
-    ],
-    [
-     8.587,
-     11.736
-    ],
-    [
-     0.572,
-     12.022
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S010",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Lager",
-   "ref": null,
-   "polygon": [
-    [
-     15.743,
-     12.022
-    ],
-    [
-     22.04,
-     12.022
-    ],
-    [
-     22.04,
-     7.013
-    ],
-    [
-     15.743,
-     7.156
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S011",
-   "floor_id": "plan-89323a15-F0",
-   "type": "stair",
-   "room_type": "stairwell",
-   "name": "Treppe Mitte",
-   "ref": null,
-   "polygon": [
-    [
-     0.515,
-     14.884
-    ],
-    [
-     9.016,
-     14.884
-    ],
-    [
-     9.016,
-     11.879
-    ],
-    [
-     0.515,
-     11.879
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S012",
-   "floor_id": "plan-89323a15-F0",
-   "type": "hall",
-   "room_type": "lobby",
-   "name": "Foyer",
-   "ref": null,
-   "polygon": [
-    [
-     23.758,
-     24.616
-    ],
-    [
-     37.211,
-     24.616
-    ],
-    [
-     37.211,
-     16.888
-    ],
-    [
-     36.924,
-     4.866
-    ],
-    [
-     21.325,
-     5.009
-    ],
-    [
-     19.75,
-     12.022
-    ],
-    [
-     19.75,
-     17.747
-    ],
-    [
-     23.758,
-     17.747
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S013",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "hall",
-   "name": "Auditorium (Arena)",
-   "ref": null,
-   "polygon": [
-    [
-     23.901,
-     24.616
-    ],
-    [
-     37.211,
-     24.616
-    ],
-    [
-     37.211,
-     20.609
-    ],
-    [
-     23.901,
-     20.609
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S014",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Café (Gastraum)",
-   "ref": null,
-   "polygon": [
-    [
-     37.211,
-     16.745
-    ],
-    [
-     47.515,
-     16.745
-    ],
-    [
-     47.515,
-     4.294
-    ],
-    [
-     36.924,
-     4.866
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S015",
-   "floor_id": "plan-89323a15-F0",
-   "type": "corridor",
-   "room_type": "corridor",
-   "name": "Flur Nord",
-   "ref": null,
-   "polygon": [
-    [
-     23.901,
-     28.481
-    ],
-    [
-     40.359,
-     28.91
-    ],
-    [
-     42.649,
-     32.202
-    ],
-    [
-     46.084,
-     28.91
-    ],
-    [
-     46.37,
-     25.189
-    ],
-    [
-     42.935,
-     25.189
-    ],
-    [
-     42.935,
-     27.192
-    ],
-    [
-     40.359,
-     27.192
-    ],
-    [
-     23.901,
-     27.336
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S016",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Büro",
-   "ref": null,
-   "polygon": [
-    [
-     29.339,
-     32.058
-    ],
-    [
-     32.058,
-     32.058
-    ],
-    [
-     32.058,
-     28.91
-    ],
-    [
-     29.339,
-     28.91
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S017",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Lager",
-   "ref": null,
-   "polygon": [
-    [
-     32.116,
-     32.202
-    ],
-    [
-     35.923,
-     32.202
-    ],
-    [
-     35.923,
-     29.053
-    ],
-    [
-     32.116,
-     29.053
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S018",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Müll",
-   "ref": null,
-   "polygon": [
-    [
-     36.066,
-     32.345
-    ],
-    [
-     38.785,
-     32.345
-    ],
-    [
-     38.785,
-     29.053
-    ],
-    [
-     36.066,
-     29.053
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S019",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Umkleide",
-   "ref": null,
-   "polygon": [
-    [
-     33.919,
-     27.192
-    ],
-    [
-     37.354,
-     27.192
-    ],
-    [
-     37.354,
-     24.759
-    ],
-    [
-     33.919,
-     24.759
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S020",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "WC",
-   "ref": null,
-   "polygon": [
-    [
-     37.64,
-     27.192
-    ],
-    [
-     42.935,
-     27.192
-    ],
-    [
-     42.935,
-     22.04
-    ],
-    [
-     37.64,
-     22.04
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S021",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "WC",
-   "ref": null,
-   "polygon": [
-    [
-     40.302,
-     23.471
-    ],
-    [
-     42.935,
-     23.471
-    ],
-    [
-     42.935,
-     20.323
-    ],
-    [
-     40.302,
-     20.323
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S022",
-   "floor_id": "plan-89323a15-F0",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "WC",
-   "ref": null,
-   "polygon": [
-    [
-     37.497,
-     21.754
-    ],
-    [
-     42.935,
-     20.18
-    ],
-    [
-     42.935,
-     17.031
-    ],
-    [
-     37.497,
-     17.031
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-S023",
-   "floor_id": "plan-89323a15-F0",
-   "type": "corridor",
-   "room_type": "corridor",
-   "name": "Flur Ost",
-   "ref": null,
-   "polygon": [
-    [
-     42.935,
-     26.334
-    ],
-    [
-     44.653,
-     26.334
-    ],
-    [
-     44.653,
-     16.888
-    ],
-    [
-     42.935,
-     17.031
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S001",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Arbeitsbereich",
-   "ref": null,
-   "polygon": [
-    [
-     -17.0,
-     33.017
-    ],
-    [
-     -6.748,
-     33.017
-    ],
-    [
-     -6.748,
-     21.188
-    ],
-    [
-     -13.53,
-     21.188
-    ],
-    [
-     -13.53,
-     18.034
-    ],
-    [
-     -17.0,
-     18.034
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S002",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Seminar Rooms 1-3",
-   "ref": null,
-   "polygon": [
-    [
-     -6.433,
-     32.386
-    ],
-    [
-     22.587,
-     32.071
-    ],
-    [
-     22.587,
-     21.346
-    ],
-    [
-     17.067,
-     21.346
-    ],
-    [
-     13.913,
-     21.504
-    ],
-    [
-     10.127,
-     21.504
-    ],
-    [
-     3.819,
-     21.661
-    ],
-    [
-     1.295,
-     21.031
-    ],
-    [
-     -6.433,
-     21.031
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S003",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Putzraum",
-   "ref": null,
-   "polygon": [
-    [
-     -13.373,
-     21.188
-    ],
-    [
-     -9.587,
-     21.188
-    ],
-    [
-     -9.587,
-     17.876
-    ],
-    [
-     -13.373,
-     17.876
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S004",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "EDV",
-   "ref": null,
-   "polygon": [
-    [
-     -9.43,
-     21.094
-    ],
-    [
-     -6.748,
-     21.094
-    ],
-    [
-     -6.748,
-     17.876
-    ],
-    [
-     -9.43,
-     17.876
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S005",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "WC",
-   "ref": null,
-   "polygon": [
-    [
-     -6.591,
-     21.031
-    ],
-    [
-     -0.282,
-     21.031
-    ],
-    [
-     -0.282,
-     17.718
-    ],
-    [
-     -6.591,
-     17.718
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S006",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "WC",
-   "ref": null,
-   "polygon": [
-    [
-     3.819,
-     21.661
-    ],
-    [
-     9.181,
-     21.661
-    ],
-    [
-     9.181,
-     17.561
-    ],
-    [
-     3.819,
-     17.561
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S007",
-   "floor_id": "plan-89323a15-F1",
-   "type": "lift",
-   "room_type": "lift",
-   "name": "Lift",
-   "ref": null,
-   "polygon": [
-    [
-     10.285,
-     20.557
-    ],
-    [
-     12.809,
-     20.557
-    ],
-    [
-     12.809,
-     17.561
-    ],
-    [
-     10.285,
-     17.561
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S008",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Lager",
-   "ref": null,
-   "polygon": [
-    [
-     17.162,
-     21.346
-    ],
-    [
-     22.429,
-     21.346
-    ],
-    [
-     22.429,
-     17.245
-    ],
-    [
-     17.162,
-     17.245
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S009",
-   "floor_id": "plan-89323a15-F1",
-   "type": "corridor",
-   "room_type": "corridor",
-   "name": "Flur 1. OG",
-   "ref": null,
-   "polygon": [
-    [
-     -17.0,
-     17.876
-    ],
-    [
-     -9.43,
-     17.876
-    ],
-    [
-     -0.282,
-     20.715
-    ],
-    [
-     3.819,
-     20.715
-    ],
-    [
-     3.819,
-     17.561
-    ],
-    [
-     13.913,
-     17.245
-    ],
-    [
-     17.067,
-     20.715
-    ],
-    [
-     17.067,
-     17.561
-    ],
-    [
-     29.684,
-     17.403
-    ],
-    [
-     29.684,
-     14.406
-    ],
-    [
-     13.913,
-     12.514
-    ],
-    [
-     13.282,
-     5.259
-    ],
-    [
-     -9.43,
-     5.416
-    ],
-    [
-     -9.43,
-     15.037
-    ],
-    [
-     -17.0,
-     15.195
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S010",
-   "floor_id": "plan-89323a15-F1",
-   "type": "stair",
-   "room_type": "stairwell",
-   "name": "Treppe West",
-   "ref": null,
-   "polygon": [
-    [
-     -8.641,
-     31.282
-    ],
-    [
-     -6.748,
-     31.282
-    ],
-    [
-     -6.748,
-     21.346
-    ],
-    [
-     -8.641,
-     21.346
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S011",
-   "floor_id": "plan-89323a15-F1",
-   "type": "stair",
-   "room_type": "stairwell",
-   "name": "Treppe Mitte",
-   "ref": null,
-   "polygon": [
-    [
-     0.191,
-     14.88
-    ],
-    [
-     9.339,
-     14.88
-    ],
-    [
-     9.339,
-     11.883
-    ],
-    [
-     0.191,
-     11.883
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S012",
-   "floor_id": "plan-89323a15-F1",
-   "type": "outdoor",
-   "room_type": "generic_room",
-   "name": "Terrasse",
-   "ref": null,
-   "polygon": [
-    [
-     -5.171,
-     11.725
-    ],
-    [
-     9.023,
-     11.725
-    ],
-    [
-     9.023,
-     5.101
-    ],
-    [
-     -5.171,
-     5.101
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S013",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "CAD-Center",
-   "ref": null,
-   "polygon": [
-    [
-     -17.0,
-     15.037
-    ],
-    [
-     -9.587,
-     15.037
-    ],
-    [
-     -9.587,
-     5.416
-    ],
-    [
-     -17.0,
-     5.416
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S014",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "outdoor",
-   "name": "Luftraum",
-   "ref": null,
-   "polygon": [
-    [
-     -5.329,
-     15.037
-    ],
-    [
-     -1.323,
-     15.037
-    ],
-    [
-     -1.323,
-     11.883
-    ],
-    [
-     -5.329,
-     11.883
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S015",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Teeküche",
-   "ref": null,
-   "polygon": [
-    [
-     13.597,
-     12.514
-    ],
-    [
-     16.184,
-     12.514
-    ],
-    [
-     16.184,
-     8.729
-    ],
-    [
-     13.597,
-     8.729
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S016",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Living Lab Einzelhandel",
-   "ref": null,
-   "polygon": [
-    [
-     16.278,
-     12.356
-    ],
-    [
-     22.366,
-     12.356
-    ],
-    [
-     22.366,
-     6.678
-    ],
-    [
-     16.278,
-     6.678
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S017",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "outdoor",
-   "name": "Luftraum",
-   "ref": null,
-   "polygon": [
-    [
-     24.164,
-     14.406
-    ],
-    [
-     29.684,
-     14.406
-    ],
-    [
-     29.684,
-     5.101
-    ],
-    [
-     24.164,
-     5.101
-    ]
-   ],
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-S018",
-   "floor_id": "plan-89323a15-F1",
-   "type": "room",
-   "room_type": "generic_room",
-   "name": "Auditorium upper rows",
-   "ref": null,
-   "polygon": [
-    [
-     22.745,
-     32.071
-    ],
-    [
-     30.0,
-     28.916
-    ],
-    [
-     30.0,
-     17.561
-    ],
-    [
-     22.745,
-     17.561
-    ]
-   ],
-   "synthetic": false
-  }
- ],
- "openings": [
-  {
-   "id": "plan-89323a15-F0-O0001",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S005",
-    "plan-89323a15-F0-S006"
-   ],
-   "kind": "opening",
-   "position": [
-    5.82,
-    20.752
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0002",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S005",
-    "plan-89323a15-F0-S006"
-   ],
-   "kind": "opening",
-   "position": [
-    4.977,
-    20.752
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0003",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S005",
-    "plan-89323a15-F0-S006"
-   ],
-   "kind": "opening",
-   "position": [
-    5.677,
-    20.752
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0004",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S005",
-    "plan-89323a15-F0-S006"
-   ],
-   "kind": "opening",
-   "position": [
-    4.867,
-    20.752
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0005",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S005",
-    "plan-89323a15-F0-S004"
-   ],
-   "kind": "opening",
-   "position": [
-    4.394,
-    20.156
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0006",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S011",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "opening",
-   "position": [
-    0.544,
-    14.74
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0007",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S011",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "opening",
-   "position": [
-    0.544,
-    13.849
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0008",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S011",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "opening",
-   "position": [
-    0.544,
-    13.112
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0009",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S011",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "opening",
-   "position": [
-    0.544,
-    12.762
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0010",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S011",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "opening",
-   "position": [
-    0.544,
-    12.537
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0011",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    37.029,
-    9.222
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0012",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    37.023,
-    8.993
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0013",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    37.022,
-    8.932
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0014",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    37.012,
-    8.516
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0015",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    37.01,
-    8.454
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0016",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    37.002,
-    8.095
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0017",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S014",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "opening",
-   "position": [
-    36.995,
-    7.789
-   ],
-   "width_m": 2.0,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0018",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S003",
-    "plan-89323a15-F0-S001"
-   ],
-   "kind": "door",
-   "position": [
-    6.612,
-    25.475
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0019",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S007",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "door",
-   "position": [
-    13.581,
-    17.396
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0020",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S010",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "door",
-   "position": [
-    19.566,
-    12.065
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0021",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S009",
-    "outside"
-   ],
-   "kind": "entrance",
-   "position": [
-    17.173,
-    5.056
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0022",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S003",
-    "outside"
-   ],
-   "kind": "entrance",
-   "position": [
-    8.015,
-    32.202
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0023",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S015",
-    "plan-89323a15-F0-S016"
-   ],
-   "kind": "door",
-   "position": [
-    30.784,
-    28.785
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0024",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S015",
-    "plan-89323a15-F0-S017"
-   ],
-   "kind": "door",
-   "position": [
-    35.218,
-    28.914
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O0025",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S023",
-    "plan-89323a15-F0-S020"
-   ],
-   "kind": "door",
-   "position": [
-    42.935,
-    24.33
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O0001",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S009",
-    "plan-89323a15-F1-S002"
-   ],
-   "kind": "door",
-   "position": [
-    1.564,
-    20.901
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O0002",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S009",
-    "plan-89323a15-F1-S008"
-   ],
-   "kind": "door",
-   "position": [
-    22.349,
-    17.496
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new28",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S002",
-    "plan-89323a15-F0-S003"
-   ],
-   "kind": "door",
-   "position": [
-    10.648,
-    32.202
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new29",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S004",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "door",
-   "position": [
-    1.144,
-    17.529
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new30",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S006",
-    "plan-89323a15-F0-S003"
-   ],
-   "kind": "door",
-   "position": [
-    6.583,
-    22.756
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new31",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S008",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "door",
-   "position": [
-    9.874,
-    17.408
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new32",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S012",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "door",
-   "position": [
-    21.325,
-    5.009
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new33",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S013",
-    "plan-89323a15-F0-S012"
-   ],
-   "kind": "door",
-   "position": [
-    23.901,
-    24.616
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new34",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S015",
-    "plan-89323a15-F0-S023"
-   ],
-   "kind": "door",
-   "position": [
-    42.935,
-    26.334
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new35",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S018",
-    "plan-89323a15-F0-S015"
-   ],
-   "kind": "door",
-   "position": [
-    38.787,
-    28.961
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new36",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S019",
-    "plan-89323a15-F0-S015"
-   ],
-   "kind": "door",
-   "position": [
-    37.354,
-    27.205
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new37",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S020",
-    "plan-89323a15-F0-S015"
-   ],
-   "kind": "door",
-   "position": [
-    42.935,
-    27.192
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new38",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S022",
-    "plan-89323a15-F0-S023"
-   ],
-   "kind": "door",
-   "position": [
-    42.935,
-    20.18
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new39",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S023",
-    "plan-89323a15-F0-S014"
-   ],
-   "kind": "door",
-   "position": [
-    44.653,
-    16.817
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new40",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S003",
-    "plan-89323a15-F0-S009"
-   ],
-   "kind": "door",
-   "position": [
-    6.641,
-    17.426
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new41",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S001",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    -13.53,
-    17.955
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new42",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S003",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    -9.587,
-    17.876
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new43",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S004",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    -6.748,
-    18.708
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new44",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S005",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    -0.282,
-    20.715
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new45",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S006",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    3.819,
-    17.561
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new46",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S007",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    10.282,
-    17.46
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new47",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S011",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    0.191,
-    14.88
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new48",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S012",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    -5.171,
-    11.725
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new49",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S013",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    -9.587,
-    15.039
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new50",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S015",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    13.597,
-    12.514
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new51",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S016",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    16.252,
-    12.574
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new52",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S018",
-    "plan-89323a15-F1-S009"
-   ],
-   "kind": "door",
-   "position": [
-    22.745,
-    17.525
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new53",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S021",
-    "plan-89323a15-F0-S020"
-   ],
-   "kind": "door",
-   "position": [
-    40.302,
-    23.471
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F0-O-new54",
-   "floor_id": "plan-89323a15-F0",
-   "space_ids": [
-    "plan-89323a15-F0-S021",
-    "plan-89323a15-F0-S022"
-   ],
-   "kind": "door",
-   "position": [
-    42.441,
-    20.323
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new55",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S010",
-    "plan-89323a15-F1-S001"
-   ],
-   "kind": "door",
-   "position": [
-    -8.641,
-    31.282
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-F1-O-new56",
-   "floor_id": "plan-89323a15-F1",
-   "space_ids": [
-    "plan-89323a15-F1-S010",
-    "plan-89323a15-F1-S002"
-   ],
-   "kind": "door",
-   "position": [
-    -6.591,
-    31.282
-   ],
-   "width_m": 0.9,
-   "step_free": true,
-   "synthetic": false
-  }
- ],
- "vertical_connectors": [
-  {
-   "id": "plan-89323a15-V01",
-   "kind": "lift",
-   "name": "Lift",
-   "floor_ids": [
-    "plan-89323a15-F0",
-    "plan-89323a15-F1"
-   ],
-   "space_ids": [
-    "plan-89323a15-F0-S008",
-    "plan-89323a15-F1-S007"
-   ],
-   "step_free": true,
-   "synthetic": false
-  },
-  {
-   "id": "plan-89323a15-V02",
-   "kind": "stairs",
-   "name": "Treppe",
-   "floor_ids": [
-    "plan-89323a15-F0",
-    "plan-89323a15-F1"
-   ],
-   "space_ids": [
-    "plan-89323a15-F0-S011",
-    "plan-89323a15-F1-S011"
-   ],
-   "step_free": false,
-   "synthetic": false
-  }
- ],
- "assets": []
+  "building": {
+    "id": "plan-89323a15",
+    "name": "Munich Urban Colab",
+    "source": "plan_upload",
+    "source_ref": {
+      "floor_offsets_m": {
+        "1": [
+          -17.631,
+          3.997
+        ]
+      },
+      "floors_aligned": true
+    },
+    "license": "",
+    "attribution": "Built from uploaded floor plans",
+    "split": "user",
+    "units": "m"
+  },
+  "floors": [
+    {
+      "id": "plan-89323a15-F0",
+      "level": 0,
+      "name": "Ground floor",
+      "elevation_m": 0.0,
+      "height_m": 3.0
+    },
+    {
+      "id": "plan-89323a15-F1",
+      "level": 1,
+      "name": "Floor 1",
+      "elevation_m": 3.0,
+      "height_m": 3.0
+    }
+  ],
+  "spaces": [
+    {
+      "id": "plan-89323a15-F0-S001",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Projektraum West",
+      "ref": null,
+      "polygon": [
+        [
+          0.859,
+          32.202
+        ],
+        [
+          6.583,
+          32.202
+        ],
+        [
+          6.583,
+          22.899
+        ],
+        [
+          0.859,
+          22.899
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S002",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Project Room",
+      "ref": null,
+      "polygon": [
+        [
+          10.648,
+          32.202
+        ],
+        [
+          23.7,
+          32.202
+        ],
+        [
+          23.7,
+          21.181
+        ],
+        [
+          10.648,
+          21.468
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S003",
+      "floor_id": "plan-89323a15-F0",
+      "type": "corridor",
+      "room_type": "corridor",
+      "name": "Flur West",
+      "ref": null,
+      "polygon": [
+        [
+          6.641,
+          32.202
+        ],
+        [
+          10.648,
+          32.202
+        ],
+        [
+          10.648,
+          21.468
+        ],
+        [
+          9.16,
+          21.468
+        ],
+        [
+          9.16,
+          17.46
+        ],
+        [
+          6.641,
+          17.46
+        ],
+        [
+          6.641,
+          22.899
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S004",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Umkleide",
+      "ref": null,
+      "polygon": [
+        [
+          1.145,
+          22.756
+        ],
+        [
+          4.351,
+          22.756
+        ],
+        [
+          4.351,
+          17.604
+        ],
+        [
+          1.145,
+          17.604
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S005",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "EDV",
+      "ref": null,
+      "polygon": [
+        [
+          4.437,
+          20.752
+        ],
+        [
+          6.526,
+          20.752
+        ],
+        [
+          6.526,
+          17.604
+        ],
+        [
+          4.437,
+          17.604
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S006",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "ELT-Verteiler",
+      "ref": null,
+      "polygon": [
+        [
+          3.721,
+          22.756
+        ],
+        [
+          6.526,
+          22.756
+        ],
+        [
+          6.526,
+          20.752
+        ],
+        [
+          3.721,
+          20.752
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S007",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Lager",
+      "ref": null,
+      "polygon": [
+        [
+          13.31,
+          21.181
+        ],
+        [
+          17.174,
+          21.181
+        ],
+        [
+          17.174,
+          17.317
+        ],
+        [
+          13.31,
+          17.317
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S008",
+      "floor_id": "plan-89323a15-F0",
+      "type": "lift",
+      "room_type": "lift",
+      "name": "Lift",
+      "ref": null,
+      "polygon": [
+        [
+          9.875,
+          21.038
+        ],
+        [
+          12.594,
+          21.038
+        ],
+        [
+          12.594,
+          17.46
+        ],
+        [
+          9.875,
+          17.46
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S009",
+      "floor_id": "plan-89323a15-F0",
+      "type": "corridor",
+      "room_type": "corridor",
+      "name": "Flur Süd",
+      "ref": null,
+      "polygon": [
+        [
+          0.572,
+          17.46
+        ],
+        [
+          13.31,
+          17.317
+        ],
+        [
+          17.747,
+          20.609
+        ],
+        [
+          23.471,
+          21.038
+        ],
+        [
+          23.471,
+          17.747
+        ],
+        [
+          19.75,
+          17.747
+        ],
+        [
+          19.607,
+          12.165
+        ],
+        [
+          21.325,
+          9.16
+        ],
+        [
+          21.325,
+          5.009
+        ],
+        [
+          8.587,
+          5.152
+        ],
+        [
+          8.587,
+          11.736
+        ],
+        [
+          0.572,
+          12.022
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S010",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Lager",
+      "ref": null,
+      "polygon": [
+        [
+          15.743,
+          12.022
+        ],
+        [
+          22.04,
+          12.022
+        ],
+        [
+          22.04,
+          7.013
+        ],
+        [
+          15.743,
+          7.156
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S011",
+      "floor_id": "plan-89323a15-F0",
+      "type": "stair",
+      "room_type": "stairwell",
+      "name": "Treppe Mitte",
+      "ref": null,
+      "polygon": [
+        [
+          0.515,
+          14.884
+        ],
+        [
+          9.016,
+          14.884
+        ],
+        [
+          9.016,
+          11.879
+        ],
+        [
+          0.515,
+          11.879
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S012",
+      "floor_id": "plan-89323a15-F0",
+      "type": "hall",
+      "room_type": "lobby",
+      "name": "Foyer",
+      "ref": null,
+      "polygon": [
+        [
+          23.758,
+          24.616
+        ],
+        [
+          37.211,
+          24.616
+        ],
+        [
+          37.211,
+          16.888
+        ],
+        [
+          36.924,
+          4.866
+        ],
+        [
+          21.325,
+          5.009
+        ],
+        [
+          19.75,
+          12.022
+        ],
+        [
+          19.75,
+          17.747
+        ],
+        [
+          23.758,
+          17.747
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S013",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "hall",
+      "name": "Auditorium (Arena)",
+      "ref": null,
+      "polygon": [
+        [
+          23.901,
+          24.616
+        ],
+        [
+          37.211,
+          24.616
+        ],
+        [
+          37.211,
+          20.609
+        ],
+        [
+          23.901,
+          20.609
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S014",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Café (Gastraum)",
+      "ref": null,
+      "polygon": [
+        [
+          37.211,
+          16.745
+        ],
+        [
+          47.515,
+          16.745
+        ],
+        [
+          47.515,
+          4.294
+        ],
+        [
+          36.924,
+          4.866
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S015",
+      "floor_id": "plan-89323a15-F0",
+      "type": "corridor",
+      "room_type": "corridor",
+      "name": "Flur Nord",
+      "ref": null,
+      "polygon": [
+        [
+          23.901,
+          28.481
+        ],
+        [
+          40.359,
+          28.91
+        ],
+        [
+          42.649,
+          32.202
+        ],
+        [
+          46.084,
+          28.91
+        ],
+        [
+          46.37,
+          25.189
+        ],
+        [
+          42.935,
+          25.189
+        ],
+        [
+          42.935,
+          27.192
+        ],
+        [
+          40.359,
+          27.192
+        ],
+        [
+          23.901,
+          27.336
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S016",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Büro",
+      "ref": null,
+      "polygon": [
+        [
+          29.339,
+          32.058
+        ],
+        [
+          32.058,
+          32.058
+        ],
+        [
+          32.058,
+          28.91
+        ],
+        [
+          29.339,
+          28.91
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S017",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Lager",
+      "ref": null,
+      "polygon": [
+        [
+          32.116,
+          32.202
+        ],
+        [
+          35.923,
+          32.202
+        ],
+        [
+          35.923,
+          29.053
+        ],
+        [
+          32.116,
+          29.053
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S018",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Müll",
+      "ref": null,
+      "polygon": [
+        [
+          36.066,
+          32.345
+        ],
+        [
+          38.785,
+          32.345
+        ],
+        [
+          38.785,
+          29.053
+        ],
+        [
+          36.066,
+          29.053
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S019",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Umkleide",
+      "ref": null,
+      "polygon": [
+        [
+          33.919,
+          27.192
+        ],
+        [
+          37.354,
+          27.192
+        ],
+        [
+          37.354,
+          24.759
+        ],
+        [
+          33.919,
+          24.759
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S020",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "WC",
+      "ref": null,
+      "polygon": [
+        [
+          37.64,
+          27.192
+        ],
+        [
+          42.935,
+          27.192
+        ],
+        [
+          42.935,
+          22.04
+        ],
+        [
+          37.64,
+          22.04
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S021",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "WC",
+      "ref": null,
+      "polygon": [
+        [
+          40.302,
+          23.471
+        ],
+        [
+          42.935,
+          23.471
+        ],
+        [
+          42.935,
+          20.323
+        ],
+        [
+          40.302,
+          20.323
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S022",
+      "floor_id": "plan-89323a15-F0",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "WC",
+      "ref": null,
+      "polygon": [
+        [
+          37.497,
+          21.754
+        ],
+        [
+          42.935,
+          20.18
+        ],
+        [
+          42.935,
+          17.031
+        ],
+        [
+          37.497,
+          17.031
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-S023",
+      "floor_id": "plan-89323a15-F0",
+      "type": "corridor",
+      "room_type": "corridor",
+      "name": "Flur Ost",
+      "ref": null,
+      "polygon": [
+        [
+          42.935,
+          26.334
+        ],
+        [
+          44.653,
+          26.334
+        ],
+        [
+          44.653,
+          16.888
+        ],
+        [
+          42.935,
+          17.031
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S001",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Arbeitsbereich",
+      "ref": null,
+      "polygon": [
+        [
+          -17.0,
+          33.017
+        ],
+        [
+          -6.748,
+          33.017
+        ],
+        [
+          -6.748,
+          21.188
+        ],
+        [
+          -13.53,
+          21.188
+        ],
+        [
+          -13.53,
+          18.034
+        ],
+        [
+          -17.0,
+          18.034
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S002",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Seminar Rooms 1-3",
+      "ref": null,
+      "polygon": [
+        [
+          -6.433,
+          32.386
+        ],
+        [
+          22.587,
+          32.071
+        ],
+        [
+          22.587,
+          21.346
+        ],
+        [
+          17.067,
+          21.346
+        ],
+        [
+          13.913,
+          21.504
+        ],
+        [
+          10.127,
+          21.504
+        ],
+        [
+          3.819,
+          21.661
+        ],
+        [
+          1.295,
+          21.031
+        ],
+        [
+          -6.433,
+          21.031
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S003",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Putzraum",
+      "ref": null,
+      "polygon": [
+        [
+          -13.373,
+          21.188
+        ],
+        [
+          -9.587,
+          21.188
+        ],
+        [
+          -9.587,
+          17.876
+        ],
+        [
+          -13.373,
+          17.876
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S004",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "EDV",
+      "ref": null,
+      "polygon": [
+        [
+          -9.43,
+          21.094
+        ],
+        [
+          -6.748,
+          21.094
+        ],
+        [
+          -6.748,
+          17.876
+        ],
+        [
+          -9.43,
+          17.876
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S005",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "WC",
+      "ref": null,
+      "polygon": [
+        [
+          -6.591,
+          21.031
+        ],
+        [
+          -0.282,
+          21.031
+        ],
+        [
+          -0.282,
+          17.718
+        ],
+        [
+          -6.591,
+          17.718
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S006",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "WC",
+      "ref": null,
+      "polygon": [
+        [
+          3.819,
+          21.661
+        ],
+        [
+          9.181,
+          21.661
+        ],
+        [
+          9.181,
+          17.561
+        ],
+        [
+          3.819,
+          17.561
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S007",
+      "floor_id": "plan-89323a15-F1",
+      "type": "lift",
+      "room_type": "lift",
+      "name": "Lift",
+      "ref": null,
+      "polygon": [
+        [
+          10.285,
+          20.557
+        ],
+        [
+          12.809,
+          20.557
+        ],
+        [
+          12.809,
+          17.561
+        ],
+        [
+          10.285,
+          17.561
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S008",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Lager",
+      "ref": null,
+      "polygon": [
+        [
+          17.162,
+          21.346
+        ],
+        [
+          22.429,
+          21.346
+        ],
+        [
+          22.429,
+          17.245
+        ],
+        [
+          17.162,
+          17.245
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S009",
+      "floor_id": "plan-89323a15-F1",
+      "type": "corridor",
+      "room_type": "corridor",
+      "name": "Flur 1. OG",
+      "ref": null,
+      "polygon": [
+        [
+          -17.0,
+          17.876
+        ],
+        [
+          -9.43,
+          17.876
+        ],
+        [
+          -0.282,
+          20.715
+        ],
+        [
+          3.819,
+          20.715
+        ],
+        [
+          3.819,
+          17.561
+        ],
+        [
+          13.913,
+          17.245
+        ],
+        [
+          17.067,
+          20.715
+        ],
+        [
+          17.067,
+          17.561
+        ],
+        [
+          29.684,
+          17.403
+        ],
+        [
+          29.684,
+          14.406
+        ],
+        [
+          13.913,
+          12.514
+        ],
+        [
+          13.282,
+          5.259
+        ],
+        [
+          -9.43,
+          5.416
+        ],
+        [
+          -9.43,
+          15.037
+        ],
+        [
+          -17.0,
+          15.195
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S010",
+      "floor_id": "plan-89323a15-F1",
+      "type": "stair",
+      "room_type": "stairwell",
+      "name": "Treppe West",
+      "ref": null,
+      "polygon": [
+        [
+          -8.641,
+          31.282
+        ],
+        [
+          -6.748,
+          31.282
+        ],
+        [
+          -6.748,
+          21.346
+        ],
+        [
+          -8.641,
+          21.346
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S011",
+      "floor_id": "plan-89323a15-F1",
+      "type": "stair",
+      "room_type": "stairwell",
+      "name": "Treppe Mitte",
+      "ref": null,
+      "polygon": [
+        [
+          0.191,
+          14.88
+        ],
+        [
+          9.339,
+          14.88
+        ],
+        [
+          9.339,
+          11.883
+        ],
+        [
+          0.191,
+          11.883
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S012",
+      "floor_id": "plan-89323a15-F1",
+      "type": "outdoor",
+      "room_type": "generic_room",
+      "name": "Terrasse",
+      "ref": null,
+      "polygon": [
+        [
+          -5.171,
+          11.725
+        ],
+        [
+          9.023,
+          11.725
+        ],
+        [
+          9.023,
+          5.101
+        ],
+        [
+          -5.171,
+          5.101
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S013",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "CAD-Center",
+      "ref": null,
+      "polygon": [
+        [
+          -17.0,
+          15.037
+        ],
+        [
+          -9.587,
+          15.037
+        ],
+        [
+          -9.587,
+          5.416
+        ],
+        [
+          -17.0,
+          5.416
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S014",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "outdoor",
+      "name": "Luftraum",
+      "ref": null,
+      "polygon": [
+        [
+          -5.329,
+          15.037
+        ],
+        [
+          -1.323,
+          15.037
+        ],
+        [
+          -1.323,
+          11.883
+        ],
+        [
+          -5.329,
+          11.883
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S015",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Teeküche",
+      "ref": null,
+      "polygon": [
+        [
+          13.597,
+          12.514
+        ],
+        [
+          16.184,
+          12.514
+        ],
+        [
+          16.184,
+          8.729
+        ],
+        [
+          13.597,
+          8.729
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S016",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Living Lab Einzelhandel",
+      "ref": null,
+      "polygon": [
+        [
+          16.278,
+          12.356
+        ],
+        [
+          22.366,
+          12.356
+        ],
+        [
+          22.366,
+          6.678
+        ],
+        [
+          16.278,
+          6.678
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S017",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "outdoor",
+      "name": "Luftraum",
+      "ref": null,
+      "polygon": [
+        [
+          24.164,
+          14.406
+        ],
+        [
+          29.684,
+          14.406
+        ],
+        [
+          29.684,
+          5.101
+        ],
+        [
+          24.164,
+          5.101
+        ]
+      ],
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-S018",
+      "floor_id": "plan-89323a15-F1",
+      "type": "room",
+      "room_type": "generic_room",
+      "name": "Auditorium upper rows",
+      "ref": null,
+      "polygon": [
+        [
+          22.745,
+          32.071
+        ],
+        [
+          30.0,
+          28.916
+        ],
+        [
+          30.0,
+          17.561
+        ],
+        [
+          22.745,
+          17.561
+        ]
+      ],
+      "synthetic": false
+    }
+  ],
+  "openings": [
+    {
+      "id": "plan-89323a15-F0-O0001",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S005",
+        "plan-89323a15-F0-S006"
+      ],
+      "kind": "opening",
+      "position": [
+        5.82,
+        20.752
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0002",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S005",
+        "plan-89323a15-F0-S006"
+      ],
+      "kind": "opening",
+      "position": [
+        4.977,
+        20.752
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0003",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S005",
+        "plan-89323a15-F0-S006"
+      ],
+      "kind": "opening",
+      "position": [
+        5.677,
+        20.752
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0004",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S005",
+        "plan-89323a15-F0-S006"
+      ],
+      "kind": "opening",
+      "position": [
+        4.867,
+        20.752
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0005",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S005",
+        "plan-89323a15-F0-S004"
+      ],
+      "kind": "opening",
+      "position": [
+        4.394,
+        20.156
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0006",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S011",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "opening",
+      "position": [
+        0.544,
+        14.74
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0007",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S011",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "opening",
+      "position": [
+        0.544,
+        13.849
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0008",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S011",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "opening",
+      "position": [
+        0.544,
+        13.112
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0009",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S011",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "opening",
+      "position": [
+        0.544,
+        12.762
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0010",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S011",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "opening",
+      "position": [
+        0.544,
+        12.537
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0011",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        37.029,
+        9.222
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0012",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        37.023,
+        8.993
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0013",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        37.022,
+        8.932
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0014",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        37.012,
+        8.516
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0015",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        37.01,
+        8.454
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0016",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        37.002,
+        8.095
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0017",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S014",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "opening",
+      "position": [
+        36.995,
+        7.789
+      ],
+      "width_m": 2.0,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0018",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S003",
+        "plan-89323a15-F0-S001"
+      ],
+      "kind": "door",
+      "position": [
+        6.612,
+        25.475
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0019",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S007",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "door",
+      "position": [
+        13.581,
+        17.396
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0020",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S010",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "door",
+      "position": [
+        19.566,
+        12.065
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0021",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S009",
+        "outside"
+      ],
+      "kind": "entrance",
+      "position": [
+        17.173,
+        5.056
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0022",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S003",
+        "outside"
+      ],
+      "kind": "entrance",
+      "position": [
+        8.015,
+        32.202
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0023",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S015",
+        "plan-89323a15-F0-S016"
+      ],
+      "kind": "door",
+      "position": [
+        30.784,
+        28.785
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0024",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S015",
+        "plan-89323a15-F0-S017"
+      ],
+      "kind": "door",
+      "position": [
+        35.218,
+        28.914
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O0025",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S023",
+        "plan-89323a15-F0-S020"
+      ],
+      "kind": "door",
+      "position": [
+        42.935,
+        24.33
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O0001",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S009",
+        "plan-89323a15-F1-S002"
+      ],
+      "kind": "door",
+      "position": [
+        1.564,
+        20.901
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O0002",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S009",
+        "plan-89323a15-F1-S008"
+      ],
+      "kind": "door",
+      "position": [
+        22.349,
+        17.496
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new28",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S002",
+        "plan-89323a15-F0-S003"
+      ],
+      "kind": "door",
+      "position": [
+        10.648,
+        32.202
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new29",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S004",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "door",
+      "position": [
+        1.144,
+        17.529
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new30",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S006",
+        "plan-89323a15-F0-S003"
+      ],
+      "kind": "door",
+      "position": [
+        6.583,
+        22.756
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new31",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S008",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "door",
+      "position": [
+        9.874,
+        17.408
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new32",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S012",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "door",
+      "position": [
+        21.325,
+        5.009
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new33",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S013",
+        "plan-89323a15-F0-S012"
+      ],
+      "kind": "door",
+      "position": [
+        23.901,
+        24.616
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new34",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S015",
+        "plan-89323a15-F0-S023"
+      ],
+      "kind": "door",
+      "position": [
+        42.935,
+        26.334
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new35",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S018",
+        "plan-89323a15-F0-S015"
+      ],
+      "kind": "door",
+      "position": [
+        38.787,
+        28.961
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new36",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S019",
+        "plan-89323a15-F0-S015"
+      ],
+      "kind": "door",
+      "position": [
+        37.354,
+        27.205
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new37",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S020",
+        "plan-89323a15-F0-S015"
+      ],
+      "kind": "door",
+      "position": [
+        42.935,
+        27.192
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new38",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S022",
+        "plan-89323a15-F0-S023"
+      ],
+      "kind": "door",
+      "position": [
+        42.935,
+        20.18
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new39",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S023",
+        "plan-89323a15-F0-S014"
+      ],
+      "kind": "door",
+      "position": [
+        44.653,
+        16.817
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new40",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S003",
+        "plan-89323a15-F0-S009"
+      ],
+      "kind": "door",
+      "position": [
+        6.641,
+        17.426
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new41",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S001",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        -13.53,
+        17.955
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new42",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S003",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        -9.587,
+        17.876
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new43",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S004",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        -6.748,
+        18.708
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new44",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S005",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        -0.282,
+        20.715
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new45",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S006",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        3.819,
+        17.561
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new46",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S007",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        10.282,
+        17.46
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new47",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S011",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        0.191,
+        14.88
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new48",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S012",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        -5.171,
+        11.725
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new49",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S013",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        -9.587,
+        15.039
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new50",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S015",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        13.597,
+        12.514
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new51",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S016",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        16.252,
+        12.574
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new52",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S018",
+        "plan-89323a15-F1-S009"
+      ],
+      "kind": "door",
+      "position": [
+        22.745,
+        17.525
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new53",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S021",
+        "plan-89323a15-F0-S020"
+      ],
+      "kind": "door",
+      "position": [
+        40.302,
+        23.471
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F0-O-new54",
+      "floor_id": "plan-89323a15-F0",
+      "space_ids": [
+        "plan-89323a15-F0-S021",
+        "plan-89323a15-F0-S022"
+      ],
+      "kind": "door",
+      "position": [
+        42.441,
+        20.323
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new55",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S010",
+        "plan-89323a15-F1-S001"
+      ],
+      "kind": "door",
+      "position": [
+        -8.641,
+        31.282
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-F1-O-new56",
+      "floor_id": "plan-89323a15-F1",
+      "space_ids": [
+        "plan-89323a15-F1-S010",
+        "plan-89323a15-F1-S002"
+      ],
+      "kind": "door",
+      "position": [
+        -6.591,
+        31.282
+      ],
+      "width_m": 0.9,
+      "step_free": true,
+      "synthetic": false
+    }
+  ],
+  "vertical_connectors": [
+    {
+      "id": "plan-89323a15-V01",
+      "kind": "lift",
+      "name": "Lift",
+      "floor_ids": [
+        "plan-89323a15-F0",
+        "plan-89323a15-F1"
+      ],
+      "space_ids": [
+        "plan-89323a15-F0-S008",
+        "plan-89323a15-F1-S007"
+      ],
+      "step_free": true,
+      "synthetic": false
+    },
+    {
+      "id": "plan-89323a15-V02",
+      "kind": "stairs",
+      "name": "Treppe",
+      "floor_ids": [
+        "plan-89323a15-F0",
+        "plan-89323a15-F1"
+      ],
+      "space_ids": [
+        "plan-89323a15-F0-S011",
+        "plan-89323a15-F1-S011"
+      ],
+      "step_free": false,
+      "synthetic": false
+    }
+  ],
+  "assets": [
+    {
+      "id": "plan-89323a15-A00001",
+      "name": "Fire extinguisher 0.01",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S002",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        16.186,
+        30.868
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00002",
+      "name": "Fire extinguisher 0.02",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S015",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        32.548,
+        28.356
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00003",
+      "name": "Fire extinguisher 0.03",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S015",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        40.579,
+        27.542
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00004",
+      "name": "Fire extinguisher 0.04",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S003",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        7.664,
+        20.442
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00005",
+      "name": "Fire extinguisher 0.05",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S009",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        12.525,
+        16.333
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00006",
+      "name": "Fire extinguisher 0.06",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S023",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        44.303,
+        20.3
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00007",
+      "name": "Fire extinguisher 0.07",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S012",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        23.392,
+        5.708
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00008",
+      "name": "Fire extinguisher 0.08",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F0-S014",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        42.924,
+        5.283
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00009",
+      "name": "Fire alarm call point 0.01",
+      "category": "equipment",
+      "type": "manual_call_point",
+      "space_id": "plan-89323a15-F0-S003",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        9.894,
+        31.067
+      ],
+      "footprint": {
+        "width_m": 0.15,
+        "depth_m": 0.1,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00010",
+      "name": "Fire alarm call point 0.02",
+      "category": "equipment",
+      "type": "manual_call_point",
+      "space_id": "plan-89323a15-F0-S015",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        42.479,
+        31.345
+      ],
+      "footprint": {
+        "width_m": 0.15,
+        "depth_m": 0.1,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00011",
+      "name": "Fire alarm call point 0.03",
+      "category": "equipment",
+      "type": "manual_call_point",
+      "space_id": "plan-89323a15-F0-S009",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        9.465,
+        10.95
+      ],
+      "footprint": {
+        "width_m": 0.15,
+        "depth_m": 0.1,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00012",
+      "name": "Fire alarm call point 0.04",
+      "category": "equipment",
+      "type": "manual_call_point",
+      "space_id": "plan-89323a15-F0-S012",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        30.055,
+        5.708
+      ],
+      "footprint": {
+        "width_m": 0.15,
+        "depth_m": 0.1,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00013",
+      "name": "Fire alarm call point 0.05",
+      "category": "equipment",
+      "type": "manual_call_point",
+      "space_id": "plan-89323a15-F0-S012",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        36.587,
+        5.433
+      ],
+      "footprint": {
+        "width_m": 0.15,
+        "depth_m": 0.1,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00014",
+      "name": "Defibrillator 0.01",
+      "category": "equipment",
+      "type": "defibrillator",
+      "space_id": "plan-89323a15-F0-S009",
+      "floor_id": "plan-89323a15-F0",
+      "position": [
+        13.612,
+        6.417
+      ],
+      "footprint": {
+        "width_m": 0.4,
+        "depth_m": 0.2,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00015",
+      "name": "Fire extinguisher 1.01",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S002",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        11.521,
+        31.676
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00016",
+      "name": "Fire extinguisher 1.02",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S001",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        -9.635,
+        23.385
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00017",
+      "name": "Fire extinguisher 1.03",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S002",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        -5.466,
+        24.236
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00018",
+      "name": "Fire extinguisher 1.04",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S018",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        24.058,
+        27.798
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00019",
+      "name": "Fire extinguisher 1.05",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S013",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        -10.324,
+        11.09
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00020",
+      "name": "Fire extinguisher 1.06",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S009",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        -6.124,
+        11.09
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00021",
+      "name": "Fire extinguisher 1.07",
+      "category": "equipment",
+      "type": "fire_extinguisher",
+      "space_id": "plan-89323a15-F1-S009",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        23.144,
+        13.974
+      ],
+      "footprint": {
+        "width_m": 0.3,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00022",
+      "name": "Fire alarm call point 1.01",
+      "category": "equipment",
+      "type": "manual_call_point",
+      "space_id": "plan-89323a15-F1-S009",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        10.048,
+        10.995
+      ],
+      "footprint": {
+        "width_m": 0.15,
+        "depth_m": 0.1,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00023",
+      "name": "First aid kit 1.01",
+      "category": "equipment",
+      "type": "first_aid_kit",
+      "space_id": "plan-89323a15-F1-S009",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        13.197,
+        8.319
+      ],
+      "footprint": {
+        "width_m": 0.4,
+        "depth_m": 0.2,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    },
+    {
+      "id": "plan-89323a15-A00024",
+      "name": "Eyewash station 1.01",
+      "category": "equipment",
+      "type": "eyewash_station",
+      "space_id": "plan-89323a15-F1-S015",
+      "floor_id": "plan-89323a15-F1",
+      "position": [
+        15.126,
+        9.079
+      ],
+      "footprint": {
+        "width_m": 0.4,
+        "depth_m": 0.3,
+        "rotation_deg": 0.0
+      },
+      "source": "evacuation_plan"
+    }
+  ]
 }
