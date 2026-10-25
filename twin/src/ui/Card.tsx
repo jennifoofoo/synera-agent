@@ -21,6 +21,7 @@ import { RouteChips } from "./RouteChips";
 import { TurnIcon, rideUp } from "./Walk";
 import { useRound } from "../round/round";
 import { KnowledgeButton } from "./KnowledgeGraph";
+import { hereAnswers } from "../tapAnswer";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -153,7 +154,6 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const select = useTwin((s) => s.select);
   const position = useTwin((s) => s.state?.position ?? null);
   const ask = useTwin((s) => s.ask);
-  const setHere = useTwin((s) => s.setHere);
   const openDirections = useTwin((s) => s.openDirections);
   const busy = useTwin((s) => s.chatBusy);
 
@@ -180,11 +180,12 @@ function SelectionCard({ model }: { model: BuildingModel }) {
   const equipment = useMemo(() => (equipmentRoom ? equipmentOf(model.assetById.values(), equipmentRoom) : null), [model, equipmentRoom]);
 
   const imHere = () => {
-    // No agent call: the position is set on screen now and travels as context.here with the next chat message.
+    // The position is set on screen now and travels as context.here with the next chat message. No agent call,
+    // unless Wanda waits for a place ("Where are you?"): then "I'm here." answers her at once (tapAnswer.ts).
     if (!roomId) return;
     const floorId = selection.floor_id ?? model.spaceById.get(roomId)?.floor_id;
     if (!floorId) return;
-    setHere({ space_id: roomId, floor_id: floorId, point: selection.kind === "point" || selection.kind === "space" ? (selection.point ?? null) : null });
+    hereAnswers({ space_id: roomId, floor_id: floorId, point: selection.kind === "point" || selection.kind === "space" ? (selection.point ?? null) : null });
     select(null);
   };
 
