@@ -34,7 +34,8 @@ function looksLikeQuestion(text: string): boolean {
   return trimmed.includes("?") || trimmed.split(/\s+/).length > 3 || QUESTION_START.test(trimmed);
 }
 
-export function Omnibox({ walking = false }: { walking?: boolean }) {
+/** `docked`: the laptop chat column (Sidebar.tsx): the Wanda bar and the input both stay visible. */
+export function Omnibox({ walking = false, docked = false }: { walking?: boolean; docked?: boolean }) {
   const model = useTwin((s) => s.model);
   const ask = useTwin((s) => s.ask);
   const busy = useTwin((s) => s.chatBusy);
@@ -385,7 +386,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
       : "Search rooms and things…";
 
   return (
-    <div className={`omnibox ${expanded ? "expanded" : "collapsed"}`} ref={rootRef}>
+    <div className={`omnibox ${expanded ? "expanded" : "collapsed"}${docked ? " docked" : ""}`} ref={rootRef}>
       {history && pairs.length > 0 && (
         <ol className="ob-history" aria-label="Earlier replies">
           {pairs.map((pair) => (
@@ -458,7 +459,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
       <form
         className={`omnibox-input ${listening ? "is-listening" : ""}`}
         onSubmit={(event) => event.preventDefault()}
-        aria-hidden={!expanded || undefined}
+        aria-hidden={(!expanded && !docked) || undefined}
       >
         <Autocomplete
           inputRef={inputRef}
@@ -552,7 +553,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
       </form>
       )}
 
-      {(!expanded || walking) && (
+      {(!expanded || walking || docked) && (
         <div className={`wanda-bar ob-fabs ${mode}`}>
           {/* The orb is the mic: one voice button, voice first. While walking it stays: "next", "back", "repeat",
               "stop" by voice (see store.ask). */}
