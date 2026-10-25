@@ -20,7 +20,12 @@ import pytest
 
 pytest.importorskip("playwright.sync_api", reason="playwright not installed (uv sync --group e2e)")
 
-from tests.e2e.test_walk_with_me import FIND_ROUTE, page, server  # noqa: F401 - shared fixtures
+from tests.e2e import test_walk_with_me as walk_with_me
+
+FIND_ROUTE = walk_with_me.FIND_ROUTE
+# the same server (fake chat, a multi-floor dev building) and phone-sized page as the Walk with me test
+server = walk_with_me.server
+page = walk_with_me.page
 
 pytestmark = pytest.mark.e2e
 
@@ -93,8 +98,10 @@ def test_next_moves_the_dot_back_moves_it_back(page):
     for _ in range(min(3, len(steps) - 1)):
         now = _next(page)
         _check_at_step(page, now)
-        assert not seen or math.dist(seen[-1]["position"]["point"], now["position"]["point"]) > 0.3 or (
-            seen[-1]["position"]["floor_id"] != now["position"]["floor_id"]
+        assert (
+            not seen
+            or math.dist(seen[-1]["position"]["point"], now["position"]["point"]) > 0.3
+            or (seen[-1]["position"]["floor_id"] != now["position"]["floor_id"])
         ), "the dot moved"
         seen.append(now)
     assert [s["step"] for s in seen] == list(range(1, len(seen) + 1))
