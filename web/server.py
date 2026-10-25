@@ -24,7 +24,8 @@ Place knowledge (web/knowledge_api.py, docs/specs/place-knowledge.md; POSTs need
   POST /api/facts {building, kind: note|issue, anchor: {space_id?, asset_id?, element_id?, point?, floor_id?}, text,
                  valid_to?, author?, related?, photo_base64?}   -> {fact, state}; closures only via the chat card
   GET  /api/facts/photo?key=&id=        image/jpeg (resized, no EXIF)
-  POST /api/facts/undo {building}       removes the newest fact if younger than 2 minutes -> {undone, state}
+  POST /api/facts/undo {building, id?}  removes that fact (else the newest) if younger than 2 minutes -> {undone, state}
+  POST /api/round {building, type, area?, start?, return_to_start?, step_free?}  plan_round for the page -> {round, route, state}
   GET  /api/graph?key=[&format=aas][&at=]   JSON-LD with Brick/RealEstateCore types, or the AAS export
   state_view.facts (open now, all floors), state_view.closed_until {element_id: ISO}; timed closures are applied
   at the start of every request (no background job)
@@ -252,7 +253,7 @@ class App:
         if path == "/api/facts":
             result = knowledge_api.create(self.knowledge, session.map, key, body)
         elif path == "/api/facts/undo":
-            result = knowledge_api.undo(self.knowledge, session.map, key)
+            result = knowledge_api.undo(self.knowledge, session.map, key, str(body.get("id") or ""))
         else:
             return 404, {"error": f"Unknown endpoint {path}"}
         with self.lock:
@@ -382,6 +383,19 @@ class App:
                     }
                 except MapError as error:
                     return 200, {"route": {"ok": False, "error": str(error)}, "state": api.state_view(session)}
+            if path == "/api/round":
+                try:
+                    view = api.round_view(
+                        session,
+                        str(body.get("type", "")),
+                        str(body["start"]) if body.get("start") else None,
+                        str(body.get("area") or ""),
+                        bool(body.get("return_to_start", False)),
+                        bool(body.get("step_free", False)),
+                    )
+                except MapError as error:
+                    view = {"ok": False, "error": str(error)}
+                return 200, {"round": view, "state": api.state_view(session)}
             if path == "/api/route/clear":
                 return 200, api.clear_route(session)
             if path == "/api/close":

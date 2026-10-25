@@ -532,19 +532,24 @@ class KnowledgeStore:
             self.save(bm, [*facts, done])
         return replace(done)
 
-    def undo_last(self, building, now: datetime | None = None, within_s: int = UNDO_SECONDS) -> Fact | None:
-        """Remove the newest fact if it was created less than `within_s` seconds ago (typo right after saving).
+    def undo_last(
+        self, building, now: datetime | None = None, within_s: int = UNDO_SECONDS, fact_id: str | None = None
+    ) -> Fact | None:
+        """Remove a fact created less than `within_s` seconds ago (typo right after saving): the one with `fact_id`,
+        else the newest. With an id, a fact someone else saved in between is never touched.
         Undoing a resolution reopens the fact it resolved. Returns the removed fact or None."""
         current = berlin_now(now)
         with self.lock:
             facts = self.load(building)
             if not facts:
                 return None
-            last = facts[-1]
+            last = next((fact for fact in facts if fact.id == fact_id), None) if fact_id else facts[-1]
+            if last is None:
+                return None
             age = (current - parse_time(last.created_at)).total_seconds()
             if not 0 <= age < within_s:
                 return None
-            kept = facts[:-1]
+            kept = [fact for fact in facts if fact is not last]
             if last.resolves:
                 for fact in kept:
                     if fact.id == last.resolves and fact.resolved_by == last.id:

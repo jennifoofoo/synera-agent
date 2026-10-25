@@ -169,6 +169,18 @@ def test_undo_only_right_after_creating_and_undo_of_resolution_reopens(bm, store
     assert back.id == issue.id and back.valid_to is None and back.resolved_by is None
 
 
+def test_undo_by_id_removes_only_that_note_not_a_newer_one(bm, store):
+    room = next(iter(bm.spaces))
+    mine = store.add(bm, kind="note", anchor={"space_id": room}, text="meine", now=SUNDAY)
+    theirs = store.add(
+        bm, kind="note", anchor={"space_id": room}, text="von jemand anderem", now=later(SUNDAY, seconds=5)
+    )
+    assert store.undo_last(bm, now=later(SUNDAY, seconds=10), fact_id="nope") is None
+    assert store.undo_last(bm, now=later(SUNDAY, seconds=10), fact_id=mine.id).id == mine.id
+    assert [f.id for f in store.query(bm, at=later(SUNDAY, seconds=11))] == [theirs.id]
+    assert store.undo_last(bm, now=later(SUNDAY, seconds=200), fact_id=theirs.id) is None  # too late
+
+
 def test_persistence_survives_a_new_store(bm, store):
     room = next(iter(bm.spaces))
     fact = store.add(bm, kind="note", anchor={"space_id": room}, text="bleibt", now=SUNDAY)

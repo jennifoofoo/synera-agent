@@ -154,7 +154,8 @@ def make_session(building_path) -> api.Session:
 
 def test_state_view_has_no_edit_keys_without_edits(building_path):
     state = api.state_view(make_session(building_path))
-    assert set(state) == {"closed", "added_doors", "route", "position", "guide", "campus"}
+    # facts and closed_until are the place notes and timed closures (always present, empty without notes), not edits
+    assert set(state) == {"closed", "added_doors", "route", "position", "guide", "campus", "facts", "closed_until"}
 
 
 def test_state_view_add_then_undo_round_trip(building_path):

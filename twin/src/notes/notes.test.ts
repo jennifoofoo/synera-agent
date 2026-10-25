@@ -99,14 +99,19 @@ describe("facts", () => {
     expect((await local.list("b")).length).toBe(1);
   });
 
-  it("saves on the server with {fact, state} and undoes only the newest note", async () => {
+  it("saves on the server with {fact, state} and undoes exactly the note it names", async () => {
     const original = globalThis.fetch;
     const saved = { ...base, id: "f-1", photo: "/api/facts/photo?key=b&id=f-1", author: "Klaus", person_id: "klaus" };
     const calls: string[] = [];
+    const bodies: string[] = [];
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
       calls.push(`${init?.method ?? "GET"} ${url}`);
       if (url === "/api/facts") return new Response(JSON.stringify({ fact: saved, state: { facts: [saved] } }));
-      if (url === "/api/facts/undo") return new Response(JSON.stringify({ undone: saved, state: { facts: [] } }));
+      if (url === "/api/facts/undo") {
+        const { id } = JSON.parse(String(init?.body));
+        bodies.push(id);
+        return new Response(JSON.stringify({ undone: id === "f-1" ? saved : null, state: { facts: [] } }));
+      }
       return new Response(JSON.stringify({ facts: [saved], persons: [] }));
     }) as typeof fetch;
     const server = new ServerFacts();
@@ -115,7 +120,8 @@ describe("facts", () => {
     expect(reply.state).toEqual({ facts: [saved] });
     expect(await server.undo("b", "f-1")).toEqual({ state: { facts: [] } });
     await expect(server.undo("b", "f-other")).rejects.toThrow();
-    expect(calls.filter((c) => c.startsWith("POST"))).toEqual(["POST /api/facts", "POST /api/facts/undo"]);
+    expect(bodies).toEqual(["f-1", "f-other"]); // the server undoes by id, so another person's note is never hit
+    expect(calls.filter((c) => c.startsWith("POST"))).toEqual(["POST /api/facts", "POST /api/facts/undo", "POST /api/facts/undo"]);
     expect("resolve" in server).toBe(false);
     globalThis.fetch = original;
   });

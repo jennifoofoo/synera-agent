@@ -253,12 +253,10 @@ export class ServerFacts implements FactsStorage {
     return "fact" in reply ? { fact: reply.fact as Fact, state: reply.state } : { fact: reply as unknown as Fact };
   }
 
-  /** POST /api/facts/undo removes the building's newest fact if it is younger than 2 minutes; refuse when that is
-   * not this note (someone saved after it, or it is too old), so undo never removes another person's note. */
+  /** POST /api/facts/undo with the note's id removes exactly that note if it is younger than 2 minutes, so undo
+   * never removes another person's note saved in between. */
   async undo(buildingKey: string, id: string): Promise<{ state?: unknown }> {
-    const newest = (await this.list(buildingKey))[0];
-    if (newest?.id !== id) throw new Error("Only the newest note can be undone.");
-    const reply = await postJson("/api/facts/undo", { key: buildingKey });
+    const reply = await postJson("/api/facts/undo", { key: buildingKey, id });
     if (!reply.undone) throw new Error("Too late to undo.");
     return { state: reply.state };
   }

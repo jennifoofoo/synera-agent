@@ -237,6 +237,25 @@ def test_agent_round_carries_its_stops_for_the_page(app, monkeypatch):
     assert "round" not in page["state"]["route"]
 
 
+def test_round_endpoint_plans_like_the_agent_and_draws_the_round(app):
+    """POST /api/round runs plan_round (same order and metres as the chat) and draws it with route.round."""
+    key = "dev/proc-factory-dev-003"
+    bm = app.session(key).map
+    start = next(s["id"] for s in bm.spaces.values() if s["name"] == "Main aisle H-B5")
+    expected = plan_round(bm, "fire extinguisher", start, floor_level=0)
+    _, reply = app.post(
+        "/api/round", {"building": key, "type": "fire extinguisher", "area": "Ground floor", "start": start}
+    )
+    planned = reply["round"]
+    assert planned["ok"] and [s["space_id"] for s in planned["stops"]] == [s["space_id"] for s in expected["stops"]]
+    assert planned["total_m"] == expected["total_m"]
+    route = reply["state"]["route"]
+    stops = [stop["space_id"] for stop in route["round"]["stops"]]
+    assert route["start"] == start and route["via"] == stops[:-1] and route["destination"] == stops[-1]
+    _, bad = app.post("/api/round", {"building": key, "type": "unicorn", "start": start})
+    assert bad["round"]["ok"] is False and bad["round"]["error"]
+
+
 def test_page_route_asked_during_chat_wins_over_the_agent_route(app, key, monkeypatch):
     start, end = rooms_on_lift_floors(app, key)
 

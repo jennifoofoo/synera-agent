@@ -5,7 +5,7 @@
   POST /api/facts {building|key, kind: note|issue, anchor, text, valid_to?, author?, related?, photo_base64?}
                  -> {fact, state}   (closures only through the chat card, they change routes)
   GET  /api/facts/photo?key=&id=   image/jpeg
-  POST /api/facts/undo {building|key} -> {undone: fact|null, state}   (only facts younger than 2 minutes)
+  POST /api/facts/undo {building|key, id?} -> {undone: fact|null, state}   (that fact, else the newest; only younger than 2 minutes)
   GET  /api/graph?key=[&format=aas][&at=]   JSON-LD (Brick/REC) or Asset Administration Shell export
 
 The store keeps photos as "photos/<id>.jpg"; here they become /api/facts/photo URLs for the building key."""
@@ -128,8 +128,8 @@ def create(store: KnowledgeStore, bm, key: str, body: dict) -> dict:
     return {"fact": public(fact, key)}
 
 
-def undo(store: KnowledgeStore, bm, key: str) -> dict:
-    removed = store.undo_last(bm)
+def undo(store: KnowledgeStore, bm, key: str, fact_id: str | None = None) -> dict:
+    removed = store.undo_last(bm, fact_id=fact_id or None)
     tick(store, bm)
     return {"undone": public(removed, key) if removed else None}
 
