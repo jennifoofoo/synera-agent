@@ -144,6 +144,31 @@ export function FloorBadge({ kind, direction, level, title }: { kind: "stairs" |
   );
 }
 
+/** 2D: width (px) of the floor-change hint "Continues on Floor 1 ↑" (glyph, text at about 7 px a character, padding). */
+export function floorHintWidth(text: string): number {
+  return 22 + Math.ceil(text.length * 7) + 14;
+}
+
+/** 2D: where the route changes floor, a tappable blue pill "Continues on Floor 1 ↑" that shows that floor. */
+export function FloorHint({ kind, text, title, onGo }: { kind: "stairs" | "lift"; text: string; title: string; onGo: () => void }) {
+  return (
+    <button
+      type="button"
+      className="floor-badge floor-hint"
+      title={title}
+      aria-label={title}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onGo();
+      }}
+    >
+      {GLYPHS[kind]}
+      <span>{text}</span>
+    </button>
+  );
+}
+
 /** Diameter (px) of a found thing's dot, and of a dot that stands for several close together. */
 export const FOUND_DOT_PX = 12;
 export const FOUND_MANY_PX = 18;

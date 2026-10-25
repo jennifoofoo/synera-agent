@@ -10,13 +10,22 @@ import type { BuildingState, Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { closedConnectorStops } from "../model/closures";
-import type { Highlight, Selection } from "../store";
+import { useTwin, type Highlight, type Selection } from "../store";
 import { openingEditsOf, outlineGeometry, polygonGeometry, wallTopOutline, withCutaway } from "./geometry";
 import { cutawayUniforms } from "./FloorMesh";
 import { HereDot, TapPin } from "./HerePin";
 import { ClosedGlyph } from "./Labels";
 import { Pulse, PulseFew } from "./markerLayout";
-import { FloorBadge } from "./poiIcons";
+import { FloorHint } from "./poiIcons";
+import { floorChangeMarks, routeStackKey } from "./floorVisibility";
+
+/** A floor-change pill was tapped: only that floor, as the rail does (a stacked route steps out of the stack). */
+function showFloorOf(floorId: string) {
+  const store = useTwin.getState();
+  const key = routeStackKey(store.state?.route);
+  if (store.viewMode === "3d" && key && store.routeStackOff !== key) store.setRouteStackOff(key);
+  store.focusFloor(floorId);
+}
 import { assetSize } from "./Things";
 
 interface Props {
@@ -228,22 +237,17 @@ export function Markers({ model, state, floorY, visibleFloors, focusedFloorId, h
       <HereDot model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} reducedMotion={reducedMotion} worker={worker} colour={hereColour} />
       <TapPin model={model} floorY={floorY} visibleFloors={visibleFloors} flat={flat} />
 
-      {/* floor changes of the route in 3D: one small "↑ 1" badge where to go up or down (2D: Labels.tsx lays it out) */}
+      {/* floor changes of the route in 3D: on each drawn floor a tappable pill where the route leaves ("↑ Floor 1 via
+          Main Stairs") and where it arrives ("↓ from Ground floor, Main Stairs"); 2D: Labels.tsx lays them out */}
       {!flat &&
-        state?.route?.ok &&
-        state.route.floor_changes?.map((change, index) =>
-          shown(change.from_floor) ? (
-            <group key={`fc-${index}`} position={at(change.from_floor, change.from_point)}>
-              <Html center position-y={1.4} zIndexRange={[3, 0]} style={{ pointerEvents: "none" }}>
-                <FloorBadge
-                  kind={change.kind === "lift" ? "lift" : "stairs"}
-                  direction={change.direction}
-                  level={model.floorById.get(change.to_floor)?.level ?? 0}
-                  title={`${change.name} ${change.direction} to ${model.floorById.get(change.to_floor)?.name ?? change.to_floor}`}
-                />
+        [...visibleFloors].flatMap((floorId) =>
+          floorChangeMarks(state?.route, floorId, model).map((mark) => (
+            <group key={mark.key} position={at(floorId, mark.point)}>
+              <Html center position-y={1.4} zIndexRange={[3, 0]} style={{ pointerEvents: "auto" }}>
+                <FloorHint kind={mark.kind} text={mark.text} title={`${mark.text}: show that floor`} onGo={() => showFloorOf(mark.otherFloor)} />
               </Html>
             </group>
-          ) : null,
+          )),
         )}
 
       {/* closures: a closed room gets a red tint with an outline ... */}

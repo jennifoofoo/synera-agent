@@ -17,6 +17,9 @@
   box-sizing: border-box; display: inline-flex; align-items: center; gap: 2px; color: #fff; white-space: nowrap;
   font: 700 12px/1 var(--font, system-ui, sans-serif); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
+/* 2D: the same pill as a button with words, tappable (it switches to the floor the route continues on) */
+.floor-badge.floor-hint { height: 26px; border-radius: 13px; padding: 0 10px 0 6px; gap: 4px; cursor: pointer; pointer-events: auto; font-weight: 600; }
+.floor-badge.floor-hint:active { transform: scale(0.96); }
 .floor-badge svg { width: 14px; height: 14px; fill: #fff; }
 .floor-badge svg .stroke { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 
