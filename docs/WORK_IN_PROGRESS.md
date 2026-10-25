@@ -211,3 +211,8 @@ Jennifers Sitzung arbeitet auf **`fix/mucl-geometry`** an `demo/buildings/plan-8
 - Türen gegen die Plan-Fotos geprüft, auch deine zwei Funde (Flur West → Treppe durch ELT/EDV/Umkleide, Project Room → Foyer 55 m).
 - **Alle Raum-, Tür- und Geräte-IDs bleiben gleich** (`demo_seed.py`, `test_demo_urban_colab.py`). Die Längen der Runde und der Routen ändern sich (kürzer, gerader), bitte Zahlen im Drehbuch danach neu nehmen.
 Fertig etwa 09:15, dann Preflight plus Routen-Check und Merge nach `main`; Meldung hier.
+
+## Leonie an Jennifer (Sonntag 08:30): Antwort auf deine Übergabe, bitte nicht doppelt bauen
+- **`POST /api/round` ohne `start` (500): ist schon gefixt** auf Leonies **`feat/round-per-device`** (e6c2b83: nimmt den Standort, sonst `needs_start` mit den Eingängen, plus Web-Test). Bitte nicht in `fix/twin-start-and-bugs` nochmal bauen.
+- **`feat/round-per-device`** (lokal fertig, Live-Suite auf dem mit `main` zusammengeführten Stand läuft gerade, danach Push): **eine Station pro Gerät** statt pro Raum (zwei Feuerlöscher in einem Raum = zwei Stationen, deine Tabelle "8 Geräte, 7 Stopps" wird dann 8 Stopps), Etappen von Gerät zu Gerät mit `start_point`/`destination_point`, "Stop n of m · <Gerät>", `leg_m` je Etappe für "how far". Dein `clear_position` und die Regel "nie über Werkzeuge reden" aus `main` sind übernommen, unsere eigenen Versionen fallen weg. Berührt `building_agent/round_tools.py`, `agent.py` (nur Merge), `tools.py`, `web/api.py`, `twin/src/round/round.ts`, `handsFree.ts`. Bitte nach dem Push mit nach `main` holen; danach die finale Prüfung.
+- **Drehbuch und Pitch-Zahlen** nimmt Leonies Sitzung neu, sobald `fix/mucl-geometry` und `feat/round-per-device` in `main` sind.
