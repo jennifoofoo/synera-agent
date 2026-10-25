@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 import type { BuildingState, Point, Route } from "./api/types";
-import { createWalkWithMe, legsFromRoute, requestMotionPermission, type MotionStatus, type WalkPosition, type WalkWithMe } from "./motion";
+import { createWalkWithMe, legsFromRoute, motionSupport, requestMotionPermission, type MotionStatus, type WalkPosition, type WalkWithMe } from "./motion";
 import { useTwin, walkSteps } from "./store";
 import { speak } from "./voice";
 import { metresIn, readable } from "./walkInfo";
@@ -25,6 +25,8 @@ interface WalkMotionState {
   uncertaintyM: number;
   /** the estimate reached the destination: "You should be about there." */
   arrived: boolean;
+  /** the viewer has answered Walk with me once (switch or the hint), so the hint in the guide does not ask again */
+  answered: boolean;
 }
 
 function loadPref(): boolean {
@@ -35,7 +37,16 @@ function loadPref(): boolean {
   }
 }
 
+function loadAnswered(): boolean {
+  try {
+    return localStorage.getItem(PREF_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 function savePref(on: boolean): void {
+  useWalkMotion.setState({ answered: true });
   try {
     localStorage.setItem(PREF_KEY, on ? "1" : "0");
   } catch {
@@ -43,7 +54,7 @@ function savePref(on: boolean): void {
   }
 }
 
-export const useWalkMotion = create<WalkMotionState>(() => ({ on: loadPref(), notice: null, estimate: null, uncertaintyM: 0, arrived: false }));
+export const useWalkMotion = create<WalkMotionState>(() => ({ on: loadPref(), notice: null, estimate: null, uncertaintyM: 0, arrived: false, answered: loadAnswered() }));
 
 const STATUS_TEXT: Partial<Record<MotionStatus, string>> = {
   "needs-https": "needs https",
@@ -76,6 +87,25 @@ export async function toggleWalkWithMe(): Promise<void> {
   useWalkMotion.setState({ on: true });
   savePref(true);
   showNotice("on");
+}
+
+/** A phone whose motion sensors can work here (touch screen, sensors present, https). Laptops never qualify. */
+export function walkWithMeAvailable(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia?.("(pointer: coarse)").matches) return false;
+  const status = motionSupport();
+  return status !== "unsupported" && status !== "needs-https";
+}
+
+/** The hint's "Turn on": the same switch tap (permission inside the gesture). A refused permission counts as an
+ * answer too, so the hint does not ask again; the switch stays available. */
+export async function acceptWalkWithMeHint(): Promise<void> {
+  await toggleWalkWithMe();
+  if (!useWalkMotion.getState().on) savePref(false);
+}
+
+/** The hint's "Not now": remembered like switching it off. */
+export function declineWalkWithMeHint(): void {
+  savePref(false);
 }
 
 /** While true, Walk with me moves the guide. A time-based auto-pace timer must not run then (one driver only). */

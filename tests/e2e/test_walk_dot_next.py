@@ -189,6 +189,8 @@ def test_walk_with_me_next_agrees_with_the_dot_and_next_is_secondary(page):
     ride = next(i for i, line in enumerate(steps) if line.startswith(("Take ", "Use ")))
     if ride < 2:
         pytest.skip("stairs come right away: no walk step before them")
+    # the first-time hint stands in for the switch; this test drives the switch, so the hint is answered already
+    page.evaluate("() => window.__walkMotion.setState({ answered: true })")
     page.evaluate("() => window.__twinStore.getState().startWalk()")
     page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
     page.get_by_role("switch", name="Walk with me").click()

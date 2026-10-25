@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useTwin, walkSteps } from "../store";
 import { speak, stopSpeaking } from "../voice";
 import { metresLeft, readable, walkMinutes } from "../walkInfo";
-import { honestLine, toggleWalkWithMe, useWalkMotion } from "../walkWithMe";
+import { acceptWalkWithMeHint, declineWalkWithMeHint, honestLine, toggleWalkWithMe, useWalkMotion, walkWithMeAvailable } from "../walkWithMe";
 import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
 import { PhoneSheet } from "./PhoneSheet";
 import { RoundBar } from "./Round";
@@ -64,6 +64,7 @@ export function Walk() {
   const motionOn = useWalkMotion((s) => s.on);
   const estimate = useWalkMotion((s) => s.estimate);
   const motionNotice = useWalkMotion((s) => s.notice);
+  const motionAnswered = useWalkMotion((s) => s.answered);
   const line = step !== null ? honestLine(readable(walkSteps()[step] ?? "")) : "";
   const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
@@ -90,6 +91,8 @@ export function Walk() {
   // Walk with me on: the module's estimate (walking metres only), shown as "about".
   const length = estimate ? Math.round(estimate.distanceLeftM) : metresLeft(steps, step, route.length_m);
   const minutes = length !== null ? walkMinutes(length) : null;
+  // The hint stands in for the switch while it shows (one "Walk with me" on the phone, not two).
+  const showHint = step === 0 && !motionOn && !motionAnswered && walkWithMeAvailable();
   const end = () => {
     stopWalk();
     void clearRoute();
@@ -132,13 +135,32 @@ export function Walk() {
             {last ? "Done" : "Next"}
           </button>
         </div>
+        {/* Asked once, at the start of the guide, on phones that have the sensors; the answer is remembered. Under the
+            buttons, next to the switch it explains, so Back/Next never move (phone landscape is only 390 px high). */}
+        {showHint && (
+          <div className="walk-hint" role="group" aria-label="Walk with me hint">
+            <p>Walk with me?</p>
+            <div className="walk-hint-actions">
+              <button className="primary" onClick={() => void acceptWalkWithMeHint()}>
+                Turn on
+              </button>
+              <button className="walk-hint-close" onClick={declineWalkWithMeHint} aria-label="Not now" title="Not now">
+                ×
+              </button>
+            </div>
+          </div>
+        )}
         {/* One quiet row under the buttons: the Walk with me switch (counts steps, moves an estimated dot along the
             route; off by default) and the list toggle. */}
         <div className="walk-foot">
-          <label className="walk-motion-switch">
-            <input type="checkbox" role="switch" checked={motionOn} onChange={() => void toggleWalkWithMe()} aria-label="Walk with me" />
-            Walk with me
-          </label>
+          {showHint ? (
+            <span />
+          ) : (
+            <label className="walk-motion-switch">
+              <input type="checkbox" role="switch" checked={motionOn} onChange={() => void toggleWalkWithMe()} aria-label="Walk with me" />
+              Walk with me
+            </label>
+          )}
           {steps.length > 1 && (
             <button className="link walk-toggle" onClick={() => setList(!list)} aria-expanded={list}>
               {list ? "Hide steps" : `All ${steps.length} steps`}

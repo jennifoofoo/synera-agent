@@ -181,6 +181,8 @@ def test_walk_with_me_moves_the_estimate_and_never_sends_it(page):
     if len(steps) > 1 and steps[0].startswith(("Start in ", "Start at ")):
         steps = steps[1:]  # the guide leaves out the opening "Start in X" line (store.ts walkLines)
     ride = next(i for i, line in enumerate(steps) if line.startswith(("Take ", "Use ")))
+    # This test drives the switch itself; the first-time hint (which stands in for the switch) is answered already.
+    page.evaluate("() => window.__walkMotion.setState({ answered: true })")
     page.evaluate("() => window.__twinStore.getState().startWalk()")
     page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
     switch = page.get_by_role("switch", name="Walk with me")
@@ -259,3 +261,85 @@ def test_walk_with_me_moves_the_estimate_and_never_sends_it(page):
         assert '"here"' not in request["body"] and "start_point" not in request["body"], request
         assert "/api/chat" not in request["url"], request
     assert not page.errors, page.errors
+
+
+def _start_guide(page) -> None:
+    if not page.evaluate(FIND_ROUTE):
+        pytest.skip("no route across floors in the picked building")
+    page.evaluate("() => window.__twinStore.getState().startWalk()")
+    # generous: the laptop page renders 3D every frame, which is slow headless on a loaded machine
+    page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=20000)
+
+
+def _restart_guide(page) -> None:
+    page.evaluate("() => window.__twinStore.getState().stopWalk()")
+    page.wait_for_timeout(200)
+    page.evaluate("() => window.__twinStore.getState().startWalk()")
+    page.wait_for_function("() => window.__twinStore.getState().walkStep === 0", timeout=5000)
+
+
+def test_walk_hint_turns_it_on_once_and_is_not_asked_again(page):
+    """Phone, first guide: the hint asks once; "Turn on" uses the switch path and is remembered."""
+    _start_guide(page)
+    hint = page.get_by_role("group", name="Walk with me hint")
+    assert hint.is_visible()
+    assert page.get_by_role("switch", name="Walk with me").count() == 0, "one Walk with me control at a time"
+    assert "Walk with me?" in hint.inner_text()
+    assert len(hint.inner_text().split()) <= 6, "one short line, no explanation text on the phone"
+    hint.get_by_role("button", name="Turn on").click()
+    page.wait_for_function("() => window.__walkMotion.getState().on", timeout=5000)
+    assert page.get_by_role("switch", name="Walk with me").is_checked()
+    assert page.evaluate("() => localStorage.getItem('twin.walkWithMe')") == "1"
+    assert not hint.is_visible()
+    assert page.get_by_role("switch", name="Walk with me").is_visible(), "the switch is back once answered"
+    # switched off again later: still answered, the hint stays away
+    page.get_by_role("switch", name="Walk with me").click()
+    _restart_guide(page)
+    assert page.get_by_role("group", name="Walk with me hint").count() == 0
+    assert not page.errors, page.errors
+
+
+def test_walk_hint_not_now_is_remembered(page):
+    _start_guide(page)
+    page.get_by_role("group", name="Walk with me hint").get_by_role("button", name="Not now").click()
+    assert page.get_by_role("group", name="Walk with me hint").count() == 0
+    assert page.evaluate("() => localStorage.getItem('twin.walkWithMe')") == "0"
+    assert not page.evaluate("() => window.__walkMotion.getState().on")
+    page.reload()
+    page.wait_for_function(
+        "() => !!(window.__twinStore && window.__twinStore.getState().model && window.__walkMotion)", timeout=20000
+    )
+    _start_guide(page)
+    assert page.get_by_role("group", name="Walk with me hint").count() == 0, "not asked again after a reload"
+
+
+def test_walk_hint_only_after_the_first_step(page):
+    """The hint belongs to the start of the guide: after Next it is gone, the switch is still there."""
+    _start_guide(page)
+    assert page.get_by_role("group", name="Walk with me hint").is_visible()
+    page.get_by_role("button", name="Next", exact=True).click()
+    assert page.get_by_role("group", name="Walk with me hint").count() == 0
+    assert page.get_by_role("switch", name="Walk with me").is_visible()
+
+
+def test_walk_hint_never_on_a_laptop(server, playwright_instance):
+    """A laptop (mouse, no touch) gets no hint, even though Chrome defines DeviceMotionEvent."""
+    url, key = server
+    try:
+        browser = playwright_instance.chromium.launch()
+    except Exception as error:  # noqa: BLE001 - missing browser binary
+        pytest.skip(f"chromium not installed: {str(error)[:80]}")
+    context = browser.new_context(viewport={"width": 1280, "height": 800})
+    context.add_init_script(INIT)
+    page = context.new_page()
+    try:
+        page.goto(f"{url}/?building={key}")
+        page.wait_for_function(
+            "() => !!(window.__twinStore && window.__twinStore.getState().model && window.__walkMotion)", timeout=20000
+        )
+        _start_guide(page)
+        page.wait_for_timeout(300)
+        assert page.get_by_role("group", name="Walk with me hint").count() == 0
+    finally:
+        context.close()
+        browser.close()
