@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, egoGraph, factStateAt, localId, mainType, momentLabel, spreadOut, timeRange, type LdNode } from "./egoGraph";
+import { DAY_MS, QUIET_SHOWN, egoGraph, factStateAt, localId, mainType, momentLabel, spreadOut, timeRange, wrapLabel, type LdNode } from "./egoGraph";
 
 const B = "urn:synera:b1";
 const room = `${B}:space:S1`;
@@ -50,6 +50,17 @@ function graph(extraAssets = 0): LdNode[] {
   ];
 }
 
+/** The same room without any note (facts dropped), plus lifts/stairs and extra doors. */
+function quietGraph(extraAssets = 0, extraDoors = 0): LdNode[] {
+  const doors: LdNode[] = Array.from({ length: extraDoors }, (_, i) => ({
+    "@id": `${B}:opening:E${i}`,
+    "@type": ["rec:Door", "brick:Door"],
+    connects: [room, `${B}:space:S2`],
+  }));
+  const stairs: LdNode = { "@id": `${B}:connector:ST1`, "@type": ["rec:Stairs", "brick:Stairs"], name: "Stairs East", connects: [room, `${B}:space:S2`] };
+  return [...graph(extraAssets).filter((n) => !(n["@type"] as string[]).includes("wanda:Fact")), ...doors, stairs];
+}
+
 describe("factStateAt", () => {
   const fact: LdNode = { "@id": "f", validFrom: iso(0), validTo: iso(DAY_MS) };
   it("is future before validFrom, open in between, ended from validTo on", () => {
@@ -64,11 +75,13 @@ describe("factStateAt", () => {
 });
 
 describe("egoGraph", () => {
-  it("puts the room in the centre, its assets and doors in ring 1, facts in ring 2 and reporters in ring 3", () => {
+  it("puts the room in the centre, what carries a note in ring 1 (rest collapsed), facts in ring 2 and reporters in ring 3", () => {
     const ego = egoGraph(graph(), "S1", { at: now });
-    const ids = (ring: number) => ego.nodes.filter((n) => n.ring === ring).map((n) => localId(n.id));
+    const ids = (ring: number) => ego.nodes.filter((n) => n.ring === ring).map((n) => (n.role === "more" ? "more" : localId(n.id)));
     expect(ids(0)).toEqual(["S1"]);
-    expect(ids(1).sort()).toEqual(["D1", "M1", "X1"]);
+    expect(ids(1)).toEqual(["M1", "more"]); // the extinguisher and the door carry no note
+    expect(ego.more).toBe(2);
+    expect(ego.moreItems.map((i) => i.label).sort()).toEqual(["Door to Corridor", "Extinguisher"]);
     expect(ids(2).sort()).toEqual(["f-1", "f-2"]);
     expect(ids(3)).toEqual(["marta"]);
     const edge = (from: string, to: string) => ego.edges.some((e) => localId(e.from) === from && localId(e.to) === to);
@@ -76,9 +89,46 @@ describe("egoGraph", () => {
     expect(edge("S1", "f-2")).toBe(true);
     expect(edge("f-1", "marta")).toBe(true);
     expect(ego.nodes.find((n) => localId(n.id) === "M1")?.hasFacts).toBe(true);
-    expect(ego.nodes.find((n) => localId(n.id) === "D1")?.label).toBe("Door to Corridor");
+    expect(ego.nodes.find((n) => n.role === "more")?.label).toBe("+2 more");
     expect(ego.nodes.find((n) => localId(n.id) === "f-1")).toMatchObject({ number: 1, person: "Marta", anchor: "CNC lathe", role: "note" });
     expect(ego.oldest).toBe(now - DAY_MS);
+  });
+
+  it("keeps lifts and stairs in ring 1 next to the noted things, and a note on a door brings the door out", () => {
+    const withStairs = [...graph(), { "@id": `${B}:connector:ST1`, "@type": ["rec:Stairs", "brick:Stairs"], name: "Stairs East", connects: [room, `${B}:space:S2`] } as LdNode];
+    const ring1 = egoGraph(withStairs, "S1", { at: now }).nodes.filter((n) => n.ring === 1 && n.role !== "more");
+    expect(ring1.map((n) => n.label).sort()).toEqual(["CNC lathe", "Stairs East"]);
+    const noteOnDoor: LdNode = { "@id": `${B}:fact:f-5`, "@type": ["wanda:Fact", "wanda:Note"], kind: "note", text: "Door sticks", validFrom: iso(-1000), anchoredAt: [`${B}:opening:D1`], isLocatedIn: room };
+    const labels = egoGraph([...graph(), noteOnDoor], "S1", { at: now }).nodes.filter((n) => n.ring === 1).map((n) => n.label);
+    expect(labels).toContain("Door to Corridor");
+  });
+
+  it("collapses everything else into one +N more node, however many things the room holds", () => {
+    const ego = egoGraph(graph(30), "S1", { at: now });
+    const ring1 = ego.nodes.filter((n) => n.ring === 1);
+    expect(ring1.map((n) => n.role)).toEqual(["asset", "more"]);
+    expect(ego.more).toBe(33 - 1);
+    expect(ego.moreItems).toHaveLength(32);
+    expect(ring1.at(-1)?.label).toBe("+32 more");
+  });
+
+  it("shows the 6 most relevant things with names when the room has no notes: lifts/stairs, doors, safety first", () => {
+    const ego = egoGraph(quietGraph(10, 3), "S1", { at: now });
+    const ring1 = ego.nodes.filter((n) => n.ring === 1 && n.role !== "more");
+    expect(ring1).toHaveLength(QUIET_SHOWN);
+    expect(ring1[0].label).toBe("Stairs East");
+    expect(ring1.filter((n) => n.role === "door")).toHaveLength(4); // D1 and three more
+    expect(ring1.map((n) => n.label)).toContain("Extinguisher");
+    expect(ring1.every((n) => n.label.length > 0 && !n.hasFacts)).toBe(true);
+    expect(ego.more).toBe(17 - QUIET_SHOWN); // 17 things around the room, 6 shown
+    expect(ego.nodes.filter((n) => n.ring >= 2)).toEqual([]);
+  });
+
+  it("has no +N more node when everything fits", () => {
+    const small = quietGraph().filter((n) => n["@id"] !== `${B}:asset:M1`);
+    const ego = egoGraph(small, "S1", { at: now });
+    expect(ego.more).toBe(0);
+    expect(ego.nodes.some((n) => n.role === "more")).toBe(false);
   });
 
   it("hides a fact after its validTo, or fades it with showEnded, and hides facts not yet valid", () => {
@@ -92,22 +142,29 @@ describe("egoGraph", () => {
     expect(before.nodes.filter((n) => n.ring >= 2)).toEqual([]);
   });
 
-  it("caps ring 1 with a +N node and keeps the nodes that carry facts", () => {
-    const ego = egoGraph(graph(30), "S1", { at: now, cap: 16 });
-    const ring1 = ego.nodes.filter((n) => n.ring === 1);
-    expect(ring1).toHaveLength(16);
-    expect(ego.more).toBe(33 - 15);
-    expect(ring1.at(-1)?.label).toBe(`+${33 - 15}`);
-    expect(ring1.some((n) => localId(n.id) === "M1")).toBe(true);
+  it("keeps every node inside the viewBox, which follows the node count", () => {
+    for (const data of [graph(30), quietGraph(10, 12), graph()]) {
+      const ego = egoGraph(data, "S1", { at: now, width: 360 });
+      for (const node of ego.nodes) {
+        expect(node.x).toBeGreaterThanOrEqual(0);
+        expect(node.x).toBeLessThanOrEqual(360);
+        expect(node.y).toBeGreaterThanOrEqual(ego.view.y);
+        expect(node.y).toBeLessThanOrEqual(ego.view.y + ego.view.height);
+      }
+    }
+    const small = egoGraph(graph(), "S1", { at: now, width: 360 });
+    const big = egoGraph(quietGraph(10, 12), "S1", { at: now, width: 360 });
+    expect(small.view.width).toBe(360);
+    expect(small.view.height).toBeLessThan(big.view.height + 1);
+    expect(small.view.height).toBeLessThan(300);
   });
 
-  it("keeps every node inside the drawing area", () => {
-    const ego = egoGraph(graph(30), "S1", { at: now, width: 360, height: 300 });
-    for (const node of ego.nodes) {
-      expect(node.x).toBeGreaterThanOrEqual(0);
-      expect(node.x).toBeLessThanOrEqual(360);
-      expect(node.y).toBeGreaterThanOrEqual(0);
-      expect(node.y).toBeLessThanOrEqual(300);
+  it("puts labels outside: left of nodes on the left half, right of nodes on the right half, never cut", () => {
+    const ego = egoGraph(quietGraph(10, 12), "S1", { at: now, width: 360 });
+    for (const node of ego.nodes.filter((n) => n.ring === 1)) {
+      expect(node.side).toBe(node.x >= 180 ? "right" : "left");
+      expect(node.lines?.length).toBeLessThanOrEqual(2);
+      expect(node.lines?.join("").includes("…")).toBe(false);
     }
   });
 
@@ -131,6 +188,23 @@ describe("labels and range", () => {
   it("says Now, Tomorrow or the date", () => {
     expect(momentLabel(now, now)).toBe("Now");
     expect(momentLabel(now + DAY_MS, now)).toMatch(/^Tomorrow /);
+  });
+});
+
+describe("wrapLabel", () => {
+  it("keeps short labels on one line and wraps long ones to two balanced lines without cutting", () => {
+    expect(wrapLabel("Chair", 16)).toEqual(["Chair"]);
+    expect(wrapLabel("Fire alarm call point 0.04", 16)).toEqual(["Fire alarm", "call point 0.04"]);
+    expect(wrapLabel("Door to Flur Nord Ost", 12)).toEqual(["Door to Flur", "Nord Ost"]);
+  });
+  it("never uses an ellipsis, even for one long word", () => {
+    const lines = wrapLabel("Extinguisher_0000000000000001", 12);
+    expect(lines).toHaveLength(2);
+    expect(lines.join("")).not.toContain("…");
+    expect(lines.join("").replace("-", "")).toContain("Extinguisher");
+  });
+  it("splits after - _ and /", () => {
+    expect(wrapLabel("plan-89323a15-A00007-extra", 10).length).toBe(2);
   });
 });
 

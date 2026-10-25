@@ -30,6 +30,80 @@ function fitBox(c: CameraControlsImpl, box: THREE.Box3, animate: boolean, pad = 
   void c.fitToSphere(sphere, animate);
 }
 const HOME_POLAR = Math.PI / 3.6;
+/** Screen space (px) the laptop chrome covers around the 3D home view: name chip, voice bar, floor rail. */
+const HOME_CHROME = { top: 80, bottom: 104, left: 24, right: 72 };
+
+/** Home in 3D, tight: the building's own points (its footprint corners, else the box's corners; not the bounding
+ * sphere, which leaves a flat building small in a wide window) fill the screen minus the chrome, seen from
+ * `azimuth` / `polar`. Projects with a copy of the real camera (its view offset included) and searches the distance,
+ * then centres the projection in the free area. */
+function fitHome(
+  c: CameraControlsImpl,
+  camera: THREE.Camera,
+  box: THREE.Box3,
+  azimuth: number,
+  polar: number,
+  view: { width: number; height: number },
+  animate: boolean,
+  points?: THREE.Vector3[],
+) {
+  if (!(camera as THREE.PerspectiveCamera).isPerspectiveCamera || view.width < 1 || view.height < 1) {
+    void c.rotateTo(azimuth, polar, animate);
+    fitBox(c, box, animate, 0.95);
+    return;
+  }
+  const probe = (camera as THREE.PerspectiveCamera).clone();
+  const chrome = view.width < 700 ? { top: 72, bottom: 120, left: 12, right: 12 } : HOME_CHROME;
+  const lo = new THREE.Vector2(-1 + (2 * chrome.left) / view.width, -1 + (2 * chrome.bottom) / view.height);
+  const hi = new THREE.Vector2(1 - (2 * chrome.right) / view.width, 1 - (2 * chrome.top) / view.height);
+  const direction = new THREE.Vector3().setFromSpherical(new THREE.Spherical(1, polar, azimuth));
+  const corners: THREE.Vector3[] = points?.length ? points : [];
+  if (!corners.length) {
+    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
+  }
+  const target = box.getCenter(new THREE.Vector3());
+  const point = new THREE.Vector3();
+  const place = (distance: number) => {
+    probe.position.copy(target).addScaledVector(direction, distance);
+    probe.up.set(0, 1, 0);
+    probe.lookAt(target);
+    probe.updateMatrixWorld(true);
+  };
+  const extent = (distance: number) => {
+    place(distance);
+    const min = new THREE.Vector2(Infinity, Infinity);
+    const max = new THREE.Vector2(-Infinity, -Infinity);
+    for (const corner of corners) {
+      point.copy(corner).project(probe);
+      min.set(Math.min(min.x, point.x), Math.min(min.y, point.y));
+      max.set(Math.max(max.x, point.x), Math.max(max.y, point.y));
+    }
+    return { min, max };
+  };
+  const radius = box.getBoundingSphere(new THREE.Sphere()).radius;
+  let distance = radius * 3;
+  for (let pass = 0; pass < 3; pass++) {
+    // the smallest distance at which the box fits the free area (its width and height; centring follows)
+    let near = Math.max(1, radius * 0.6);
+    let far = radius * 12;
+    for (let i = 0; i < 28; i++) {
+      const mid = (near + far) / 2;
+      const { min, max } = extent(mid);
+      if (max.x - min.x <= hi.x - lo.x && max.y - min.y <= hi.y - lo.y) far = mid;
+      else near = mid;
+    }
+    distance = far;
+    // move the target so the box's projection sits in the middle of the free area
+    const { min, max } = extent(distance);
+    const depth = target.clone().project(probe).z;
+    const from = new THREE.Vector3((min.x + max.x) / 2, (min.y + max.y) / 2, depth).unproject(probe);
+    const to = new THREE.Vector3((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, depth).unproject(probe);
+    target.add(from.sub(to));
+  }
+  distance *= 1.04; // a hair of air around the building
+  place(distance);
+  void c.setLookAt(probe.position.x, probe.position.y, probe.position.z, target.x, target.y, target.z, animate);
+}
 
 function pointInPolygon(x: number, y: number, polygon: [number, number][]): boolean {
   let inside = false;
@@ -218,9 +292,31 @@ export function CameraRig({ model, floorY, floorTop, topY }: Props) {
         fitBox(c, box, animate, 0.9);
         return;
       }
-      box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
-      void c.rotateTo(HOME_AZIMUTH, profile === "worker" ? Math.PI / 5 : HOME_POLAR, animate);
-      fitBox(c, box, animate, 0.95);
+      const polar = profile === "worker" ? Math.PI / 5 : HOME_POLAR;
+      if (floorMode === "exploded") {
+        box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
+        void c.rotateTo(HOME_AZIMUTH, polar, animate);
+        fitBox(c, box, animate, 0.95);
+        return;
+      }
+      // One floor at a time: frame what is drawn, the focused floor and the outlines below it (floors above are
+      // hidden, an upper floor that reaches past the ground floor must not shrink the view).
+      const focused = model.floorById.get(focusedFloorId ?? "") ?? model.floors[0];
+      const points: THREE.Vector3[] = [];
+      const wallTop = floorY(focused.id) + 1.2; // the cut walls
+      for (const floor of model.floors) {
+        if (floor.level > focused.level) continue;
+        const y = floorY(floor.id);
+        for (const space of floor.spaces) {
+          for (const [x, z] of space.polygon) {
+            points.push(new THREE.Vector3(x, y, -z));
+            if (floor.id === focused.id) points.push(new THREE.Vector3(x, wallTop, -z));
+          }
+        }
+      }
+      for (const point of points) box.expandByPoint(point);
+      if (box.isEmpty()) box.set(new THREE.Vector3(bounds.minX, 0, -bounds.maxY), new THREE.Vector3(bounds.maxX, topY, -bounds.minY));
+      fitHome(c, camera, box, HOME_AZIMUTH, polar, viewport, animate, points);
       return;
     }
     if (request.kind === "floor" && request.floorId) {

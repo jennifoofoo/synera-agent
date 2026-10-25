@@ -2,18 +2,19 @@
 // accepting it flies there and selects it. Enter on a sentence asks the building (the reply shows in the Card).
 // Voice in via the mic (push-to-talk), replies to spoken questions are spoken back (mute toggle).
 // By default one bottom bar shows: the Wanda orb, which is the Talk button (push-to-talk), a one-line caption (what
-// Wanda hears, thinks or says), Ask (opens the input) and, while listening or speaking, Stop. The input stays mounted but invisible, so the
+// Wanda hears, thinks or says) and Ask (opens the input). The orb is the one voice control: Stop while Wanda speaks,
+// Mute / Unmute Wanda (hands-free) while walking, Talk otherwise. The input stays mounted but invisible, so the
 // header search, Cmd/Ctrl+K, the caption and Ask just focus it; focus opens it, an empty blur or Escape closes it.
 // Owner: chat/search session, see ARCHITECTURE.md.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTwin } from "../store";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { setHandsFreeMuted, useTwin } from "../store";
 import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
 import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
 import { parseWake } from "../wake";
 import { Autocomplete, type PlaceHit } from "./Autocomplete";
-import { HandsFreeButton, HandsFreeStatus } from "./HandsFree";
+import { HandsFreeStatus } from "./HandsFree";
 import { voiceHint } from "./phoneHints";
 import "./Omnibox.css";
 
@@ -312,7 +313,20 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
   const talkClick = () => {
     const fired = longPress.current?.fired;
     longPress.current = null;
-    if (!fired) toggleMic();
+    if (fired) return;
+    // One voice control: while Wanda speaks it stops her; while walking it mutes or unmutes hands-free ("Hey Wanda"
+    // is on by itself during a walk, and nothing else offers a mute); otherwise it is Talk (tap again to send).
+    if (!listenerRef.current && speaking) {
+      stopAll();
+      return;
+    }
+    if (walking && !listenerRef.current) {
+      setHandsFreeMuted(handsFreeOn); // remembered for the rest of the walk
+      useTwin.getState().setHandsFree(!handsFreeOn);
+      return;
+    }
+    if (followUpOpen && !handsFreeOn) cancelFollowUp(); // one recognition at a time
+    toggleMic();
   };
 
   const toggleSound = () => {
@@ -369,14 +383,18 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
     mode = "reply";
     caption = lastReply;
   } else if (walking) {
-    // The step itself is the big line of the walk sheet (and the map pill): the bar only says how to talk.
-    caption = "Guiding · say “Wanda”";
+    // The step itself is the big line of the walk sheet (and the map pill): the bar stays quiet.
+    caption = "";
   } else if (!chatAvailable && !walking) {
     caption = "Search rooms and things";
   } else {
     caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Say “Wanda” or tap the mic";
   }
-  const showStop = listening || followUpListening || speaking;
+  const stops = speaking && !listening;
+  const orbLabel = listening ? "Stop and send" : stops ? "Stop" : walking ? (handsFreeOn ? "Mute Wanda" : "Unmute Wanda") : voiceOut ? "Talk" : "Talk (spoken replies off)";
+  const orbTitle = listening ? "Tap to send" : stops ? "Tap to stop" : walking ? (handsFreeOn ? "Tap to mute “Hey Wanda”" : "Tap so Wanda listens again") : "Tap and speak (hold: spoken replies on/off)";
+  // While walking the bar only says that Wanda listens or speaks, never the step or the reply (the sheet has them).
+  if (walking) caption = mode === "listening" ? "Listening…" : mode === "speaking" ? "Speaking…" : "";
 
   const placeholder = listening
     ? "Listening…"
@@ -559,10 +577,10 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
           <button
             type="button"
             ref={talkRef}
-            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""}`}
-            aria-label={listening ? "Stop and send" : voiceOut ? "Talk" : "Talk (spoken replies off)"}
-            aria-pressed={listening}
-            title={listening ? "Tap to send" : "Tap and speak (hold: spoken replies on/off)"}
+            className={`wanda-orb ${mode} wb-orb ob-talk mic ${listening ? "listening" : ""} ${speaking ? "speaking" : ""} ${walking && !handsFreeOn ? "muted" : ""}`}
+            aria-label={orbLabel}
+            aria-pressed={walking && !listening && !stops ? !handsFreeOn : listening}
+            title={orbTitle}
             disabled={busy}
             onPointerDown={talkDown}
             onPointerUp={talkUp}
@@ -571,8 +589,8 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
             onContextMenu={(event) => event.preventDefault()}
             onClick={talkClick}
           >
-            <MicIcon />
-            {!voiceOut && !listening && (
+            <WandaFairy />
+            {(!voiceOut || (walking && !handsFreeOn)) && !listening && (
               <span className="ob-badge" aria-hidden>
                 <MutedIcon />
               </span>
@@ -586,7 +604,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
             // Focus inside the tap so iOS opens the keyboard; the focus opens the input.
             onClick={walking ? undefined : () => inputRef.current?.focus()}
           >
-            {mode === "speaking" && <span className="wb-kicker">Speaking · </span>}
+            {mode === "speaking" && !walking && <span className="wb-kicker">Speaking · </span>}
             <span className="wb-text">{caption}</span>
           </div>
           {!walking && (
@@ -600,13 +618,8 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
               <KeyboardIcon />
             </button>
           )}
-          {/* "Hey Wanda" is switched on in the step sheet; here only while it is on, to see and mute it */}
-          {handsFreeOn && !walking && <HandsFreeButton className="wb-btn" />}
-          {showStop && (
-            <button type="button" className="wb-btn wb-stop" aria-label="Stop" title="Stop" onClick={stopAll}>
-              <StopIcon />
-            </button>
-          )}
+          {/* One voice entry point: no separate stop or hands-free button here. "Hey Wanda" is switched on with the
+              walk (and the wake word); the step sheet has its own toggle. */}
         </div>
       )}
     </div>
@@ -625,6 +638,53 @@ function MicIcon() {
   );
 }
 
+const MIC_PATH =
+  "M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z";
+
+/** Wanda as a small fairy light inside the orb: a soft halo, two pairs of wings (one pair left, one right, flapping
+ * by scaleX from the core), the glowing core with the white mic on it (still "tap to talk"), and three sparks that
+ * only show while thinking. The state comes from the orb's classes (Omnibox.css); only inner parts animate. */
+function WandaFairy() {
+  const id = useId().replace(/:/g, "");
+  return (
+    <svg className="wf" viewBox="0 0 48 48" aria-hidden focusable="false">
+      <defs>
+        <radialGradient id={`${id}-core`} cx="50%" cy="56%" r="55%">
+          <stop offset="0" className="wf-stop-signal" />
+          <stop offset="1" className="wf-stop-dark" />
+        </radialGradient>
+        <radialGradient id={`${id}-soft`}>
+          <stop offset="0.55" className="wf-stop-signal" />
+          <stop offset="1" className="wf-stop-signal wf-stop-clear" />
+        </radialGradient>
+      </defs>
+      <circle className="wf-halo" cx="24" cy="24" r="24" fill={`url(#${id}-soft)`} />
+      <g className="wf-body">
+        {[false, true].map((left) => (
+          <g key={left ? "l" : "r"} transform={left ? "matrix(-1 0 0 1 48 0)" : undefined}>
+            <g className={`wf-wings ${left ? "wf-left" : "wf-right"}`}>
+              <path className="wf-wing wf-wing-up" d="M25 22C29 14 37.5 4.8 44.8 4.2c3.6-.3 3.4 4.4.2 8.6C40 19 32.5 22.6 25 24.6z" />
+              <path className="wf-wing wf-wing-down" d="M25.5 26.4c5.8.4 13.2 3.2 16.2 7.6 2.2 3.3-.5 6.2-4 4.4-4.4-2.3-8.9-7-12.2-10.2z" />
+            </g>
+          </g>
+        ))}
+        <g className="wf-core-g">
+          <circle className="wf-glow" cx="24" cy="24" r="19" fill={`url(#${id}-soft)`} />
+          <circle className="wf-core" cx="24" cy="24" r="15" fill={`url(#${id}-core)`} />
+          {/* a thin light edge along the top-left rim, well clear of the mic */}
+          <path className="wf-shine" d="M10.6 21.6A13.6 13.6 0 0 1 21.6 10.6" />
+          <path className="wf-mic" d={MIC_PATH} transform="translate(24 24.4) scale(0.8) translate(-12 -11.5)" />
+        </g>
+        <g className="wf-sparks">
+          <circle className="wf-spark" cx="24" cy="4.6" r="1.5" />
+          <circle className="wf-spark" cx="40.8" cy="33.7" r="1.5" />
+          <circle className="wf-spark" cx="7.2" cy="33.7" r="1.5" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 function KeyboardIcon() {
   return (
     <svg {...iconProps}>
@@ -638,15 +698,6 @@ function CloseIcon() {
   return (
     <svg {...iconProps}>
       <path d="M6 6l12 12M18 6L6 18" />
-    </svg>
-  );
-}
-
-/** Hang up: a phone handset tipped down, the usual "end call" sign. */
-function StopIcon() {
-  return (
-    <svg {...glyphProps}>
-      <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.996.996 0 0 1 0-1.41C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28a11.27 11.27 0 0 0-2.67-1.85.996.996 0 0 1-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z" />
     </svg>
   );
 }

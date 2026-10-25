@@ -5,8 +5,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
+import { useNotes } from "../notes/notesStore";
 import { useTwin } from "../store";
-import { DAY_MS, HOUR_MS, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
+import { ASSET_R, DAY_MS, FACT_R, HOUR_MS, LINE_H, PERSON_R, ROOM_R, TYPE_H, egoGraph, mainType, momentLabel, timeRange, type EgoNode, type LdNode } from "./egoGraph";
 import "./KnowledgeGraph.css";
 
 interface KnowledgeState {
@@ -26,8 +27,12 @@ export function closeKnowledge(): void {
   useKnowledge.setState({ roomId: null });
 }
 
-/** The entry in the room card. */
+/** The entry in the room card: for the planner on a laptop (never the technician's phone), and only for a room that
+ * has at least one note or issue (now or in its history), else there is nothing to show. */
 export function KnowledgeButton({ roomId }: { roomId: string }) {
+  const planner = useTwin((s) => s.profile === "planner");
+  const hasNotes = useNotes((s) => s.notes.some((note) => note.kind !== "closure" && note.anchor.space_id === roomId));
+  if (!planner || !hasNotes) return null;
   return (
     <button type="button" data-testid="knowledge-open" onClick={() => openKnowledge(roomId)}>
       Knowledge
@@ -65,7 +70,6 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
   const [focus, setFocus] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const width = useWidth(box, phone ? 340 : 400);
-  const height = phone ? Math.min(340, Math.round(width * 0.92)) : width;
   const key = encodeURIComponent(buildingKey);
   const until = timeRange(null, now).max;
 
@@ -87,7 +91,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const ego = useMemo(() => (graph ? egoGraph(graph, roomId, { at, showEnded, width, height }) : null), [graph, roomId, at, showEnded, width, height]);
+  const ego = useMemo(() => (graph ? egoGraph(graph, roomId, { at, showEnded, width }) : null), [graph, roomId, at, showEnded, width]);
   const range = timeRange(ego?.oldest ?? null, now);
   const room = ego?.nodes[0];
   const facts = ego?.nodes.filter((node) => node.ring === 2) ?? [];
@@ -111,7 +115,7 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
         {!error && !ego && <p className="kg-muted">Loading graph…</p>}
         {ego && ego.nodes.length === 0 && <p className="kg-muted">This room is not in the graph.</p>}
         {ego && ego.nodes.length > 0 && (
-          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Ego graph of ${room?.label}`} data-testid="knowledge-svg">
+          <svg width={ego.view.width} height={Math.ceil(ego.view.height)} viewBox={`${ego.view.x} ${ego.view.y.toFixed(1)} ${ego.view.width} ${ego.view.height.toFixed(1)}`} role="img" aria-label={`Ego graph of ${room?.label}`} data-testid="knowledge-svg">
             <g className="kg-edges">
               {ego.edges.map((edge) => {
                 const from = byId.get(edge.from);
@@ -121,11 +125,17 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
               })}
             </g>
             {ego.nodes.map((node) => (
-              <GraphNode key={node.id} node={node} focused={focus === node.id} onFocus={setFocus} width={width} />
+              <GraphNode key={node.id} node={node} focused={focus === node.id} onFocus={setFocus} />
             ))}
           </svg>
         )}
       </div>
+      {ego && focus === "more" && ego.moreItems.length > 0 && (
+        <p className="kg-more-list" data-testid="knowledge-more-list">
+          <span className="kg-muted">Also here: </span>
+          {groupLabels(ego.moreItems.map((item) => item.label)).join(", ")}
+        </p>
+      )}
       <div className="kg-focus" aria-live="polite">
         {focused ? (
           <>
@@ -198,54 +208,63 @@ function Panel({ roomId, buildingKey }: { roomId: string; buildingKey: string })
   );
 }
 
-const RADIUS: Record<number, number> = { 0: 22, 1: 7, 2: 10, 3: 12 };
+const RADIUS: Record<number, number> = { 0: ROOM_R, 1: ASSET_R, 2: FACT_R, 3: PERSON_R };
 
-function GraphNode({ node, focused, onFocus, width }: { node: EgoNode; focused: boolean; onFocus: (id: string | null) => void; width: number }) {
+/** "Door to Hall, Door to Hall, Chair" -> ["Door to Hall x2", "Chair"] (first appearance order). */
+function groupLabels(labels: string[]): string[] {
+  const counts = new Map<string, number>();
+  for (const label of labels) counts.set(label, (counts.get(label) ?? 0) + 1);
+  return [...counts].map(([label, count]) => (count > 1 ? `${label} ×${count}` : label));
+}
+
+function GraphNode({ node, focused, onFocus }: { node: EgoNode; focused: boolean; onFocus: (id: string | null) => void }) {
   const r = RADIUS[node.ring];
-  const cx = width / 2;
-  const right = node.x >= cx;
   const select = () => onFocus(focused ? null : node.id);
   const classes = ["kg-node", node.role, node.state === "ended" ? "ended" : "", focused ? "focused" : "", node.hasFacts ? "has-facts" : ""].join(" ");
-  // Ring 1 labels only where they matter (things with notes) or on focus; else the circle alone keeps it calm.
-  const showLabel = node.ring !== 1 || node.hasFacts || focused || node.role === "more";
-  const dx = node.ring === 1 && node.role !== "more" ? (right ? r + 4 : -(r + 4)) : 0;
+  // Ring 1 labels sit beside the node on the outside (left of the left half, right of the right half), up to two lines,
+  // never cut; the small type line only where it matters (things with notes) or on focus.
+  const right = node.side !== "left";
+  const dx = right ? r + 5 : -(r + 5);
+  const anchor = right ? "start" : "end";
+  const rows: Array<{ text: string; cls: string }> = (node.lines ?? []).map((text) => ({ text, cls: "kg-label" }));
+  if (node.ring === 1 && node.role !== "more" && (node.hasFacts || focused)) rows.push({ text: mainType(node.types), cls: "kg-type" });
+  const heights = rows.map((row) => (row.cls === "kg-type" ? TYPE_H : LINE_H));
+  const total = heights.reduce((sum, h) => sum + h, 0);
+  let cursor = -total / 2;
+  const placed = rows.map((row, i) => {
+    const y = cursor + heights[i] / 2;
+    cursor += heights[i];
+    return { ...row, y };
+  });
   return (
     <g
       className={classes}
       transform={`translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`}
       tabIndex={0}
       role="button"
-      aria-label={`${node.text ?? node.label}, ${mainType(node.types)}`}
+      aria-label={`${node.text ?? node.label}, ${mainType(node.types) || "more"}`}
       data-id={node.id}
       onClick={select}
       onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && select()}
     >
       <title>{`${node.text ?? node.label}\n${node.types.join(", ")}`}</title>
       <circle r={r + 8} className="kg-hit" />
-      {node.role === "person" ? <circle r={r} /> : node.role === "more" ? <circle r={r + 6} /> : node.ring === 2 ? <rect x={-r} y={-r} width={2 * r} height={2 * r} rx={node.role === "note" ? 3 : r} /> : <circle r={r} />}
+      {node.ring === 2 ? <rect x={-r} y={-r} width={2 * r} height={2 * r} rx={node.role === "note" ? 3 : r} /> : <circle r={r} />}
       {node.role === "closure" && <line className="kg-bar" x1={-r} y1={r} x2={r} y2={-r} />}
       {node.ring === 2 && <text className="kg-num-text" dy="0.35em">{node.label}</text>}
       {node.role === "person" && <text className="kg-initial" dy="0.35em">{node.label.slice(0, 1).toUpperCase()}</text>}
-      {node.role === "more" && <text className="kg-more-text" dy="0.35em">{node.label}</text>}
-      {node.ring === 1 && node.role !== "more" && showLabel && (
-        <>
-          <text className="kg-label" x={dx} dy="-0.1em" style={{ textAnchor: right ? "start" : "end" }}>
-            {clip(node.label, 16)}
+      {node.ring === 1 &&
+        placed.map((row) => (
+          <text key={`${row.cls}${row.text}`} className={row.cls} x={dx} y={row.y} dy="0.35em" style={{ textAnchor: anchor }}>
+            {row.text}
           </text>
-          <text className="kg-type" x={dx} dy="1.1em" style={{ textAnchor: right ? "start" : "end" }}>
-            {mainType(node.types)}
+        ))}
+      {node.role === "person" &&
+        (node.lines ?? []).map((line, i) => (
+          <text key={line} className="kg-label" y={r + 10 + i * LINE_H}>
+            {line}
           </text>
-        </>
-      )}
-      {node.role === "person" && (
-        <text className="kg-label" y={r + 12}>
-          {node.label}
-        </text>
-      )}
+        ))}
     </g>
   );
-}
-
-function clip(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
