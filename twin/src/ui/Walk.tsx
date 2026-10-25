@@ -67,8 +67,9 @@ export function Walk() {
   const line = step !== null ? honestLine(readable(walkSteps()[step] ?? "")) : "";
   const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
-    const { voiceOut, handsFree, speechAvailable } = useTwin.getState();
-    if (line && (voiceOut || handsFree)) void speak(line, speechAvailable);
+    // Muted while walking (the orb): the steps are read out only once the person unmuted Wanda.
+    const { handsFree, speechAvailable } = useTwin.getState();
+    if (line && handsFree) void speak(line, speechAvailable);
   }, [line, step, repeat]);
   useEffect(() => () => stopSpeaking(), []);
   // Esc ends the route (guide and line in one go), unless the key belongs to a text field.

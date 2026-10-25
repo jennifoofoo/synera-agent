@@ -392,7 +392,10 @@ export function Omnibox({ walking = false, docked = false }: { walking?: boolean
   } else {
     caption = handsFreeOn ? "Ask or say “Hey Wanda”" : "Say “Wanda” or tap the mic";
   }
-  const stops = speaking && !listening;
+  // Muted while walking: the orb rests (no speaking or reply animation) until a tap unmutes it.
+  const mutedWalk = walking && !handsFreeOn && !listening;
+  if (mutedWalk && (mode === "speaking" || mode === "reply")) mode = "idle";
+  const stops = speaking && !listening && !mutedWalk;
   const orbLabel = listening ? "Stop and send" : stops ? "Stop" : walking ? (handsFreeOn ? "Mute Wanda" : "Unmute Wanda") : voiceOut ? "Talk" : "Talk (spoken replies off)";
   const orbTitle = listening ? "Tap to send" : stops ? "Tap to stop" : walking ? (handsFreeOn ? "Tap to mute “Hey Wanda”" : "Tap so Wanda listens again") : "Tap and speak (hold: spoken replies on/off)";
   // While walking the bar only says that Wanda listens or speaks, never the step or the reply (the sheet has them).
