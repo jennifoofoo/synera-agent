@@ -1,18 +1,18 @@
 /* ===== Walk: step-by-step directions (owner: phone session). Maps layout; colours from the tokens (one signal blue). */
 .card-walk { --walk-blue: var(--signal); }
-.card-walk button.primary:hover { background: var(--signal-dark); }
+.card-walk button.primary:hover { background: var(--signal-dark); border-color: var(--signal-dark); }
 .card-walk .walk-end { flex: none; min-height: 30px; padding: 4px 10px; font-size: 13px; }
 .worker .card-walk .walk-end { min-height: 44px; min-width: 44px; font-size: 14px; }
 .card-walk .walk-now { display: flex; gap: 12px; align-items: flex-start; margin-top: 8px; }
 .card-walk .walk-now p { margin: 0; font-size: 20px; line-height: 1.3; font-weight: 600; }
 .card-walk .walk-icon { flex: none; color: var(--walk-blue); }
-.card-walk button.primary { background: var(--walk-blue); color: #fff; }
+.card-walk button.primary { background: var(--walk-blue); border-color: var(--walk-blue); color: #fff; }
 .card-walk .walk-toggle { display: block; margin: 8px auto 0; }
 .worker .card.card-walk button.link.walk-toggle { min-height: 44px; min-width: 64px; margin-top: 2px; }
-.walk-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--hairline-strong); }
+.walk-list { list-style: none; margin: 10px 0 0; padding: 0; border-top: 1px solid var(--line); }
 .walk-list button {
   display: flex; gap: 10px; align-items: baseline; width: 100%; min-height: 44px; padding: 10px 4px;
-  border: 0; border-bottom: 1px solid var(--hairline-strong); border-radius: 0; background: transparent; color: var(--text);
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text);
   text-align: left; font-size: 15px;
 }
 .walk-list button.done { color: var(--muted); }
@@ -27,3 +27,11 @@
 .card-walk .walk-motion-switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--ink-2); }
 .card-walk .walk-motion-switch input { width: 18px; height: 18px; margin: 0; accent-color: var(--signal); }
 .worker .card-walk .walk-motion-switch { min-height: 44px; }
+/* Phone in landscape: little height. A smaller step line and tighter gaps keep Back/Next on screen (tap areas stay 44 px). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .card-walk .walk-now { margin-top: 4px; }
+  .card-walk .walk-now p { font-size: 16px; line-height: 1.25; }
+  .card-walk .walk-foot { margin-top: 2px; }
+  .card-walk .card-actions { margin-top: 6px; }
+}
+.card-walk .walk-end { background: transparent; border-color: transparent; color: var(--ink-2); }

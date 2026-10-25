@@ -16,6 +16,9 @@ import { HereChip } from "./HereChip";
 import { DirectionsPanel, DirectionsSummary } from "./Directions";
 import { PhoneSheet } from "./PhoneSheet";
 import { readable } from "../walkInfo";
+import { AvoidsClosed } from "./AvoidsClosed";
+import { RouteChips } from "./RouteChips";
+import { TurnIcon, rideUp } from "./Walk";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -372,54 +375,47 @@ function RouteLine({ model, route }: { model: BuildingModel; route: Route }) {
   );
 }
 
-/** The route card: "30 m to X · 4 steps · step-free", then "Guide me" and "End route". The step text (the reply
- * that drew the route, else the route's own steps) only behind "Steps"; guiding speaks it step by step. */
+/** The route card: destination, fact chips, the numbered steps (the reply that drew the route, else the route's own
+ * steps), then "Guide me" and "End route". Guiding speaks the steps one by one. */
 function RouteCard({ model, route, details, note }: { model: BuildingModel; route: Route; details?: string; note?: string }) {
   const ask = useTwin((s) => s.ask);
   const busy = useTwin((s) => s.chatBusy);
   const end = useEndRoute();
-  const [open, setOpen] = useState(false);
   useEscape(end);
   const facts = routeFacts(model, route);
   const steps = walkLines(route.steps).map(readable);
   return (
     <Sheet className="card-route" label={`Route to ${facts.destination}`} onClose={end}>
-      <div className="route-summary" data-testid="route-summary">
+      <div className="route-head">
         <span className="route-dot" aria-hidden />
-        <span className="route-sentence">
-          {facts.length && <b>{facts.length}</b>} to <strong>{facts.destination}</strong>
-          <span className="card-muted">
-            {facts.steps > 0 && ` · ${facts.steps} ${facts.steps === 1 ? "step" : "steps"}`}
-            {facts.floors > 1 && ` · ${facts.floors} floors`}
-            {" · "}
-          </span>
-          <span className={facts.stepFree ? "ok" : "warn"}>{facts.stepFree ? "step-free" : "has stairs"}</span>
-        </span>
+        <strong className="route-dest">{facts.destination}</strong>
       </div>
+      <RouteChips length={facts.length} lengthM={route.length_m} floors={facts.floors} stepFree={facts.stepFree} />
+      <AvoidsClosed model={model} route={route} />
       {note && <div className="card-note">{note}</div>}
-      <div className="card-actions">
+      {details ? (
+        <div className="card-text open route-details">{details}</div>
+      ) : (
+        steps.length > 0 && (
+          <ol className="route-steps">
+            {steps.map((line, index) => (
+              <li key={index}>
+                <TurnIcon line={line} up={rideUp(route.floor_changes, steps, index)} />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ol>
+        )
+      )}
+      <div className="card-actions card-actions-stack">
         <button className="primary" disabled={busy} onClick={() => void ask("guide me")}>
           Guide me
         </button>
-        <button onClick={end} title="End the route (Esc)">
+        <button className="ghost" onClick={end} title="End the route (Esc)">
           End route
         </button>
       </div>
-      {(details || steps.length > 0) && (
-        <button className="link route-steps-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? "Hide steps" : "Steps"}
-        </button>
-      )}
-      {open &&
-        (details ? (
-          <div className="card-text open route-details">{details}</div>
-        ) : (
-          <ol className="route-steps">
-            {steps.map((line, index) => (
-              <li key={index}>{line}</li>
-            ))}
-          </ol>
-        ))}
     </Sheet>
   );
 }
+

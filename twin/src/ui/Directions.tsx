@@ -9,7 +9,8 @@ import type { Route } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { HERE, useTwin, walkLines, type Place } from "../store";
 import { PlaceInput } from "./Autocomplete";
-import { walkMinutes } from "./Walk";
+import { RouteChips } from "./RouteChips";
+import { AvoidsClosed } from "./AvoidsClosed";
 import "./Directions.css";
 
 export function placeName(model: BuildingModel, place: Place | null): string {
@@ -127,7 +128,7 @@ export function DirectionsPanel({ model }: { model: BuildingModel }) {
 function facts(model: BuildingModel, route: Route) {
   const changes = route.floor_changes ?? [];
   const stepFree = !!route.step_free || changes.every((change) => model.connectorById.get(change.connector_id)?.step_free);
-  const length = route.length_m !== undefined ? `${Math.round(route.length_m)} m · ${walkMinutes(route.length_m)} min` : "";
+  const length = route.length_m !== undefined ? `${Math.round(route.length_m)} m` : "";
   return { length, floors: route.floors?.length ?? 1, stepFree };
 }
 
@@ -146,22 +147,10 @@ export function DirectionsSummary({ model }: { model: BuildingModel }) {
     close(true);
     startWalk();
   };
-  // The same one line as the route card ("30 m · 1 min · 4 steps · step-free") and the same primary action.
-  const steps = walkLines(route.steps).length;
   return (
     <>
-      <div className="route-summary" data-testid="route-summary">
-        <span className="route-dot" aria-hidden />
-        <span className="route-sentence">
-          {f.length && <b>{f.length}</b>}
-          <span className="card-muted">
-            {steps > 0 && ` · ${steps} ${steps === 1 ? "step" : "steps"}`}
-            {f.floors > 1 && ` · ${f.floors} floors`}
-            {" · "}
-          </span>
-          <span className={f.stepFree ? "ok" : "warn"}>{f.stepFree ? "step-free" : "has stairs"}</span>
-        </span>
-      </div>
+      <RouteChips length={f.length} lengthM={route.length_m} floors={f.floors} stepFree={f.stepFree} />
+      <AvoidsClosed model={model} route={route} />
       <div className="card-actions">
         <button className="primary" onClick={start} title="Step-by-step directions">
           Guide me

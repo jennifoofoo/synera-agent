@@ -17,7 +17,7 @@ export { walkMinutes };
 type Change = { direction: "up" | "down" }[] | undefined;
 
 /** Up or down for a ride step: the n-th "Take/Use … to …" line is the n-th floor change. */
-function rideUp(changes: Change, steps: string[], step: number): boolean {
+export function rideUp(changes: Change, steps: string[], step: number): boolean {
   const index = steps.slice(0, step).filter(isRide).length;
   return changes?.[index]?.direction !== "down";
 }
@@ -27,7 +27,7 @@ function isRide(line: string): boolean {
 }
 
 /** The standard maps pictogram for a step: start dot, straight arrow, stairs/lift up or down, arrival pin. */
-function TurnIcon({ line, up }: { line: string; up: boolean }) {
+export function TurnIcon({ line, up }: { line: string; up: boolean }) {
   const path = /^Start/.test(line)
     ? <circle cx="12" cy="12" r="5" fill="currentColor" stroke="none" />
     : /arrived/i.test(line)
