@@ -33,6 +33,14 @@
 .worker .welcome-chip { min-height: 44px; padding: 4px 12px; font-size: 14px; }
 /* phone portrait: three chips, so the card does not cover most of the plan */
 @media (orientation: portrait) { .worker .welcome-chip:nth-child(n + 4) { display: none; } }
+/* phone: a compact card that shows all of its chips (none cut at the edge) and leaves most of the plan free:
+   small fairy, one short title, no subline, slimmer chips that may sit side by side. */
+.worker .welcome-card { max-height: none; overflow: visible; padding: 10px 12px 12px; }
+.worker .welcome-fairy { --fairy-h: 32px; margin: -2px auto 0; }
+.worker .welcome-title { font-size: 16px; }
+.worker .welcome-sub { display: none; }
+.worker .welcome-chips { margin-top: 8px; }
+.worker .welcome-chip { min-height: 40px; padding: 4px 12px; font-size: 13.5px; }
 
 @media (prefers-reduced-motion: reduce) {
   .welcome-card { animation: none; transition: opacity var(--t-base); }
