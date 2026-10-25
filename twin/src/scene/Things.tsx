@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
-import type { ThreeEvent } from "@react-three/fiber";
+import { useThree, type ThreeEvent } from "@react-three/fiber";
 import type { Asset, BuildingState } from "../api/types";
 import type { FloorModel } from "../model/model";
-import { assetHeight, isFloorMarking } from "../model/assetHeights";
+import { assetHeight, isFloorMarking, zoomedHeight } from "../model/assetHeights";
 import { COLOURS, GROUP_COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { tapMap } from "../tapAnswer";
@@ -14,7 +14,8 @@ import { MIN_SHAPE_PX, useMapZoom } from "./mapZoom";
 // Two kinds of things, like an architectural model: machines and the landmarks of the directions are full bodies
 // (rounded, a darker top, a soft shadow) because they are what people steer by; everything else is a low body at its
 // default height by type (model/assetHeights.ts: a desk at table height, a pallet a hand high, else 0.3 m), one
-// instanced mesh for all of them. Floor markings stay flat in that mesh, tinted like the walkway floor marking.
+// instanced mesh for all of them. Furniture of flats and offices grows with zoom: a low block far out (at most
+// 0.25 m), its full type height at the near tier, so an overview of a flat is rooms, not a field of white boxes. Floor markings stay flat in that mesh, tinted like the walkway floor marking.
 
 /** Bodies: a rounded box standing on the floor, vertex colour darkens the top face a step (instance colour on top). */
 const bodyBox = new RoundedBoxGeometry(1, 1, 1, 3, 0.06);
@@ -103,9 +104,20 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
   const moved = state?.moved_assets ?? {};
   const all = useMemo(() => floor.assets.filter((asset) => !removed.has(asset.id)).slice(0, limit), [floor, removed, limit]);
   const { scale, tier } = useMapZoom(floor.bounds.cx, y, -floor.bounds.cy);
+  // How many screens wide the floor is drawn at this scale bucket (furniture height, model/assetHeights.ts growth).
+  const screenPx = useThree((s) => Math.max(s.size.width, s.size.height));
+  const floorScreens = floor.bounds.size / scale / Math.max(1, screenPx);
   const landmarks = useLandmarks();
   // While a route is shown or walked the task is the route: shapes step back, its landmarks step forward.
   const routeShown = useTwin((s) => !!s.state?.route?.ok || !!s.state?.guide?.active);
+  // 3D: found (highlighted) and selected things stand at full height at every zoom, like the landmarks.
+  const highlights = useTwin((s) => s.highlights);
+  const selectedId = useTwin((s) => (s.selection?.kind === "asset" ? s.selection.id : null));
+  const keepKey = useMemo(
+    () => [...new Set([...Object.values(highlights).flatMap((h) => h.ids), ...(selectedId ? [selectedId] : [])])].sort().join("|"),
+    [highlights, selectedId],
+  );
+  const kept = useMemo(() => new Set(keepKey ? keepKey.split("|") : []), [keepKey]);
   // Focus mode: with a route, things in rooms off the route fade like their rooms (FloorMesh.tsx); landmarks never.
   const pathKey = state?.route?.ok ? (state.route.space_path ?? []).join("|") : "";
   const onRoute = useMemo(() => (pathKey ? new Set(pathKey.split("|")) : null), [pathKey]);
@@ -153,7 +165,8 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       return colour;
     };
     split.slab.forEach((asset, index) => {
-      place(asset, flat ? PLAN_HEIGHT : assetSize(asset)[1]);
+      // 3D: furniture grows with zoom (a low block far out, full type height near; model/assetHeights.ts).
+      place(asset, flat ? PLAN_HEIGHT : zoomedHeight(asset, scale, floorScreens, kept.has(asset.id)));
       slab.setMatrixAt(index, temp.matrix);
       colour.set(flat ? planColour(asset) : isFloorMarking(asset) ? MARKING : COLOURS.footprint);
       slab.setColorAt(index, focus(asset));
@@ -180,7 +193,7 @@ export function Things({ floor, y, state, limit, flat = false }: Props) {
       body.computeBoundingSphere();
       shadow.computeBoundingSphere();
     }
-  }, [split, moved, flat, landmarks, routeShown, onRoute]);
+  }, [split, moved, flat, landmarks, routeShown, onRoute, scale, floorScreens, kept]);
 
   const onClick = (list: Asset[]) => (event: ThreeEvent<MouseEvent>) => {
     // 2D: a tap on a shape only selects the thing when zoomed in; farther out it goes to the room below.
