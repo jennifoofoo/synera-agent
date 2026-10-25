@@ -113,3 +113,16 @@ Branch **`feat/inspection-round-and-notes`** (auf aktuellem `main`, 822dc44) ent
 - `feat/twin-notes`: Notizen/Probleme mit Foto als Fakten nach `docs/specs/place-knowledge.md`, nutzt automatisch `/api/facts` (sonst IndexedDB), Pins, Verlauf, Vorlesen beim Begleiten, Einsatzprotokoll.
 - Hey Wanda in `handsFree.ts`: "done/erledigt" hakt die Station ab, "how many left", "note:/merk dir:", "problem:", "what's here", "finished/fertig" (Protokoll).
 Noch offen vor `main`: `scripts/check.sh` auf ruhigem Rechner (einziger roter Test war `test_impact.py::test_sweep_over_all_buildings` mit 117 s statt 90 s unter Last), volle Live-Suite, Testantworten byte-gleich, Entscheidung A zu zwei Startknöpfen (`inRound()` aus `twin/src/round/round.ts` in `ui/Card.tsx`). Sprach-Notizen speichern heute direkt (ohne Karte und Ja); sobald `remember_here` (K2) da ist, kann der Notiz-Teil des Einhängers raus.
+
+## Jennifer, Sonntag 03:45: `feat/twin-desktop-flow` (belegt)
+1. **Laptop: Chat als Seitenleiste links** (nur Profil `planner`, Handy unverändert): Eingabe oben, Verlauf immer sichtbar, Antwort/Route/Begleiten in derselben Spalte, Kamera rahmt mit `--left-inset` im freien Bereich.
+2. **Weicher Wechsel 2D ↔ 3D:** Kamera fliegt senkrecht auf den Plan-Maßstab, Wände senken/heben sich, erst dann Kameratausch (unsichtbar). Fast senkrecht kippen rastet 2D ein, Zwei-Finger-Wischen nach oben im Plan geht in 3D.
+Dateien: `twin/src/App.tsx`, `twin/src/styles.css`, `twin/src/ui/Omnibox.*`, `twin/src/store.ts` (nur Inset/Übergang), `twin/src/scene/CameraRig.tsx`, `twin/src/scene/Scene.tsx`, `twin/src/scene/FloorMesh.tsx`. `Card.tsx` und `Walk.tsx` nur CSS-seitig, damit Leonies Runde sauber drauf passt.
+
+## Leonie, Sonntag ~03:40: neu auf `feat/inspection-round-and-notes` (gepusht)
+- Notizen über den echten Server: Speichern wendet `{fact, state}` an, Undo über `/api/facts/undo` (nur neueste Notiz), Fotos als Server-URL, "Fixed/Done" auf dem Server-Weg ausgeblendet (kein Endpunkt für Statuswechsel).
+- Runde per Sprache führt Station für Station: `plan_round` merkt sich die Stopps, der Server hängt sie als `state.route.round` an die Route (**kleine Ergänzung in `web/api.py`, bitte kurz ansehen**), die Seite übernimmt sie (`adoptRound()`); "Guide me" und "Hey Wanda, done" gehen Stopp für Stopp. Test: `tests/test_web.py::test_agent_round_carries_its_stops_for_the_page`.
+- Notizen ohne Noise: während einer Runde nur Notizen an den Geräten der Runde (an diesem Stopp), bei normalen Routen nur am Ziel; alles andere auf dem Weg bleibt still.
+- Für dich gefunden (nicht von uns): `tests/test_selection.py::test_state_view_has_no_edit_keys_without_edits` ist rot, weil `state` jetzt `facts`/`closed_until` enthält; und wieder der 400er "invalid signature in thinking block" bei getippter, dann gesprochener Frage im selben Chat.
+- Bekannte Lücken: Rückweg zum Start bei Runden mit Rückkehr wird nicht gelotst; das Einsatzprotokoll zählt während einer Runde nur die erste Etappe.
+- Live-Suite für den Branch noch nicht gelaufen (Pflicht vor `main`, weil `round_tools.py` sich geändert hat).

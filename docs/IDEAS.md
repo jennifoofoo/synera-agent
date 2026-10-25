@@ -421,3 +421,22 @@ Jennifer's question: link the twin with the outside world. Kit buildings carry n
 Cheap version (about 30 min, no API key): one address per building in a small file, a "Route to the building" button that opens Google or Apple Maps with that address, handover to our map at the entrance. Pitch line: inside Wanda knows every room, outside she hands over to Maps; next step entrances with coordinates for a door-to-machine route from the train station.
 Build only after the round and overlap merges and after both agree.
 Variant without Maps: a made-up surrounding in 3D (lawn around the footprint, a few trees, a path to each `outside` entrance, parking at the dock). About 1 to 2 h, only through the design session, after the merges; watch phone performance.
+
+## 14. Evakuierungsmodus an alle offenen Handys (Idee von Jennifer, 25.10.2026 früh)
+
+### Idee
+Der Facility Manager löst am Laptop "Evakuierung" aus (optional mit Gefahrenbereich, z. B. "Brand in Halle B"). Jedes Handy, auf dem die Seite für dieses Gebäude offen ist, wird in Echtzeit rot: Vibration, Wanda spricht, die Route zum nächsten Ausgang ab dem eigenen Standort startet automatisch und weicht dem Gefahrenbereich aus. Knopf "Ich bin draußen", der Laptop sieht "3 von 4 draußen".
+
+### Was heute schon da ist
+- `find_exit` (schnellster und zweiter Ausgang, nie Aufzug, fester Hinweis "folge den echten Schildern"), Notfall-Regeln im Prompt.
+- Sperrungen: der Gefahrenbereich ist eine Sperrung, Routen weichen aus.
+
+### Was gebaut werden müsste (ca. 2 bis 2,5 h)
+- Server: `POST /api/alert` und `GET /api/alert?key=` pro Gebäude (Zeitstempel, Gefahrenbereich).
+- Handy: alle 2 s nachfragen (Polling statt Push, läuft auch über den Tunnel), roter Vollbildhinweis, automatische Route zum Ausgang.
+- Laptop: Knopf mit Karte und Ja (wie jede Änderung), optional Rückmeldungen zählen.
+
+### Risiken und Haken
+- "Eingeloggt" heißt nur "Seite offen": keine Konten, kein Push bei gesperrtem Handy. Echte Benachrichtigung gehört auf die Roadmap.
+- Sicherheitsfunktion: muss zuverlässig sein, ein Fehlalarm in der Live-Demo ist schlimmer als keine Funktion.
+- Widerspricht "Nicht bauen: Mehrnutzer" in `docs/PLAN_SUNDAY.md`. Entscheidung Jennifer: erst muss alles andere sleek sein, dann eventuell.
