@@ -102,51 +102,73 @@
 .worker .wanda-bar { height: 64px; padding: 0 8px 0 10px; }
 @keyframes wb-in { from { opacity: 0; transform: translateY(4px) scaleY(0.92); } to { opacity: 1; transform: none; } }
 
-/* the orb: Synera blue, a soft highlight top left; breathes when idle, follows the voice level, turns while thinking */
+/* The orb is the mic button and Wanda's fairy light (WandaFairy in Omnibox.tsx): a halo, two pairs of wings, the
+   glowing core with the white mic, three sparks while thinking. The button never scales or moves (a tap target that
+   stays under the finger); only the inner SVG parts animate, and only with transform and opacity. */
 .wanda-orb {
   --wanda-level: 0;
   flex: none; position: relative; width: 40px; height: 40px; border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--signal-ink) 55%, transparent) 0, transparent 38%),
-    radial-gradient(circle at 50% 55%, var(--signal) 0, var(--signal-dark) 100%);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--signal-dark) 35%, transparent);
-  animation: wb-breathe 3s ease-in-out infinite;
 }
 .worker .wanda-orb { width: 44px; height: 44px; }
-@keyframes wb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
-.wanda-orb.listening, .wanda-orb.speaking {
-  animation: none;
-  transform: scale(calc(1 + var(--wanda-level, 0) * 0.25));
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--signal-dark) 35%, transparent),
-    0 0 calc(6px + var(--wanda-level, 0) * 26px) calc(var(--wanda-level, 0) * 6px) color-mix(in srgb, var(--signal) 45%, transparent);
-  transition: transform 80ms linear, box-shadow 80ms linear;
-}
-/* the orb is the mic button: a white mic on the blue orb; listening it turns solid Synera blue with the voice ring */
 .wb-orb {
   display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; cursor: pointer;
-  color: var(--signal-ink); --ob-active: var(--signal);
+  color: var(--signal-ink); --ob-active: var(--signal); background: transparent;
 }
-.wb-orb svg { width: 22px; height: 22px; filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--signal-dark) 50%, transparent)); }
+/* listening and speaking: one soft ring, the halo inside the SVG (it follows --wanda-level, set from audioLevel.ts);
+   no box-shadow ring on the button on top of it (.ob-talk.listening has one for the plain mic) */
+.wanda-orb.wb-orb.listening, .wanda-orb.wb-orb.speaking { background: transparent; box-shadow: none; }
+.wb-orb:hover { background: transparent; }
 .wb-orb:disabled { opacity: 1; cursor: progress; }
-/* as a button the orb keeps its size (a tap target that never moves under the finger): it breathes and follows the
-   voice with its glow only, not by scaling */
-.wanda-orb.wb-orb, .wanda-orb.wb-orb.listening, .wanda-orb.wb-orb.speaking { transform: none; }
-.wanda-orb.wb-orb.idle { animation: wb-glow 3s ease-in-out infinite; }
-@keyframes wb-glow {
-  0%, 100% { box-shadow: 0 2px 6px color-mix(in srgb, var(--signal-dark) 35%, transparent); }
-  50% { box-shadow: 0 2px 6px color-mix(in srgb, var(--signal-dark) 35%, transparent), 0 0 0 4px color-mix(in srgb, var(--signal) 14%, transparent); }
-}
 .wb-orb:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
 @media (pointer: coarse) { .wb-orb { width: 48px; height: 48px; min-width: 48px; min-height: 48px; } }
-/* thinking: a lighter arc travels round the orb */
-.wanda-orb.thinking::after {
-  content: ""; position: absolute; inset: -3px; border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0 62%, color-mix(in srgb, var(--signal) 70%, var(--signal-ink)) 88%, transparent 100%);
-  -webkit-mask: radial-gradient(circle, transparent 0 calc(50% - 3px), #000 calc(50% - 2px));
-  mask: radial-gradient(circle, transparent 0 calc(50% - 3px), #000 calc(50% - 2px));
-  animation: wb-spin 1.4s linear infinite;
+.wb-orb .ob-badge svg { width: 14px; height: 14px; }
+
+.wf { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.wf-halo, .wf-body, .wf-wings, .wf-core-g, .wf-sparks { transform-box: view-box; transform-origin: 50% 50%; }
+.wf-stop-signal { stop-color: var(--signal); }
+.wf-stop-dark { stop-color: var(--signal-dark); }
+.wf-stop-clear { stop-opacity: 0; }
+.wf-halo { opacity: 0.16; }
+.wf-wing {
+  fill: color-mix(in srgb, var(--signal) 38%, transparent);
+  stroke: color-mix(in srgb, var(--signal) 55%, var(--signal-ink)); stroke-width: 0.8; stroke-linejoin: round;
 }
-@keyframes wb-spin { to { transform: rotate(1turn); } }
+.wf-wing-down { fill: color-mix(in srgb, var(--signal) 26%, transparent); }
+.wf-glow { opacity: 0.35; }
+.wf-shine { fill: none; stroke: var(--signal-ink); stroke-width: 1.3; stroke-linecap: round; opacity: 0.4; }
+.wf-mic { fill: var(--signal-ink); }
+.wf-spark { fill: var(--signal); stroke: var(--signal-ink); stroke-width: 0.7; }
+.wf-sparks { display: none; }
+
+/* idle and reply: floats 2 px up and down, the wings beat slowly, the halo breathes */
+.wanda-orb.idle .wf-body, .wanda-orb.reply .wf-body { animation: wf-float 3s ease-in-out infinite; }
+.wanda-orb.idle .wf-wings, .wanda-orb.reply .wf-wings { animation: wf-flap 1.6s ease-in-out infinite; }
+.wanda-orb.idle .wf-halo { animation: wf-breathe 3s ease-in-out infinite; }
+/* reply: one short flash when the reply arrives, then breathing as in idle */
+.wanda-orb.reply .wf-halo { animation: wf-flash 0.7s ease-out, wf-breathe 3s ease-in-out 0.7s infinite; }
+.wanda-orb.reply .wf-glow { animation: wf-glow-flash 0.7s ease-out; }
+/* listening: fast wings, the halo up */
+.wanda-orb.listening .wf-wings { animation: wf-flap 0.35s ease-in-out infinite; }
+.wanda-orb.listening .wf-halo, .wanda-orb.speaking .wf-halo {
+  opacity: calc(0.3 + var(--wanda-level, 0) * 0.5); transform: scale(calc(1 + var(--wanda-level, 0) * 0.3));
+  transition: opacity 80ms linear, transform 80ms linear;
+}
+/* thinking: wings still, three sparks circle the core */
+.wanda-orb.thinking .wf-sparks { display: inline; animation: wf-spin 1.4s linear infinite; }
+.wanda-orb.thinking .wf-wings { animation: none; }
+/* speaking: the core pulses with the voice level, wings at medium pace */
+.wanda-orb.speaking .wf-wings { animation: wf-flap 0.6s ease-in-out infinite; }
+.wanda-orb.speaking .wf-core-g { transform: scale(calc(1 + var(--wanda-level, 0) * 0.12)); transition: transform 80ms linear; }
+.wanda-orb.speaking .wf-glow { opacity: calc(0.35 + var(--wanda-level, 0) * 0.55); transition: opacity 80ms linear; }
+/* walking with "Hey Wanda" muted: the fairy rests */
+.wanda-orb.muted .wf-body, .wanda-orb.muted .wf-wings, .wanda-orb.muted .wf-halo { animation: none; }
+
+@keyframes wf-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes wf-flap { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.85); } }
+@keyframes wf-breathe { 0%, 100% { opacity: 0.16; } 50% { opacity: 0.3; } }
+@keyframes wf-flash { 0% { opacity: 0.6; } 100% { opacity: 0.16; } }
+@keyframes wf-glow-flash { 0% { opacity: 0.8; } 100% { opacity: 0.35; } }
+@keyframes wf-spin { to { transform: rotate(1turn); } }
 
 /* the caption: one line, the tap target that opens the input */
 .wb-caption {
@@ -188,7 +210,10 @@
   .wanda-bar, .omnibox.expanded .omnibox-input { animation: none; }
   .wanda-orb, .wanda-orb.listening, .wanda-orb.speaking { animation: none; transform: none; transition: none; }
   .wanda-orb.listening, .wanda-orb.speaking { box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 30%, transparent); }
-  .wanda-orb.thinking::after, .wanda-orb.wb-orb.idle { animation: none; }
+  /* the fairy stands still: wings open, sparks shown but not circling; the states show by halo and glow only */
+  .wanda-orb .wf *, .wanda-orb .wf { animation: none !important; transition: none !important; }
+  .wanda-orb .wf-core-g, .wanda-orb .wf-halo { transform: none !important; }
+  .wanda-orb.speaking .wf-glow { opacity: 0.6; }
 }
 .omnibox.collapsed .ob-status { align-self: flex-end; }
 /* suggestion chips above the empty input: send the question as if typed */
