@@ -250,6 +250,8 @@ function autoProfile(): Profile {
   return narrow || phone ? "worker" : "planner";
 }
 
+const NEW_BUILDING_COMMAND = /^(new building|neues geb(ä|ae)ude|new floor ?plan|neuer grundriss|upload (a )?(floor ?)?plan)\.?$/i;
+
 export const useTwin = create<TwinState>((set, get) => ({
   buildings: [],
   buildingKey: null,
@@ -546,6 +548,18 @@ export const useTwin = create<TwinState>((set, get) => ({
     }
     if (/^guide me\.?$/i.test(message.trim()) && get().state?.route?.ok) {
       get().startWalk(); // the drawn route already has its steps; no agent call
+      return null;
+    }
+    if (NEW_BUILDING_COMMAND.test(message.trim())) {
+      // UI-only shortcut (no server call). store.ts cannot import ui/newBuildingStore (it imports this store): an event.
+      window.dispatchEvent(new CustomEvent("twin:new-building"));
+      set((s) => ({
+        chat: [
+          ...s.chat,
+          { id: ++messageId, role: "user", text: message },
+          { id: ++messageId, role: "agent", text: "Opening the plan upload. Drop a floor plan (PNG or JPG) per floor." },
+        ],
+      }));
       return null;
     }
     const context: ChatContext = {};

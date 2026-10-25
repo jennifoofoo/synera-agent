@@ -75,7 +75,10 @@ def _check_at_step(page, now):
     assert now["focused"] == pos["floor_id"], "the shown floor is the dot's floor"
     assert now["pending"] and now["pending"]["point"] == pos["point"], "kept for the next chat message"
     drawn = page.evaluate(DOT_WORLD, "here-dot") or page.evaluate(DOT_WORLD, "walk-estimate")
-    assert drawn is not None and math.dist(drawn, pos["point"]) < 0.05, "the dot is drawn there"
+    # Guide me follow-cam (scene/FollowCam.tsx): the drawn dot starts at the step and walks it at walking pace, so it
+    # is drawn on the route line (at the step start or already ahead of it), not pinned to the start.
+    assert drawn is not None, "the dot is drawn"
+    assert page.evaluate(OFF_ROUTE, [drawn, pos["floor_id"]]) < 0.5, "the drawn dot lies on the route line"
 
 
 def test_next_moves_the_dot_back_moves_it_back(page):

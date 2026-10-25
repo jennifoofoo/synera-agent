@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
-import { EffectComposer, N8AO, SMAA, Vignette } from "@react-three/postprocessing";
+import { EffectComposer, N8AO, SMAA } from "@react-three/postprocessing";
 import type { EffectComposer as EffectComposerImpl } from "postprocessing";
 import { COLOURS } from "../model/palette";
 
-/** Planner-only effects: ambient occlusion (N8AO), anti-aliasing, a weak vignette. No DoF, no chromatic aberration. */
+/** Planner-only effects: ambient occlusion (N8AO) and anti-aliasing. The vignette lives in the CSS studio backdrop
+ * (styles.css), so it darkens the backdrop corners, not the model. No DoF, no chromatic aberration. */
 export default function Effects({ quality }: { quality: number }) {
   const composer = useRef<EffectComposerImpl>(null);
   const size = useThree((s) => s.size);
@@ -23,7 +24,6 @@ export default function Effects({ quality }: { quality: number }) {
     <EffectComposer ref={composer} multisampling={0} enableNormalPass={false}>
       <N8AO aoRadius={1.0} intensity={0.8} distanceFalloff={1.0} quality={quality === 2 ? "medium" : "low"} halfRes color={new THREE.Color(COLOURS.aoTint)} />
       <SMAA />
-      <Vignette eskil={false} offset={0.35} darkness={0.1} />
     </EffectComposer>
   );
 }
