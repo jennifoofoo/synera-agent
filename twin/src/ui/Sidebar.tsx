@@ -16,6 +16,7 @@ import { NotesButton } from "./Facts";
 import { Omnibox } from "./Omnibox";
 import { Round } from "./Round";
 import { TopBar } from "./TopBar";
+import { FairyFigure } from "./FairyFigure";
 import { useWelcomeChips } from "./Welcome";
 import "./Sidebar.css";
 
@@ -167,6 +168,7 @@ function ColumnWelcome() {
   const chips = useWelcomeChips();
   return (
     <li className="sb-welcome" aria-label="Welcome">
+      <FairyFigure className="sb-welcome-fairy" />
       <h2 className="welcome-title">Hi, I'm Wanda.</h2>
       <p className="welcome-sub">What can I help you find in {name ?? "this building"}?</p>
       {chips.length > 0 && (

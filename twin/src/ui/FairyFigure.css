@@ -1,0 +1,38 @@
+/* Wanda's fairy figure (FairyFigure.tsx): tokens only, transform and opacity only. Size with --fairy-h. */
+.ff { display: block; height: var(--fairy-h, 64px); width: calc(var(--fairy-h, 64px) * 0.75); overflow: visible; }
+.ff-stop-signal { stop-color: var(--signal); }
+.ff-stop-dark { stop-color: var(--signal-dark); }
+.ff-stop-ink { stop-color: var(--signal-ink); }
+.ff-stop-faint { stop-opacity: 0.2; }
+.ff-stop-soft { stop-opacity: 0.4; }
+.ff-stop-clear { stop-opacity: 0; }
+.ff-wing { fill: color-mix(in srgb, var(--signal) 12%, transparent); stroke: color-mix(in srgb, var(--signal) 55%, transparent); stroke-width: 0.6; stroke-linejoin: round; }
+.ff-wing-down { fill: color-mix(in srgb, var(--signal) 16%, transparent); }
+.ff-spark { fill: var(--signal); }
+.ff-s2 { opacity: 0.7; }
+.ff-s3 { opacity: 0.5; }
+.ff-s4 { opacity: 0.6; }
+
+/* every wing flutters from the body axis (x 24 of the 48 wide view box), the upper pair a beat ahead of the lower */
+.ff-float, .ff-wing, .ff-halo { transform-box: view-box; }
+.ff-wing { transform-origin: 24px 24px; }
+.ff-halo { transform-origin: 24px 26px; }
+.ff-spark { transform-box: fill-box; transform-origin: center; }
+.ff-float { animation: ff-float 4s ease-in-out infinite; }
+.ff-halo { animation: ff-breathe 4s ease-in-out infinite; }
+.ff-wing-up { animation: ff-flutter-up 1.8s ease-in-out infinite; }
+.ff-wing-down { animation: ff-flutter-down 1.8s ease-in-out 0.18s infinite; }
+.ff-spark { animation: ff-twinkle 2.4s ease-in-out infinite; }
+.ff-s2 { animation-delay: 0.6s; }
+.ff-s3 { animation-delay: 1.2s; }
+.ff-s4 { animation-delay: 1.8s; }
+
+@keyframes ff-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes ff-breathe { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+@keyframes ff-flutter-up { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.78); } }
+@keyframes ff-flutter-down { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.84); } }
+@keyframes ff-twinkle { 0%, 100% { opacity: 0.25; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ff, .ff * { animation: none !important; }
+}
