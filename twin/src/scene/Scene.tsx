@@ -9,6 +9,7 @@ import type { BuildingModel } from "../model/model";
 import { COLOURS } from "../model/palette";
 import { useTwin } from "../store";
 import { CameraRig } from "./CameraRig";
+import { Declutter } from "./Declutter";
 import { FloorRise } from "./FloorRise";
 import { FloorMesh, buildTimes, controlsRef } from "./FloorMesh";
 import { GroundGrid } from "./GroundGrid";
@@ -83,6 +84,7 @@ function Building({ model }: { model: BuildingModel }) {
       />
       <OpeningMarks model={model} state={state} floorY={floorY} visibleFloors={visibleFloors} />
       <CameraRig model={model} floorY={floorY} floorTop={floorTop} topY={topY} />
+      <Declutter />
     </group>
   );
 }
