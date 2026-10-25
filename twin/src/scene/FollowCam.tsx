@@ -21,13 +21,16 @@ import { routeFloorIds } from "./floorVisibility";
 
 /** Walking pace indoors (m/s), the same 1.2 m/s as walkMinutes and the auto-pace spec. */
 const WALK_MPS = 1.2;
-/** 3D: polar angle of the camera (from straight down; 0.6 rad = 56° pitch) and its distance to the target. */
-const POLAR = 0.6;
-const DISTANCE_M = 16;
-const MIN_DISTANCE_M = 10;
-/** The target sits this far ahead of the dot (3D, metres). Small: the dot must stay clear of the step card at the
- * bottom of the screen; the tilted view shows the route ahead anyway. */
-const AHEAD_M = 0.5;
+/** 3D: polar angle of the camera (from straight down; 0.95 rad = 54° from the vertical) and its distance to the
+ * target. With the 32° lens, 40 m shows about 25 to 30 m of route ahead and the walls and rooms around it. */
+const POLAR = 0.95;
+const DISTANCE_M = 40;
+const MIN_DISTANCE_M = 20;
+/** Under a floor above (several floors stacked apart) the camera gets flatter, up to this polar angle (74°). */
+const MAX_POLAR = 1.3;
+/** The target sits this far ahead of the dot (3D, metres), so the dot stays in the lower third of the visible map,
+ * clear of the step card or the bottom sheet. */
+const AHEAD_M = 5;
 /** 2D: metres across the shorter side of the canvas, and the share of it the target leads the dot. */
 const PLAN_SPAN_M = 26;
 const PLAN_AHEAD = 0.06;
@@ -293,8 +296,12 @@ export function FollowCam({ model, floorY }: Props) {
       }
       const room = ceiling - 1;
       if (room < wantDistance * Math.cos(wantPolar)) {
-        wantDistance = Math.max(MIN_DISTANCE_M, room / Math.cos(POLAR));
-        wantPolar = Math.acos(THREE.MathUtils.clamp(room / wantDistance, 0.2, 1));
+        // Flatter first (keeps the long view), then closer if even the flattest pitch does not fit.
+        wantPolar = Math.min(MAX_POLAR, Math.acos(THREE.MathUtils.clamp(room / wantDistance, 0.2, 1)));
+        if (room < wantDistance * Math.cos(wantPolar)) {
+          wantDistance = Math.max(MIN_DISTANCE_M, room / Math.cos(wantPolar));
+          wantPolar = Math.acos(THREE.MathUtils.clamp(room / wantDistance, 0.2, 1));
+        }
       }
     }
     // Ahead of the dot along the smoothed heading: the walking direction is -(sin θ, cos θ) in world x/z.
