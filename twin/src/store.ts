@@ -232,6 +232,14 @@ export function handsFreeMuted(): boolean {
     return false;
   }
 }
+/** The person unmuted Wanda during an earlier walk (explicitly, not just never muted): the next walk listens too. */
+export function handsFreeUnmuted(): boolean {
+  try {
+    return localStorage.getItem("twin.handsFreeMuted") === "0";
+  } catch {
+    return false;
+  }
+}
 export function setHandsFreeMuted(muted: boolean): void {
   try {
     localStorage.setItem("twin.handsFreeMuted", muted ? "1" : "0");
@@ -518,8 +526,9 @@ export const useTwin = create<TwinState>((set, get) => ({
     if (!get().state?.route?.ok) return;
     set({ walkStep: 0, selection: null, popover: null, replyShown: false });
     walkFloor(0);
-    // Guidance listens for "Hey Wanda" by itself, unless the person muted it last time.
-    if (!handsFreeMuted() && !get().handsFree) get().setHandsFree(true);
+    // Wanda is muted while walking (the orb shows it; a tap unmutes). Only someone who unmuted her in an earlier walk
+    // gets "Hey Wanda" listening by itself.
+    if (handsFreeUnmuted() && !get().handsFree) get().setHandsFree(true);
   },
   setWalkStep(step) {
     const steps = walkSteps();

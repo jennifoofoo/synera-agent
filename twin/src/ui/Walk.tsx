@@ -67,6 +67,7 @@ export function Walk() {
   const line = step !== null ? honestLine(readable(walkSteps()[step] ?? "")) : "";
   const repeat = useTwin((s) => s.walkRepeat); // "repeat" said or typed while walking
   useEffect(() => {
+    // The orb's mute is the mic only: with the speaker on the steps are read out, muted or not.
     const { voiceOut, handsFree, speechAvailable } = useTwin.getState();
     if (line && (voiceOut || handsFree)) void speak(line, speechAvailable);
   }, [line, step, repeat]);
