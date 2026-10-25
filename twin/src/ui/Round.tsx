@@ -2,12 +2,12 @@
 // (floor, hall or the whole building), from where; then "14 stops · 230 m · ~4 min", the stops in order, Start, and
 // "What if a door here?". While walking, RoundBar sits on top of the step sheet (Walk.tsx): "Stop 3 of 14 · …" + Done.
 // URL trigger: #round=fire%20extinguisher&area=Ground%20floor[&building=<key>][&door=<room id>,<room id>].
-// All facts from round.ts (model + /api/route), nothing from the agent.
+// All facts from round.ts (POST /api/round: the same plan_round the chat agent uses).
 
 import { useEffect, useMemo, useRef } from "react";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
-import { areaOptions } from "../round/order";
+import { areaOptions } from "../round/choices";
 import {
   assetLabel,
   cancelDoor,
@@ -129,7 +129,6 @@ export function Round() {
         <>
           <p className="round-summary">
             <strong>{summary(plan)}</strong>
-            {plan.measured === "straight" && <span className="round-muted"> · order by straight line</span>}
           </p>
           {whatIf && (
             <div className="round-whatif" role="status">
