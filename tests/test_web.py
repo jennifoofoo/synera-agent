@@ -592,3 +592,11 @@ def test_round_line_runs_through_every_device_and_is_as_long_as_the_round(app):
             assert gap < 0.3, (stop["name"], gap)
     assert {stop["floor"] for stop in planned["stops"]} == {"Ground floor", "Floor 1"}
     assert route["floor_changes"]
+
+
+def test_a_page_note_naming_a_problem_is_saved_as_an_issue():
+    """The note form has no "It's a problem" box any more (25.10.): problem words make the note an issue."""
+    from building_agent.knowledge_tools import detect_kind
+
+    assert detect_kind("The dishwasher leaks a little", "note") == "issue"
+    assert detect_kind("Remote is in the drawer", "note") == "note"

@@ -24,6 +24,7 @@ from building_agent.knowledge import (
     closed_until,
     graph_jsonld,
 )
+from building_agent.knowledge_tools import detect_kind
 
 MAX_POST_BYTES = 12 * 1024 * 1024  # JSON with an 8 MB photo as base64 (4/3) plus the fields
 PAGE_KINDS = ("note", "issue")
@@ -111,6 +112,7 @@ def create(store: KnowledgeStore, bm, key: str, body: dict) -> dict:
     kind = body.get("kind", "note")
     if kind not in PAGE_KINDS:
         raise KnowledgeError("The page can add notes and issues; closures go through the chat (card and yes).")
+    kind = detect_kind(str(body.get("text") or ""), kind)  # "the dishwasher leaks" is a problem, typed or spoken
     photo = decode_photo(body["photo_base64"]) if body.get("photo_base64") else None
     source = body.get("source") if body.get("source") in ("tap", "text", "voice") else "tap"
     fact = store.add(
