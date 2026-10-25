@@ -81,8 +81,22 @@ def test_tap_answers_where_are_you(page, server):
     answer = requests[1]
     assert answer["message"] == "I'm here."
     here = answer["context"]["here"]
-    assert here["space_id"] == space_id
     assert here.get("point"), "the exact tapped point travels with context.here"
+    # The camera may settle between taps, so the room under the same screen spot can differ from step 1; what
+    # matters is that the room sent is the room that contains the tapped point.
+    inside = page.evaluate(
+        """([id, p]) => {
+          const poly = window.__twinAudit.store.getState().model.spaceById.get(id).polygon;
+          let c = false;
+          for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const [xi, yi] = poly[i], [xj, yj] = poly[j];
+            if ((yi > p[1]) !== (yj > p[1]) && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c;
+          }
+          return c;
+        }""",
+        [here["space_id"], here["point"]],
+    )
+    assert inside, f"the tapped point {here['point']} is not inside {here['space_id']}"
     assert "space_id" not in answer["context"], "no selection context with the answer"
     hint.wait_for(state="hidden", timeout=15000)
     page.wait_for_function("!window.__twinAudit.store.getState().chatBusy", timeout=10000)
