@@ -6,7 +6,7 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 - Depth from one layered shadow and frosted glass, not from borders: floating controls use `--glass` with `backdrop-filter: blur(var(--blur))` and `--shadow-float`. No hairline borders; only a 6 % rim (`--hairline`) where glass needs it on white, and 14 % dividers (`--hairline-strong`) inside segmented controls.
 - Soft shapes: corners 10 / 14 / 18 px (`--radius-sm`, `--radius`, `--radius-lg`), pills (`--radius-pill`, 999px) for chips, round buttons and scene labels.
 - One signal colour (Synera blue) for the route, primary buttons and selection. Green and red only for state (step-free, closed).
-- The building is a near-white model. Slabs are very light greys, walls sit half way between slab and white, a thin light edge line (`COLOURS.edge`) and the light give the shape, not a dark colour. Colour only for the hue groups (spec: `docs/specs/room-colours.md`), the same five as before, now desaturated: kitchens and canteens, toilets and lockers, stairs and lifts, meeting rooms, and in factory halls the main walkways. Every other room type is a near-white grey that differs by lightness only. Colour never alone: each hue group has an icon and a row in the help legend (`LEGEND_GROUPS` in palette.ts), and the groups also differ in lightness so they stay apart with red-green colour blindness. No red or green room fills. Furniture takes the floor's own tone (machines a touch darker): show everything, but quietly. Important equipment shows as an icon.
+- The building is a near-white model. Slabs are very light greys, walls sit half way between slab and white, a thin light edge line (`COLOURS.edge`) and the light give the shape, not a dark colour. Colour only for the hue groups (spec: `docs/specs/room-colours.md`), the same five as before, in a soft but clearly visible tint: kitchens and canteens, toilets and lockers, stairs and lifts, meeting rooms, and in factory halls the main walkways. Every other room type is a near-white grey that differs by lightness only. Colour never alone: each hue group has an icon and a row in the help legend (`LEGEND_GROUPS` in palette.ts), and the groups also differ in lightness so they stay apart with red-green colour blindness. No red or green room fills. Furniture takes the floor's own tone (machines a touch darker): show everything, but quietly. Important equipment shows as an icon.
 - Same group colours in 2D and 3D. The 2D plan is north-up, turns neutral rooms near-white, keeps the hue groups and draws dark, crisp wall lines (`COLOURS.planEdge`).
 - The route is the hero: a 6 px line (5.5 px in 3D) with a 2 px white casing, a 7 px halo of the signal colour at 16 %, thin white dashes travelling along it at walking pace, a pulsing start dot and a red destination pin that pops in (0.26 s). The red of the pin (`COLOURS.destination`) is used for nothing else.
 - Closed is one quiet language, in `--danger` (never the safety red), 2D and 3D: a closed room is tinted red with an outline and carries a "Closed · name" badge, no big circles; a closed lift or stairs keeps its glyph with a red edge and a diagonal bar, its slab gets a pale red hatching and from the mid zoom tier a "Closed" tag; a closed door gets a red bar across its gap. The route card adds one line ("Avoids closed Office lift"), the help legend a "Closed" row. Reopening removes all of it at once (`model/closures.ts`).
@@ -31,11 +31,11 @@ All values of the look live in `src/styles/tokens.css` (CSS custom properties). 
 | `--signal-dark` / `--signal-soft` | #002478 / #ebf1ff | hover and pressed, selected fills (dark text on soft) |
 | `--signal-ink` | #ffffff | text on signal |
 | `--ok` / `--danger` / `--warn` / `--info` | #2f7d5b / #b3382c / #4a5260 / #004fab | state only; info = "you are here" |
-| `--room-food` | #efe6d4 | kitchen, canteen (sand) |
-| `--room-sanitary` | #dce8ec | toilet, bathroom, locker room (pale aqua) |
-| `--room-vertical` | #dcd6e6 | stairs and lifts, also the 3D shafts (muted violet) |
-| `--room-meeting` | #dbe3d5 | meeting, seminar, lecture hall, library (pale sage) |
-| `--room-walkway` | #f2edd3 | main aisles and traffic lanes in factory halls (pale lemon floor marking) |
+| `--room-food` | #f2dbaa | kitchen, canteen (sand) |
+| `--room-sanitary` | #bde1ea | toilet, bathroom, locker room (pale aqua) |
+| `--room-vertical` | #d0c6ea | stairs and lifts, also the 3D shafts (muted violet) |
+| `--room-meeting` | #c9e4bb | meeting, seminar, lecture hall, library (pale sage) |
+| `--room-walkway` | #f1ecc3 | main aisles and traffic lanes in factory halls (pale lemon floor marking) |
 | `--safety-red` / `--safety-green` | #a52019 / #237f52 | safety icons only (fire extinguisher; first aid, eyewash, defibrillator, exit) |
 | `--radius-sm` / `--radius` / `--radius-lg` | 10 / 14 / 18 px | buttons and inputs, cards and panels, sheets |
 | `--radius-pill` | 999px | chips, round buttons, scene labels |
@@ -51,7 +51,7 @@ Scene only (palette.ts `COLOURS`): wall top edges #9aa0a8 (ghost floors #c4c8ce)
 
 Lights and post-processing: `NoToneMapping` (so the near-white slabs keep their values), hemisphere light 1.6 (sky `#ffffff`, ground `#dcd9d3`), key light 1.3, fill light 0.5, and N8AO with radius 1.4, intensity 1.1 and the neutral tint above, so contact shadows stay soft and never turn into a grey wash.
 
-Label contrast (ink #1d2430 on the slab, WCAG formula): corridors 14.2, outdoor 13.3, walkway 13.2, work 13.1, food 12.6, sanitary 12.5, logistics 12.4, production 12.3, meeting 11.8, technical 11.4 (the darkest slab, #dadde0), stairs and lifts 11.0. Every slab is above 10:1, far over the 4.5:1 AA limit. Secondary text (`--ink-2`) is still not used for room labels. Scene labels are `--glass-strong` pills with ink text.
+Label contrast (ink #1d2430 on the slab, WCAG formula): corridors 14.2, outdoor 13.3, work 13.1, walkway 13.0, logistics 12.4, production 12.3, food 11.5, technical 11.4, meeting 11.4, sanitary 11.2, stairs and lifts 9.6 (the darkest slab, #d0c6ea). Every slab is above 9.5:1, far over the 4.5:1 AA limit. Secondary text (`--ink-2`) is still not used for room labels. Scene labels are `--glass-strong` pills with ink text.
 
 ## Typography
 Inter Variable, self-hosted via `@fontsource-variable/inter` (imported in `src/main.tsx`), no external font request. Tabular numerals globally (`font-feature-settings: "tnum"`). Scale 12 / 14 / 16 / 20 / 28 px with weights 400, 500 and 600 only; the building name is 20 px / 600. Uppercase tracking only on tiny section labels (`.tiny-label`, planner headings).
