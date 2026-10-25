@@ -3,7 +3,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import { Html } from "@react-three/drei";
+import { Html } from "./SharpHtml";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Point } from "../api/types";
 import { samePoint } from "../model/format";

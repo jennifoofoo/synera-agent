@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Html } from "@react-three/drei";
+import { Html } from "./SharpHtml";
 import { useFrame } from "@react-three/fiber";
 import { controlsRef } from "./FloorMesh";
 import type { Asset, Point, Space } from "../api/types";

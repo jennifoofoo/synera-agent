@@ -4,7 +4,8 @@
 
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Html, Line } from "@react-three/drei";
+import { Line } from "@react-three/drei";
+import { Html } from "./SharpHtml";
 import { useFrame } from "@react-three/fiber";
 import type { BuildingState, Point } from "../api/types";
 import type { BuildingModel } from "../model/model";

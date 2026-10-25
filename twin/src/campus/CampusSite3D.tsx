@@ -2,7 +2,8 @@
 // between the entrances (walkway on the ground, bridge raised by its level_delta), the route as one glowing line.
 // Tap a building (or its name) = enter it. Own small Canvas, independent of the building scene.
 
-import { CameraControls, Html, Line } from "@react-three/drei";
+import { CameraControls, Line } from "@react-three/drei";
+import { Html } from "../scene/SharpHtml";
 import { Canvas, type ThreeEvent } from "@react-three/fiber";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import CameraControlsImpl from "camera-controls";

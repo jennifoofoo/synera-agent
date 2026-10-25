@@ -5,7 +5,7 @@
 // pinned here (they keep their own closure marks).
 
 import { useEffect, useState } from "react";
-import { Html } from "@react-three/drei";
+import { Html } from "./SharpHtml";
 import type { Point } from "../api/types";
 import type { BuildingModel } from "../model/model";
 import { newestFirst, sinceLabel, type Note } from "../notes/notes";

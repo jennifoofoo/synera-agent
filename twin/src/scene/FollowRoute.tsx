@@ -3,7 +3,8 @@
 
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { Html, Line } from "@react-three/drei";
+import { Line } from "@react-three/drei";
+import { Html } from "./SharpHtml";
 import { useFrame } from "@react-three/fiber";
 import type { Line2 } from "three-stdlib";
 import type { Route } from "../api/types";
