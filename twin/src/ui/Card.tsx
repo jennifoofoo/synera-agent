@@ -19,6 +19,7 @@ import { readable } from "../walkInfo";
 import { AvoidsClosed } from "./AvoidsClosed";
 import { RouteChips } from "./RouteChips";
 import { TurnIcon, rideUp } from "./Walk";
+import { useRound } from "../round/round";
 
 export function Card() {
   const model = useTwin((s) => s.model);
@@ -30,6 +31,9 @@ export function Card() {
   const draft = useTwin((s) => s.draft);
   const campusRoute = useTwin((s) => s.campusRoute);
   const directions = useTwin((s) => s.directions);
+  // Decision A (docs/specs/inspection-round.md): while a round is planned or walked, the round panel owns the drawn
+  // route, so the normal route card (a second "Guide me") stays hidden.
+  const roundActive = useRound((s) => !!s.plan && (s.guiding || s.open));
   if (!model || draft) return null; // a Level 4 draft has its own ids; Route/I'm here would hit the API with them
 
   let card: ReactNode = null;
@@ -38,7 +42,7 @@ export function Card() {
   else if (guide?.active) card = <GuideCard model={model} />;
   else if (busy) card = null; // the Omnibox shows "thinking" above the input
   else if (replyShown) card = <ReplyCard model={model} />;
-  else if (route?.ok && !campusRoute) card = <RouteCard model={model} route={route} />;
+  else if (route?.ok && !campusRoute && !roundActive) card = <RouteCard model={model} route={route} />;
 
   return (
     <>

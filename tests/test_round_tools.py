@@ -160,3 +160,29 @@ def test_tool_in_a_benchmark_message_never_asks_for_a_start(bm):
     guide.last_user_text = "Shortest round over all fire extinguishers. Answer: <metres>"
     with pytest.raises(ToolError, match="start is given in the question"):
         round_tool.call({"what": "fire extinguisher"})
+
+
+DEMO = Path("data/train/proc-factory-train-015")
+
+
+@pytest.mark.skipif(not DEMO.exists(), reason="data/train is missing")
+def test_demo_round_from_the_entrance_matches_the_spec():
+    """Spec acceptance (docs/specs/inspection-round.md): 5 stops from "entrance in Main aisle H-B3", length equal to
+    the route through the same stops (±1 m), and a door between H-A2 and Server room 0.16 makes it shorter."""
+    demo = copy_map(routing.load_map(DEMO))
+    result = plan_round(demo, "fire extinguisher", "entrance in Main aisle H-B3", floor_level=0)
+    assert len(result["stops"]) == 5 and result["start"] == "Main aisle H-B3"
+    via = [stop["space_id"] for stop in result["stops"]]
+    same_order = routing.route(demo, demo.resolve_space("Main aisle H-B3"), via[-1], False, via[:-1])
+    assert same_order.length_m == pytest.approx(result["total_m"], abs=1)
+    first, second = demo.resolve_space("Production zone H-A2"), demo.resolve_space("Server room 0.16")
+    with_door = copy_map(demo)
+    with_door.add_door(first, second, position=shared_wall_midpoint(demo, first, second))
+    assert (
+        plan_round(with_door, "fire extinguisher", "Main aisle H-B3", floor_level=0)["total_m"] < result["total_m"] - 20
+    )
+
+
+def test_unknown_start_still_fails_after_the_entrance_words_are_dropped(bm):
+    with pytest.raises(MapError):
+        plan_round(bm, "fire extinguisher", "entrance in Nowhere room 9.99", floor_level=0)

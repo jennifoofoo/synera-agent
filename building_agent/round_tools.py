@@ -28,6 +28,10 @@ MAX_ENTRANCES = 6
 EPSILON_M = 1e-6  # a new order must be shorter by more than this to replace the one found first
 HERE_WORDS = {"here", "hier", "me", "my position", "current position", "where i am"}
 HALL_LETTER = re.compile(r"^(?:hall|halle)\s+([a-z])$")
+# "the entrance in Main aisle H-B3", "Eingang in Halle A": the room behind the door is the start.
+ENTRANCE_IN = re.compile(
+    r"^(?:at\s+)?(?:the\s+)?(?:main\s+)?(?:entrance|eingang)\s+(?:in|at|of|to|im|in der|zur|zum)\s+", re.IGNORECASE
+)
 
 
 # ---------- what and where ----------
@@ -66,6 +70,17 @@ def area_match(bm: BuildingMap, space: dict, area: str) -> bool:
     tokens = [token[:-1] if token.endswith("s") and len(token) > 3 else token for token in words_of(said)]
     known = set(words_of(fold(space["name"]))) | set(words_of(space["room_type"].replace("_", " ")))
     return bool(tokens) and all(token in known for token in tokens)
+
+
+def start_space(bm: BuildingMap, start: str | None) -> str:
+    """resolve_space, also for "entrance in <room>" (people name the start by its entrance)."""
+    try:
+        return bm.resolve_space(start)
+    except MapError:
+        room = ENTRANCE_IN.sub("", (start or "").strip())
+        if room == (start or "").strip():
+            raise
+        return bm.resolve_space(room)
 
 
 def area_names(bm: BuildingMap, assets: list[dict]) -> list[str]:
@@ -172,7 +187,7 @@ def plan_round(
                 f"No matching device in '{area[:60]}'. Rooms that have one: {', '.join(area_names(bm, assets))}."
             )
         assets = in_area
-    start_id = bm.resolve_space(start)
+    start_id = start_space(bm, start)
     by_room: dict[str, list[dict]] = {}
     for asset in sorted(assets, key=lambda a: (natural_key(a["name"]), a["id"])):
         by_room.setdefault(asset["space_id"], []).append(asset)
