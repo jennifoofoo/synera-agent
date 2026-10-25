@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DAY_MS, egoGraph, factStateAt, localId, mainType, momentLabel, timeRange, type LdNode } from "./egoGraph";
+import { DAY_MS, egoGraph, factStateAt, localId, mainType, momentLabel, spreadOut, timeRange, type LdNode } from "./egoGraph";
 
 const B = "urn:synera:b1";
 const room = `${B}:space:S1`;
@@ -130,5 +130,12 @@ describe("labels and range", () => {
   it("says Now, Tomorrow or the date", () => {
     expect(momentLabel(now, now)).toBe("Now");
     expect(momentLabel(now + DAY_MS, now)).toMatch(/^Tomorrow /);
+  });
+});
+
+describe("spreadOut", () => {
+  it("puts flagged items on evenly spaced slots", () => {
+    expect(spreadOut([1, 2, 3, 4, 5, 6], (n) => n <= 2)).toEqual([1, 3, 4, 2, 5, 6]);
+    expect(spreadOut([1, 2], () => true)).toEqual([1, 2]);
   });
 });

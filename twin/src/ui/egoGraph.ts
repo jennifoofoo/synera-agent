@@ -139,14 +139,15 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
     return CATEGORY_RANK[node.category ?? ""] ?? 1;
   };
   const sorted = [...around].sort((a, b) => rank(a) - rank(b) || (a.name ?? a["@id"]).localeCompare(b.name ?? b["@id"]));
-  const shown = sorted.length > cap ? sorted.slice(0, cap - 1) : sorted;
-  const more = sorted.length - shown.length;
+  const picked = sorted.length > cap ? sorted.slice(0, cap - 1) : sorted;
+  const more = sorted.length - picked.length;
+  const shown = spreadOut(picked, (node) => withFacts.has(node["@id"]));
 
   const cx = width / 2;
   const cy = height / 2;
-  const radius = Math.max(60, Math.min(width, height) / 2 - 30);
-  const r1 = radius * 0.48;
-  const r2 = radius * 0.76;
+  const radius = Math.max(60, Math.min(width, height) / 2 - 28);
+  const r1 = radius * 0.55;
+  const r2 = radius * 0.78;
   const r3 = radius;
   const polar = (r: number, angle: number) => ({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
 
@@ -155,7 +156,7 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
   const angleOf = new Map<string, number>();
   const ring1Count = shown.length + (more > 0 ? 1 : 0);
   const step = (2 * Math.PI) / Math.max(ring1Count, 1);
-  const start = -Math.PI / 2;
+  const start = -Math.PI / 2 + step / 2;
   shown.forEach((node, index) => {
     const angle = start + index * step;
     angleOf.set(node["@id"], angle);
@@ -185,7 +186,10 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
   for (const [anchor, entries] of groups) {
     entries.forEach(({ fact, index, state }, k) => {
       const base = anchor === roomIri ? free[k] : (angleOf.get(anchor) ?? start);
-      const spread = anchor === roomIri ? 0 : (k - (entries.length - 1) / 2) * 0.32;
+      // The anchor's label runs sideways at the anchor's height, so turn the fact away from the horizontal
+      // (further up in the top half, further down in the bottom half), else it sits on the label.
+      const away = Math.sign(Math.sin(base) * Math.cos(base)) || 1;
+      const spread = anchor === roomIri ? 0 : away * 0.35 + (k - (entries.length - 1) / 2) * 0.32;
       const angle = base + spread;
       const kind = (fact.kind ?? "note") as Role;
       const role: Role = kind === "issue" || kind === "closure" ? kind : "note";
@@ -221,6 +225,19 @@ export function egoGraph(graph: LdNode[], roomId: string, options: EgoOptions): 
     nodes.push({ id: personId, ring: 3, role: "person", label: short(person?.name ?? localId(personId), 14), types: person ? typesOf(person) : ["rec:Person"], ...polar(r3, angle) });
   }
   return { nodes, edges, more, oldest };
+}
+
+/** The flagged items on evenly spaced slots (so things with notes do not bunch up), the rest in order between. */
+export function spreadOut<T>(items: T[], flagged: (item: T) => boolean): T[] {
+  const hot = items.filter(flagged);
+  const cold = items.filter((item) => !flagged(item));
+  if (hot.length === 0 || cold.length === 0) return items;
+  const slots = new Set(hot.map((_, k) => Math.floor((k * items.length) / hot.length)));
+  const out: T[] = [];
+  let h = 0;
+  let c = 0;
+  for (let i = 0; i < items.length; i += 1) out.push(slots.has(i) ? hot[h++] : cold[c++]);
+  return out;
 }
 
 /** `count` angles spread into the widest gaps between `taken` angles (all if nothing is taken). */
