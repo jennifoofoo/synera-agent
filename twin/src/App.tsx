@@ -18,6 +18,7 @@ import { Phone } from "./ui/Phone";
 import { Planner } from "./ui/Planner";
 import { Round } from "./ui/Round";
 import { Walk } from "./ui/Walk";
+import { Welcome } from "./ui/Welcome";
 
 /** One screen: the building, one input, one card. Everything else only when needed. */
 export function App() {
@@ -42,6 +43,7 @@ export function App() {
       style={{ "--top-inset": `${topInset}px`, "--bottom-inset": `${bottomInset}px`, "--right-inset": `${rightInset}px` } as React.CSSProperties}
     >
       <Scene />
+      <Welcome />
       <CampusSite />
       <TopBar />
       <FloorRail />
