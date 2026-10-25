@@ -50,7 +50,7 @@ class Model:
 @pytest.fixture
 def model(monkeypatch):
     stand_in = Model()
-    monkeypatch.setattr(agent_module.StarterAgent, "ask", lambda self, text: stand_in.ask(self, text))
+    monkeypatch.setattr(agent_module.Agent, "run_tools", lambda self, text: stand_in.ask(self, text))
     return stand_in
 
 

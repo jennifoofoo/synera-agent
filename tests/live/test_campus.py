@@ -11,11 +11,10 @@ from pathlib import Path
 
 import pytest
 
-import starter_agent.agent as starter_module
 from building_agent import agent as agent_module
 from building_agent.campus import entrances, load_maps, make_example_campus
 from building_agent.campus_tools import CampusHolder
-from tests.live.harness import LIVE_CACHE, LIVE_MODEL, Call, Transcript, Turn, calls_in
+from tests.live.harness import LIVE_CACHE, LIVE_EFFORT, LIVE_MODEL, Call, Transcript, Turn, calls_in
 
 DATA = Path("data")
 CAMPUS_A, FACTORY, RESPLAN = "proc-campus-dev-000", "proc-factory-dev-003", "resplan-439"
@@ -51,24 +50,21 @@ def building_name(holder: CampusHolder, building_id: str) -> str:
 
 def run_campus_script(user_turns: list[str], connected: bool = True) -> tuple[Transcript, list[dict]]:
     """(transcript, final links as dicts). Cached on disk by turns, model and prompt text."""
-    raw = json.dumps([user_turns, connected, LIVE_MODEL, agent_module.CONVERSATION_RULES, CAMPUS_RULES])
+    raw = json.dumps([user_turns, connected, LIVE_MODEL, LIVE_EFFORT, agent_module.CONVERSATION_RULES, CAMPUS_RULES])
     path = LIVE_CACHE / f"campus-{hashlib.sha256(raw.encode()).hexdigest()}.json"
     if path.exists():
         saved = json.loads(path.read_text(encoding="utf-8"))
         turns = [Turn(t["user"], t["reply"], [Call(**c) for c in t["calls"]]) for t in saved["turns"]]
         return Transcript(turns), saved["links"]
     holder = build_holder(connected)
-    previous_model = starter_module.MODEL
-    starter_module.MODEL = LIVE_MODEL
-    try:
-        agent = agent_module.Agent(holder.bm, Path("agent_output") / "live_scratch", campus=holder)
-        turns = []
-        for user_text in user_turns:
-            seen = len(agent.messages)
-            reply = agent.ask(user_text)
-            turns.append(Turn(user_text, reply, calls_in(agent.messages[seen:])))
-    finally:
-        starter_module.MODEL = previous_model
+    agent = agent_module.Agent(
+        holder.bm, Path("agent_output") / "live_scratch", campus=holder, model=LIVE_MODEL, effort=LIVE_EFFORT
+    )
+    turns = []
+    for user_text in user_turns:
+        seen = len(agent.messages)
+        reply = agent.ask(user_text)
+        turns.append(Turn(user_text, reply, calls_in(agent.messages[seen:])))
     links = [{"id": link.id, "closed": link.closed, "length_m": link.length_m} for link in holder.campus.links]
     LIVE_CACHE.mkdir(parents=True, exist_ok=True)
     path.write_text(
