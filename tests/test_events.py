@@ -14,7 +14,7 @@ from building_agent import knowledge_tools as kt
 from building_agent.guide_tools import GuideState
 from building_agent.knowledge import KnowledgeError, KnowledgeStore, apply_timed_closures
 from building_agent.tools import make_tools
-from scripts.demo_events_seed import EVENTS, seed_events
+from scripts.demo_events_seed import EVENTS, room_id, seed_events
 from starter_agent.building_map import BuildingMap
 from web.server import App
 
@@ -204,3 +204,78 @@ def test_api_lists_future_events_in_history(tmp_path, bm):
     _, graph = app.get("/api/graph", {"key": ["user/plan-89323a15"]})
     titles = {node.get("text") for node in graph["@graph"] if node.get("kind") == "event"}
     assert "Pitches" in titles
+
+
+# ---------- review fixes: events stay out of notes and fixes, time words, seed ----------
+
+
+def tool(tools, name: str, **kwargs) -> dict:
+    return json.loads(tools[1][name](**kwargs))
+
+
+def test_fixed_never_ends_a_booking(tools):
+    state, _ = tools
+    state.last_user_text = "The projector in the Project Room is fixed."
+    result = tool(tools, "resolve_here", place="Project Room", text="projector fixed")
+    assert result.get("nothing_open") and state.pending is None
+    state.last_user_text = "Project is erledigt."
+    result = tool(tools, "resolve_here", place="Project", text="erledigt")
+    assert "I understood" not in result and state.pending is None
+
+
+def test_facts_here_leaves_events_to_find_events(tools):
+    assert tool(tools, "facts_here", place="Project Room")["count"] == 0
+    assert tool(tools, "facts_here", place="all", person="Leonie")["count"] == 0
+    assert tool(tools, "facts_here", place="all", history=True)["count"] == 0
+
+
+def test_unreadable_time_is_asked_back_never_guessed(tools, bm, store):
+    result = find(tools, place="Project Room", when="whenever it suits")
+    assert "free" not in result and result["question"] and result["time_not_understood"]
+    free = kt.room_free(bm, store, room(bm, "Project Room"), NOW, "when the moon is blue")
+    assert "free" not in free and free["question"]
+    assert kt.event_window("31.02.", NOW) is None
+
+
+@pytest.mark.parametrize(
+    ("words", "start"),
+    [
+        ("übermorgen", datetime(2026, 10, 27, 0, 0, tzinfo=kt.TZ)),
+        ("day after tomorrow", datetime(2026, 10, 27, 0, 0, tzinfo=kt.TZ)),
+        ("Friday", datetime(2026, 10, 30, 0, 0, tzinfo=kt.TZ)),
+        ("am Freitag", datetime(2026, 10, 30, 0, 0, tzinfo=kt.TZ)),
+        ("Montag um 14 Uhr", datetime(2026, 10, 26, 14, 0, tzinfo=kt.TZ)),
+        ("27.10.", datetime(2026, 10, 27, 0, 0, tzinfo=kt.TZ)),
+        ("12.10. at 9:00", datetime(2026, 10, 12, 9, 0, tzinfo=kt.TZ)),
+        ("2026-10-28", datetime(2026, 10, 28, 0, 0, tzinfo=kt.TZ)),
+        ("heute morgen", datetime(2026, 10, 25, 6, 0, tzinfo=kt.TZ)),
+        ("at 2", datetime(2026, 10, 25, 14, 0, tzinfo=kt.TZ)),
+        ("um 3", datetime(2026, 10, 25, 15, 0, tzinfo=kt.TZ)),
+        ("at 09:00", datetime(2026, 10, 25, 9, 0, tzinfo=kt.TZ)),
+    ],
+)
+def test_days_weekdays_and_dates(words, start):
+    assert kt.event_window(words, NOW).start == start
+
+
+def test_this_week_counts_upcoming_events_of_the_week(bm, tmp_path):
+    monday = NOW - timedelta(days=6)  # Monday 19.10: the pitches on Sunday are later this week
+    store = KnowledgeStore(tmp_path / "week")
+    seed_events(bm, store, NOW, quiet=True)
+    events, _ = kt.search_events(bm, store, monday, query="pitches", when="this week")
+    assert [e["text"] for e in events] == ["Pitches"]
+    events, _ = kt.search_events(bm, store, monday - timedelta(days=7), query="pitches", when="next week")
+    assert [e["text"] for e in events] == ["Pitches"]
+
+
+def test_seed_on_the_next_day_replaces_the_old_set(bm, store):
+    seed_events(bm, store, NOW + timedelta(days=1), quiet=True)
+    events = [f for f in store.query(bm, history=True, at=NOW + timedelta(days=1)) if f.kind == "event"]
+    assert len(events) == len(EVENTS)
+    assert all(f.valid_to.startswith("2026-10-26") for f in events)
+
+
+def test_seed_room_lookup_checks_the_name(bm):
+    assert room_id(bm, ("F0-S002", "Project Room")) == "plan-89323a15-F0-S002"
+    assert room_id(bm, ("F0-S001", "Project Room")) == "plan-89323a15-F0-S002"  # the name wins over a stale id
+    assert room_id(bm, ("F0-S001", "Renamed room")) == "plan-89323a15-F0-S001"  # renamed: the id still holds

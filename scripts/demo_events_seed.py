@@ -3,8 +3,8 @@ can answer "Where are the pitches?" or "Is the Project Room free at 10:00?" (doc
 
     uv run python scripts/demo_events_seed.py [building_dir] [--root agent_output/knowledge]
 
-Dates are relative to today (Europe/Berlin). Idempotent: an event with the same title and start is skipped. Events
-never change routes. Demo data only, never for benchmark buildings.
+Dates are relative to today (Europe/Berlin). Idempotent: an event with the same title and start is skipped, and a
+demo event seeded on another day is replaced by today's (no second hackathon on day two). Events never change routes. Demo data only, never for benchmark buildings.
 """
 
 import argparse
@@ -39,15 +39,18 @@ EVENTS = [
 
 
 def room_id(bm: BuildingMap, room: tuple[str, str]) -> str:
-    """The room by id (<building id>-<suffix>), else by its name; stops when neither exists."""
+    """The room by id (<building id>-<suffix>) when its name matches; else the room with that name; else the id alone
+    (the plan renamed it). Stops when neither exists."""
     suffix, name = room
     space_id = f"{bm.data['building']['id']}-{suffix}"
-    if space_id in bm.spaces:
+    if space_id in bm.spaces and bm.spaces[space_id]["name"] == name:
         return space_id
     found = [space["id"] for space in bm.spaces.values() if space["name"] == name]
-    if not found:
-        raise SystemExit(f"No room {space_id} or named {name!r} in this building.")
-    return found[0]
+    if found:
+        return found[0]
+    if space_id in bm.spaces:
+        return space_id
+    raise SystemExit(f"No room {space_id} or named {name!r} in this building.")
 
 
 def at_day(today: datetime, days: int, hour: int, minute: int) -> datetime:
@@ -58,6 +61,21 @@ def seed_events(bm: BuildingMap, store: KnowledgeStore, now: datetime | None = N
     """Add the demo events around `now` (default: the real time). Returns how many were added."""
     current = berlin_now(now)
     today = current.replace(hour=0, minute=0, second=0, microsecond=0)
+    planned = {(title, parse_time(at_day(today, *start))) for title, _, start, _, _ in EVENTS}
+    titles = {title for title, _ in planned}
+    with store.lock:  # demo events seeded on another day go (the store has no delete call, so edit its list)
+        facts = store.load(bm)
+        kept = [
+            fact
+            for fact in facts
+            if not (
+                fact.kind == "event" and fact.text in titles and (fact.text, parse_time(fact.valid_from)) not in planned
+            )
+        ]
+        if len(kept) != len(facts):
+            store.save(bm, kept)
+            if not quiet:
+                print(f"{len(facts) - len(kept)} demo events from another day replaced.")
     known = {
         (fact.text, parse_time(fact.valid_from))
         for fact in store.query(bm, status="all", at=current)

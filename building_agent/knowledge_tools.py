@@ -596,8 +596,13 @@ DAY_PARTS = [  # (pattern, from hour, to hour) on the named day
     (r"\b(afternoon|nachmittag)\b", 12, 18),
     (r"\b(evening|tonight|abend)\b", 18, 24),
 ]
-TOMORROW = re.compile(r"\b(tomorrow|morgen)\b", re.IGNORECASE)
+DAY_AFTER = re.compile(r"(?:\b|^)(übermorgen|uebermorgen|day after tomorrow)\b", re.IGNORECASE)
+TOMORROW = re.compile(r"(?<![\wäöüß])(tomorrow|morgen)\b", re.IGNORECASE)
 YESTERDAY = re.compile(r"\b(yesterday|gestern)\b", re.IGNORECASE)
+WEEKDAY_WORD = re.compile(rf"\b({_DAYS})\b", re.IGNORECASE)
+DATE_WORD = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})?(?!\d)|\b(\d{4})-(\d{2})-(\d{2})\b")
+AFTERNOON_HOURS = range(1, 7)  # 'at 2', 'um 3' without am/pm during a working day mean the afternoon
+ASK_WHEN = "Which day and time do you mean? For example today at 15:00 or tomorrow morning."
 TITLE_STOP = {"the", "a", "an", "der", "die", "das", "event", "events", "session", "is", "ist", "wann", "when", "where"}
 
 
@@ -611,42 +616,90 @@ class EventWindow:
 
 
 def clock_in(text: str) -> tuple[int, int] | None:
-    """(hour, minute) of a clock time in the words ('at 14:00', 'um 15 Uhr', '3pm', '14.30'), None without one."""
+    """(hour, minute) of a clock time in the words ('at 14:00', 'um 15 Uhr', '3pm', '14.30'), None without one.
+    'at 2' or 'um 3' (1 to 6, no am/pm, no leading zero) is the afternoon: 14:00, 15:00."""
     for match in CLOCK_AT.finditer(text):
         if match.group("pre") or match.group("minute") or match.group("ampm") or match.group("uhr"):
             clock = clock_of(match)
-            if clock is not None:
-                return clock
+            if clock is None:
+                continue
+            raw = match.group("hour")
+            if not match.group("ampm") and clock[0] in AFTERNOON_HOURS and not raw.startswith("0"):
+                return clock[0] + 12, clock[1]
+            return clock
     return None
 
 
+def named_day(text: str, midnight: datetime) -> tuple[datetime | None, str]:
+    """The day the words name (today, tomorrow, übermorgen, yesterday, a weekday, 25.10. or 2026-10-25) at
+    midnight, and the words with a date removed (so '12.10.' is never read as 12:10). None when no day is named."""
+    date = DATE_WORD.search(text)
+    if date:
+        rest = text[: date.start()] + " " + text[date.end() :]
+        try:
+            if date.group(4):
+                day = midnight.replace(year=int(date.group(4)), month=int(date.group(5)), day=int(date.group(6)))
+            else:
+                year = date.group(3)
+                year = midnight.year if not year else int(year) + (2000 if len(year) == 2 else 0)
+                day = midnight.replace(year=year, month=int(date.group(2)), day=int(date.group(1)))
+        except ValueError:
+            return None, rest
+        return day, rest
+    if DAY_AFTER.search(text):
+        return midnight + timedelta(days=2), text
+    if YESTERDAY.search(text):
+        return midnight - timedelta(days=1), text
+    if TOMORROW.search(text) and "heute morgen" not in text and "this morgen" not in text:
+        return midnight + timedelta(days=1), text
+    weekday = WEEKDAY_WORD.search(text)
+    if weekday:
+        return midnight + timedelta(days=(WEEKDAY[weekday.group(1).lower()] - midnight.weekday()) % 7), text
+    if re.search(r"\b(today|heute)\b", text):
+        return midnight, text
+    return None, text
+
+
+def forward_period(text: str, current: datetime) -> tuple[datetime, datetime] | None:
+    """'this week' / 'this month' for events: the whole week or month, so upcoming events count too."""
+    midnight = at_clock(current, time(0, 0))
+    if re.search(r"\b(this week|diese woche|dieser woche|the week|der woche)\b", text):
+        monday = midnight - timedelta(days=current.weekday())
+        return monday, monday + timedelta(days=7)
+    if re.search(r"\b(this month|diesen monat|diesem monat)\b", text):
+        first = midnight.replace(day=1)
+        return first, (first + timedelta(days=32)).replace(day=1)
+    if re.search(r"\b(next week|nächste woche|naechste woche|nächsten woche|naechsten woche)\b", text):
+        monday = midnight - timedelta(days=current.weekday()) + timedelta(days=7)
+        return monday, monday + timedelta(days=7)
+    return period_bounds(text, current)
+
+
 def event_window(when: str | None, current: datetime) -> EventWindow | None:
-    """What 'now', 'at 14:00', 'this afternoon', 'today', 'tomorrow morning', 'yesterday' mean for events; None when
-    the words name no time (then every event counts). 'morgen früh' is tomorrow morning, a bare 'morgen' tomorrow."""
+    """What 'now', 'at 14:00', 'this afternoon', 'today', 'tomorrow morning', 'übermorgen', 'Friday', '25.10.',
+    'this week' mean for events; None when the words name no time the tool can read (the caller asks back).
+    'morgen früh' is tomorrow morning, 'heute morgen' this morning."""
     text = " ".join(str(when or "").lower().split())
     if not text:
         return None
-    clock = clock_in(text)
-    if NOW_WHEN.search(text) and clock is None:
-        return EventWindow(current, current, "now")
     midnight = at_clock(current, time(0, 0))
-    day = midnight
-    if TOMORROW.search(text) and "heute morgen" not in text:
-        day = midnight + timedelta(days=1)
-    if re.search(r"\bmorgen (früh|frueh|vormittag|mittag|nachmittag|abend)\b", text):
-        day = midnight + timedelta(days=1)
-    if YESTERDAY.search(text):
-        day = midnight - timedelta(days=1)
-    label = day_words(day, current)
+    day, rest = named_day(text, midnight)
+    clock = clock_in(rest)
+    if NOW_WHEN.search(text) and clock is None and day is None:
+        return EventWindow(current, current, "now")
+    if day is None and DATE_WORD.search(text):
+        return None  # an impossible date ('31.02.')
+    base = day if day is not None else midnight
+    label = day_words(base, current)
     if clock is not None:
-        moment = day.replace(hour=clock[0], minute=clock[1])
+        moment = base.replace(hour=clock[0], minute=clock[1])
         return EventWindow(moment, moment, f"{label} {clock_words(moment)}")
     for pattern, begin, finish in DAY_PARTS:
-        if re.search(pattern, text):
-            return EventWindow(day + timedelta(hours=begin), day + timedelta(hours=finish), f"{label} {text}")
-    if re.search(r"\b(today|heute|tomorrow|morgen|yesterday|gestern)\b", text):
+        if re.search(pattern, rest) or ("heute morgen" in text and begin == 6):
+            return EventWindow(base + timedelta(hours=begin), base + timedelta(hours=finish), f"{label} {text}")
+    if day is not None:
         return EventWindow(day, day + timedelta(days=1), label)
-    bounds = period_bounds(text, current)
+    bounds = forward_period(text, current)
     if bounds:
         return EventWindow(bounds[0], bounds[1], text)
     return None
@@ -739,8 +792,12 @@ def search_events(
 
 
 def room_free(bm: BuildingMap, store, space_id: str, current: datetime, when: str | None = None) -> dict:
-    """Is the room free at that moment (or for that whole period)? {free, busy_with: [event lines]}."""
-    window = event_window(when, current) or EventWindow(current, current, "now")
+    """Is the room free at that moment (or for that whole period)? {free, time, busy_with: [event lines]}; without
+    `when` it means now. Time words it cannot read give only the question back, never a guess at `free`."""
+    window = event_window(when, current)
+    if window is None and when and str(when).strip():
+        return {"time_not_understood": when, "question": ASK_WHEN}
+    window = window or EventWindow(current, current, "now")
     busy = [
         fact
         for fact in all_events(bm, store, current)
@@ -949,7 +1006,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
         if not filters:
             filters = {"space_id": anchor.space_id}
         facts = [fact_dict(f) for f in store.query(bm, at=current, **filters)]
-        return [f for f in facts if f.get("status") == "open"]
+        return [f for f in facts if f.get("status") == "open" and f.get("kind") != "event"]
 
     def only_open_match(place: str | None) -> Anchor | None:
         """The anchor of the one open fact whose place the words name, when the words alone match several places."""
@@ -958,6 +1015,8 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             return None
         anchors = {}
         for fact in store_of(state).query(bm, at=now()):
+            if fact.kind == "event":  # a booking is never 'fixed'
+                continue
             found = fact.anchor or {}
             label = anchor_label(bm, found)
             if wanted <= set(words_of(label)):
@@ -1111,7 +1170,7 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
             if value:
                 filters[name] = value.strip().lower().replace(" ", "_") if name == "asset_type" else value.strip()
         try:
-            facts = [fact_dict(f) for f in store.query(bm, **filters)]
+            facts = [fact_dict(f) for f in store.query(bm, **filters) if f.kind != "event"]  # events: find_events
         except (MapError, ValueError, KeyError) as error:
             raise ToolError(str(error)) from error
         bm.found_facts = facts
@@ -1175,14 +1234,14 @@ def make_knowledge_tools(bm: BuildingMap, state) -> list:
         rooms = event_rooms(place) if place else None
         if isinstance(rooms, dict):
             return as_json(rooms)
+        if when and str(when).strip() and event_window(when, current) is None:
+            return as_json({"time_not_understood": when, "question": ASK_WHEN, "say": "Ask this question only."})
         events, window = search_events(bm, store, current, query, when, rooms)
         lines = [event_line(bm, fact, current) for fact in events]
         bm.found_facts = events
         result: dict = {"now": f"today {clock_words(current)}", "count": len(lines), "events": lines[:5]}
         if window is not None:
             result["time"] = window.words
-        elif when:
-            result["time_not_understood"] = when
         if rooms:
             space_id = min(rooms)
             result["place"] = room_label(bm, space_id)
