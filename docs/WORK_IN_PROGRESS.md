@@ -162,3 +162,10 @@ Heute bekommt jedes gefundene Gerät (`reply.located` → `setHighlight("found")
 2. **Puls nur zum Ankommen:** 2–3 Mal pulsieren, dann still (danach kein `invalidate()` pro Frame mehr).
 3. **Kein zusätzlich getönter Raum**, wenn das Ziel ohnehin blau ist.
 4. **Schilder nur für wenige:** bei vielen Treffern Namensschilder nur für die nächsten paar (oder beim Antippen), Rest nur eingefärbt; Anzahl im Chat ("60 pallet racks, nearest: …").
+
+## Leonie an Jennifer (Sonntag ~05:20): Standort, Werkzeug-Sätze, Hover
+1. **Nie über Werkzeuge reden (Pflicht):** Wanda antwortete im Chat "I've stopped using Hall access 0.21 as your position … My tools have no way to fully delete a position, so it may still show in the background". So ein Satz darf ein Nutzer nie sehen. Bitte Prompt-Regel: nie über eigene Werkzeuge, IDs oder Grenzen sprechen; stattdessen nachfragen ("Where are you now? Tap the map or tell me a room.").
+2. **Werkzeug "Standort löschen"** für den Agenten (wie `context.here = {clear: true}` der Seite), damit "ich bin nicht mehr da" den Punkt wirklich entfernt.
+3. **Hover-Fehler:** `twin/src/styles.css:28` setzt `.hf-btn:hover` auf weißen Hintergrund, der eingeschaltete Hey-Wanda-Knopf hat aber weißes Symbol → beim Hover unsichtbar. Fix: `.hf-btn.on:hover { background: var(--signal-dark); }`.
+4. **Verschmiertes Ziel-Label** ("Toilet 0.24", "Production zone H-A2"): im DOM nur ein Element, kein text-shadow; die Html-Position hat Bruchteil-Pixel (`matrix(1,0,0,1,625.571,187.695)`), das macht Text in Chrome unscharf. Vorschlag: Position auf ganze Pixel runden (oder `transform: translate3d` mit gerundeten Werten).
+Auf `feat/inspection-round-and-notes` (gepusht): "I'm here" plant eine angezeigte Route vom neuen Standort neu (vorher blieb sie am alten Start), und die Zahlen in der Runden-Auswahl gelten für den gewählten Bereich (Hall A, Etage) statt für das ganze Gebäude. Bitte nach `main` holen.
