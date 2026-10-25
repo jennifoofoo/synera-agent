@@ -9,7 +9,7 @@
     {"id": "S06", "slot": "0:28-0:35", "target_s": 7, "text": "Software knows what. Tracking knows roughly where. Nobody guides you, and nobody keeps what you learned."},
     {"id": "S07", "slot": "0:35-0:38", "target_s": 3, "text": "This is Wanda."},
     {"id": "S08", "slot": "0:38-0:48", "target_s": 10, "text": "Gisela plans her round on the laptop: the shortest order, computed on the building's own plans."},
-    {"id": "S09", "slot": "1:28-1:37", "target_s": 9, "text": "Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays with the company, even when people retire."},
+    {"id": "S09", "slot": "1:28-1:37", "target_s": 9, "text": "Every note lands in the building's knowledge graph: who, where, when, with a photo. It stays, even when people retire."},
     {"id": "S10", "slot": "1:37-1:46", "target_s": 9, "text": "Every fact comes from code, not the language model: routes, rounds, areas, doors. The model only picks the tool and talks."},
     {"id": "S11", "slot": "1:46-1:50", "target_s": 4, "text": "Every answer is computed, so every answer can be checked."},
     {"id": "S12", "slot": "1:50-1:56", "target_s": 6, "text": "It works on any building, even from the evacuation plan on the wall."},
