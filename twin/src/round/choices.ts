@@ -25,6 +25,15 @@ export function areaOptions(floors: Floor[], spaces: Space[]): string[] {
   return ["Whole building", ...[...floors].sort((a, b) => a.level - b.level).map((floor) => floor.name || `Level ${floor.level}`), ...halls.map((hall) => `Hall ${hall}`)];
 }
 
+/** Whether an asset lies in an area choice of the panel ("Whole building", a floor name or "Level n", "Hall A"). */
+export function assetInArea(asset: Asset, area: string, floors: Floor[], spaceName: (id: string) => string): boolean {
+  if (!area || area === "Whole building") return true;
+  const hall = /^Hall ([A-Z])$/.exec(area)?.[1];
+  if (hall) return hallOf(spaceName(asset.space_id)) === hall;
+  const floor = floors.find((candidate) => (candidate.name || `Level ${candidate.level}`) === area);
+  return floor ? asset.floor_id === floor.id : true;
+}
+
 /** Where a round starts when nobody is placed: the room behind the building's first entrance (by room id). */
 export function entranceRoom(openings: Opening[]): string | null {
   const rooms = openings.filter((opening) => opening.kind === "entrance" && opening.space_ids.length).map((opening) => opening.space_ids[0]);

@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { prettyType } from "../model/palette";
 import { useTwin } from "../store";
-import { areaOptions } from "../round/choices";
+import { areaOptions, assetInArea } from "../round/choices";
 import {
   assetLabel,
   cancelDoor,
@@ -38,10 +38,17 @@ export function Round() {
 
   const types = useMemo(() => {
     if (!model) return [];
+    // The count in brackets is for the chosen area (Hall A, a floor), not the whole building; types with none there
+    // drop out of the list, except the one already chosen.
     const counts = new Map<string, number>();
-    for (const asset of model.building.assets) counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
+    const spaceName = (id: string) => model.spaceById.get(id)?.name ?? "";
+    for (const asset of model.building.assets) {
+      if (!assetInArea(asset, round.area, model.building.floors, spaceName)) continue;
+      counts.set(asset.type, (counts.get(asset.type) ?? 0) + 1);
+    }
+    for (const asset of model.building.assets) if (asset.type === round.type && !counts.has(asset.type)) counts.set(asset.type, 0);
     return [...counts.entries()].sort((a, b) => prettyType(a[0]).localeCompare(prettyType(b[0])));
-  }, [model]);
+  }, [model, round.area, round.type]);
   const areas = useMemo(() => (model ? areaOptions(model.building.floors, model.building.spaces) : []), [model]);
 
   if (!model || walking) return null;
