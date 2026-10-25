@@ -143,3 +143,22 @@ def test_panel_fits_phone(seeded, playwright_instance):
         assert page.errors == [], page.errors
     finally:
         browser.close()
+
+
+def test_more_node_expands_as_text_and_labels_are_not_cut(seeded, playwright_instance):
+    url, _, _ = seeded
+    browser, page = open_panel(playwright_instance, url, {"width": 390, "height": 844})
+    try:
+        assert "\u2026" not in page.get_by_test_id("knowledge-svg").text_content()
+        assert page.get_by_test_id("knowledge-more-list").count() == 0
+        more = page.locator("[data-testid=knowledge-svg] g.kg-node.more")
+        dot = more.locator("circle.kg-hit")
+        if more.count():  # one node for the rest, which opens as plain text below the graph
+            dot.click()
+            assert page.get_by_test_id("knowledge-more-list").inner_text().startswith("Also here")
+            dot.click()
+            assert page.get_by_test_id("knowledge-more-list").count() == 0
+        assert page.evaluate("() => document.documentElement.scrollWidth") <= 390
+        assert page.errors == [], page.errors
+    finally:
+        browser.close()
