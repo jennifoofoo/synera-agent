@@ -170,6 +170,16 @@ export function isSpeaking(): boolean {
 const ANSWER_LINE = /^\s*\**\s*Answer:/i;
 const ID_TOKEN = /\s*[([]?`?\b[A-Za-z][\w.]*(?:-[\w.]+){2,}`?[)\]]?/g;
 
+/** Text for display: raw ids such as "Project Room [plan-89323a15-F0-S002]" lose the id ("Project Room"). */
+export function withoutIds(text: string): string {
+  return text
+    .replace(ID_TOKEN, (token) => (/\d/.test(token) ? "" : token))
+    .replace(/\(\s*\)|\[\s*\]/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
 /** The reply without its final "Answer: …" line (also "**Answer:**"). For anything shown or spoken. */
 export function withoutAnswerLine(reply: string): string {
   const lines = reply.trimEnd().split("\n");

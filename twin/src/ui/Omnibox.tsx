@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTwin, walkSteps } from "../store";
-import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, type Listener } from "../voice";
+import { isSpeaking, keepAwake, listen, sharedAudio, speak, speechInputProblem, spokenText, stopSpeaking, withoutIds, type Listener } from "../voice";
 import { startAudioElementLevel, startMicLevel } from "../audioLevel";
 import { cancelFollowUp, followUpAfterSpeech, imHere, pauseHandsFree, setFollowUpPref } from "../handsFree";
 import { parseWake } from "../wake";
@@ -567,7 +567,7 @@ export function Omnibox({ walking = false }: { walking?: boolean }) {
             onClick={walking ? undefined : () => inputRef.current?.focus()}
           >
             {mode === "speaking" && <span className="wb-kicker">Speaking · </span>}
-            <span className="wb-text">{caption}</span>
+            <span className="wb-text">{withoutIds(caption)}</span>
           </div>
           {!walking && (
             <button
