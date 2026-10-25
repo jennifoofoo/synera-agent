@@ -127,3 +127,72 @@ Devices: **iPhone A** = Gisela's phone (screen recording on, Wanda page over the
 - `docs/HANDOVER_URBAN_COLAB_FLOORS.md`: adding the ground-floor west part (E.06) or more floors can add extinguishers and change [N]/[X] and the stop order. Re-read the panel after any building change.
 - Wanda's spoken sentence for the round (number of stops/metres) is phrased by the LLM: do not script it, keep the real audio or mute it under the caption.
 - Laptop and phone are separate sessions: the video says "same round", which is true because both call the same `plan_round`, but it does not claim the laptop plan syncs to the phone.
+
+## 6. Production (one person, a Mac, about 2 hours after the shoot)
+
+**Rule:** all narration is **voiceover**, recorded after the shoot to the final picture. On camera only two kinds of sound: Gisela's short lines to Wanda ("Hey Wanda …", "Done", "Note: …", "Finished") and Wanda's real app voice. Nothing else is spoken on location. Clean means: no ums, no room noise under the VO, no UI clutter, no secrets.
+
+### Toolchain (pick the left column unless you already know the right one)
+
+| Job | Recommended (fast, Mac) | Alternative |
+|---|---|---|
+| Laptop screen recording | macOS screenshot bar (Cmd+Shift+5 → "Record Selected Portion", Options → microphone off) | **Screen Studio** or **Cap** if installed: smooth auto-zoom on clicks makes the 11-s laptop beat look produced; not worth installing under time pressure |
+| Phone screen recording | iPhone Control Centre → Screen Recording, **long-press → Microphone on** (so Gisela's line and Wanda's voice are in the file for sync) | – |
+| Camera | second iPhone, 4K 30 fps, landscape, locked exposure (long-press on the subject) | any camera |
+| Edit, split screen, captions | **CapCut desktop** (free): drag both clips onto two tracks, "Picture in picture" / crop to 50/50, auto-captions → edit → burn in on export | **iMovie** (split screen exists, captions are weak), **DaVinci Resolve** only if someone knows it, **Descript** if you want to edit by deleting words in the transcript |
+| Voiceover | Record: iPhone Voice Memos or QuickTime, a headset/lavalier mic, small quiet room with soft surfaces (no corridor echo) | Generate: **ElevenLabs** (we already use it in the app). Use one narrator voice that is clearly **not** Wanda's app voice (`ELEVENLABS_VOICE_ID`), so the jury can tell narrator and product apart |
+| Captions | CapCut auto-captions, fix names by hand ("Wanda", "Urban Colab", "South Corridor"), white text, dark box, bottom third, at least 5 % of frame height | Descript captions |
+| Music | royalty-free, calm, no vocals (CapCut library, YouTube Audio Library, Pixabay Music), at **−25 to −30 dB** under the VO, ducked further under Wanda's voice | none (fine) |
+| Architecture diagram | **Keynote** with Magic Move (see below), export as 1080p movie | an HTML motion slide (below), screen-recorded |
+
+**Code-based options, honestly:**
+- **Remotion** (render video from React) has official agent skills (`remotion-dev/skills` on GitHub), and community skills exist (e.g. `video-shotcraft`). It could render the split screen, animated captions and the diagram from our own twin components. But it needs a Node project, a render setup and someone who checks frame timing: realistic first result 2–4 hours. **Not before a 13:00 deadline.** Good later for a polished version.
+- **HTML motion slide** for the 10-s diagram beat: one self-contained HTML file with CSS animations (boxes appear, arrows draw, a JSON snippet flashes), opened full screen and screen-recorded. A Claude session can write it in about 15 minutes, no install. Use it only if Keynote is not at hand.
+- Agentic "do the whole edit" repos (OpenMontage etc.) are not worth the setup today.
+
+### Step-by-step plan (times for one person)
+
+| Step | What | Time |
+|---|---|---|
+| 1 | Prep checklist (§4), seed, reset, rehearse twice | 20 min |
+| 2 | Shoot S1–S4, S9 (problem shots, plan photo) | 20 min |
+| 3 | Shoot S6+S7 (round, split screen), 2–3 full takes, sync clap each take | 25 min |
+| 4 | Record S5 (laptop planning), 3 takes | 10 min |
+| 5 | Build the diagram (Keynote or HTML) and the 145 card | 20 min |
+| 6 | AirDrop everything to the Mac, rename (below), pick best takes | 10 min |
+| 7 | Rough cut in CapCut to the storyboard timings, split screen synced on the clap | 25 min |
+| 8 | Record/generate the VO to the rough cut, place it, trim to fit | 15 min |
+| 9 | Captions (auto, then correct), music, levels | 15 min |
+| 10 | Export 1080p, QA (below), upload | 15 min |
+
+Total about 3 h 15 min including the shoot; the edit alone (steps 5–10) is about 1 h 40 min. If short on time: skip music, skip the knowledge-view pan, use one round take.
+
+**File naming** (one folder `video/`, not in git): `S06_round_cam_take2.mov`, `S07_round_phone_take2.mp4`, `S05_laptop_take1.mov`, `VO_problem_v2.m4a`, `DIAG_architecture.mov`, exports `wanda_2min_v1.mp4`, `wanda_2min_FINAL.mp4`.
+
+**Export and upload:** 1920×1080, 30 fps, H.264, about 10–16 Mbit/s, AAC 48 kHz. Upload as **YouTube unlisted** (most reliable playback for the jury) or Loom; open the link in a private window to check it plays without login. One person uploads, agreed in chat.
+
+### Architecture / trust beat: animated diagram (Keynote, 10 s + 8 s)
+
+Slide A (1:32–1:42), white background, one accent colour, builds left to right, one box per beat of the VO:
+1. Microphone icon → box **"Gisela's voice"**
+2. Arrow → box **"Wanda (Claude)"**, small line under it: *"picks a tool, phrases the answer"*
+3. Arrow → stack of three small boxes **"route · round · notes"**, label **"Deterministic tools (Python)"**
+4. Arrow → box **"Building graph"**, sub-line: *"rooms, doors, stairs, lifts, devices"*
+5. Return arrow back to Wanda, labelled **"facts"**; a tiny JSON flashes on it: `{"stops": [N], "total_m": [X]}` (numbers as on the panel)
+6. Title builds last at the top: **"Facts from code. Language from the model."**
+
+Card B (1:42–1:47): big **"145 benchmark answers. All computed by code. Reproducible."**
+
+Slide C (1:47–1:55), Magic Move: the evacuation-plan photo (`demo/plans/urban-colab/photos/E05_ground_floor.jpeg`) shrinks to the left → arrow **"Level 4: plan reading"** → screenshot of the 2D map → 3D twin screenshot. Caption: **"Read from its evacuation plans."**
+
+### Final QA checklist (watch the exported file, not the timeline)
+
+- [ ] Length **≤ 2:00** (check the file's duration in Finder/QuickTime, not the editor).
+- [ ] Product name spelled **"Wanda – the building that talks back"** on the title card and the end card; team names correct.
+- [ ] Audio: VO peaks around −6 dB, no clipping; Wanda's voice understandable; music never louder than speech; no echo or wind.
+- [ ] Captions legible on a phone held at arm's length; no typos in room names (English names only); source line under the 12.9 million number.
+- [ ] Split screen in sync (her lips and the "Done" on the map within a few frames).
+- [ ] Every number on screen matches the panel on shoot day and says which round it is (7 per room / 8 per device).
+- [ ] No secrets, tunnel URLs, terminal with `.env`, personal tabs, notifications, battery warnings, email addresses.
+- [ ] Watched once muted (the story still works) and once with eyes closed (the VO still works).
+- [ ] Link plays in a private window; link pasted into the submission form.
