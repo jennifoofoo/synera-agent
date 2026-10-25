@@ -1,9 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { CampusBack } from "../campus/CampusBack";
 import { useCampus } from "../campus/campusStore";
 import { useTwin } from "../store";
 import { useNewBuilding } from "./newBuildingStore";
 import { usePlannerList } from "./Planner";
+import { buildingLabels } from "./buildingLabels";
 
 /** Top left: the building's name; tapping it changes the building. Nothing else up here. */
 export function TopBar() {
@@ -17,6 +18,7 @@ export function TopBar() {
   // Laptop: the list of rooms and things lives in this menu (Planner.tsx); the phone has no list.
   const listable = useTwin((s) => s.profile === "planner" && !!s.model && !s.draft);
   const site = campusMode === "site" && campus?.loaded;
+  const labels = useMemo(() => buildingLabels(buildings), [buildings]);
   // "new building" typed or spoken in the Omnibox (store.ask): the store cannot import newBuildingStore (cycle)
   useEffect(() => {
     const onNew = () => useNewBuilding.getState().open();
@@ -42,7 +44,7 @@ export function TopBar() {
         >
           {buildings.map((entry) => (
             <option key={entry.key} value={entry.key}>
-              {entry.name} ({entry.key})
+              {labels.get(entry.key) ?? entry.name}
             </option>
           ))}
           {campuses.map((entry) => (
